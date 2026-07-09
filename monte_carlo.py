@@ -31,6 +31,7 @@ from gust_comparison import make_gust_fn
 from sensors import IMUSensor, GPSSensor, SensorSuite
 from ekf_sim import simulate_with_ekf, compute_metrics
 from ekf_comparison import _reset_controller
+from fallback_controller import HybridWithFallback
 
 
 def run_trial(plant, x0_base, trim, trial_seed, V_cruise, z_ref, dt):
@@ -70,16 +71,25 @@ def run_trial(plant, x0_base, trim, trial_seed, V_cruise, z_ref, dt):
     u_trim = trim['control']
     results = {}
 
-    # ── 3제어기 ──
+    # ── 4제어기 ──
+    lqr = ScheduledLQR(P, v_ref=[V_cruise, 0, 0], z_ref=z_ref)
+
     ctrls = {
-        'LQR': ScheduledLQR(P, v_ref=[V_cruise, 0, 0], z_ref=z_ref),
+        'LQR': lqr,
         'NMPC': NMPCController(P, v_ref=[V_cruise, 0, 0], z_ref=z_ref,
                                 u_ref=u_trim, N=20, dt_nmpc=0.05, dt_ctrl=0.02),
     }
-    # Hybrid는 무거우니 매번 새로 생성
+    # Hybrid 단독
     vn = VirtualNMPC(P, v_ref=[V_cruise, 0, 0], z_ref=z_ref,
                       N=20, dt_nmpc=0.05, dt_ctrl=0.02)
     ctrls['Hybrid'] = ProperHybrid(vn, P, dt=dt)
+
+    # Hybrid + LQR 폴백
+    vn2 = VirtualNMPC(P, v_ref=[V_cruise, 0, 0], z_ref=z_ref,
+                       N=20, dt_nmpc=0.05, dt_ctrl=0.02)
+    hybrid2 = ProperHybrid(vn2, P, dt=dt)
+    lqr2 = ScheduledLQR(P, v_ref=[V_cruise, 0, 0], z_ref=z_ref)
+    ctrls['H+Fallback'] = HybridWithFallback(hybrid2, lqr2, z_ref=z_ref, dt=dt)
 
     for name, ctrl in ctrls.items():
         sensors.reset()
@@ -115,13 +125,14 @@ def main():
     x0_base = trim['state'].copy()
     x0_base[2] = z_ref
 
-    names = ['LQR', 'NMPC', 'Hybrid']
+    names = ['LQR', 'NMPC', 'Hybrid', 'H+Fallback']
     all_results = {n: [] for n in names}
 
-    print(f"\n{'='*60}")
-    print(f"  몬테카를로: {N_TRIALS}회 × 3제어기 (RTK, 70 m/s + 돌풍)")
-    print(f"{'='*60}")
+    print(f"\n{'='*70}")
+    print(f"  몬테카를로: {N_TRIALS}회 × 4제어기 (RTK, 70 m/s + 돌풍)")
+    print(f"{'='*70}")
     print(f"  랜덤: 초기조건, IMU바이어스, 돌풍강도/시작시각")
+    print(f"  H+Fallback = Hybrid + LQR 폴백 (이상 감지 시 전환)")
     print()
 
     t_start = timer.time()
@@ -137,11 +148,11 @@ def main():
         if (i + 1) % 10 == 0:
             elapsed = timer.time() - t_start
             eta = elapsed / (i + 1) * (N_TRIALS - i - 1)
-            # 현재까지 평균
             avgs = {n: np.nanmean(all_results[n]) for n in names}
             print(f"  [{i+1:3d}/{N_TRIALS}]  "
                   f"LQR={avgs['LQR']:.4f}  NMPC={avgs['NMPC']:.4f}  "
-                  f"Hybrid={avgs['Hybrid']:.4f}  "
+                  f"Hyb={avgs['Hybrid']:.4f}  "
+                  f"H+F={avgs['H+Fallback']:.4f}  "
                   f"({elapsed:.0f}s, ETA {eta:.0f}s)",
                   flush=True)
 
@@ -192,21 +203,24 @@ def main():
         bar = '#' * int(pct / 2)
         print(f"  {n:>8s}  {pct:5.1f}%  {bar}")
 
-    # Hybrid vs LQR 직접 비교
-    hybrid_wins_vs_lqr = 0
-    head_to_head = 0
+    # H+Fallback vs Hybrid 직접 비교
+    fb_wins = 0
+    fb_total = 0
     for i in range(N_TRIALS):
         h = all_results['Hybrid'][i]
-        l = all_results['LQR'][i]
-        if np.isnan(h) or np.isnan(l):
+        f = all_results['H+Fallback'][i]
+        if np.isnan(h) or np.isnan(f):
+            fb_total += 1
+            if not np.isnan(f):
+                fb_wins += 1  # Hybrid 발산, Fallback 생존 = Fallback 승
             continue
-        head_to_head += 1
-        if h < l:
-            hybrid_wins_vs_lqr += 1
+        fb_total += 1
+        if f < h:
+            fb_wins += 1
 
-    print(f"\n  Hybrid vs LQR 직접 대결: "
-          f"{hybrid_wins_vs_lqr}/{head_to_head} "
-          f"({hybrid_wins_vs_lqr/max(head_to_head,1)*100:.1f}%)")
+    print(f"\n  H+Fallback vs Hybrid: "
+          f"{fb_wins}/{fb_total} "
+          f"({fb_wins/max(fb_total,1)*100:.1f}%)")
 
     print()
 
