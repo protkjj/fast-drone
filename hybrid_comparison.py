@@ -212,6 +212,11 @@ class ProperHybrid:
         self._omega_prev = np.zeros(3)
         self._omega_dot_filt = np.zeros(3)
         self._initialized = False
+        # VirtualNMPC 리셋 (타이밍 + warm start)
+        if hasattr(self.nmpc, '_last_t'):
+            self.nmpc._last_t = -np.inf
+        if hasattr(self.nmpc, '_u_current') and hasattr(self.nmpc, 'u_ref'):
+            self.nmpc._u_current = self.nmpc.u_ref.copy()
 
     def __call__(self, t, x):
         # 1. NMPC: 가상 명령
@@ -247,18 +252,7 @@ class ProperHybrid:
         return np.clip(n_actual + dn, self.p['n_min'], self.p['n_max'])
 
     def _compute_G(self, n):
-        G = np.zeros((4, 4))
-        pos, dirs = self.p['rotor_positions'], self.p['rotor_directions']
-        k_T, k_Q = self.p['k_T'], self.p['k_Q']
-        Jx, Jy, Jz = self.p['Ixx'], self.p['Iyy'], self.p['Izz']
-        for i in range(4):
-            ni = max(n[i], 1.0)
-            dT = 2*k_T*ni
-            G[0,i] = dT
-            G[1,i] = -pos[i,1]*dT/Jx
-            G[2,i] = pos[i,0]*dT/Jy
-            G[3,i] = dirs[i]*2*k_Q*ni/Jz
-        return G
+        return compute_control_effectiveness(self.p, n)
 
     def _fallback(self, T_cmd, omega_dot_des):
         J = np.diag([self.p['Ixx'], self.p['Iyy'], self.p['Izz']])
@@ -273,6 +267,26 @@ class ProperHybrid:
 # ══════════════════════════════════════════════════
 # 4. NaiveHybrid (이전 버전, 비교용)
 # ══════════════════════════════════════════════════
+
+def compute_control_effectiveness(params, n_actual):
+    """
+    제어 효과 행렬 G(4×4): ∂[T, ω̇]/∂n.
+
+    ProperHybrid와 NaiveHybrid 공통 사용.
+    """
+    G = np.zeros((4, 4))
+    pos, dirs = params['rotor_positions'], params['rotor_directions']
+    k_T, k_Q = params['k_T'], params['k_Q']
+    Jx, Jy, Jz = params['Ixx'], params['Iyy'], params['Izz']
+    for i in range(4):
+        ni = max(n_actual[i], 1.0)
+        dT = 2 * k_T * ni
+        G[0, i] = dT
+        G[1, i] = -pos[i, 1] * dT / Jx
+        G[2, i] = pos[i, 0] * dT / Jy
+        G[3, i] = dirs[i] * 2 * k_Q * ni / Jz
+    return G
+
 
 class NaiveHybrid:
     """나이브 NMPC+INDI: 모터속도 위에 INDI 보정 얹음 → 이중 보정."""
@@ -300,7 +314,7 @@ class NaiveHybrid:
         self._omega_dot_filt = self._alpha*raw + (1-self._alpha)*self._omega_dot_filt
         self._omega_prev = omega.copy()
         d = omega_dot_pred - self._omega_dot_filt
-        G = ProperHybrid._compute_G(self, n_actual)
+        G = compute_control_effectiveness(self.p, n_actual)
         dv = np.array([0.0, d[0], d[1], d[2]])
         try:
             dn = np.linalg.solve(G, dv)

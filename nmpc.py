@@ -230,7 +230,10 @@ def run_nmpc_comparison():
     # 30 m/s 기준 게인 (PID/LQR)
     trim_30 = find_trim(P, 30.0)
     pid_base_gains = True   # 30 m/s 게인 고정
-    K_fixed = LQRController(P, trim_30['state'], trim_30['control']).K.copy()
+    lqr_30 = LQRController(P, trim_30['state'], trim_30['control'])
+    K_fixed = lqr_30.K.copy()
+    K_r_fixed = lqr_30.K_r.copy()
+    n_reduced = lqr_30.n_reduced
 
     results = []
 
@@ -264,6 +267,8 @@ def run_nmpc_comparison():
         lqr = LQRController.__new__(LQRController)
         lqr.p = P
         lqr.K = K_fixed
+        lqr.K_r = K_r_fixed
+        lqr.n_reduced = n_reduced
         lqr.valid = True
         lqr.x_trim = x_trim.copy()
         lqr.u_trim = u_trim.copy()

@@ -187,47 +187,52 @@ class ESKF:
         self.bias_acc += dx[9:12]
         self.bias_gyro += dx[12:15]
 
-    def update_accel(self, acc_body, R_acc=3.0):
+    def update_accel(self, acc_body, R_acc=2.0):
         """
         가속도계 기반 자세(roll/pitch) 업데이트.
 
         원리:
-          호버나 등속비행 시, 가속도계는 주로 중력을 측정:
-            a_body ≈ R^T @ [0, 0, g]
-          이 값을 명목 자세에서 예측한 값과 비교하면
-          roll/pitch 오차를 보정할 수 있음.
+          가속도계는 비력(specific force) = 중력 + 동적가속도를 측정.
+          등속 비행 시 비력 ≈ R^T @ g → 중력 방향으로 자세 보정.
 
-        주의:
-          급기동 시에는 가속도가 중력만이 아니므로
-          R_acc를 크게 해서 신뢰도를 낮춤.
+        동적가속도 분리가 안 되는 이유:
+          IMU가 유일한 동적가속도 소스 → 같은 데이터로 빼면 순환 논리.
+          대신 적응적 가중치로 기동 시 신뢰도를 낮춤.
+
+        적응 전략 (2가지 게이팅):
+          1. |a| 게이팅: |비력| ≈ g이면 신뢰 ↑ (중력만 측정)
+          2. |ω| 게이팅: 각속도 작으면 신뢰 ↑ (회전 안 함 = 정상상태)
+          → 둘 다 만족할 때만 강한 보정, 기동 중엔 자동으로 약해짐.
 
         Parameters
         ----------
         acc_body : array(3)
             가속도계 측정 (비력) [m/s²].
         R_acc : float
-            가속도 측정 노이즈 표준편차 [m/s²].
-            클수록 업데이트가 약해짐 (급기동 시 키울 것).
+            기본 측정 노이즈 표준편차 [m/s²].
         """
         R = Rotation.from_quat(self.q).as_matrix()
-
-        # 명목 상태에서 예상되는 가속도계 읽기 (= R^T @ g)
         g_body_expected = R.T @ np.array([0, 0, self.g])
 
-        # 바이어스 보정된 측정
         acc_corrected = acc_body - self.bias_acc
 
-        # 급기동 감지: 비력 크기가 g에서 벗어나면 신뢰도 감소
+        # ── 적응적 가중치 (이중 게이팅) ──
+        # 게이트 1: 비력 크기. |a| ≈ g이면 중력 위주 → 신뢰
         acc_mag = np.linalg.norm(acc_corrected)
-        deviation = abs(acc_mag - self.g) / self.g
-        # deviation 0 = 중력만 = 높은 신뢰, deviation > 0.3 = 급기동 = 낮은 신뢰
-        adaptive_R = R_acc * (1.0 + 10.0 * deviation)
+        mag_deviation = abs(acc_mag - self.g) / self.g   # 0 = 완벽, 1 = 2g
+
+        # 게이트 2: 각속도 크기. 회전 없으면 정상상태 → 신뢰
+        omega_mag = np.linalg.norm(self._last_gyro_corrected) \
+                    if hasattr(self, '_last_gyro_corrected') else 0.0
+
+        # R_acc 스케일링: 두 게이트가 클수록 R 증가 (신뢰↓)
+        # mag_deviation > 0.3 또는 omega > 1 rad/s면 거의 무시
+        scale = 1.0 + 20.0 * mag_deviation**2 + 5.0 * omega_mag**2
+        adaptive_R = R_acc * scale
 
         innovation = acc_corrected - g_body_expected
 
         # 야코비안: h(x) = R^T·g + b_a
-        # ∂h/∂δθ = [R^T·g]×  (자세 오차 → 중력 방향 변화)
-        # ∂h/∂δb_a = +I      (바이어스 오차 → 측정 예측 증가)
         H = np.zeros((3, self.DIM_ERR))
         H[:, 6:9] = _skew(g_body_expected)
         H[:, 9:12] = np.eye(3)
@@ -290,6 +295,9 @@ class ESKF:
 
         # 관성 가속도 = R @ 비력(동체) + 중력
         acc_inertial = R @ acc_corrected + self.g_vec
+
+        # 동적가속도 저장 (update_accel에서 중력 분리에 사용)
+        self._last_acc_inertial = acc_inertial.copy()
 
         self.pos = self.pos + self.vel * dt + 0.5 * acc_inertial * dt**2
         self.vel = self.vel + acc_inertial * dt
