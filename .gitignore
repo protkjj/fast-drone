@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# ROS2 빌드 산출물
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# acados 생성 파일
+c_generated_code/
+acados_ocp_*.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 환경
+.env
+*.swp
+*.swo
