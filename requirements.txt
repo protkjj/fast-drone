@@ -1,0 +1,12 @@
+# 고속 ISR 드론 제어 시뮬 — Python 의존성
+# 설치: pip install -r requirements.txt
+# 검증 환경: Python 3.12.3 (Ubuntu 24.04)
+
+numpy>=1.26
+scipy>=1.11
+casadi>=3.6      # 6-DOF 동역학 + NMPC
+matplotlib>=3.8  # mission_sim.py 시각화
+
+# 선택(고급, 실시간 NMPC): acados
+#   pip 로 안 되고 별도 소스 빌드 필요 → SETUP.md "acados(선택)" 참고
+#   없어도 mission_sim.py / 모든 파이썬 시뮬은 정상 동작

@@ -38,7 +38,6 @@ from px4_msgs.msg import (
     VehicleOdometry,
     VehicleStatus,
     ActuatorMotors,
-    VehicleAngularVelocity,
 )
 
 from .frame_utils import (
@@ -55,10 +54,11 @@ from .safety import SafetyGuard
 # QoS 프로파일 (PX4 micro-XRCE-DDS 호환)
 # ════════════════════════════════════════════════════
 
-# PX4 토픽은 "best effort" + "transient local" 조합 사용
+# PX4 uXRCE-DDS out 토픽은 best_effort + volatile.
+# (구 TRANSIENT_LOCAL 구독은 volatile 발행과 QoS 불일치로 데이터 미수신됨)
 _px4_qos = QoSProfile(
     reliability=ReliabilityPolicy.BEST_EFFORT,
-    durability=DurabilityPolicy.TRANSIENT_LOCAL,
+    durability=DurabilityPolicy.VOLATILE,
     history=HistoryPolicy.KEEP_LAST,
     depth=1,
 )
@@ -144,11 +144,10 @@ class OffboardController(Node):
             VehicleOdometry, '/fmu/out/vehicle_odometry',
             self._odom_callback, _px4_qos)
         self.create_subscription(
-            VehicleStatus, '/fmu/out/vehicle_status',
+            VehicleStatus, '/fmu/out/vehicle_status_v4',
             self._status_callback, _px4_qos)
-        self.create_subscription(
-            VehicleAngularVelocity, '/fmu/out/vehicle_angular_velocity',
-            self._gyro_callback, _px4_qos)
+        # 각속도는 VehicleOdometry.angular_velocity(body FRD)에서 취득
+        # (v1.18 SITL DDS 토픽에 vehicle_angular_velocity 미포함)
 
         # ── 제어 타이머 ──
         self._timer = self.create_timer(self.dt, self._control_loop)
@@ -164,16 +163,14 @@ class OffboardController(Node):
         self._pos_ned = np.array(msg.position, dtype=float)
         self._vel_ned = np.array(msg.velocity, dtype=float)
         self._q_ned_sf = np.array(msg.q, dtype=float)
+        # 동체 각속도(FRD) — 별도 VehicleAngularVelocity 대신 odom에서 취득
+        self._omega_body = np.array(msg.angular_velocity, dtype=float)
 
         if not self._state_valid:
             self._state_valid = True
             self.get_logger().info(
                 f'첫 상태 수신! pos_ned={self._pos_ned}'
             )
-
-    def _gyro_callback(self, msg: VehicleAngularVelocity):
-        """VehicleAngularVelocity 수신 → 동체 각속도."""
-        self._omega_body = np.array(msg.xyz, dtype=float)
 
     def _status_callback(self, msg: VehicleStatus):
         """VehicleStatus 수신 → arming 상태 추적."""
@@ -316,12 +313,14 @@ class OffboardController(Node):
         msg = OffboardControlMode()
         msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
         # 모든 상위 레벨 비활성, 직접 액추에이터만 활성
+        # (PX4 v1.18: 필드명 actuator → direct_actuator, thrust_and_torque 추가)
         msg.position = False
         msg.velocity = False
         msg.acceleration = False
         msg.attitude = False
         msg.body_rate = False
-        msg.actuator = True
+        msg.thrust_and_torque = False
+        msg.direct_actuator = True
         self.pub_offboard_mode.publish(msg)
 
     def _publish_motors(self, motor_speeds):
@@ -333,10 +332,11 @@ class OffboardController(Node):
 
         # 모터 매핑 (우리 r1~r4 → PX4 motor 1~4)
         # 커스텀 에어프레임에서 매핑을 일치시키므로 순서 동일
+        n_ch = len(msg.control)  # PX4 버전별 채널 수 (v1.15=16, v1.18=12)
         for i in range(4):
             msg.control[i] = float(normalized[i])
         # 나머지 채널 NaN (미사용)
-        for i in range(4, 16):
+        for i in range(4, n_ch):
             msg.control[i] = float('nan')
 
         self.pub_actuator.publish(msg)
@@ -365,6 +365,27 @@ class OffboardController(Node):
         msg.source_component = 1
         msg.from_external = True
         self.pub_vehicle_cmd.publish(msg)
+
+    def shutdown_disarm(self):
+        """
+        노드 종료 시 기체를 안전하게 disarm.
+
+        Ctrl+C로 노드만 죽으면 PX4는 armed 상태를 유지해 모터가 계속 돈다.
+        종료 직전 모터 정지 + disarm 명령을 보내고 DDS로 전송되도록 잠깐 spin.
+        (force 미사용: 비행 중이면 PX4가 거부 → offboard-loss failsafe에 위임)
+        """
+        try:
+            self._publish_zero_motors()
+            self._send_vehicle_command(
+                VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM,
+                param1=0.0,   # 0 = DISARM
+            )
+            # 명령이 실제 송신되도록 잠깐 스핀 (약 0.2초)
+            for _ in range(10):
+                rclpy.spin_once(self, timeout_sec=0.02)
+            self.get_logger().info('종료 시 disarm 명령 전송 완료')
+        except Exception as e:
+            self.get_logger().warn(f'종료 disarm 실패: {e}')
 
     # ════════════════════════════════════════════════
     # 제어기 생성
@@ -437,8 +458,11 @@ def main(args=None):
     except KeyboardInterrupt:
         node.get_logger().info('종료 요청 (Ctrl+C)')
     finally:
+        # 종료 시 기체 disarm (모터 계속 도는 것 방지)
+        node.shutdown_disarm()
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

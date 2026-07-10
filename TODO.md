@@ -1,6 +1,6 @@
 # 고속 정찰 드론 제어 — TODO / 다음 단계
 
-> 현재 상태: 파이썬 시뮬 **EKF 포함 전 시나리오 검증 완료**
+> 현재 상태: 파이썬 시뮬 검증 완료 + **Ubuntu에 PX4 SITL + Gazebo 스택 기동 성공 (2026-07-10)**
 > 최종 목표: **실기 비행** (시뮬 충분히 거친 후)
 > 확정: **RTK GPS + ProperHybrid** (5개 시나리오 전부 1위)
 
@@ -38,18 +38,27 @@
 - 안전장치 (safety.py) — NaN/변화율/자세/고도 5중 보호
 - Ubuntu 세팅 스크립트 (scripts/setup_ubuntu.sh)
 
+### Ubuntu 실환경 구축 (Phase 0 + Phase 1) ★ 신규 완료 (2026-07-10)
+- **검증 환경**: Ubuntu 24.04.4 / ROS2 Jazzy / Gazebo Harmonic(gz-sim 8.11) / micro-XRCE-DDS
+- PX4-Autopilot 클론 + 의존성 설치 + `make px4_sitl gz_x500` 빌드 성공
+- Python 의존성 정리: requirements.txt(시뮬용) + PX4 Tools/setup/requirements.txt 설치
+- **SITL + Gazebo 기동 확인**: x500 드론 로드, Gazebo GUI 표시
+- **micro-XRCE-DDS Agent(8888) ↔ PX4 연결 확인**: 토픽/publisher 생성 성공
+- 팀원 온보딩 문서 작성: **SETUP.md** (Ubuntu→Python→PX4 SITL 전 과정)
+- 결정: **Docker 미사용** (사용자 3~4명, 네이티브 스택이 이미 검증됨)
+
 ---
 
 ## 📋 TODO (우선순위 순)
 
-### [1] ROS/Gazebo 환경 세팅 ★ 다음 1순위
-**목적**: 실기 경로 본격 진입. 파이썬 시뮬은 충분히 끝남.
+### [1] ROS/Gazebo 환경 세팅 — ✅ 완료 (2026-07-10)
+~~Phase 0/1 완료~~. 위 "Ubuntu 실환경 구축" 참고. 남은 세부 작업:
 
-- Phase 0: Ubuntu 24.04 + ROS2 Jazzy + PX4 + micro-XRCE-DDS + Gazebo Harmonic
-- Phase 1: 기본 쿼드(x500)로 SITL 통신 확인 (**커스텀 기체 전에!**)
-- ⚠️ 버전 짝 확정 먼저: ROS2 Jazzy↔Ubuntu 24.04↔Gazebo Harmonic
-- ⚠️ micro-XRCE-DDS가 자주 말썽 → 안 붙으면 버전부터 의심
-- 세팅 스크립트(scripts/setup_ubuntu.sh) + 실행 도우미(scripts/run_sitl.sh) 이미 작성됨
+- ✅ ROS2 토픽 흐름 확인 (/fmu/out/* 수신, QoS=best_effort, v1.18은 토픽명 `_v1` 접미사)
+- ✅ **ROS2 워크스페이스 빌드** — px4_msgs(main) + px4_ros_com + fast_drone_ctrl colcon 성공
+- ✅ x500 이착륙 full cycle 검증 — 이륙→2.5m 호버→착륙→자동 disarm
+  - 헤드리스(QGC 없이 ROS2)에선 arm 차단됨 → `NAV_RCL_ACT=0` 등 파라미터로 해결
+  - 팀원은 콘솔+QGC 정상 방식이면 파라미터 불필요 → 문서화 생략 결정
 
 ### [2] Gazebo 커스텀 통합
 **⚠️ 숨은 대형 작업 두 개:**
