@@ -36,7 +36,7 @@ class HybridWithFallback:
     """
 
     def __init__(self, hybrid_ctrl, lqr_ctrl, z_ref=50.0,
-                 z_err_limit=5.0, var_window=50, var_limit=1e5,
+                 z_err_limit=2.0, var_window=50, var_limit=5e4,
                  cooldown_sec=2.0, min_hybrid_sec=1.0, dt=0.001):
         """
         Parameters
@@ -126,12 +126,22 @@ class HybridWithFallback:
         if np.any(np.isnan(u)) or np.any(np.isinf(u)):
             return True
 
-        # 2. 고도 오차 과대
+        # 2. 출력 범위 이상: 모터 명령이 음수이거나 n_max를 크게 초과
+        #    정상 범위를 벗어난 출력 = NMPC/INDI가 발산 중
+        if np.any(u < -100) or np.any(u > 2500):
+            return True
+
+        # 3. 고도 오차 과대
         z_err = abs(x[2] - self.z_ref)
         if z_err > self.z_err_limit:
             return True
 
-        # 3. 모터 명령 진동 (분산 기반)
+        # 4. 속도 이상: 목표 70 m/s인데 속도가 비정상적으로 벗어남
+        vel_mag = np.linalg.norm(x[3:6])
+        if vel_mag > 150.0:  # 150 m/s 이상 = 확실히 비정상
+            return True
+
+        # 5. 모터 명령 진동 (분산 기반, 짧은 윈도우)
         self._cmd_history.append(u.copy())
         if len(self._cmd_history) > self.var_window:
             self._cmd_history.pop(0)
