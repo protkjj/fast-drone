@@ -125,8 +125,11 @@ class SafetyGuard:
             u = self._check_state(u, state)
 
         # ── 최종 기록 ──
+        # rate limiter 연속성: _last_valid_u는 매 스텝 실제 출력으로 전진해야 함.
+        # (WARNING일 때 갱신 안 하면 초기 hover값에 고착 → 출력이 576±max_delta에
+        #  갇혀 모터 차동=자세제어 불가 → 서서히 전복. 반드시 항상 갱신.)
+        self._last_valid_u = u.copy()
         if self.level == SafetyLevel.NOMINAL:
-            self._last_valid_u = u.copy()
             self._watchdog_count = 0
 
         return u

@@ -76,6 +76,10 @@ class OffboardController(Node):
             -p z_ref:=50.0
     """
 
+    # 우리 로터 순서(r0=FR,r1=FL,r2=RL,r3=RR) → gz motorNumber 매핑.
+    # gz motor1↔2가 우리와 뒤바뀌어 있어 1,2 스왑. MOTOR_MAP[gz]=our_r.
+    MOTOR_MAP = (0, 2, 1, 3)
+
     def __init__(self):
         super().__init__('offboard_controller')
 
@@ -330,11 +334,16 @@ class OffboardController(Node):
 
         normalized = motor_speed_to_normalized(motor_speeds, self.n_max)
 
-        # 모터 매핑 (우리 r1~r4 → PX4 motor 1~4)
-        # 커스텀 에어프레임에서 매핑을 일치시키므로 순서 동일
+        # 모터 매핑: 우리 dynamics.py 로터 순서(r0=FR,r1=FL,r2=RL,r3=RR)를
+        # gz 모델 motorNumber(0=FR,1=RL,2=FL,3=RR)에 맞춤.
+        # → gz motor1↔2가 우리 r1↔2와 뒤바뀌어 있어 스왑 필요.
+        #   MOTOR_MAP[gz] = our_r : gz모터 gz에 우리 r번 명령을 넣음
+        #   (스핀도 x500 위상과 동일해 이 스왑으로 위치·요 모두 정합)
+        #   ※ 만약 요(yaw)만 반대로 돌면 gz 모델 turningDirection 4개 반전.
+        MOTOR_MAP = self.MOTOR_MAP
         n_ch = len(msg.control)  # PX4 버전별 채널 수 (v1.15=16, v1.18=12)
-        for i in range(4):
-            msg.control[i] = float(normalized[i])
+        for gz in range(4):
+            msg.control[gz] = float(normalized[MOTOR_MAP[gz]])
         # 나머지 채널 NaN (미사용)
         for i in range(4, n_ch):
             msg.control[i] = float('nan')
