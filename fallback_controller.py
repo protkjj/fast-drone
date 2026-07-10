@@ -118,18 +118,18 @@ class HybridWithFallback:
 
     def _check_fallback(self, u, x):
         """폴백 필요 여부 판단."""
-        # 채터링 방지: 복귀 직후엔 전환하지 않음
-        if self._steps_since_switch < self.min_hybrid_steps and self._switch_count > 0:
-            return False
-
-        # 1. NaN/Inf
+        # ── 무조건 검사 (채터링 가드보다 우선) ──
+        # NaN/Inf나 극단 출력은 복귀 직후라도 즉시 폴백해야 안전
         if np.any(np.isnan(u)) or np.any(np.isinf(u)):
             return True
 
-        # 2. 출력 범위 이상: 모터 명령이 음수이거나 n_max를 크게 초과
-        #    정상 범위를 벗어난 출력 = NMPC/INDI가 발산 중
         if np.any(u < -100) or np.any(u > 2500):
             return True
+
+        # ── 채터링 방지: 복귀 직후엔 나머지 검사 건너뜀 ──
+        if self._steps_since_switch < self.min_hybrid_steps and self._switch_count > 0:
+            self._steps_since_switch += 1
+            return False
 
         # 3. 고도 오차 과대
         z_err = abs(x[2] - self.z_ref)

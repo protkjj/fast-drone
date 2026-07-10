@@ -19,6 +19,7 @@ VirtualNMPC:
 import numpy as np
 import casadi as ca
 import time as timer
+from scipy.spatial.transform import Rotation
 
 from vehicle_params import vehicle_params as P
 from dynamics import (build_dynamics, _quat_to_rotmat, _quat_derivative,
@@ -102,6 +103,14 @@ class VirtualNMPC:
         self._build_nlp(params, x_sym, u_sym)
         self._last_t = -np.inf
         self._u_current = self.u_ref.copy()
+        # _w0_init는 _build_nlp()에서 설정됨
+
+    def reset(self):
+        """MC 시행 간 독립성 보장을 위한 완전 리셋."""
+        self._last_t = -np.inf
+        self._u_current = self.u_ref.copy()
+        if self._w0_init is not None:
+            self.w0 = self._w0_init.copy()
 
     def _build_nlp(self, params, x_sym, u_sym):
         N, nx, nu = self.N, NX_V, NU_V
@@ -164,6 +173,7 @@ class VirtualNMPC:
         self.lbg = np.array(lbg)
         self.ubg = np.array(ubg)
         self.w0 = np.array(w0)
+        self._w0_init = self.w0.copy()
 
     def __call__(self, t, x_full):
         """17D 플랜트 상태 → 13D 추출 → [T, ν_ω] 반환."""
@@ -212,11 +222,9 @@ class ProperHybrid:
         self._omega_prev = np.zeros(3)
         self._omega_dot_filt = np.zeros(3)
         self._initialized = False
-        # VirtualNMPC 리셋 (타이밍 + warm start)
-        if hasattr(self.nmpc, '_last_t'):
-            self.nmpc._last_t = -np.inf
-        if hasattr(self.nmpc, '_u_current') and hasattr(self.nmpc, 'u_ref'):
-            self.nmpc._u_current = self.nmpc.u_ref.copy()
+        # VirtualNMPC 완전 리셋 (타이밍 + warm start + w0)
+        if hasattr(self.nmpc, 'reset'):
+            self.nmpc.reset()
 
     def __call__(self, t, x):
         # 1. NMPC: 가상 명령
@@ -237,13 +245,27 @@ class ProperHybrid:
         self._omega_prev = omega.copy()
 
         # 3. INDI: [T,ω̇]_cmd vs [T,ω̇]_meas → Δn
-        T_meas = np.sum(self.p['k_T'] * n_actual**2)
+        # v_body 계산 (전진비 반영)
+        q = x[6:10]
+        R = Rotation.from_quat(q).as_matrix()
+        v_body = R.T @ x[3:6]
+        V_axial = max(-v_body[2], 0.0)
+
+        # 전진비 보정된 추력 측정
+        T_meas = 0.0
+        for i in range(4):
+            ni = n_actual[i]
+            n_rps = ni / (2 * np.pi)
+            J = V_axial / (n_rps * self.p['D_prop'] + 1e-8)
+            fac = max(1.0 - J / self.p['J_max'], 0.0)
+            T_meas += self.p['k_T'] * ni**2 * fac
+
         dv = np.array([T_cmd - T_meas,
                        omega_dot_des[0] - self._omega_dot_filt[0],
                        omega_dot_des[1] - self._omega_dot_filt[1],
                        omega_dot_des[2] - self._omega_dot_filt[2]])
 
-        G = self._compute_G(n_actual)
+        G = self._compute_G(n_actual, v_body)
         try:
             dn = np.linalg.solve(G, dv)
         except np.linalg.LinAlgError:
@@ -251,8 +273,8 @@ class ProperHybrid:
 
         return np.clip(n_actual + dn, self.p['n_min'], self.p['n_max'])
 
-    def _compute_G(self, n):
-        return compute_control_effectiveness(self.p, n)
+    def _compute_G(self, n, v_body=None):
+        return compute_control_effectiveness(self.p, n, v_body)
 
     def _fallback(self, T_cmd, omega_dot_des):
         J = np.diag([self.p['Ixx'], self.p['Iyy'], self.p['Izz']])
@@ -268,23 +290,61 @@ class ProperHybrid:
 # 4. NaiveHybrid (이전 버전, 비교용)
 # ══════════════════════════════════════════════════
 
-def compute_control_effectiveness(params, n_actual):
+def compute_control_effectiveness(params, n_actual, v_body=None):
     """
     제어 효과 행렬 G(4×4): ∂[T, ω̇]/∂n.
 
-    ProperHybrid와 NaiveHybrid 공통 사용.
+    전진비(advance ratio) 반영:
+      동역학에서 T = k_T * n^2 * fac,  fac = max(1 - J/J_max, 0)
+      → dT/dn = k_T * n * (1 + fac)
+
+      fac = 1 (호버): dT/dn = 2*k_T*n (기존과 동일)
+      fac < 1 (전진비 큼): dT/dn 감소 → INDI가 추력 변화를 정확히 계산
+
+    왜 중요한가:
+      감속 중 드론이 30도 틸트 → V_axial ≈ 25 m/s → fac ≈ 0.63
+      기존: dT/dn을 38% 과대평가 → 모터 under-command → 고도 추락
+      수정: 정확한 dT/dn → 모터 정확 제어 → 고도 안정
+
+    Parameters
+    ----------
+    v_body : array(3) or None
+        동체 프레임 속도. None이면 fac=1 (호버 가정).
     """
     G = np.zeros((4, 4))
     pos, dirs = params['rotor_positions'], params['rotor_directions']
     k_T, k_Q = params['k_T'], params['k_Q']
     Jx, Jy, Jz = params['Ixx'], params['Iyy'], params['Izz']
+    D = params['D_prop']
+    J_max = params['J_max']
+
+    # V_axial: 로터 추력축(body -z) 방향 유입 속도
+    if v_body is not None:
+        V_axial = max(-v_body[2], 0.0)
+    else:
+        V_axial = 0.0
+
     for i in range(4):
         ni = max(n_actual[i], 1.0)
-        dT = 2 * k_T * ni
+
+        # 전진비 → 추력 감소 팩터
+        if V_axial > 0:
+            n_rps = ni / (2 * np.pi)
+            J = V_axial / (n_rps * D + 1e-8)
+            fac = max(1.0 - J / J_max, 0.0)
+        else:
+            fac = 1.0
+
+        # dT/dn = k_T * n * (1 + fac)  (해석적 미분)
+        # fac=1: 2*k_T*n (기존), fac=0.63: 1.63*k_T*n (감소)
+        dT = k_T * ni * (1.0 + fac)
+        dQ = k_Q * ni * (1.0 + fac)
+
         G[0, i] = dT
         G[1, i] = -pos[i, 1] * dT / Jx
         G[2, i] = pos[i, 0] * dT / Jy
-        G[3, i] = dirs[i] * 2 * k_Q * ni / Jz
+        G[3, i] = dirs[i] * dQ / Jz
+
     return G
 
 

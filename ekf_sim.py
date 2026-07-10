@@ -100,7 +100,9 @@ def simulate_with_ekf(plant, controller, x0, T,
         # 매 스텝은 너무 빈번 → 기동 중 오보정 위험
         if sensor_data.gps_valid:
             eskf.update_accel(sensor_data.acc_body)
-            eskf.update_gps(sensor_data.gps_pos, sensor_data.gps_vel)
+            eskf.update_gps(sensor_data.gps_pos, sensor_data.gps_vel,
+                            R_pos=sensors.gps.noise_pos,
+                            R_vel=sensors.gps.noise_vel)
 
         # ── 5. 추정 상태 추출 ──
         x_hat = eskf.get_state()

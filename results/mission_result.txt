@@ -1,0 +1,348 @@
+
+======================================================================
+  전 비행구간 통합 시뮬레이션 (돌풍 포함)
+  이륙 -> 가속 -> 순항(+돌풍) -> 감속 -> 호버링
+======================================================================
+
+      구간          시간     v_x [m/s]       z [m]        최대가속
+  ────────────────────────────────────────────────────────
+      이륙     0~  10s             0     2 -> 50  7.5 m/s2(z)
+     안정화    10~  13s             0          50           -
+      가속    13~  28s       0 -> 70          50    7.3 m/s2
+      순항    28~  43s            70          50           -
+      감속    43~  58s       70 -> 0          50    7.3 m/s2
+     호버링    58~  65s             0          50           -
+
+  총 시뮬 시간: 65초
+
+  돌풍: 수직 10 m/s, t=35~36s (순항 중)
+
+[준비] 제어기 생성...
+  ScheduledLQR: 9/9 속도점 유효
+
+======================================================================
+  [1] 단일 미션 시뮬레이션 (돌풍 포함)
+======================================================================
+
+  LQR 시뮬 시작... 완료 [12.3s]  RMSE: vx=16.779, z=4.437
+
+  Hybrid 시뮬 시작... 완료 [84.8s]  RMSE: vx=1.883, z=1.752
+
+  NMPC 시뮬 시작... /Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 51060 (\N{HANGUL SYLLABLE I}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 47449 (\N{HANGUL SYLLABLE RYUG}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 50504 (\N{HANGUL SYLLABLE AN}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 51221 (\N{HANGUL SYLLABLE JEONG}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 54868 (\N{HANGUL SYLLABLE HWA}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 44032 (\N{HANGUL SYLLABLE GA}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 49549 (\N{HANGUL SYLLABLE SOG}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 49692 (\N{HANGUL SYLLABLE SUN}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 54637 (\N{HANGUL SYLLABLE HANG}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 44048 (\N{HANGUL SYLLABLE GAM}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 54840 (\N{HANGUL SYLLABLE HO}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 48260 (\N{HANGUL SYLLABLE BEO}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 47553 (\N{HANGUL SYLLABLE RING}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 44592 (\N{HANGUL SYLLABLE GI}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 51456 (\N{HANGUL SYLLABLE JUN}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 46028 (\N{HANGUL SYLLABLE DOL}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 54413 (\N{HANGUL SYLLABLE PUNG}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 51060 (\N{HANGUL SYLLABLE I}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 47449 (\N{HANGUL SYLLABLE RYUG}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 50504 (\N{HANGUL SYLLABLE AN}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 51221 (\N{HANGUL SYLLABLE JEONG}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 54868 (\N{HANGUL SYLLABLE HWA}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 44032 (\N{HANGUL SYLLABLE GA}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 49549 (\N{HANGUL SYLLABLE SOG}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 49692 (\N{HANGUL SYLLABLE SUN}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 54637 (\N{HANGUL SYLLABLE HANG}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 44048 (\N{HANGUL SYLLABLE GAM}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 54840 (\N{HANGUL SYLLABLE HO}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 48260 (\N{HANGUL SYLLABLE BEO}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 47553 (\N{HANGUL SYLLABLE RING}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 44592 (\N{HANGUL SYLLABLE GI}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 51456 (\N{HANGUL SYLLABLE JUN}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 46028 (\N{HANGUL SYLLABLE DOL}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 54413 (\N{HANGUL SYLLABLE PUNG}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+완료 [165.1s]  RMSE: vx=3.730, z=2.804
+
+  [저장] results/mission_plot.png
+
+  RMSE v_x [m/s]
+      구간         LQR      Hybrid        NMPC
+  ────────────────────────────────────────────
+      이륙      0.1668      0.0040      0.1408
+     안정화      0.1111      0.0001      0.0054
+      가속     18.4377      1.9572      5.9422
+      순항     16.3950      0.0161      3.2823
+      감속     24.4054      3.3960      3.7665
+     호버링      5.7876      0.0142      0.0486
+      전체     16.7791      1.8829      3.7298
+
+  RMSE z [m]
+      구간         LQR      Hybrid        NMPC
+  ────────────────────────────────────────────
+      이륙      9.8889      4.0746      5.7851
+     안정화      2.1614      0.4350      0.4776
+      가속      0.4424      0.2942      2.8963
+      순항      0.2620      0.0344      1.7553
+      감속      2.0993      1.4507      0.4951
+     호버링      5.5753      0.0080      0.0134
+      전체      4.4368      1.7518      2.8041
+
+  최대 Dz [m]
+      구간         LQR      Hybrid        NMPC
+  ────────────────────────────────────────────
+      이륙     14.0495      5.7477      8.2043
+     안정화      5.2211      1.2627      1.5849
+      가속      0.6459      0.4543      5.3440
+      순항      0.5212      0.1457      4.6451
+      감속      5.4261      4.9977      1.1395
+     호버링      9.7396      0.0350      0.0584
+      전체     14.0495      5.7477      8.2043
+
+======================================================================
+  구간 전환 + 돌풍 응답
+======================================================================
+
+  이륙 상승 (t=0~11s)
+       제어기     최대Dvx      최대Dz      최종vx       최종z
+  ────────────────────────────────────────────
+       LQR     0.277    14.050     -0.13     48.04
+    Hybrid     0.009     5.748      0.00     49.69
+      NMPC     0.335     8.204     -0.00     50.02
+
+  가속 시작 (t=13~18s)
+       제어기     최대Dvx      최대Dz      최종vx       최종z
+  ────────────────────────────────────────────
+       LQR     7.942     0.313      9.56     49.81
+    Hybrid     2.258     0.252     15.24     50.25
+      NMPC     3.994     0.388     13.51     49.61
+
+  순항 진입 (t=26~30s)
+       제어기     최대Dvx      최대Dz      최종vx       최종z
+  ────────────────────────────────────────────
+       LQR    28.433     0.602     47.90     49.60
+    Hybrid     1.600     0.227     70.00     49.98
+      NMPC     7.524     5.344     65.99     47.76
+
+  돌풍 응답 (t=35~39s)
+       제어기     최대Dvx      최대Dz      최종vx       최종z
+  ────────────────────────────────────────────
+       LQR    15.226     0.371     58.02     49.90
+    Hybrid     0.059     0.146     70.00     49.98
+      NMPC     3.130     1.340     67.21     48.92
+
+  감속 시작 (t=43~48s)
+       제어기     최대Dvx      최대Dz      최종vx       최종z
+  ────────────────────────────────────────────
+       LQR     9.250     0.104     61.57     49.97
+    Hybrid     4.851     2.540     56.08     47.46
+      NMPC     8.427     1.140     58.43     49.57
+
+  호버 진입 (t=56~61s)
+       제어기     최대Dvx      최대Dz      최종vx       최종z
+  ────────────────────────────────────────────
+       LQR    34.817     9.740     -0.56     42.17
+    Hybrid     1.269     0.166      0.00     50.00
+      NMPC     2.084     0.289     -0.03     50.00
+
+======================================================================
+  최종 상태 (t=65초) -- 기준: v=0, z=50m
+======================================================================
+
+       제어기       v_x       v_z         z       |v|
+  ──────────────────────────────────────
+       LQR    -0.087     0.413    49.906     0.422
+    Hybrid     0.000    -0.000    50.000     0.000
+      NMPC     0.000     0.000    50.000     0.000
+
+  전체 RMSE z 순위:
+    1. Hybrid: 1.7518 m *
+    2. NMPC: 2.8041 m
+    3. LQR: 4.4368 m
+
+======================================================================
+  [2] 몬테카를로 (10회)
+  랜덤: 초기조건(z,vx,vz) + 돌풍(강도 5~15 m/s, 시각 랜덤)
+  LQR ~5초/회, Hybrid ~50초/회
+======================================================================
+
+  LQR 몬테카를로 (10회)...
+
+    [1/10] z=4.426      
+    [2/10] z=4.462      
+    [3/10] z=4.416      
+    [4/10] z=4.433      
+    [5/10] z=4.406      
+    [6/10] z=4.449      
+    [7/10] z=4.433      
+    [8/10] z=4.445      
+    [9/10] z=4.424      
+    [10/10] z=4.445      
+  완료 [124.8s]
+
+  Hybrid 몬테카를로 (10회)...
+
+    [1/10] z=1.651      
+    [2/10] z=2.518      
+    [3/10] z=1.850      
+    [4/10] z=1.709      
+    [5/10] z=1.915      
+    [6/10] z=1.657      
+    [7/10] z=1.756      
+    [8/10] z=2.822      
+    [9/10] z=1.777      
+    [10/10] z=1.631      
+  완료 [941.7s]
+
+======================================================================
+  몬테카를로 결과 (N=10)
+======================================================================
+
+       LQR  (10/10 성공)
+    RMSE z:  평균=4.434  std=0.016  최소=4.406  최대=4.462
+    RMSE vx: 평균=16.774  std=0.048  최소=16.673  최대=16.817
+    돌풍강도-RMSE z 상관: r=-0.90
+
+    Hybrid  (10/10 성공)
+    RMSE z:  평균=1.929  std=0.386  최소=1.631  최대=2.822
+    RMSE vx: 평균=1.959  std=0.549  최소=1.477  최대=3.360
+    돌풍강도-RMSE z 상관: r=-0.39
+
+  Hybrid vs LQR:
+    평균 RMSE z: Hybrid 1.929 vs LQR 4.434 (+56.5%)
+    Hybrid 최악: 2.822  vs  LQR 최선: 4.406
+    => Hybrid 최악 < LQR 최선: 통계적 우위 확실
+
+======================================================================
+  [3] RTK EKF 미션 (RTK GPS sigma=0.02m)
+  센서노이즈 하에서 제어기 성능 재검증
+======================================================================
+
+  LQR+RTK EKF... 완료 [19.9s]  RMSE: vx=16.779, z=4.437
+
+  Hybrid+RTK EKF... /Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 51060 (\N{HANGUL SYLLABLE I}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 47449 (\N{HANGUL SYLLABLE RYUG}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 50504 (\N{HANGUL SYLLABLE AN}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 51221 (\N{HANGUL SYLLABLE JEONG}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 54868 (\N{HANGUL SYLLABLE HWA}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 44032 (\N{HANGUL SYLLABLE GA}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 49549 (\N{HANGUL SYLLABLE SOG}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 49692 (\N{HANGUL SYLLABLE SUN}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 54637 (\N{HANGUL SYLLABLE HANG}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 44048 (\N{HANGUL SYLLABLE GAM}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 54840 (\N{HANGUL SYLLABLE HO}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 48260 (\N{HANGUL SYLLABLE BEO}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 47553 (\N{HANGUL SYLLABLE RING}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 44592 (\N{HANGUL SYLLABLE GI}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 51456 (\N{HANGUL SYLLABLE JUN}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 46028 (\N{HANGUL SYLLABLE DOL}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:533: UserWarning: Glyph 54413 (\N{HANGUL SYLLABLE PUNG}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 51060 (\N{HANGUL SYLLABLE I}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 47449 (\N{HANGUL SYLLABLE RYUG}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 50504 (\N{HANGUL SYLLABLE AN}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 51221 (\N{HANGUL SYLLABLE JEONG}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 54868 (\N{HANGUL SYLLABLE HWA}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 44032 (\N{HANGUL SYLLABLE GA}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 49549 (\N{HANGUL SYLLABLE SOG}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 49692 (\N{HANGUL SYLLABLE SUN}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 54637 (\N{HANGUL SYLLABLE HANG}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 44048 (\N{HANGUL SYLLABLE GAM}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 54840 (\N{HANGUL SYLLABLE HO}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 48260 (\N{HANGUL SYLLABLE BEO}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 47553 (\N{HANGUL SYLLABLE RING}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 44592 (\N{HANGUL SYLLABLE GI}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 51456 (\N{HANGUL SYLLABLE JUN}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 46028 (\N{HANGUL SYLLABLE DOL}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+/Users/kj/Desktop/dynamic/fast_drone/mission_sim.py:534: UserWarning: Glyph 54413 (\N{HANGUL SYLLABLE PUNG}) missing from font(s) DejaVu Sans.
+  plt.savefig(save_path, dpi=150, bbox_inches='tight')
+완료 [107.2s]  RMSE: vx=1.612, z=1.670
+
+  참값 vs RTK EKF 비교 (RMSE z)
+       제어기        참값   RTK EKF       저하율
+  ────────────────────────────────────
+       LQR     4.437     4.437     -0.0%
+    Hybrid     1.752     1.670     -4.7%
+
+  RTK EKF — RMSE z [m]
+      구간         LQR      Hybrid
+  ────────────────────────────────
+      이륙      9.8909      4.0754
+     안정화      2.1628      0.4369
+      가속      0.4419      0.2821
+      순항      0.2562      0.4635
+      감속      2.0976      0.8272
+     호버링      5.5707      0.0093
+      전체      4.4367      1.6703
+
+  [저장] results/mission_ekf_plot.png
+
+======================================================================
+  완료!
+======================================================================

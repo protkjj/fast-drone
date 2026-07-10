@@ -68,8 +68,9 @@ def make_controllers(V_cruise, z_ref, dt, x_trim, u_trim):
     ctrls['INDI'] = INDIController(
         P, v_ref=[V_cruise, 0, 0], z_ref=z_ref, dt=dt)
 
+    T_trim = float(np.sum(P['k_T'] * u_trim**2))
     vnmpc = VirtualNMPC(
-        P, v_ref=[V_cruise, 0, 0], z_ref=z_ref,
+        P, v_ref=[V_cruise, 0, 0], z_ref=z_ref, T_ref=T_trim,
         N=20, dt_nmpc=0.05, dt_ctrl=0.02)
     ctrls['Hybrid'] = ProperHybrid(vnmpc, P, dt=dt)
 

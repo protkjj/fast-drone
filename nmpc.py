@@ -66,6 +66,14 @@ class NMPCController:
         # 상태
         self._last_t = -np.inf
         self._u_current = self.u_ref.copy()
+        # _w0_init는 _build_nlp()에서 설정됨
+
+    def reset(self):
+        """MC 시행 간 독립성 보장을 위한 완전 리셋."""
+        self._last_t = -np.inf
+        self._u_current = self.u_ref.copy()
+        if self._w0_init is not None:
+            self.w0 = self._w0_init.copy()
 
     def _build_rk4(self, f, x_sym, u_sym):
         """예측용 RK4 한 스텝 함수."""
@@ -168,6 +176,7 @@ class NMPCController:
         self.lbg = np.array(lbg, dtype=float)
         self.ubg = np.array(ubg, dtype=float)
         self.w0  = np.array(w0, dtype=float)
+        self._w0_init = self.w0.copy()
 
     def __call__(self, t, x):
         """dt_ctrl 주기마다 NLP를 풀고 첫 제어 반환."""
