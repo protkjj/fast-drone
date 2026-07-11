@@ -30,3 +30,6 @@ Thumbs.db
 
 # Python venv
 .venv/
+
+# SITL 실행 로그/아티팩트 (scripts/sitl_run.sh 출력)
+results/sitl_runs/

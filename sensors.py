@@ -81,6 +81,7 @@ class IMUSensor:
         seed : int or None
             난수 시드 (재현성).
         """
+        self._seed = seed
         self.rng = np.random.default_rng(seed)
         self.noise_acc = noise_acc
         self.noise_gyro = noise_gyro
@@ -95,6 +96,10 @@ class IMUSensor:
             self.bias_gyro = np.array(bias_gyro, dtype=float)
         else:
             self.bias_gyro = self.rng.normal(0, 0.005, 3)  # ~0.005 rad/s
+
+    def reset(self):
+        """RNG 재시드 (제어기 간 동일 노이즈 실현 = 공정 비교). 바이어스는 유지."""
+        self.rng = np.random.default_rng(self._seed)
 
     def measure(self, x_true, acc_inertial, g=9.81):
         """
@@ -170,6 +175,7 @@ class GPSSensor:
         noise_vel : float
             속도 노이즈 표준편차 [m/s].
         """
+        self._seed = seed
         self.rng = np.random.default_rng(seed)
         self.noise_pos = noise_pos
         self.noise_vel = noise_vel
@@ -201,6 +207,7 @@ class GPSSensor:
 
     def reset(self):
         self._step_count = 0
+        self.rng = np.random.default_rng(self._seed)   # 재시드: 제어기 간 동일 노이즈(공정 비교)
 
 
 class SensorSuite:
@@ -250,6 +257,7 @@ class SensorSuite:
         return data
 
     def reset(self):
+        self.imu.reset()   # IMU RNG도 재시드 (기존엔 GPS만 리셋 → 제어기 비교 불공정)
         self.gps.reset()
 
 

@@ -194,7 +194,11 @@ def compute_phase_metrics(result, profile):
         mask = (ts >= t_start) & (ts < t_end)
         if not np.any(mask):
             continue
-        if np.any(np.isnan(xs[mask])):
+        _seg = xs[mask]
+        _z_dev = np.nanmax(np.abs(_seg[:, 2] - z_refs[mask])) if len(_seg) else 0.0
+        # 발산 판정: NaN/비유한 또는 고도가 참조에서 >50m 이탈
+        # (유한하지만 튄 궤적을 '성공'으로 집계하지 않도록; hybrid_comparison |z-z_ref|>50 기준과 일치)
+        if (not np.all(np.isfinite(_seg))) or _z_dev > 50.0:
             metrics.append({'name': name, 'diverged': True,
                             'rmse_vx': np.inf, 'rmse_z': np.inf,
                             'max_vx_err': np.inf, 'max_z_err': np.inf})

@@ -608,7 +608,18 @@ class INDIController:
         self._omega_prev = omega.copy()
 
         # ━━ 4. INDI 증분 ━━
-        T_meas = np.sum(self.p['k_T'] * n_actual**2)
+        # 전진비(advance ratio) 반영 — 버그픽스 3-1을 standalone INDI에도 적용.
+        # (수직상승/이륙 등 축방향 유입 V_axial>0 이면 fac<1 → 추력·자세효과 과대평가 방지.
+        #  ProperHybrid.compute_control_effectiveness와 동일 규칙.)
+        v_body = R.T @ vel
+        V_axial = max(-v_body[2], 0.0)
+        T_meas = 0.0
+        for i in range(4):
+            ni = n_actual[i]
+            n_rps = ni / (2 * np.pi)
+            Jadv = V_axial / (n_rps * self.p['D_prop'] + 1e-8)
+            fac = max(1.0 - Jadv / self.p['J_max'], 0.0)
+            T_meas += self.p['k_T'] * ni**2 * fac
 
         # 가상 제어 오차: [추력, 각가속도] 기대 - 측정
         dv = np.array([T_cmd - T_meas,
@@ -616,8 +627,8 @@ class INDIController:
                        omega_dot_des[1] - self._omega_dot_filt[1],
                        omega_dot_des[2] - self._omega_dot_filt[2]])
 
-        # G: 현재 로터 속도에서의 제어 효과 (4×4)
-        G = self._compute_G(n_actual)
+        # G: 현재 로터 속도에서의 제어 효과 (4×4, 전진비 반영)
+        G = self._compute_G(n_actual, v_body)
 
         try:
             dn = np.linalg.solve(G, dv)
@@ -627,28 +638,36 @@ class INDIController:
         n_cmd = n_actual + dn
         return np.clip(n_cmd, self.p['n_min'], self.p['n_max'])
 
-    def _compute_G(self, n_actual):
+    def _compute_G(self, n_actual, v_body=None):
         """
-        제어 효과 행렬 G(4×4): ∂[T_total, ω̇]/∂n.
+        제어 효과 행렬 G(4×4): ∂[T_total, ω̇]/∂n. (전진비 반영, 버그픽스 3-1)
 
-        행 0: ∂T/∂ni = 2·k_T·ni
-        행 1: ∂ω̇_x/∂ni = (-r_y·2·k_T·ni) / Ixx
-        행 2: ∂ω̇_y/∂ni = (r_x·2·k_T·ni) / Iyy
-        행 3: ∂ω̇_z/∂ni = (dir·2·k_Q·ni) / Izz
+        전진비 fac = max(1 - J/J_max, 0),  J = V_axial/(n_rps·D)
+          dT/dn = k_T·n·(1+fac),  dQ/dn = k_Q·n·(1+fac)
+          fac=1(호버): 2·k_T·n (기존과 동일)
+        v_body=None이면 fac=1 (호버 가정) → 하위호환.
         """
         G = np.zeros((4, 4))
         pos = self.p['rotor_positions']
         dirs = self.p['rotor_directions']
         k_T, k_Q = self.p['k_T'], self.p['k_Q']
         Jxx, Jyy, Jzz = self.p['Ixx'], self.p['Iyy'], self.p['Izz']
+        D, J_max = self.p['D_prop'], self.p['J_max']
+        V_axial = max(-v_body[2], 0.0) if v_body is not None else 0.0
 
         for i in range(4):
             ni = max(n_actual[i], 1.0)           # 0 방지
-            dT = 2 * k_T * ni                    # ∂T_i/∂n_i
+            if V_axial > 0:
+                n_rps = ni / (2 * np.pi)
+                Jadv = V_axial / (n_rps * D + 1e-8)
+                fac = max(1.0 - Jadv / J_max, 0.0)
+            else:
+                fac = 1.0
+            dT = k_T * ni * (1.0 + fac)          # ∂T_i/∂n_i (전진비 반영)
             G[0, i] = dT
             G[1, i] = -pos[i, 1] * dT / Jxx     # r_y × (-T) 모멘트
             G[2, i] = pos[i, 0] * dT / Jyy      # r_x × T 모멘트
-            G[3, i] = dirs[i] * 2 * k_Q * ni / Jzz  # 반토크
+            G[3, i] = dirs[i] * k_Q * ni * (1.0 + fac) / Jzz  # 반토크
 
         return G
 

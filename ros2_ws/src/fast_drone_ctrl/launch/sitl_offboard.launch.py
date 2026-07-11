@@ -24,6 +24,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -61,12 +62,15 @@ def generate_launch_description():
             name='offboard_controller',
             output='screen',
             parameters=[{
+                # 노드가 double로 선언한 파라미터는 ParameterValue(value_type=float)로
+                # 감싸야 launch의 문자열 substitution이 타입 불일치 예외 없이 전달됨.
                 'controller_type': LaunchConfiguration('controller_type'),
-                'v_ref_x': LaunchConfiguration('v_ref_x'),
-                'v_ref_y': LaunchConfiguration('v_ref_y'),
-                'v_ref_z': LaunchConfiguration('v_ref_z'),
-                'z_ref': LaunchConfiguration('z_ref'),
-                'control_rate_hz': LaunchConfiguration('control_rate_hz'),
+                'v_ref_x': ParameterValue(LaunchConfiguration('v_ref_x'), value_type=float),
+                'v_ref_y': ParameterValue(LaunchConfiguration('v_ref_y'), value_type=float),
+                'v_ref_z': ParameterValue(LaunchConfiguration('v_ref_z'), value_type=float),
+                'z_ref': ParameterValue(LaunchConfiguration('z_ref'), value_type=float),
+                'control_rate_hz': ParameterValue(
+                    LaunchConfiguration('control_rate_hz'), value_type=float),
                 'n_max': 1800.0,
                 'arm_delay_sec': 2.0,
             }],

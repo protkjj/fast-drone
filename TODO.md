@@ -47,6 +47,34 @@
 - 팀원 온보딩 문서 작성: **SETUP.md** (Ubuntu→Python→PX4 SITL 전 과정)
 - 결정: **Docker 미사용** (사용자 3~4명, 네이티브 스택이 이미 검증됨)
 
+### 커스텀 기체 fast_missile SITL 호버 성공 ★ 신규 완료 (2026-07-11)
+- 커스텀 기체 `fast_missile{,_base}` (질량 8kg, 관성 0.02/0.70/0.70, 4100 에어프레임)
+- **arm 직후 전복 문제 해결 → 30초+ 안정 호버 (PID, z=5m)**
+- 전복 원인 = **모터맵/스핀/부호가 아님** (전부 실측 정상). 진짜 원인 2가지:
+  1. **heading 미초기화** (기체 yaw≈−96° 스폰인데 CascadedPID가 절대 0° 목표) → heading 래치
+  2. **자세게인 과대** (EKF omega 노이즈 증폭 → 진동 발산) → `att_gain_scale=0.35`
+- 진단 방법: 단일모터/순수축 오픈루프 test(플랜트 검증) + 오프라인 파이썬 노이즈 재현
+- 상세: HANDOFF.md "✅ 해결 (2026-07-11)" + 메모리 sitl-hover-flip-rootcause
+
+### [1b] 제어기 노드 연결·강건화 + Hybrid 연결 ★ 신규 (2026-07-12)
+- **노드 기능 추가** (offboard_node.py):
+  - `att_gain_scale`(기본 0.35)를 **컨트롤러별 일반화** — pid(Kp/Kd), **lqr(K_r δφ·δω 열)**, indi(Kp/Kd_indi)
+  - **LQR heading 재선형화** (`_relatch_lqr_heading`): 스폰 기수로 트림 재선형화 → δφ 오차 1.49→0 (프레임 정합)
+  - **`hybrid` case 추가** — ProperHybrid(VirtualNMPC+INDI) 노드 연결. SITL 실시간용 `dt_ctrl=0.1(10Hz)/max_iter=5`
+  - ProperHybrid INDI **ω̇를 실측 Δt로 계산**(하드코딩 dt 제거) → 가변 루프율 강건
+- **SITL 결과(호버 z=5)**: PID 안정 ✓ / LQR·INDI·Hybrid **전부 롤(omega_x) 발산 → 전복**
+  - heading 래치·게인축소·타이밍픽스로 개선(더 오래 버팀)됐으나 근본 미해결
+  - ⚠️ **오프라인 모델(dynamics.py)로는 이 발산이 재현 안 됨**(너무 이상적: 무노이즈·무지연·무접촉).
+    → **컨트롤러 튜닝은 Gazebo-in-the-loop로만 가능** (오프라인은 로드/버그 사전검증용)
+
+### [1b-후속] 🔴 롤 불안정 + 장축 X/Z 결정 (LQR/Hybrid SITL의 블로커)
+- **증상**: PID 외 3개 컨트롤러 전부 **롤축(Ixx=0.02, 피치/요의 1/35)**에서 폭발
+- **후보 원인**: Ixx=0.02가 롤을 초민감하게 만듦. 단 **관성만 스왑 불가** —
+  현재 공력(S_ref=코단면, C_A0 유선형)이 **장축=X(수평 미사일)** 가정이라 300km/h 성립.
+  장축=Z(수직)로 보면 공력 전체 재정의 필요 + 300km/h 불가.
+  → **장축 X vs Z는 공력+관성+외형을 함께 정하는 미해결 설계질문** (아래 [2]와 직결)
+- 다음 세션: 이 결정을 먼저 확정한 뒤 그에 맞춰 관성/공력 정합 → 재시험
+
 ---
 
 ## 📋 TODO (우선순위 순)
@@ -84,6 +112,31 @@
 - NMPC를 궤적추종(trajectory-tracking)으로 개선 (천이 성능)
 - 학습 기반 (RL/잔차)
 - Isaac Sim (RL 대량학습 필요 시에만)
+
+---
+
+## 🐛 코드 리뷰 결과 (2026-07-12, 4중 병렬 리뷰)
+
+**총평**: arm-즉시-크래시급 치명 버그 없음 (제어기 수학·ESKF·좌표변환·모터맵·호버추력 전부 정합).
+
+### ✅ 이번에 수정함
+1. **INDI 전진비 누락** (controller.py `_compute_G`/`T_meas`) — 버그픽스 3-1이 ProperHybrid엔 있었으나
+   노드가 쓰는 standalone INDIController엔 빠져 있었음. `dT/dn=k_T·n·(1+fac)`로 통일 (하위호환 v_body=None→fac=1)
+2. **센서 RNG 미재시드** (sensors.py) — GPS/IMU `reset()`에서 `self.rng`를 저장seed로 재시드. 이제 제어기 간
+   동일 노이즈 실현 = 공정 비교 (기존엔 "표준GPS LQR 역전" 결론이 노이즈 뽑기 운일 수 있었음).
+   ※ 비교 루프는 **첫 제어기 전에도 reset() 호출** 필요(첫 vs 나머지 스트림 위치 일치).
+3. **NMPC 무효 쿼터니언 초기추측** (nmpc.py) — `[0,0,0,0]`→`[1,0,0,0]` (첫 solve 반복 낭비 방지)
+4. **mission_sim 발산판정** — NaN만 보던 것을 `|z-z_ref|>50m`도 발산 처리 (튄 궤적을 성공으로 집계 방지)
+5. **launch 파라미터 타입** — `ParameterValue(..., value_type=float)` 래핑 (ros2 launch 경로 타입불일치 예방)
+
+### ⏳ 이월 (설계결정/위험/저영향)
+- **PX4 에어프레임 CA_ROTOR/KM가 x500 값** (4100_gz_fast_missile) — offboard direct-actuator엔 무해,
+  단 offboard-loss failsafe 등 PX4 네이티브 복구가 잘못된 믹서로 비행 → 실기 전 수정 필요
+- **관성텐서 vs 외형 vs 공력 축 불일치** (Ixx 장축=X vs 외형 세로미사일=Z) → 위 [1b-후속]/[2]에서 결정
+- rotor_directions가 gz SDF turningDirection과 전부 반대부호(호버 성공=상쇄된 듯) — 건드리지 말 것(검증 후)
+- att_gain_scale는 scheduled_pid엔 무효(노드가 경고) — 그 모드 쓰면 전복 재현 위험
+- ESKF predict/update 1스텝(1ms) 지연 / fallback vel_mag 데드코드 — 무시가능
+- safety 레이트리미터 pre-arm desync — 이륙 무해(재현 확인)
 
 ---
 

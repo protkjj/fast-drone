@@ -127,7 +127,9 @@ class NMPCController:
             w.append(X_k)
             lbw += [-1e6] * nx
             ubw += [1e6] * nx
-            w0  += [0.0] * nx
+            _xg = [0.0] * nx
+            _xg[6:10] = [1.0, 0.0, 0.0, 0.0]   # 유효 단위 쿼터니언(호버) — 무효 [0,0,0,0] 초기추측 방지
+            w0  += _xg
 
             # 동역학 제약: X_k = F(X_prev, U_k)
             X_pred = self.F(X_prev, U_k)

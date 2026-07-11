@@ -253,3 +253,27 @@ ros2 topic echo /fmu/out/vehicle_odometry --once
 3. **Phase 3**: 실기체 (RTK GPS + 컴패니언 컴퓨터 + acados RTI)
 
 자세한 로드맵: `HANDOFF.md`, `TODO.md`
+
+---
+
+## SITL 원커맨드 실행 (`scripts/sitl_run.sh`)
+
+여러 터미널을 수동으로 띄우는 대신, agent → PX4 SITL → offboard_node 를 **한 명령**으로 순서
+기동(각 단계 준비 완료를 폴링 확인)하고 로그 수집 + 종료 시 안전 정리한다.
+
+```bash
+# 기본: pid, z_ref=5m, 30초, GUI (이륙→호버 검증됨)
+./scripts/sitl_run.sh
+
+# 옵션: 제어기/고도/시간/헤드리스
+./scripts/sitl_run.sh -c lqr -z 10 -d 20
+./scripts/sitl_run.sh -c hybrid --headless
+./scripts/sitl_run.sh --build            # Desktop 소스→px4_drone 배포 후 colcon build
+
+# 플래그: -c 제어기 / -z 고도 / -x 전진속도 / -g att_gain_scale / -d 시간 / --headless / --build / --no-tmux
+```
+
+- 로그: `results/sitl_runs/<timestamp>/{agent,px4,node}.log` (노드 [DIAG]/[안전] 포함, gitignore됨)
+- tmux 있으면 3-pane 라이브 뷰, 없으면 백그라운드+로그. Ctrl+C 또는 시간초과 시 node→px4→gz→agent 순 정리.
+- 재실행 안전(idempotent): 시작 시 이전 stale 프로세스·8888 포트 먼저 정리.
+- 전제: PX4=`~/px4_drone/PX4-Autopilot`, 빌드된 ROS2 워크스페이스=`~/px4_drone/ros2_ws`.

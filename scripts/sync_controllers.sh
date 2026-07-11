@@ -19,7 +19,7 @@ DST="$ROOT/ros2_ws/src/fast_drone_ctrl/fast_drone_ctrl/controllers"
 
 # offboard_node.py가 필요로 하는 모듈들
 # (Hybrid 실기 도입 시 hybrid_comparison 추가)
-MODULES="controller vehicle_params dynamics trim nmpc fallback_controller"
+MODULES="controller vehicle_params dynamics trim nmpc fallback_controller hybrid_comparison"
 
 mkdir -p "$DST"
 touch "$DST/__init__.py"
