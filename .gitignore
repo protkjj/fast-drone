@@ -33,3 +33,6 @@ Thumbs.db
 
 # SITL 실행 로그/아티팩트 (scripts/sitl_run.sh 출력)
 results/sitl_runs/
+
+# Gazebo SDF (Ubuntu PX4 폴더에 원본 있음, 여기는 임시 복사본)
+*.sdf
