@@ -1,0 +1,41 @@
+# bench_accel_experiments.py 실행 결과 (2026-08-04, macOS Apple Silicon)
+# (qpOASES 라이선스 배너와 반복 경고 메시지는 [...]로 축약. 원 출력은 재실행으로 재현 가능)
+
+[A] RK4 스텝 함수 평가: CasADi VM vs JIT(clang -O2)
+  JIT 컴파일(RK4 1스텝): 2.03 s
+  단건 호출: VM   14.69 us | JIT   13.70 us |  1.1x
+  map(1000): VM    1.81 us | JIT    0.18 us | 커널 10.3x  (파이썬 호출 오버헤드 제거판)
+
+[기준] IPOPT (동일 NLP, 실험 스크립트 재구성판)
+  ipopt max_iter=30: warm 중앙값   20.7 ms | p95   45.9 ms
+  # bench_compute.py의 VirtualNMPC 20.6ms와 일치 → NLP 재구성 검증됨
+
+[B] sqpmethod(max_iter=1) + qpOASES — RTI 흉내
+  [... qpOASES 배너, "Maximum number of iterations reached" 반복 ...]
+  sqpmethod convexify+qpoases: warm 중앙값 3190.2 ms | p95 6792.7 ms
+    vs ipopt 해: |Δu| 중앙값 66.427 (u 크기 ~136.2 대비 48.8%)
+  [... "Indefinite Hessian detected", "No regularity of sensitivities", NaN/Inf 경고 반복 ...]
+  sqpmethod plain+qpoases: warm 중앙값    0.7 ms | p95  215.0 ms
+    vs ipopt 해: |Δu| 중앙값 71.563 (u 크기 ~136.2 대비 52.5%)
+    # 주의: 0.7ms는 "빠른 성공"이 아니라 QP 실패 후 조기 반환이 다수 섞인 수치 (신뢰 불가)
+  sqpmethod convexify+osqp: warm 중앙값    5.6 ms | p95   10.4 ms
+    vs ipopt 해: |Δu| 중앙값 1371705233.762 (해 발산 — 완전 실패)
+
+[C] IPOPT + jit=True (NLP 전체 C 컴파일)
+  컴파일 시간: 76.9 s
+  ipopt+jit max_iter=30: warm 중앙값    7.7 ms | p95   18.3 ms
+  속도향상: 2.68x (vs 기준 20.7 ms)
+
+# ── 핵심 해석 ──
+# [A] 커널만 보면 codegen이 10.3x. 단건 호출에서 1.1x인 이유는 파이썬 호출
+#     오버헤드(~13us)가 지배하기 때문 → "어디서 시간을 쓰는지"에 따라 이득이 갈림.
+# [B] CasADi sqpmethod로 "가난한 RTI"는 이 문제에서 실패.
+#     원인: sqpmethod는 exact Hessian 사용 → 우리 NLP의 라그랑지안 Hessian이
+#     부정정칙(indefinite) → qpOASES는 워킹셋 폭주(3.2s), OSQP는 발산.
+#     convexify(regularize)를 켜도 고유값 분해 비용으로 오히려 느려짐.
+#     진짜 RTI는 Gauss-Newton Hessian(항상 PSD) + OCP 구조 활용 QP(HPIPM)가
+#     전제 = acados가 그 조합. DIY로는 안 된다는 실측 근거.
+# [C] jit 2.68x는 [A]의 커널 10.3x × 함수평가 비중 71%의 Amdahl 예측(~2.8x)과 일치.
+#     남은 시간은 IPOPT 내부 선형대수(MUMPS) — codegen으로는 안 줄어드는 부분.
+#     실용 결론: 'jit': True 옵션 하나로 VirtualNMPC 7.7ms → 오프라인 50Hz 여유,
+#     단 프로세스 시작마다 77s 컴파일 비용 (캐시하려면 generate()+external() 필요).

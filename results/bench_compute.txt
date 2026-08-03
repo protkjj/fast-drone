@@ -1,0 +1,47 @@
+# bench_compute.py 실행 결과 (2026-08-04, macOS Apple Silicon)
+# 주의: 수치는 이 머신 기준. Ubuntu/SITL 머신·컴패니언 컴퓨터에서는 재실행 필요.
+
+platform: macOS-26.5.1-arm64-arm-64bit-Mach-O / arm64
+python 3.13.7, casadi 3.7.2, numpy 2.3.3
+
+[startup 비용 (1회성)]
+  AxialDronePlant build:             0.44 s
+  find_trim(70) (플랜트 재빌드 포함):   0.01 s
+  LQRController build (선형화+ARE):    0.03 s
+  ScheduledLQR: 9/9 속도점 유효
+  ScheduledLQR build (9x 트림+ARE):    0.09 s
+
+[per-call 비용]  (시뮬 1kHz 루프 예산 = 1000 us/step)
+  plant.step (RK4 1ms)                           67.8 us
+  CascadedPID.__call__                           87.7 us
+  LQRController.__call__                         11.8 us
+  ScheduledLQR.__call__ (np.interp 77회)         115.8 us
+  INDIController.__call__                        90.3 us
+  ProperHybrid INDI-경로 (NMPC 캐시시)                27.3 us
+
+[NMPC 솔브 시간]  (오프라인 예산 20ms, SITL 예산 100ms)
+  NMPC 17D N=20 max_iter=30 (오프라인 설정)
+    cold   251.3 ms | warm 중앙값   41.3 ms | p95   50.5 ms | iter 중앙값 5 | 함수평가 비중 78%
+  VirtualNMPC 13D N=20 max_iter=30 (오프라인 설정)
+    cold   128.6 ms | warm 중앙값   20.6 ms | p95   29.6 ms | iter 중앙값 5 | 함수평가 비중 71%
+  VirtualNMPC 13D N=20 max_iter=5 (SITL 설정)
+    cold    24.6 ms | warm 중앙값   21.4 ms | p95   28.1 ms | iter 중앙값 5 | 함수평가 비중 69%
+  VirtualNMPC 13D N=10 dt=0.1 (지평선 1s 유지)
+    cold    36.6 ms | warm 중앙값   11.0 ms | p95   11.5 ms | iter 중앙값 5 | 함수평가 비중 65%
+
+[미션 시뮬 스루풋]  1 시뮬-초당 벽시계 (1kHz: 플랜트+제어기, NMPC 50Hz)
+  PID                   0.16 s/시뮬-초  (실시간의   0.2배 소요)
+  ScheduledLQR          0.18 s/시뮬-초  (실시간의   0.2배 소요)
+  INDI                  0.16 s/시뮬-초  (실시간의   0.2배 소요)
+  Hybrid (50Hz솔브)       1.12 s/시뮬-초  (실시간의   1.1배 소요)
+  NMPC17D (50Hz)        2.13 s/시뮬-초  (실시간의   2.1배 소요)
+
+  65초 미션 1회(Hybrid) 추정: 1.2 분  /  MC 10회: 12 분
+
+# ── 핵심 해석 ──
+# 1. Hybrid의 빠른 루프(INDI 경로)는 27us — 1kHz 예산의 2.7%. 아키텍처 의도대로 초경량.
+# 2. VirtualNMPC warm 21ms는 오프라인 50Hz 예산(20ms)과 정확히 같은 수준 (p95 30ms는 초과).
+# 3. SITL의 max_iter=5 설정은 warm 솔브에 사실상 무효 — 원래 5-iter에서 수렴하기 때문.
+#    (SITL에서 느렸던 진짜 원인은 iter 수가 아니라 per-iter 비용/머신 차이)
+# 4. IPOPT 시간의 65~78%가 함수평가(f/g/grad/jac/hess) → codegen(jit) 상한 ~2.8x (Amdahl).
+#    → bench_accel_experiments.py [C]에서 실측 2.68x로 확인됨.

@@ -1,0 +1,37 @@
+# bench_jit_diag.py 실행 결과 (2026-08-04, macOS Apple Silicon)
+# 목적: jit 벤치 공정성 검증 + p95 피크 원인 + N=10+jit 조합 실측
+
+════ N=20, dt_nmpc=0.05 (지평선 1.0s) ════
+  plain ipopt
+    중앙값   21.3 ms | p95   47.9 ms | 최악  137.3 ms | iter 5~30 (중앙 5)
+    최악 3건: #0: 137.3ms/iter30, #1: 43.2ms/iter10, #6: 24.1ms/iter6
+  jit 컴파일: 73.0 s
+  jit ipopt
+    중앙값    6.9 ms | p95   17.2 ms | 최악   58.5 ms | iter 5~30 (중앙 5)
+    최악 3건: #0: 58.5ms/iter30, #1: 15.1ms/iter10, #6: 8.1ms/iter6
+  ── 공정성: 20건 중 iter 일치 20건 (불일치 인덱스: [])
+  ── per-iter 시간: plain 4.21 ms/iter | jit 1.37 ms/iter
+  ── jit 시간 상위 5건의 iter: [30 10  6  5  5] (전체 중앙 5)
+
+════ N=10, dt_nmpc=0.1 (지평선 1.0s) ════
+  plain ipopt
+    중앙값   10.6 ms | p95   11.0 ms | 최악   11.1 ms | iter 5~5 (중앙 5)
+  jit 컴파일: 32.1 s
+  jit ipopt
+    중앙값    3.8 ms | p95    4.4 ms | 최악    7.5 ms | iter 5~5 (중앙 5)
+  ── 공정성: 20건 중 iter 일치 20건 (불일치 인덱스: [])
+  ── per-iter 시간: plain 2.13 ms/iter | jit 0.76 ms/iter
+  ── jit 시간 상위 5건의 iter: [5 5 5 5 5]
+
+# ── 핵심 해석 ──
+# 1. 공정성 검증 통과: plain vs jit의 IPOPT 반복수가 40건(20×2구성) 전부 일치.
+#    jit은 함수평가만 빨라질 뿐 최적화 경로는 동일 — 같은 문제를 같은 반복으로 푼 비교 맞음.
+# 2. p95/최악 스파이크의 원인 = 반복수 변동 (시간 상위 건 = iter 상위 건, 1:1 대응).
+#    per-iter 시간은 안정적 (plain 4.2 / jit 1.4 ms). jit 자체의 변동성 아님.
+#    최악건(#0)은 iter=30 = max_iter 상한 도달 → 그 솔브는 미수렴 상태로 반환된 것 (주의).
+# 3. N=10은 20건 전부 정확히 5-iter — 성긴 이산화가 웜스타트 안정성까지 좋게 함.
+# 4. **N=10 + jit = 중앙값 3.8ms / p95 4.4ms / 최악 7.5ms** — 실시간 관점 최우수.
+#    (폐루프 성능 대가는 results/horizon_comparison.txt 참고: vx 과도구간 +14%)
+# 5. jit per-iter 이득 3.1x(N=20)/2.8x(N=10) — bench_accel_experiments의 2.68x와 정합.
+# 6. CasADi 3.7.2는 jit 임시 .c 파일을 정리함(실행 후 잔존 없음 확인). 단 컴파일 중에는
+#    cwd에 생기므로 iCloud 동기화 폴더 밖에서 실행하는 원칙 유지.
