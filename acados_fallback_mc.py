@@ -32,17 +32,31 @@ CONFIGS = {
     'ext5': dict(rate_aug=True, cost_variant='EXT_EXACT',
                  nlp_solver_type='SQP', nlp_max_iter=5),
     'gnrti': dict(rate_aug=True),
+    # 예방형: 감속 시작(t=43)에 계획 전환 — 텀블 진입 자체를 회피해
+    # 반응형 ω15의 핸드오버 딥(~6.7m)을 줄이는지 검증. ω15는 백스톱 유지
+    'gnrti_pre': dict(rate_aug=True),
 }
+PREEMPTIVE_T = {'gnrti_pre': 43.0}
 
 
 class LoggedFB(HybridWithFallback):
-    """전환 시각·전환 시 |ω| 기록."""
+    """전환 시각·전환 시 |ω| 기록. preempt_t 설정 시 계획 전환(예방형)."""
 
-    def __init__(self, *a, **k):
+    def __init__(self, *a, preempt_t=None, **k):
         super().__init__(*a, **k)
         self.switch_events = []
+        self.preempt_t = preempt_t
 
     def __call__(self, t, x):
+        if (self.preempt_t is not None and self._using_hybrid
+                and t >= self.preempt_t):
+            # 계획 전환: 텀블 진입 전에 LQR 인수 (복귀 금지 전제)
+            self._using_hybrid = False
+            self._switch_count += 1
+            self._cmd_history.clear()
+            self.switch_events.append((float(t),
+                                       float(np.linalg.norm(x[10:13]))))
+            return self.lqr(t, x)
         was = self._using_hybrid
         u = super().__call__(t, x)
         if was and not self._using_hybrid:
@@ -98,7 +112,8 @@ def main(config_name, n_trials=30, seed=0):
         hyb = ProperHybrid(vn, P, dt=plant.dt)
         lqr = ScheduledLQR(P, v_ref=[0, 0, 0], z_ref=2.0)
         fb = LoggedFB(hyb, lqr, z_ref=2.0, z_err_limit=10.0,
-                      omega_limit=15.0, cooldown_sec=1e6, dt=plant.dt)
+                      omega_limit=15.0, cooldown_sec=1e6, dt=plant.dt,
+                      preempt_t=PREEMPTIVE_T.get(config_name))
         ctrl = MissionController(fb, profile)
         res = run_mission(plant, ctrl, x0, profile, wind_fn=gust_fn)
 
