@@ -33,7 +33,8 @@ for m in $MODULES; do
     fi
     cp "$src" "$DST/$m.py"
     # 로컬 모듈 절대 import → 상대 import (들여쓰기 보존)
-    sed -i -E \
+    # perl 사용: BSD(macOS)/GNU(Ubuntu) sed의 -i·정규식 비호환을 피함
+    perl -pi -e \
       "s/^(\s*)from (${MODULES// /|}) import/\1from .\2 import/" \
       "$DST/$m.py"
     echo "  ✓ $m.py"
