@@ -37,8 +37,10 @@ results/sitl_runs/
 # Gazebo SDF (Ubuntu PX4 폴더에 원본 있음, 여기는 임시 복사본)
 *.sdf
 
-# Claude Code 개인 설정
+# Claude Code 개인 설정 / 개인 작업 문서
 CLAUDE.md
+HANDOFF.md
+TODO.md
 
 # 발표 자료
 ppts/
