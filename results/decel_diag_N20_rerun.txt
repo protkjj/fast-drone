@@ -1,0 +1,43 @@
+
+[준비] Hybrid 제어기 생성 (N=20, dt=0.05, 지평선=1.0s)...
+
+============================================================
+  Hybrid 감속 폭발 진단 (30회)
+  VirtualNMPC N=20 (지평선 1.0s)
+  고정: 돌풍 10 m/s at t=35s
+  랜덤: 초기조건 (z±0.5, vx±0.5, vz±0.3)
+  관찰: 감속 구간 (t=43~58s) max Dz
+============================================================
+  [1/30] 감속 max_dz=1.92m  전체 z=1.622        [2/30] 감속 max_dz=1.93m  전체 z=1.627        [3/30] 감속 max_dz=3.17m  전체 z=1.640        [4/30] 감속 max_dz=2.06m  전체 z=1.633        [5/30] 감속 max_dz=5.03m  전체 z=1.778        [6/30] 감속 max_dz=1.92m  전체 z=1.635        [7/30] 감속 max_dz=4.00m  전체 z=1.679        [8/30] 감속 max_dz=4.81m  전체 z=1.756        [9/30] 감속 max_dz=0.80m  전체 z=1.611        [10/30] 감속 max_dz=5.04m  전체 z=1.718        [11/30] 감속 max_dz=3.16m  전체 z=1.666        [12/30] 감속 max_dz=3.03m  전체 z=1.686        [13/30] 감속 max_dz=4.54m  전체 z=1.720        [14/30] 감속 max_dz=3.29m  전체 z=1.652        [15/30] 감속 max_dz=4.05m  전체 z=1.724        [16/30] 감속 max_dz=3.98m  전체 z=1.707        [17/30] 감속 max_dz=0.76m  전체 z=1.610        [18/30] 감속 max_dz=6.63m  전체 z=1.964        [19/30] 감속 max_dz=1.65m  전체 z=1.620      CasADi - 2026-08-04 02:37:15 WARNING("vnmpc:nlp_g failed: Inf detected for output g, at (row 172, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:37:16 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:37:16 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 29, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:37:16 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:37:16 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 29, col 0).") [.../casadi/core/oracle_function.cpp:408]
+  [20/30] 감속 max_dz=44.30m  전체 z=10.716        [21/30] 감속 max_dz=3.31m  전체 z=1.681        [22/30] 감속 max_dz=2.51m  전체 z=1.661        [23/30] 감속 max_dz=1.30m  전체 z=1.612        [24/30] 감속 max_dz=1.27m  전체 z=1.624        [25/30] 감속 max_dz=2.77m  전체 z=1.659        [26/30] 감속 max_dz=1.62m  전체 z=1.622        [27/30] 감속 max_dz=2.26m  전체 z=1.627        [28/30] 감속 max_dz=2.06m  전체 z=1.636        [29/30] 감속 max_dz=10.24m  전체 z=2.248        [30/30] 감속 max_dz=3.24m  전체 z=1.670      
+  완료 [2934s]
+
+============================================================
+  결과 — 감속 구간 max Dz 분포 (30회)
+============================================================
+
+  심각도 분포:
+               < 2m (양호):   9회 ( 30.0%)  평균=1.46m
+               2~5m (주의):  16회 ( 53.3%)  평균=3.26m
+              5~10m (위험):   3회 ( 10.0%)  평균=5.57m
+             10~20m (심각):   1회 (  3.3%)  평균=10.24m
+            >= 20m (대참사):   1회 (  3.3%)  평균=44.30m
+
+  통계:
+    평균: 4.56 m
+    중앙: 3.09 m
+    std:  7.62 m
+    최소: 0.76 m
+    최대: 44.30 m
+    P90:  5.20 m
+    P95:  8.62 m
+
+  판정: 감속 max Dz >= 5m 발생률 = 5/30 (17%)
+  => 17% 빈도 — 구조적 문제.
+     지평선 확장(N=40) 또는 switching 필요.
+
+============================================================

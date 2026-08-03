@@ -67,7 +67,7 @@ class HybridWithFallback:
         """
         self.hybrid = hybrid_ctrl
         self.lqr = lqr_ctrl
-        self.z_ref = z_ref
+        self.z_ref = z_ref          # property — LQR에도 전파됨
 
         # 감지 파라미터
         self.z_err_limit = z_err_limit
@@ -192,6 +192,35 @@ class HybridWithFallback:
         # NMPC 타이밍 리셋
         if hasattr(self.hybrid, 'nmpc') and hasattr(self.hybrid.nmpc, '_last_t'):
             self.hybrid.nmpc._last_t = -np.inf
+
+    # ── 미션 통합용 패스스루 (MissionController의 덕타이핑 대응) ──
+    # MissionController는 inner.v_ref/z_ref와 inner.nmpc.v_ref/z_ref를
+    # hasattr로 갱신한다. 폴백이 최외곽(미션래퍼 바로 안)에 올 수 있도록
+    # 기준값을 LQR·내부 NMPC 양쪽에 전파한다.
+
+    @property
+    def nmpc(self):
+        """내부 하이브리드의 NMPC 노출 (기준값 주입 경로)."""
+        return getattr(self.hybrid, 'nmpc', None)
+
+    @property
+    def v_ref(self):
+        return getattr(self.lqr, 'v_ref', None)
+
+    @v_ref.setter
+    def v_ref(self, v):
+        if hasattr(self.lqr, 'v_ref'):
+            self.lqr.v_ref = np.array(v, dtype=float)
+
+    @property
+    def z_ref(self):
+        return self._z_ref
+
+    @z_ref.setter
+    def z_ref(self, z):
+        self._z_ref = float(z)
+        if hasattr(self.lqr, 'z_ref'):
+            self.lqr.z_ref = float(z)
 
     @property
     def fallback_count(self):

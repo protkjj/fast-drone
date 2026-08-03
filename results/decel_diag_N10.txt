@@ -1,0 +1,92 @@
+
+[준비] Hybrid 제어기 생성 (N=10, dt=0.1, 지평선=1.0s)...
+
+============================================================
+  Hybrid 감속 폭발 진단 (30회)
+  VirtualNMPC N=10 (지평선 1.0s)
+  고정: 돌풍 10 m/s at t=35s
+  랜덤: 초기조건 (z±0.5, vx±0.5, vz±0.3)
+  관찰: 감속 구간 (t=43~58s) max Dz
+============================================================
+  [1/30] 감속 max_dz=2.87m  전체 z=1.652        [2/30] 감속 max_dz=2.08m  전체 z=1.622        [3/30] 감속 max_dz=1.52m  전체 z=1.617        [4/30] 감속 max_dz=1.16m  전체 z=1.619        [5/30] 감속 max_dz=3.59m  전체 z=1.693        [6/30] 감속 max_dz=4.03m  전체 z=1.692        [7/30] 감속 max_dz=0.93m  전체 z=1.613        [8/30] 감속 max_dz=0.68m  전체 z=1.608        [9/30] 감속 max_dz=2.96m  전체 z=1.641        [10/30] 감속 max_dz=5.07m  전체 z=1.743        [11/30] 감속 max_dz=3.55m  전체 z=1.680        [12/30] 감속 max_dz=4.19m  전체 z=1.702      CasADi - 2026-08-04 02:16:35 WARNING("vnmpc:nlp_g failed: Inf detected for output g, at (row 108, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 42, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 42, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 42, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 42, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 42, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 42, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 42, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 42, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 42, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 42, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 42, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 42, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: Inf detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: Inf detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: Inf detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 29, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 29, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 29, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:16:37 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+  [13/30] 감속 max_dz=2.13m  전체 z=1.625        [14/30] 감속 max_dz=2.94m  전체 z=1.640        [15/30] 감속 max_dz=3.33m  전체 z=1.657        [16/30] 감속 max_dz=0.50m  전체 z=1.611      CasADi - 2026-08-04 02:20:17 WARNING("vnmpc:nlp_g failed: Inf detected for output g, at (row 120, col 0).") [.../casadi/core/oracle_function.cpp:408]
+  [17/30] 감속 max_dz=9.17m  전체 z=1.974        [18/30] 감속 max_dz=0.81m  전체 z=1.614        [19/30] 감속 max_dz=3.20m  전체 z=1.655      CasADi - 2026-08-04 02:23:08 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 107, col 0).") [.../casadi/core/oracle_function.cpp:408]
+  [20/30] 감속 max_dz=1.52m  전체 z=1.629      CasADi - 2026-08-04 02:24:05 WARNING("vnmpc:nlp_g failed: Inf detected for output g, at (row 120, col 0).") [.../casadi/core/oracle_function.cpp:408]
+  [21/30] 감속 max_dz=3.44m  전체 z=1.657      CasADi - 2026-08-04 02:24:58 WARNING("vnmpc:nlp_g failed: Inf detected for output g, at (row 120, col 0).") [.../casadi/core/oracle_function.cpp:408]
+  [22/30] 감속 max_dz=0.64m  전체 z=1.612        [23/30] 감속 max_dz=2.03m  전체 z=1.621        [24/30] 감속 max_dz=0.53m  전체 z=1.619        [25/30] 감속 max_dz=0.64m  전체 z=1.608        [26/30] 감속 max_dz=2.11m  전체 z=1.625      CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 13, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 13, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 29, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 29, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 29, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 29, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 29, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:29:38 WARNING("vnmpc:nlp_g failed: Inf detected for output g, at (row 29, col 0).") [.../casadi/core/oracle_function.cpp:408]
+  [27/30] 감속 max_dz=5.06m  전체 z=1.711        [28/30] 감속 max_dz=1.56m  전체 z=1.618        [29/30] 감속 max_dz=2.29m  전체 z=1.628      CasADi - 2026-08-04 02:32:16 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+CasADi - 2026-08-04 02:32:16 WARNING("vnmpc:nlp_g failed: NaN detected for output g, at (row 16, col 0).") [.../casadi/core/oracle_function.cpp:408]
+  [30/30] 감속 max_dz=14.00m  전체 z=2.656      
+  완료 [1711s]
+
+============================================================
+  결과 — 감속 구간 max Dz 분포 (30회)
+============================================================
+
+  심각도 분포:
+               < 2m (양호):  11회 ( 36.7%)  평균=0.95m
+               2~5m (주의):  15회 ( 50.0%)  평균=2.98m
+              5~10m (위험):   3회 ( 10.0%)  평균=6.43m
+             10~20m (심각):   1회 (  3.3%)  평균=14.00m
+            >= 20m (대참사):   0회 (  0.0%)
+
+  통계:
+    평균: 2.95 m
+    중앙: 2.21 m
+    std:  2.72 m
+    최소: 0.50 m
+    최대: 14.00 m
+    P90:  5.06 m
+    P95:  7.33 m
+
+  판정: 감속 max Dz >= 5m 발생률 = 4/30 (13%)
+  => 13% 빈도 — 구조적 문제.
+     지평선 확장(N=40) 또는 switching 필요.
+
+============================================================
