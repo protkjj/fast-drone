@@ -1,0 +1,107 @@
+Phase 3 — 그리드 비교 (확정 아키텍처: GN-RTI+Δu, 예방형 t=43 전환)
+감속·호버는 LQR 담당이라 전 그리드 공통 — acados 구간(이륙~순항)만 비교
+==============================================================================
+rm -f libacados_ocp_solver_vnmpc_ga1.dylib
+rm -f vnmpc_ga1_cost/vnmpc_ga1_cost_y_0_fun.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_0_fun_jac_ut_xt.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_0_hess.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_fun.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_fun_jac_ut_xt.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_hess.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_e_fun.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_e_fun_jac_ut_xt.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_e_hess.o acados_solver_vnmpc_ga1.o
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga1_cost/vnmpc_ga1_cost_y_0_fun.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_0_fun.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga1_cost/vnmpc_ga1_cost_y_0_fun_jac_ut_xt.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_0_fun_jac_ut_xt.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga1_cost/vnmpc_ga1_cost_y_0_hess.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_0_hess.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga1_cost/vnmpc_ga1_cost_y_fun.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_fun.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga1_cost/vnmpc_ga1_cost_y_fun_jac_ut_xt.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_fun_jac_ut_xt.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga1_cost/vnmpc_ga1_cost_y_hess.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_hess.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga1_cost/vnmpc_ga1_cost_y_e_fun.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_e_fun.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga1_cost/vnmpc_ga1_cost_y_e_fun_jac_ut_xt.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_e_fun_jac_ut_xt.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga1_cost/vnmpc_ga1_cost_y_e_hess.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_e_hess.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o acados_solver_vnmpc_ga1.o acados_solver_vnmpc_ga1.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga1_model/vnmpc_ga1_expl_ode_fun.o vnmpc_ga1_model/vnmpc_ga1_expl_ode_fun.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga1_model/vnmpc_ga1_expl_vde_forw.o vnmpc_ga1_model/vnmpc_ga1_expl_vde_forw.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga1_model/vnmpc_ga1_expl_vde_adj.o vnmpc_ga1_model/vnmpc_ga1_expl_vde_adj.c
+cc -shared vnmpc_ga1_cost/vnmpc_ga1_cost_y_0_fun.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_0_fun_jac_ut_xt.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_0_hess.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_fun.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_fun_jac_ut_xt.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_hess.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_e_fun.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_e_fun_jac_ut_xt.o vnmpc_ga1_cost/vnmpc_ga1_cost_y_e_hess.o acados_solver_vnmpc_ga1.o vnmpc_ga1_model/vnmpc_ga1_expl_ode_fun.o vnmpc_ga1_model/vnmpc_ga1_expl_vde_forw.o vnmpc_ga1_model/vnmpc_ga1_expl_vde_adj.o -o libacados_ocp_solver_vnmpc_ga1.dylib -L/Users/kj/acados/lib -lacados -lhpipm -lblasfeo -lm  \
+	-L -l
+ld: warning: search path '-l' not found
+External functions generated in 15.806 ms.
+Templated solver code generated in 988.399 ms.
+Build completed in 565.584 ms.
+acados was compiled without OpenMP.
+  ScheduledLQR: 9/9 속도점 유효
+
+G1 균일 20x0.05: 솔브 0.27/0.52/1.66 ms (중앙/p95/최악) | status OK 2150/2150 | |ω|max=2.2 실기판정=ok
+    이륙: z=6.474 vx=0.038
+   안정화: z=0.642 vx=0.001
+    가속: z=0.186 vx=3.754
+    순항: z=0.263 vx=0.153
+rm -f libacados_ocp_solver_vnmpc_ga2.dylib
+rm -f vnmpc_ga2_cost/vnmpc_ga2_cost_y_0_fun.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_0_fun_jac_ut_xt.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_0_hess.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_fun.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_fun_jac_ut_xt.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_hess.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_e_fun.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_e_fun_jac_ut_xt.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_e_hess.o acados_solver_vnmpc_ga2.o
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga2_cost/vnmpc_ga2_cost_y_0_fun.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_0_fun.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga2_cost/vnmpc_ga2_cost_y_0_fun_jac_ut_xt.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_0_fun_jac_ut_xt.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga2_cost/vnmpc_ga2_cost_y_0_hess.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_0_hess.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga2_cost/vnmpc_ga2_cost_y_fun.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_fun.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga2_cost/vnmpc_ga2_cost_y_fun_jac_ut_xt.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_fun_jac_ut_xt.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga2_cost/vnmpc_ga2_cost_y_hess.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_hess.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga2_cost/vnmpc_ga2_cost_y_e_fun.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_e_fun.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga2_cost/vnmpc_ga2_cost_y_e_fun_jac_ut_xt.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_e_fun_jac_ut_xt.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga2_cost/vnmpc_ga2_cost_y_e_hess.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_e_hess.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o acados_solver_vnmpc_ga2.o acados_solver_vnmpc_ga2.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga2_model/vnmpc_ga2_expl_ode_fun.o vnmpc_ga2_model/vnmpc_ga2_expl_ode_fun.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga2_model/vnmpc_ga2_expl_vde_forw.o vnmpc_ga2_model/vnmpc_ga2_expl_vde_forw.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga2_model/vnmpc_ga2_expl_vde_adj.o vnmpc_ga2_model/vnmpc_ga2_expl_vde_adj.c
+cc -shared vnmpc_ga2_cost/vnmpc_ga2_cost_y_0_fun.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_0_fun_jac_ut_xt.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_0_hess.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_fun.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_fun_jac_ut_xt.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_hess.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_e_fun.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_e_fun_jac_ut_xt.o vnmpc_ga2_cost/vnmpc_ga2_cost_y_e_hess.o acados_solver_vnmpc_ga2.o vnmpc_ga2_model/vnmpc_ga2_expl_ode_fun.o vnmpc_ga2_model/vnmpc_ga2_expl_vde_forw.o vnmpc_ga2_model/vnmpc_ga2_expl_vde_adj.o -o libacados_ocp_solver_vnmpc_ga2.dylib -L/Users/kj/acados/lib -lacados -lhpipm -lblasfeo -lm  \
+	-L -l
+ld: warning: search path '-l' not found
+External functions generated in 11.998 ms.
+Templated solver code generated in 1015.435 ms.
+Build completed in 536.603 ms.
+acados was compiled without OpenMP.
+  ScheduledLQR: 9/9 속도점 유효
+
+G2 균일 10x0.1: 솔브 0.13/0.28/0.84 ms (중앙/p95/최악) | status OK 2150/2150 | |ω|max=2.3 실기판정=ok
+    이륙: z=6.341 vx=0.054
+   안정화: z=0.471 vx=0.001
+    가속: z=0.130 vx=4.059
+    순항: z=0.279 vx=0.109
+rm -f libacados_ocp_solver_vnmpc_ga3.dylib
+rm -f vnmpc_ga3_cost/vnmpc_ga3_cost_y_0_fun.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_0_fun_jac_ut_xt.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_0_hess.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_fun.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_fun_jac_ut_xt.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_hess.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_e_fun.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_e_fun_jac_ut_xt.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_e_hess.o acados_solver_vnmpc_ga3.o
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga3_cost/vnmpc_ga3_cost_y_0_fun.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_0_fun.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga3_cost/vnmpc_ga3_cost_y_0_fun_jac_ut_xt.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_0_fun_jac_ut_xt.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga3_cost/vnmpc_ga3_cost_y_0_hess.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_0_hess.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga3_cost/vnmpc_ga3_cost_y_fun.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_fun.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga3_cost/vnmpc_ga3_cost_y_fun_jac_ut_xt.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_fun_jac_ut_xt.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga3_cost/vnmpc_ga3_cost_y_hess.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_hess.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga3_cost/vnmpc_ga3_cost_y_e_fun.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_e_fun.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga3_cost/vnmpc_ga3_cost_y_e_fun_jac_ut_xt.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_e_fun_jac_ut_xt.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga3_cost/vnmpc_ga3_cost_y_e_hess.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_e_hess.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o acados_solver_vnmpc_ga3.o acados_solver_vnmpc_ga3.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga3_model/vnmpc_ga3_expl_ode_fun.o vnmpc_ga3_model/vnmpc_ga3_expl_ode_fun.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga3_model/vnmpc_ga3_expl_vde_forw.o vnmpc_ga3_model/vnmpc_ga3_expl_vde_forw.c
+cc -fPIC -std=c99   -O2 -I/Users/kj/acados/include -I/Users/kj/acados/include/acados -I/Users/kj/acados/include/blasfeo/include -I/Users/kj/acados/include/hpipm/include  -c -o vnmpc_ga3_model/vnmpc_ga3_expl_vde_adj.o vnmpc_ga3_model/vnmpc_ga3_expl_vde_adj.c
+cc -shared vnmpc_ga3_cost/vnmpc_ga3_cost_y_0_fun.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_0_fun_jac_ut_xt.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_0_hess.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_fun.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_fun_jac_ut_xt.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_hess.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_e_fun.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_e_fun_jac_ut_xt.o vnmpc_ga3_cost/vnmpc_ga3_cost_y_e_hess.o acados_solver_vnmpc_ga3.o vnmpc_ga3_model/vnmpc_ga3_expl_ode_fun.o vnmpc_ga3_model/vnmpc_ga3_expl_vde_forw.o vnmpc_ga3_model/vnmpc_ga3_expl_vde_adj.o -o libacados_ocp_solver_vnmpc_ga3.dylib -L/Users/kj/acados/lib -lacados -lhpipm -lblasfeo -lm  \
+	-L -l
+ld: warning: search path '-l' not found
+External functions generated in 12.907 ms.
+Templated solver code generated in 1014.495 ms.
+Build completed in 533.240 ms.
+acados was compiled without OpenMP.
+  ScheduledLQR: 9/9 속도점 유효
+
+G3 비균일 12노드: 솔브 0.16/0.34/1.09 ms (중앙/p95/최악) | status OK 1278/1283 | |ω|max=15.1 실기판정=ok
+    이륙: z=6.349 vx=0.099
+   안정화: z=0.505 vx=0.002
+    가속: z=0.192 vx=5.909
+    순항: z=0.131 vx=8.806
+
+══════════════════════════════════════════════════════════════════════════════
+[요약] acados 구간 성능 — 채택은 kj 결정
+  그리드                    솔브중앙    솔브p95     이륙z     가속z    가속vx     순항z
+  G1 균일 20x0.05        0.27ms   0.52ms   6.474   0.186   3.754   0.263
+  G2 균일 10x0.1         0.13ms   0.28ms   6.341   0.130   4.059   0.279
+  G3 비균일 12노드          0.16ms   0.34ms   6.349   0.192   5.909   0.131
+
+SQP_RTI: QP solver returned error status 3 (ACADOS_MINSTEP) QP iteration 1.
+
+SQP_RTI: QP solver returned error status 1 (ACADOS_NAN_DETECTED) QP iteration 1.
+
+SQP_RTI: QP solver returned error status 1 (ACADOS_NAN_DETECTED) QP iteration 1.
+
+SQP_RTI: QP solver returned error status 1 (ACADOS_NAN_DETECTED) QP iteration 1.
+
+SQP_RTI: QP solver returned error status 1 (ACADOS_NAN_DETECTED) QP iteration 1.
