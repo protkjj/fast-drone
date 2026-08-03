@@ -36,3 +36,6 @@ results/sitl_runs/
 
 # Gazebo SDF (Ubuntu PX4 폴더에 원본 있음, 여기는 임시 복사본)
 *.sdf
+
+# Claude Code 개인 설정
+CLAUDE.md
