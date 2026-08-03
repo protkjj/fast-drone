@@ -22,6 +22,7 @@ from vnmpc_acados import AcadosVirtualNMPC
 from mission_sim import (MissionProfile, MissionController, run_mission,
                          compute_overall)
 from gust_comparison import make_gust_fn
+from acados_fallback_mc import omega_metrics   # |ω| 실기판정 (기준: MEMORY 주의 6)
 
 
 def diagnose_deceleration_acados(n_trials=30, seed=0, **vn_kwargs):
@@ -40,7 +41,7 @@ def diagnose_deceleration_acados(n_trials=30, seed=0, **vn_kwargs):
     print(f"구성: {kw}")
     print("=" * 60, flush=True)
 
-    decel_max_dz, statuses_ok = [], []
+    decel_max_dz, statuses_ok, real_fails = [], [], []
     t0_all = timer.time()
     for i in range(n_trials):
         x0 = AxialDronePlant.hover_state(P)
@@ -62,8 +63,12 @@ def diagnose_deceleration_acados(n_trials=30, seed=0, **vn_kwargs):
         s = vn.get_stats()
         statuses_ok.append((s['n_ok'] + s.get('n_maxiter', 0), s['n_solves']))
         ov = compute_overall(res)
+        omm = omega_metrics(xs)
+        real_fails.append(omm['real_fail'])
         print(f"  [{i+1}/{n_trials}] 감속 max_dz={dz:.2f}m  전체 z="
-              f"{ov['rmse_z']:.3f}  솔브usable {statuses_ok[-1][0]}/{statuses_ok[-1][1]}",
+              f"{ov['rmse_z']:.3f}  솔브usable {statuses_ok[-1][0]}/{statuses_ok[-1][1]}"
+              f"  |ω|max={omm['om_max']:.1f} run25={omm['run25']:.0f}ms"
+              f" 실기판정={'FAIL' if omm['real_fail'] else 'ok'}",
               flush=True)
 
     print(f"\n완료 [{timer.time()-t0_all:.0f}s]")
@@ -84,6 +89,8 @@ def diagnose_deceleration_acados(n_trials=30, seed=0, **vn_kwargs):
     n5 = int(np.sum(dz_arr >= 5))
     print(f"\n판정: 감속 max Dz >= 5m 발생률 = {n5}/{n_trials}"
           f" ({100*n5/n_trials:.0f}%)")
+    print(f"실기판정 FAIL (|ω|>35 또는 >25 지속 200ms+): "
+          f"{sum(real_fails)}/{n_trials}")
     print("비교: IPOPT N=20 rerun 17%(P95 8.6m, 최악 44.3m) / N=10 13%(7.3m, 14.0m)")
 
 
