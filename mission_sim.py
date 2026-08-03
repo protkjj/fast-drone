@@ -312,7 +312,7 @@ def print_mc_summary(name, mc_results):
 # 5. 감속 폭발 진단
 # ════════════════════════════════════════════════════
 
-def diagnose_deceleration(n_trials=30, seed=0, nmpc_N=20):
+def diagnose_deceleration(n_trials=30, seed=0, nmpc_N=20, dt_nmpc=0.05):
     """
     Hybrid 감속 폭발 재현 조건 특정.
 
@@ -327,16 +327,20 @@ def diagnose_deceleration(n_trials=30, seed=0, nmpc_N=20):
     nmpc_N : int
         VirtualNMPC 예측 지평선 스텝 수.
         N=20 (기본, 1.0초), N=40 (확장, 2.0초).
+    dt_nmpc : float
+        NMPC 내부 이산화 스텝 [s]. 지평선 = nmpc_N * dt_nmpc.
+        성긴 이산화 비교(N=10, dt=0.1 등)에 사용.
     """
     plant = AxialDronePlant(P, dt=0.001)
     dt = plant.dt
     profile = MissionProfile(cruise_speed=70.0, cruise_alt=50.0)
     gust_fn = make_gust_fn('vertical', 10.0, 35.0, 1.0)
 
-    horizon_sec = nmpc_N * 0.05
-    print(f"\n[준비] Hybrid 제어기 생성 (N={nmpc_N}, 지평선={horizon_sec:.1f}s)...")
+    horizon_sec = nmpc_N * dt_nmpc
+    print(f"\n[준비] Hybrid 제어기 생성 (N={nmpc_N}, dt={dt_nmpc}, "
+          f"지평선={horizon_sec:.1f}s)...")
     vnmpc = VirtualNMPC(P, v_ref=[0, 0, 0], z_ref=2.0,
-                         N=nmpc_N, dt_nmpc=0.05, dt_ctrl=0.02)
+                         N=nmpc_N, dt_nmpc=dt_nmpc, dt_ctrl=0.02)
     hybrid = ProperHybrid(vnmpc, P, dt=dt)
     ctrl = MissionController(hybrid, profile)
 

@@ -104,12 +104,19 @@ class VirtualNMPC:
         self._build_nlp(params, x_sym, u_sym)
         self._last_t = -np.inf
         self._u_current = self.u_ref.copy()
+        # 솔버 수렴 추적 (연속 미수렴 → HybridWithFallback의 전환 판단에 사용)
+        self.consec_fail = 0
+        self.last_status = 'none'
+        self._ever_converged = False
         # _w0_init는 _build_nlp()에서 설정됨
 
     def reset(self):
         """MC 시행 간 독립성 보장을 위한 완전 리셋."""
         self._last_t = -np.inf
         self._u_current = self.u_ref.copy()
+        self.consec_fail = 0
+        self.last_status = 'none'
+        self._ever_converged = False
         if self._w0_init is not None:
             self.w0 = self._w0_init.copy()
 
@@ -146,7 +153,10 @@ class VirtualNMPC:
 
             X_k = ca.SX.sym(f'X_{k}', nx)
             w.append(X_k)
-            lbw += [-1e6]*nx; ubw += [1e6]*nx; w0 += [0.0]*nx
+            lbw += [-1e6]*nx; ubw += [1e6]*nx
+            _xg = [0.0]*nx
+            _xg[6:10] = [1.0, 0.0, 0.0, 0.0]   # 유효 단위 쿼터니언(호버) 초기추측
+            w0 += _xg                          # (nmpc.py와 동일 픽스 — cold 솔브 개선)
 
             g.append(X_k - self.F(X_prev, U_k))
             lbg += [0.0]*nx; ubg += [0.0]*nx
@@ -188,6 +198,20 @@ class VirtualNMPC:
         p_val = np.concatenate([x13, self.v_ref, [self.z_ref], self.u_ref])
         sol = self.solver(x0=self.w0, lbx=self.lbw, ubx=self.ubw,
                           lbg=self.lbg, ubg=self.ubg, p=p_val)
+
+        # 수렴 추적: max_iter 도달 등 미수렴 해는 IPOPT의 "최선 반복해"라
+        # 한 번은 쓸 만하지만 연속되면 품질 저하 누적 (벤치 실측: 과도구간에서
+        # iter=30 상한 도달 사례). 솔브 단위로 카운트해 폴백이 판단하게 함.
+        # cold-start(최초 수렴 전) 실패는 예상된 것이라 카운트 제외 —
+        # 처음부터 고장난 NMPC는 폴백의 고도오차 트리거가 잡음.
+        status = self.solver.stats().get('return_status', 'unknown')
+        if status in ('Solve_Succeeded', 'Solved_To_Acceptable_Level'):
+            self.consec_fail = 0
+            self._ever_converged = True
+        elif self._ever_converged:
+            self.consec_fail += 1
+        self.last_status = status
+
         w_opt = np.array(sol['x']).flatten()
         u_opt = w_opt[0:NU_V]
         stride = NU_V + NX_V

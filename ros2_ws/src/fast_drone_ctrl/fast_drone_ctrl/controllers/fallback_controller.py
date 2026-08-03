@@ -9,6 +9,8 @@ Hybrid + LQR 폴백 제어기
   1. NaN/Inf 출력
   2. 모터 명령 진동 (짧은 윈도우 내 분산 과다)
   3. 고도 오차 과대 (|z - z_ref| > 임계값)
+  4. NMPC 연속 미수렴 (max_iter 도달 등이 nmpc_fail_limit회 연속)
+     — 미수렴 해는 최적이 아닌 채로 명령이 나가므로, 지속되면 LQR이 안전
 
 전환 동작:
   Hybrid → LQR: 즉시 전환 (bumpless 아닌 hard switch)
@@ -37,7 +39,8 @@ class HybridWithFallback:
 
     def __init__(self, hybrid_ctrl, lqr_ctrl, z_ref=50.0,
                  z_err_limit=2.0, var_window=50, var_limit=5e4,
-                 cooldown_sec=2.0, min_hybrid_sec=1.0, dt=0.001):
+                 cooldown_sec=2.0, min_hybrid_sec=1.0, dt=0.001,
+                 nmpc_fail_limit=3):
         """
         Parameters
         ----------
@@ -57,6 +60,10 @@ class HybridWithFallback:
             Hybrid 복귀 후 최소 유지 시간 [s] (채터링 방지).
         dt : float
             제어 주기 [s].
+        nmpc_fail_limit : int
+            VirtualNMPC 연속 미수렴 솔브 횟수 임계 (솔브 단위 카운트,
+            기본 3 = 50Hz 솔브 기준 60ms 지속). 과도구간의 일회성
+            max_iter 도달로 불필요하게 전환되지 않도록 1이 아닌 3.
         """
         self.hybrid = hybrid_ctrl
         self.lqr = lqr_ctrl
@@ -66,6 +73,7 @@ class HybridWithFallback:
         self.z_err_limit = z_err_limit
         self.var_window = var_window
         self.var_limit = var_limit
+        self.nmpc_fail_limit = nmpc_fail_limit
 
         # 타이밍
         self.cooldown_steps = int(cooldown_sec / dt)
@@ -139,6 +147,13 @@ class HybridWithFallback:
         # 4. 속도 이상: 목표 70 m/s인데 속도가 비정상적으로 벗어남
         vel_mag = np.linalg.norm(x[3:6])
         if vel_mag > 150.0:  # 150 m/s 이상 = 확실히 비정상
+            return True
+
+        # 4.5 NMPC 연속 미수렴 (솔브 단위 카운트는 VirtualNMPC가 유지)
+        #     미수렴 해는 최적이 아닌 명령 — 연속되면 품질 저하 누적 → LQR이 안전.
+        #     getattr 체인: nmpc 없는 제어기(테스트 스텁 등)에서도 안전하게 0.
+        if getattr(getattr(self.hybrid, 'nmpc', None),
+                   'consec_fail', 0) >= self.nmpc_fail_limit:
             return True
 
         # 5. 모터 명령 진동 (분산 기반, 짧은 윈도우)
