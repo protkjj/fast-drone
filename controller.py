@@ -289,6 +289,12 @@ class LQRController:
         q_trim_inv = np.array([-q_trim[0], -q_trim[1], -q_trim[2], q_trim[3]])
         # Hamilton product: q_trim_inv ⊗ q
         dq = self._quat_mult(q_trim_inv, q)
+        # 최단경로 보정: q와 -q는 같은 자세. 이 기체는 트림 w≡0(180° about x)
+        # 이라 부호 경계가 정상 비행자세 바로 위 — SITL/실기의 w>0 정규화
+        # (frame_utils/offboard_node)가 롤 ± 절반에서 q 부호를 뒤집으면
+        # δφ가 반전되어 정피드백이 됨 (2026-08-04 코드리뷰 검증).
+        if dq[3] < 0.0:
+            dq = -dq
         # 소교란: δφ ≈ 2 * dq[0:3] (벡터부)
         dphi = 2.0 * dq[0:3]
         # 각속도 오차
@@ -474,6 +480,8 @@ class ScheduledLQR:
         q, q_t = x[6:10], x_trim[6:10]
         q_t_inv = np.array([-q_t[0], -q_t[1], -q_t[2], q_t[3]])
         dq = LQRController._quat_mult(q_t_inv, q)
+        if dq[3] < 0.0:
+            dq = -dq          # 최단경로 보정 (LQRController와 동일 — 위 주석 참고)
         dphi = 2.0 * dq[0:3]
 
         dw = x[10:13] - x_trim[10:13]
