@@ -119,6 +119,27 @@ def test_nan_immediate():
     print("  NaN → 1스텝 만에 LQR  PASS\n")
 
 
+def test_omega_trigger():
+    """|ω| 조기 전환: omega_limit 설정 시 초과에 전환, None이면 무시."""
+    print("=" * 55)
+    print("TEST 5: ω 조기 전환 트리거")
+    hyb, _ = _StubHybrid(), None
+    ctrl = HybridWithFallback(hyb, _StubLQR(), z_ref=50.0, omega_limit=12.0)
+    x = _hover_x()
+    x[10] = 15.0                      # |ω| = 15 > 12
+    ctrl(0.0, x)
+    assert ctrl.active_controller == 'LQR', "ω 초과에 미전환"
+    print("  |ω|=15 > limit 12 → LQR 전환 ✓")
+
+    hyb2 = _StubHybrid()
+    c2 = HybridWithFallback(hyb2, _StubLQR(), z_ref=50.0)   # limit 미설정
+    x2 = _hover_x()
+    x2[10] = 15.0
+    c2(0.0, x2)
+    assert c2.active_controller == 'Hybrid', "limit=None인데 전환됨"
+    print("  omega_limit=None → 무시 (기존 동작 보존) ✓  PASS\n")
+
+
 def test_smoke_real_hybrid():
     """실제 ProperHybrid+ScheduledLQR, 70m/s 순항 5s — 새 트리거의 오탐 없음."""
     print("=" * 55)
@@ -156,6 +177,7 @@ if __name__ == '__main__':
     c, h = test_nmpc_fail_trigger()
     test_recovery_resets(c, h)
     test_nan_immediate()
+    test_omega_trigger()
     test_smoke_real_hybrid()
     print("=" * 55)
     print("ALL TESTS PASSED")

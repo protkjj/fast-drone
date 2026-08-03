@@ -40,7 +40,7 @@ class HybridWithFallback:
     def __init__(self, hybrid_ctrl, lqr_ctrl, z_ref=50.0,
                  z_err_limit=2.0, var_window=50, var_limit=5e4,
                  cooldown_sec=2.0, min_hybrid_sec=1.0, dt=0.001,
-                 nmpc_fail_limit=3):
+                 nmpc_fail_limit=3, omega_limit=None):
         """
         Parameters
         ----------
@@ -64,6 +64,10 @@ class HybridWithFallback:
             VirtualNMPC 연속 미수렴 솔브 횟수 임계 (솔브 단위 카운트,
             기본 3 = 50Hz 솔브 기준 60ms 지속). 과도구간의 일회성
             max_iter 도달로 불필요하게 전환되지 않도록 1이 아닌 3.
+        omega_limit : float or None
+            |ω| 조기 전환 임계 [rad/s]. 텀블은 |ω|~37에서 LQR 선형 영역을
+            벗어나 회복 불가 (실측) — 10~15에서 넘기면 LQR이 아직 유효.
+            None = 비활성 (기존 동작 보존). 정상 기동의 |ω|는 <2 수준.
         """
         self.hybrid = hybrid_ctrl
         self.lqr = lqr_ctrl
@@ -74,6 +78,7 @@ class HybridWithFallback:
         self.var_window = var_window
         self.var_limit = var_limit
         self.nmpc_fail_limit = nmpc_fail_limit
+        self.omega_limit = omega_limit
 
         # 타이밍
         self.cooldown_steps = int(cooldown_sec / dt)
@@ -147,6 +152,12 @@ class HybridWithFallback:
         # 4. 속도 이상: 목표 70 m/s인데 속도가 비정상적으로 벗어남
         vel_mag = np.linalg.norm(x[3:6])
         if vel_mag > 150.0:  # 150 m/s 이상 = 확실히 비정상
+            return True
+
+        # 4.3 각속도 조기 전환: 텀블이 LQR 선형 영역(|ω|~10대)을 벗어나기
+        #     전에 넘김. |ω| 37까지 가면 LQR도 회복 불가 (실측).
+        if (self.omega_limit is not None
+                and np.linalg.norm(x[10:13]) > self.omega_limit):
             return True
 
         # 4.5 NMPC 연속 미수렴 (솔브 단위 카운트는 VirtualNMPC가 유지)

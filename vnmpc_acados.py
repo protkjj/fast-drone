@@ -55,7 +55,7 @@ class AcadosVirtualNMPC:
                  nlp_solver_type='SQP_RTI', nlp_max_iter=5,
                  T_min=0.0, qp_iter_max=20, integrator='ERK',
                  as_rti_iter=None, as_rti_level=None,
-                 code_suffix='default'):
+                 cost_variant='NLS', code_suffix='default'):
         """
         Parameters
         ----------
@@ -73,6 +73,10 @@ class AcadosVirtualNMPC:
             수 회 반복 (문헌 표준: 드론레이싱 LMPC는 SQP max 5 iter).
         nlp_max_iter : int
             nlp_solver_type='SQP'일 때 반복 상한.
+        cost_variant : 'NLS' | 'EXT_EXACT'
+            EXT_EXACT = EXTERNAL cost + exact Hessian + MIRROR 정규화.
+            "GN이 대잔차 과도구간을 못 넘는다" 가설 검증용 (균일 그리드 전제).
+            yref는 모델 파라미터 p로 전달.
         T_min : float
             총추력 하한 [N]. 감속 중 최적화기가 T→0 근처로 내려가면
             모터 n→0에서 INDI G(∝n) 특이화 → 제어권한 상실 → 텀블
@@ -106,6 +110,10 @@ class AcadosVirtualNMPC:
         self.nlp_max_iter = int(nlp_max_iter)
         self.qp_iter_max = int(qp_iter_max)
         self.integrator = integrator
+        self.cost_variant = cost_variant
+        if cost_variant == 'EXT_EXACT':
+            assert np.allclose(self.time_steps, self.time_steps[0]), \
+                'EXT_EXACT는 균일 그리드 전제 (실험용)'
         self.as_rti_iter = as_rti_iter
         self.as_rti_level = as_rti_level
         self.nx_solver = NX_V + (NU_V if self.rate_aug else 0)
@@ -167,16 +175,35 @@ class AcadosVirtualNMPC:
 
         ocp = AcadosOcp()
         ocp.model = model
-        ocp.model.cost_y_expr = y_expr
-        ocp.model.cost_y_expr_e = y_e_expr
-        ocp.cost.cost_type = 'NONLINEAR_LS'
-        ocp.cost.cost_type_e = 'NONLINEAR_LS'
-        ocp.cost.W = W
-        # 종단 = 10×(Q_v, Q_z) — IPOPT판과 동일. ω는 수치용 미소값
-        ocp.cost.W_e = np.diag([50.0, 50.0, 100.0, 200.0, 1e-6, 1e-6, 1e-6])
+        W_e = np.diag([50.0, 50.0, 100.0, 200.0, 1e-6, 1e-6, 1e-6])
         self._ny = W.shape[0]
-        ocp.cost.yref = np.zeros(self._ny)
-        ocp.cost.yref_e = np.zeros(7)
+
+        if self.cost_variant == 'EXT_EXACT':
+            # EXTERNAL cost + exact Hessian — yref를 파라미터 p로.
+            # 변화율 가중은 균일 dt² 상수로 접음 (실험 전제)
+            p_ref = ca.SX.sym('p_ref', self._ny)
+            ocp.model.p = p_ref
+            ocp.parameter_values = np.zeros(self._ny)
+            if self.rate_aug:
+                R_DU = (np.array([1e-4, 0.01, 0.01, 0.01])
+                        * self.du_weight_scale * float(self.time_steps[0])**2)
+                W = np.diag(np.concatenate([np.array(base_W), R_DU]))
+            r = y_expr - p_ref
+            r_e = y_e_expr - p_ref[0:7]
+            ocp.model.cost_expr_ext_cost = r.T @ ca.DM(W) @ r
+            ocp.model.cost_expr_ext_cost_e = r_e.T @ ca.DM(W_e) @ r_e
+            ocp.cost.cost_type = 'EXTERNAL'
+            ocp.cost.cost_type_e = 'EXTERNAL'
+        else:
+            ocp.model.cost_y_expr = y_expr
+            ocp.model.cost_y_expr_e = y_e_expr
+            ocp.cost.cost_type = 'NONLINEAR_LS'
+            ocp.cost.cost_type_e = 'NONLINEAR_LS'
+            ocp.cost.W = W
+            # 종단 = 10×(Q_v, Q_z) — IPOPT판과 동일. ω는 수치용 미소값
+            ocp.cost.W_e = W_e
+            ocp.cost.yref = np.zeros(self._ny)
+            ocp.cost.yref_e = np.zeros(7)
 
         # ── 제약 ──
         if self.rate_aug:
@@ -210,7 +237,12 @@ class AcadosVirtualNMPC:
         so.cost_scaling = np.ones(self.N + 1)        # IPOPT판과 의미 일치
         so.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
         so.hpipm_mode = hpipm_mode
-        so.hessian_approx = 'GAUSS_NEWTON'
+        if self.cost_variant == 'EXT_EXACT':
+            so.hessian_approx = 'EXACT'
+            if regularize_method is None:
+                regularize_method = 'MIRROR'     # exact Hessian은 정규화 필수
+        else:
+            so.hessian_approx = 'GAUSS_NEWTON'
         so.integrator_type = self.integrator
         so.sim_method_num_stages = 4
         so.sim_method_num_steps = 3
@@ -254,7 +286,7 @@ class AcadosVirtualNMPC:
                 ) from e
             raise
 
-        if self.rate_aug:
+        if self.rate_aug and self.cost_variant != 'EXT_EXACT':
             # 변화율 가중치 = R_du·dt_k² (IPOPT판 節間 Δu 페널티와 등가, 노드별)
             R_DU = np.array([1e-4, 0.01, 0.01, 0.01]) * self.du_weight_scale
             base = np.array(base_W)
@@ -291,6 +323,10 @@ class AcadosVirtualNMPC:
         self._ever_converged = False
         self.solve_times = []
         self.statuses = []
+        try:
+            self.solver.reset()          # QP 승수 오염까지 초기화 (위 참고)
+        except AttributeError:
+            pass
         self._init_trajectory()
 
     def set_refs(self, v_ref, z_ref, T_ref=None):
@@ -307,6 +343,10 @@ class AcadosVirtualNMPC:
         yref[0:3] = self.v_ref
         yref[3] = self.z_ref
         yref[7:11] = self.u_ref            # rate_aug면 11:15(u̇ 기준)는 0
+        if self.cost_variant == 'EXT_EXACT':
+            for k in range(self.N + 1):
+                self.solver.set(k, 'p', yref)
+            return
         for k in range(self.N):
             self.solver.cost_set(k, 'yref', yref)
         self.solver.cost_set(self.N, 'yref', yref[:7])
@@ -325,6 +365,13 @@ class AcadosVirtualNMPC:
         연쇄 실패(cascade)가 됨 — 실측: 재시드 없이는 한 번의 NaN이
         이후 전 솔브를 무너뜨림 (grid 비교에서 status OK 1067/3250).
         """
+        # ⚠ 궤적(x,u)만 재시드하면 부족 — QP 승수(lam/pi)가 NaN으로 오염되면
+        # 이후 전 솔브가 실패하는 영구 불능 상태가 됨 (실측: OK 0/3250 동결).
+        # solver.reset()으로 내부 메모리(승수 포함)까지 초기화.
+        try:
+            self.solver.reset()
+        except AttributeError:
+            pass
         seed = (np.concatenate([x13, self._u_state])
                 if self.rate_aug else x13)
         u_node = np.zeros(NU_V) if self.rate_aug else self.u_ref
