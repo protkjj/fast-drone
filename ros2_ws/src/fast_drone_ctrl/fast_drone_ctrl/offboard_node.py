@@ -117,9 +117,14 @@ class OffboardController(Node):
         self.dt = 1.0 / self.control_rate
 
         # ── 안전장치 ──
+        # hover_rpm은 물리값 sqrt(mg/4k_T)로 — n_max*0.32 근사는 n_max에
+        # 종속되는 매직넘버 (코드리뷰 Issue 2 배선)
+        from .controllers.vehicle_params import vehicle_params as _VP
         self.safety = SafetyGuard(
             n_max=self.n_max,
             dt=self.dt,
+            hover_rpm=float(np.sqrt(_VP['mass'] * _VP['g']
+                                    / (4 * _VP['k_T']))),
         )
 
         # ── 제어기 생성 ──

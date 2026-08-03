@@ -139,6 +139,12 @@ class HybridWithFallback:
         if np.any(u < -100) or np.any(u > 2500):
             return True
 
+        # 상태 NaN/Inf (추정기 고장 등) — ω 트리거보다 먼저 와야 함:
+        # norm(nan) > limit 은 False라 NaN이 ω 검사를 조용히 통과함
+        # (MEMORY 주의 4 "NaN 검사 > 채터링 가드"와 같은 순서 원칙)
+        if np.any(~np.isfinite(x[2:13])):
+            return True
+
         # ── 채터링 방지: 복귀 직후엔 나머지 검사 건너뜀 ──
         if self._steps_since_switch < self.min_hybrid_steps and self._switch_count > 0:
             self._steps_since_switch += 1
