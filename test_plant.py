@@ -2,8 +2,6 @@
 검증 테스트 — 축대칭 동체 + 쿼드콥터 추진 6-DOF 플랜트
 """
 import numpy as np
-import sys
-sys.path.insert(0, '/Users/kj/Desktop/dynamic/fast_drone')
 
 from vehicle_params import vehicle_params as P
 from dynamics import AxialDronePlant, build_dynamics, compute_allocation_matrix, NX
