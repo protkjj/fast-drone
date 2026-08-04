@@ -1,7 +1,22 @@
-# acados 이식 중간 보고 — 순항 성공 / 감속 과도구간 발산 (중단 지점)
+# acados 이식 — 최종 확정 (2026-08-04)
 
-2026-08-04. 계획된 시도 상한 도달로 중단, kj 판단 대기.
-관련 파일: `vnmpc_acados.py`, `acados_grid_comparison.py`, `results/acados_grid_motors.png`
+## ✅ 최종 확정 스펙 (kj 승인 + MC 검증 완료)
+
+```
+솔버:   acados GN-RTI 13D + Δu 확장, 그리드 G2 (균일 10×0.1, 지평선 1s)
+        0.13ms / p95 0.28ms, feedback 지연 중앙 0.09ms (rti_phase 분리 시)
+전환:   예방형 t=감속시작(43s) → ScheduledLQR, 복귀 금지
+백스톱: ω15 트리거 + NaN 우선 검사(u+상태) + z오차/미수렴/분산
+검증:   G2+예방형 MC 30회 — 완주 30/30, 실기판정(|ω|>35 or >25@200ms) FAIL 0,
+        |ω|max 2.3, 감속 max_dz 9.30±0.03m (결정론적), 채터링 전무(플롯)
+한계:   감속 vx 추종 나쁨 (RMSE 26~30, LQR 특성) — z는 안전(≤3.4),
+        정찰 임무 영향 미미(예정보다 멀리 가서 멈춤), 받음각 감속(장기)이 개선 자리
+```
+
+아래는 이 결론에 도달한 전 과정 기록 (라운드 1~3 + 판정 MC).
+
+관련 파일: `vnmpc_acados.py`, `acados_fallback_mc.py`, `bench_acados.py`,
+`acados_grid_arch.py`, `final_config_mission.py`
 
 ## 성공한 것
 

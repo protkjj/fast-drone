@@ -35,8 +35,10 @@ CONFIGS = {
     # 예방형: 감속 시작(t=43)에 계획 전환 — 텀블 진입 자체를 회피해
     # 반응형 ω15의 핸드오버 딥(~6.7m)을 줄이는지 검증. ω15는 백스톱 유지
     'gnrti_pre': dict(rate_aug=True),
+    # 최종 확정 후보: G2 그리드(10×0.1) + 예방형 — 채택 전 MC 검증 (kj 지시)
+    'g2_pre': dict(rate_aug=True, N=10, dt_nmpc=0.1),
 }
-PREEMPTIVE_T = {'gnrti_pre': 43.0}
+PREEMPTIVE_T = {'gnrti_pre': 43.0, 'g2_pre': 43.0}
 
 
 class LoggedFB(HybridWithFallback):
@@ -89,7 +91,8 @@ def omega_metrics(xs, dt=0.001):
 
 
 def main(config_name, n_trials=30, seed=0):
-    kw = dict(N=20, dt_nmpc=0.05, dt_ctrl=0.02, **CONFIGS[config_name])
+    kw = dict(N=20, dt_nmpc=0.05, dt_ctrl=0.02)
+    kw.update(CONFIGS[config_name])      # 구성이 N/dt를 덮어쓸 수 있음 (G2 등)
     plant = AxialDronePlant(P, dt=0.001)
     profile = MissionProfile(cruise_speed=70.0, cruise_alt=50.0)
     gust_fn = make_gust_fn('vertical', 10.0, 35.0, 1.0)
