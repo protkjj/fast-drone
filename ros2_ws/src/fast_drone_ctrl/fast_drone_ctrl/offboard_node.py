@@ -120,11 +120,20 @@ class OffboardController(Node):
         # hover_rpm은 물리값 sqrt(mg/4k_T)로 — n_max*0.32 근사는 n_max에
         # 종속되는 매직넘버 (코드리뷰 Issue 2 배선)
         from .controllers.vehicle_params import vehicle_params as _VP
+        from .controllers.dynamics import compute_allocation_matrix as _alloc
+        _, _TM_to_f = _alloc(_VP)
         self.safety = SafetyGuard(
             n_max=self.n_max,
             dt=self.dt,
             hover_rpm=float(np.sqrt(_VP['mass'] * _VP['g']
                                     / (4 * _VP['k_T']))),
+            # 최후 폴백 회전 감쇠 (제로모멘트 대체): ω̇ ≈ -k_ω·ω, τ=0.2s
+            attitude_rescue=dict(
+                TM_to_f=_TM_to_f,
+                k_T=_VP['k_T'],
+                J_diag=np.array([_VP['Ixx'], _VP['Iyy'], _VP['Izz']]),
+                k_omega=5.0,
+            ),
         )
 
         # ── 제어기 생성 ──

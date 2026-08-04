@@ -40,7 +40,7 @@ class SafetyGuard:
     여러 보호 레이어를 순차 적용.
     """
 
-    def __init__(self, n_max, dt, hover_rpm=None):
+    def __init__(self, n_max, dt, hover_rpm=None, attitude_rescue=None):
         """
         Parameters
         ----------
@@ -51,9 +51,18 @@ class SafetyGuard:
         hover_rpm : float or None
             호버 모터 속도 [rad/s].
             None이면 n_max * 0.32 사용 (T/W~10 기체의 호버점 근사).
+        attitude_rescue : dict or None
+            최후 폴백의 회전 감쇠 (제로모멘트 호버 대체 — 리뷰 Issue 2 근본 개선):
+              TM_to_f  : array(4,4)  [T,Mx,My,Mz]→모터추력 할당 역행렬
+              k_T      : float       추력 계수 [N/(rad/s)²]
+              J_diag   : array(3)    관성 대각 [Ixx,Iyy,Izz]
+              k_omega  : float       감쇠 게인 [1/s] (ω̇≈-k·ω, 권장 5)
+            None이면 기존 제로모멘트 호버 폴백 유지.
         """
         self.n_max = n_max
         self.dt = dt
+        self._rescue = attitude_rescue
+        self._state_ref = None              # check()에서 전달된 최근 상태
 
         # 호버 폴백 속도
         if hover_rpm is None:
@@ -108,6 +117,7 @@ class SafetyGuard:
         self.triggered = False
         self.level = SafetyLevel.NOMINAL
         self.trigger_reason = ""
+        self._state_ref = state             # 폴백의 회전 감쇠용
 
         u = np.array(u_raw, dtype=float)
 
@@ -141,15 +151,13 @@ class SafetyGuard:
             self.triggered = True
 
             if self._consecutive_nan >= self.max_consecutive_nan:
-                # 연속 NaN 한계 초과 → 호버 폴백.
-                # ⚠ hover_cmd는 4모터 동일 = 모멘트 0 (자세제어 없음) —
-                #   일시 출력일 뿐이며, 지속 시 노드가 offboard 하트비트를
-                #   끊어 PX4 failsafe로 승격한다 (offboard_node Issue 3 배선)
+                # 연속 NaN 한계 초과 → 폴백 (감쇠 가능하면 회전 감쇠 호버,
+                # 아니면 제로모멘트 호버 — 지속 시 노드가 PX4로 승격)
                 self.level = SafetyLevel.FAILSAFE
                 self.trigger_reason = (
-                    f"연속 NaN {self._consecutive_nan}회 → 호버 폴백"
+                    f"연속 NaN {self._consecutive_nan}회 → 폴백"
                 )
-                return self.hover_cmd.copy()
+                return self._fallback_cmd()
             else:
                 # 일시적 NaN → 마지막 유효값 유지
                 self.level = SafetyLevel.WARNING
@@ -197,15 +205,15 @@ class SafetyGuard:
         tilt = np.arccos(cos_tilt)
 
         if tilt > self.max_tilt:
-            # 과도 틸트 → 호버 폴백 (⚠ 모멘트 0 — 위 NaN 폴백 주석과 동일:
-            # 자세 회복은 못 하고, 지속 시 노드가 PX4 failsafe로 승격)
+            # 과도 틸트 → 폴백. 회전 감쇠가 설정돼 있으면 텀블 성장을 멈춤
+            # (자세 복원까진 못 함 — 지속 시 노드가 PX4 failsafe로 승격)
             self.triggered = True
             self.level = SafetyLevel.FAILSAFE
             self.trigger_reason += (
                 f" | 틸트 {np.degrees(tilt):.0f}° > "
                 f"한계 {np.degrees(self.max_tilt):.0f}°"
             )
-            return self.hover_cmd.copy()
+            return self._fallback_cmd()
 
         # 고도 하한 체크
         altitude = state[2]  # NWU z-up
@@ -224,6 +232,28 @@ class SafetyGuard:
             u = np.clip(u + boost, 0.0, self.n_max)
 
         return u
+
+    def _fallback_cmd(self):
+        """최후 폴백 명령: 호버 추력 + 각속도 감쇠 모멘트.
+
+        제로모멘트 호버(4모터 동일)의 근본 개선 (리뷰 Issue 2):
+        M = -k_ω·J·ω 감쇠를 할당해 텀블 성장을 멈춘다 (ω̇ ≈ -k_ω·ω).
+        자세 '복원'은 아님 — PX4 승격까지의 교량.
+        감쇠 불가 조건(설정 없음 / 상태 없음 / ω 비유한)이면 제로모멘트로 강등.
+        """
+        if self._rescue is None or self._state_ref is None:
+            return self.hover_cmd.copy()
+        omega = np.asarray(self._state_ref[10:13], dtype=float)
+        if not np.all(np.isfinite(omega)):
+            return self.hover_cmd.copy()    # ω 측정 불능 — 감쇠도 불가
+
+        r = self._rescue
+        M = -r['k_omega'] * (np.asarray(r['J_diag'], dtype=float) * omega)
+        T_hover = 4.0 * r['k_T'] * float(self.hover_cmd[0])**2
+        TM = np.array([T_hover, M[0], M[1], M[2]])
+        f_ind = np.asarray(r['TM_to_f'], dtype=float) @ TM
+        n = np.sqrt(np.clip(f_ind, 0.0, None) / r['k_T'])
+        return np.clip(n, 0.0, self.n_max)
 
     def reset(self):
         """상태 초기화."""
