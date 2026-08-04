@@ -605,6 +605,10 @@ class INDIController:
         omega_dot_des = -self.Kp_indi * att_err - self.Kd_indi * omega
 
         # ━━ 3. 각가속도 측정 (LPF) ━━
+        # 측정 NaN 가드 (리뷰 3d): 자기참조 LPF는 NaN 1회로 영구 고착
+        if not (np.all(np.isfinite(omega)) and np.all(np.isfinite(n_actual))):
+            return self._fallback(T_cmd, omega_dot_des)
+
         if not self._initialized:
             self._omega_prev = omega.copy()
             self._initialized = True

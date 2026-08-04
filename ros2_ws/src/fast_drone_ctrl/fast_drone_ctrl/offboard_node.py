@@ -47,7 +47,7 @@ from .frame_utils import (
     quat_ned_to_nwu,
     motor_speed_to_normalized,
 )
-from .safety import SafetyGuard
+from .safety import SafetyGuard, SafetyLevel
 
 
 # ════════════════════════════════════════════════════
@@ -141,6 +141,15 @@ class OffboardController(Node):
         # ── 상태 변수 ──
         self._state_valid = False           # 첫 상태 수신 여부
         self._heading_latched = False       # heading을 초기 기수로 래치했는지
+        # 신선도·승격 (리뷰 Issue 3): 우리 실패를 PX4 failsafe로 넘기는 경로
+        self._last_odom_time = None
+        self._bad_odom_count = 0
+        self._stale_loops = 0
+        self._failsafe_loops = 0
+        self._escalated = False
+        self.state_timeout = 0.2            # [s] odom 신선도 한계
+        self._watchdog_limit = max(10, int(1.0 * self.control_rate))
+        self._q_nwu_prev = None             # 쿼터니언 부호 연속성 (리뷰 Issue 1 후속)
         self._pos_ned = np.zeros(3)
         self._vel_ned = np.zeros(3)
         self._q_ned_sf = np.array([1.0, 0.0, 0.0, 0.0])  # scalar-first
@@ -183,12 +192,26 @@ class OffboardController(Node):
     # ════════════════════════════════════════════════
 
     def _odom_callback(self, msg: VehicleOdometry):
-        """VehicleOdometry 수신 → 내부 상태 업데이트."""
-        self._pos_ned = np.array(msg.position, dtype=float)
-        self._vel_ned = np.array(msg.velocity, dtype=float)
-        self._q_ned_sf = np.array(msg.q, dtype=float)
+        """VehicleOdometry 수신 → 내부 상태 업데이트 (유효성 검사 포함)."""
+        pos = np.array(msg.position, dtype=float)
+        vel = np.array(msg.velocity, dtype=float)
+        q = np.array(msg.q, dtype=float)
+        om = np.array(msg.angular_velocity, dtype=float)
+        # 비유한 데이터는 버림 — 마지막 유효 상태 유지, 신선도 타이머 미갱신
+        # (리뷰 Issue 3: 상태 유효성 검사 0건이었음)
+        if not (np.all(np.isfinite(pos)) and np.all(np.isfinite(vel))
+                and np.all(np.isfinite(q)) and np.all(np.isfinite(om))):
+            self._bad_odom_count += 1
+            if self._bad_odom_count % 50 == 1:
+                self.get_logger().warn(
+                    f'비유한 odom 수신 {self._bad_odom_count}회 — 폐기')
+            return
+        self._pos_ned = pos
+        self._vel_ned = vel
+        self._q_ned_sf = q
         # 동체 각속도(FRD) — 별도 VehicleAngularVelocity 대신 odom에서 취득
-        self._omega_body = np.array(msg.angular_velocity, dtype=float)
+        self._omega_body = om
+        self._last_odom_time = self.get_clock().now()
 
         if not self._state_valid:
             self._state_valid = True
@@ -205,6 +228,17 @@ class OffboardController(Node):
         if self._vehicle_armed and not was_armed:
             self.get_logger().info('기체 ARMED')
             self._t_start = self.get_clock().now()
+            # 재arm 리셋 (리뷰 Issue 4): t가 0으로 되감기는데 제어기 내부상태
+            # (NMPC _last_t/웜스타트, INDI 필터)가 이전 비행을 기억하면
+            # 재arm 직후 수십 초 개루프가 됨 → 전부 초기화 + heading 재래치
+            if hasattr(self.controller, 'reset'):
+                self.controller.reset()
+            self.safety.reset()
+            self._heading_latched = False
+            self._escalated = False
+            self._stale_loops = 0
+            self._failsafe_loops = 0
+            self._q_nwu_prev = None
         elif not self._vehicle_armed and was_armed:
             self.get_logger().warn('기체 DISARMED')
 
@@ -219,7 +253,16 @@ class OffboardController(Node):
         Phase 1: Offboard 모드 진입 전 — 제어 모드 메시지만 발행
         Phase 2: ARM 후 — 제어기 실행 + 모터 명령 발행
         """
-        # 항상 OffboardControlMode 발행 (끊기면 failsafe 발동)
+        # 승격 상태 (리뷰 Issue 3): 우리 쪽 실패가 확정되면 offboard 하트비트를
+        # 의도적으로 중단 → PX4 offboard-loss failsafe가 기체를 인수.
+        # (기존: _publish_offboard_mode()가 무조건 실행 — 실패가 승격 안 됐음)
+        if self._escalated:
+            if self._offboard_setpoint_count % 100 == 0:
+                self.get_logger().error(
+                    '[승격] offboard 하트비트 중단 중 — PX4 failsafe 인계')
+            self._offboard_setpoint_count += 1
+            return
+
         self._publish_offboard_mode()
         self._offboard_setpoint_count += 1
 
@@ -253,6 +296,19 @@ class OffboardController(Node):
         # Phase 2: 제어기 실행
         if not self._state_valid:
             self._publish_zero_motors()
+            return
+
+        # ── 상태 신선도 워치독 (리뷰 Issue 3 — 기존 _watchdog_count는 죽은 코드) ──
+        now = self.get_clock().now()
+        stale = (self._last_odom_time is None
+                 or (now - self._last_odom_time).nanoseconds * 1e-9
+                 > self.state_timeout)
+        self._stale_loops = self._stale_loops + 1 if stale else 0
+        if self._vehicle_armed and self._stale_loops >= self._watchdog_limit:
+            self._escalated = True
+            self.get_logger().error(
+                f'[승격] 상태 두절 {self._stale_loops}루프 (>{self.state_timeout}s'
+                f' 신선도 위반 지속) — PX4 failsafe 인계')
             return
 
         # ── 오픈루프 플랜트 테스트 (컨트롤러/안전장치 우회) ──
@@ -315,6 +371,12 @@ class OffboardController(Node):
                 # 잘못된 동체축으로 매핑됨 → 롤 커플/발산. 트림을 현재 기수로
                 # 재선형화해 피드백 축을 실제 동체축과 정렬.
                 self._relatch_lqr_heading(x)
+            else:
+                # 리뷰 Issue 5: scheduled_lqr/indi 등은 heading/x_trim이 없어
+                # 조용히 통과했음 — 절대기수 가정이 스폰 기수와 싸울 수 있음
+                self.get_logger().warn(
+                    f'[heading 래치] {type(self.controller).__name__}에 '
+                    f'heading/x_trim 없음 — 절대기수 가정 주의 (스폰 기수 확인)')
             self._heading_latched = True
 
         # ── 진단 계측: 피드백 자세 lean(방향) + omega(각속도) + 요각 ──
@@ -344,6 +406,18 @@ class OffboardController(Node):
             self.get_logger().warn(
                 f'[안전] {self.safety.level.name}: {self.safety.trigger_reason}'
             )
+
+        # FAILSAFE 지속 → PX4 승격 (리뷰 Issue 2/3): SafetyGuard의 호버 폴백은
+        # 모멘트 0(자세제어 없음)이라 일시 출력일 뿐 — 2초 지속되면 우리 스택
+        # 회복 불능으로 보고 PX4에 넘김
+        self._failsafe_loops = (self._failsafe_loops + 1
+                                if self.safety.level == SafetyLevel.FAILSAFE
+                                else 0)
+        if self._vehicle_armed and self._failsafe_loops >= int(2 * self.control_rate):
+            self._escalated = True
+            self.get_logger().error(
+                '[승격] SafetyGuard FAILSAFE 2초 지속 — PX4 failsafe 인계')
+            return
 
         # 모터 명령 발행
         self._publish_motors(u)
@@ -381,9 +455,14 @@ class OffboardController(Node):
         q_ned_sl = quat_scalar_first_to_last(self._q_ned_sf)
         q_nwu = quat_ned_to_nwu(q_ned_sl)
 
-        # 부호 정규화 (연속성)
-        if q_nwu[3] < 0:
-            q_nwu = -q_nwu
+        # 부호 연속성 — 직전 샘플 기준 (리뷰: 트림 w≡0이라 w>0 관례는
+        # 롤 ±에서 부호가 튐. LQR 최단경로 보정으로 면역이지만 정석 유지)
+        if self._q_nwu_prev is not None:
+            if np.dot(q_nwu, self._q_nwu_prev) < 0:
+                q_nwu = -q_nwu
+        elif q_nwu[3] < 0:
+            q_nwu = -q_nwu                  # 첫 샘플만 관례적 부호
+        self._q_nwu_prev = q_nwu.copy()
 
         # 동체 각속도: FRD 프레임 공통이므로 변환 불필요
         omega = self._omega_body

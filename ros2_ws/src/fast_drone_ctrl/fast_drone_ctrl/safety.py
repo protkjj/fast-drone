@@ -141,7 +141,10 @@ class SafetyGuard:
             self.triggered = True
 
             if self._consecutive_nan >= self.max_consecutive_nan:
-                # 연속 NaN 한계 초과 → 호버 폴백
+                # 연속 NaN 한계 초과 → 호버 폴백.
+                # ⚠ hover_cmd는 4모터 동일 = 모멘트 0 (자세제어 없음) —
+                #   일시 출력일 뿐이며, 지속 시 노드가 offboard 하트비트를
+                #   끊어 PX4 failsafe로 승격한다 (offboard_node Issue 3 배선)
                 self.level = SafetyLevel.FAILSAFE
                 self.trigger_reason = (
                     f"연속 NaN {self._consecutive_nan}회 → 호버 폴백"
@@ -194,7 +197,8 @@ class SafetyGuard:
         tilt = np.arccos(cos_tilt)
 
         if tilt > self.max_tilt:
-            # 과도 틸트 → 호버 폴백
+            # 과도 틸트 → 호버 폴백 (⚠ 모멘트 0 — 위 NaN 폴백 주석과 동일:
+            # 자세 회복은 못 하고, 지속 시 노드가 PX4 failsafe로 승격)
             self.triggered = True
             self.level = SafetyLevel.FAILSAFE
             self.trigger_reason += (
@@ -213,8 +217,11 @@ class SafetyGuard:
             self.trigger_reason += (
                 f" | 저고도 경고 z={altitude:.1f}m"
             )
-            # 호버 이상의 추력 보장
-            u = np.maximum(u, self.hover_cmd)
+            # 호버 이상의 추력 보장 — 차동(모멘트) 보존 균일 상승.
+            # (기존 np.maximum 원소별 클램프는 낮은 모터만 끌어올려
+            #  자세 모멘트를 왜곡했음 — 리뷰 Issue 2)
+            boost = max(0.0, float(np.mean(self.hover_cmd) - np.mean(u)))
+            u = np.clip(u + boost, 0.0, self.n_max)
 
         return u
 

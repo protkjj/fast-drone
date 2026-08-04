@@ -262,6 +262,11 @@ class ProperHybrid:
         omega = x[10:13]
         n_actual = x[13:17]
 
+        # 측정 NaN 가드 (리뷰 3d): _omega_dot_filt는 자기참조 LPF라 NaN이
+        # 한 번 들어가면 영구 고착 — 갱신을 건너뛰고 모델 기반 폴백으로.
+        if not (np.all(np.isfinite(omega)) and np.all(np.isfinite(n_actual))):
+            return self._fallback(T_cmd, omega_dot_des)
+
         if not self._initialized:
             self._omega_prev = omega.copy()
             self._prev_t = t

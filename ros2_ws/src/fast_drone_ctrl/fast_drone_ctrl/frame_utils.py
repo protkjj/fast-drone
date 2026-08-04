@@ -122,7 +122,8 @@ def quat_ned_to_nwu(q_ned):
 # 복합 변환: PX4 메시지 ↔ 우리 상태 벡터
 # ════════════════════════════════════════════════════
 
-def px4_to_state(pos_ned, vel_ned, q_ned_sf, omega_body, motor_speeds):
+def px4_to_state(pos_ned, vel_ned, q_ned_sf, omega_body, motor_speeds,
+                 q_prev=None):
     """
     PX4 메시지 데이터 → 우리 상태 벡터 x(17).
 
@@ -152,8 +153,14 @@ def px4_to_state(pos_ned, vel_ned, q_ned_sf, omega_body, motor_speeds):
     q_ned_sl = quat_scalar_first_to_last(q_ned_sf)
     q_nwu = quat_ned_to_nwu(q_ned_sl)
 
-    # 쿼터니언 부호 정규화 (w > 0 관례)
-    if q_nwu[3] < 0:
+    # 쿼터니언 부호 정규화 — 직전 샘플 연속성 기준 (2026-08-04 리뷰):
+    # 이 기체는 트림 w≡0 (180° about x)이라 w>0 경계가 정상 비행자세 위에
+    # 있어, w>0 관례는 롤 ± 절반에서 부호를 튀게 함. q_prev가 있으면
+    # 내적 기준 연속성, 없을 때(첫 샘플)만 관례적 부호 선택.
+    if q_prev is not None:
+        if np.dot(q_nwu, q_prev) < 0:
+            q_nwu = -q_nwu
+    elif q_nwu[3] < 0:
         q_nwu = -q_nwu
 
     return np.concatenate([pos_nwu, vel_nwu, q_nwu, omega_body, motor_speeds])
