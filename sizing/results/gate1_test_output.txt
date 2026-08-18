@@ -1,0 +1,126 @@
+
+======================================================================
+TEST 1: 선형 스텁 — 해석해 대조 (고정점·S_hat)
+  status=converged  n_iter=4  S_hat=0.210000000
+  MTOW  = 6.866732225
+  해석해 = 6.866385373   상대오차 = 5.051e-05
+  PASS
+
+======================================================================
+TEST 2: relax 불변성 — §0.1 격리 원칙
+  relax= 0.3  MTOW=6.866396573  S_hat=0.210000000  n=31
+  relax= 0.5  MTOW=6.866397439  S_hat=0.210000000  n=17
+  relax= 1.0  MTOW=6.866388585  S_hat=0.210000000  n=7
+  relax= 1.5  MTOW=6.866377257  S_hat=0.210000000  n=6
+  relax= 2.0  MTOW=6.866374782  S_hat=0.210000000  n=16
+  MTOW 최대편차 = 2.266e-05
+  PASS
+
+======================================================================
+TEST 3: §2.5 항등식 — MTOW == Σbreakdown
+  선형     status=converged    |Σbreakdown - MTOW| = 0.000e+00
+  멱함수    status=converged    |Σbreakdown - MTOW| = 0.000e+00
+  양자화    status=limit_cycle  |Σbreakdown - MTOW| = 0.000e+00
+  PASS
+
+======================================================================
+TEST 4: 구조 발산 — 경계가 정확히 S=1 (§7.2)
+       S       status    div_mode        err
+    0.99     max_iter        None   3.24e+02
+    1.00     diverged  structural       None
+    1.10     diverged  structural       None
+    2.00     diverged  structural       None
+  PASS
+
+======================================================================
+TEST 5: [회귀] Ŝ ∈ (1, 1+delta_r) 구멍 — 발산을 수렴으로 뒤집던 자리
+  S=1.001   status=diverged    div_mode=structural   err=None
+  S=1.02    status=diverged    div_mode=structural   err=None
+  S=1.049   status=diverged    div_mode=structural   err=None
+  음수 err 유출 없음 (S=0.2~2.0 전 구간)
+  PASS
+
+======================================================================
+TEST 6: 수치 발산 — relax > 2/(1-S) 에서만 (§3.3)
+  이론 안정한계 relax < 2/(1-S) = 2.5316
+   relax  h_theory       status    div_mode
+    1.00    0.2100    converged        None
+    2.00   -0.5800    converged        None
+    2.40   -0.8960    converged        None
+    2.60   -1.0540     diverged   numerical
+    3.00   -1.3700     diverged   numerical
+  PASS
+
+======================================================================
+TEST 7: 리밋 사이클 — 중점이 아니라 분기 채택 (검토 지적 1)
+  (a) raw 고정: status=limit_cycle  n_iter=7  err=0.0000e+00
+       두 분기 raw 차=0.0000e+00  err=0.0000e+00  (기대 0.0000e+00)
+  (b) raw 진동: status=limit_cycle  n_iter=6  err=3.0000e-02
+       두 분기 raw 차=6.0000e-02  err=3.0000e-02  (기대 3.0000e-02)
+  → err=0 은 버그가 아니다: 두 분기가 같은 raw 를 주면 그 값이 정확한 고정점이다
+  PASS
+
+======================================================================
+TEST 8: 출하 설정(relax=1)에서는 양자화가 사이클을 만들지 않는다
+    quantum       status  n_iter
+      0.005    converged       3
+      0.020    converged       3
+      0.100    converged       2
+      0.500    converged       2
+      2.000    converged       2
+  → limit_cycle 기계는 §7.4 스윕 격자(relax 0.3~3.0)용이지 출하 설정용이 아니다
+  PASS
+
+======================================================================
+TEST 9: r̂ 추정 전 수렴 선언 금지 (§2.4)
+  S=0.05  status=converged  n_iter=3  
+  S=0.21  status=converged  n_iter=4  
+  S=0.4   status=converged  n_iter=7  
+  S=0.6   status=converged  n_iter=14  
+  PASS
+
+======================================================================
+TEST 10: max_iter 는 err 을 동반한다 (§3.5 — 이진 판단을 넘기지 않는다)
+  S=0.95  status=max_iter  n_iter=50  S_hat=0.9500  err=7.8056e+00
+  PASS
+
+======================================================================
+TEST 11: strc_fn 무상태성 대조 (§0 — 버그 1-3 재발 방지)
+  잡힘: strc_fn 이 순수하지 않습니다: 같은 MTOW=7.044733044733044 에 W_str 이 1.4808733333333...
+  기본값(꺼짐)에서는 실행됨: status=converged
+  PASS
+
+======================================================================
+TEST 12: 비물리 입력·모델은 예외 (§3.4)
+  e_spec<=0        → WghtInputError ✓
+  strc_fn 미연결    → WghtInputError ✓
+  W_str<0          → WghtModelError ✓
+  eps<=resid_floor → WghtInputError ✓
+  PASS
+
+======================================================================
+TEST 13: 질량 특성 — 평행축 정리·병진 불변성
+  (a) 한 점 집중: x_cg=0.500000  J_yy=0.700000  (J_yy_str=0.7)
+  (b) 평행이동: Δx_cg=1.234000000 (기대 1.234)  ΔJ_yy=-2.220e-16 (기대 0)
+  (c) 허브 배치 J_yy=0.224662 / 부착점 배치 J_yy=0.200662
+  (d) 위치 결측 시: x_cg=None  J_yy=None
+  PASS
+
+======================================================================
+TEST 14: 출력 규격 — history 3튜플·resid 부호·n_rotor
+  history 길이=4  첫 항목=(7.044733, 6.903838, -0.140895)
+  relax=2.0 의 resid 부호 집합 = {1.0, -1.0}
+  로터 6개: W_mot+W_bladeset = 0.900000  (기대 0.900000)
+  출력 키 13종 전부 존재
+  PASS
+
+======================================================================
+TEST 15: wght 자신의 무상태성 — 같은 입력이면 같은 출력
+  1회차 MTOW=6.866732225051
+  2회차 MTOW=6.866732225051
+  발산 설계점(S=1.5) 통과 후 MTOW=6.866732225051  (status=diverged)
+  PASS
+
+======================================================================
+ALL TESTS PASSED
+======================================================================
