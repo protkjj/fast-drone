@@ -17,16 +17,16 @@ RTK GPS 확정 상태에서, IMU 노이즈 레벨만 변경:
 import numpy as np
 import time as timer
 
-from vehicle_params import vehicle_params as P
-from dynamics import AxialDronePlant
-from trim import find_trim
-from controller import ScheduledLQR
-from nmpc import NMPCController
-from hybrid_comparison import VirtualNMPC, ProperHybrid
-from gust_comparison import make_gust_fn
-from sensors import IMUSensor, GPSSensor, SensorSuite
-from ekf_sim import simulate_with_ekf, simulate_perfect, compute_metrics
-from ekf_comparison import _reset_controller
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import AxialDronePlant
+from control.trim import find_trim
+from control.controller import ScheduledLQR
+from control.nmpc import NMPCController
+from control.hybrid_comparison import VirtualNMPC, ProperHybrid
+from control.gust_comparison import make_gust_fn
+from control.sensors import IMUSensor, GPSSensor, SensorSuite
+from control.ekf_sim import simulate_with_ekf, simulate_perfect, compute_metrics
+from control.ekf_comparison import _reset_controller
 
 
 def run_imu_level(plant, x0, trim, imu_scale, V_cruise, z_ref, dt, gust_fn):

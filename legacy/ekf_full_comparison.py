@@ -20,16 +20,16 @@ import numpy as np
 import time as timer
 from scipy.spatial.transform import Rotation
 
-from vehicle_params import vehicle_params as P
-from dynamics import AxialDronePlant
-from trim import find_trim
-from controller import ScheduledLQR
-from nmpc import NMPCController
-from hybrid_comparison import VirtualNMPC, ProperHybrid
-from gust_comparison import make_gust_fn
-from sweep_scheduled import reference_trajectory
-from ekf_sim import simulate_with_ekf, simulate_perfect, compute_metrics
-from ekf_comparison import create_sensors, _reset_controller
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import AxialDronePlant
+from control.trim import find_trim
+from control.controller import ScheduledLQR
+from control.nmpc import NMPCController
+from control.hybrid_comparison import VirtualNMPC, ProperHybrid
+from control.gust_comparison import make_gust_fn
+from legacy.sweep_scheduled import reference_trajectory
+from control.ekf_sim import simulate_with_ekf, simulate_perfect, compute_metrics
+from control.ekf_comparison import create_sensors, _reset_controller
 
 
 def make_ctrls(V, z_ref, dt, u_trim):

@@ -3,8 +3,8 @@
 """
 import numpy as np
 
-from vehicle_params import vehicle_params as P
-from dynamics import AxialDronePlant, build_dynamics, compute_allocation_matrix, NX
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import AxialDronePlant, build_dynamics, compute_allocation_matrix, NX
 
 
 def test_freefall():

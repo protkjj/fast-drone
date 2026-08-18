@@ -15,10 +15,10 @@
 """
 
 import numpy as np
-from vehicle_params import vehicle_params as P
-from dynamics import AxialDronePlant
-from trim import find_trim
-from controller import CascadedPID, LQRController
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import AxialDronePlant
+from control.trim import find_trim
+from control.controller import CascadedPID, LQRController
 
 
 def run_speed_sweep():

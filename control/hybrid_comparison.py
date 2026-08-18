@@ -21,12 +21,12 @@ import casadi as ca
 import time as timer
 from scipy.spatial.transform import Rotation
 
-from vehicle_params import vehicle_params as P
-from dynamics import (build_dynamics, _quat_to_rotmat, _quat_derivative,
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import (build_dynamics, _quat_to_rotmat, _quat_derivative,
                       _body_aerodynamics, EPS, compute_allocation_matrix)
-from trim import find_trim
-from controller import ScheduledLQR
-from nmpc import NMPCController
+from control.trim import find_trim
+from control.controller import ScheduledLQR
+from control.nmpc import NMPCController
 
 
 # ══════════════════════════════════════════════════
@@ -450,7 +450,7 @@ def _measure(ts, xs, us, V, z, nm):
 # ══════════════════════════════════════════════════
 
 def main():
-    from dynamics import AxialDronePlant
+    from control.dynamics import AxialDronePlant
     V, z_ref = 70.0, 50.0
 
     print("\n" + "=" * 90)

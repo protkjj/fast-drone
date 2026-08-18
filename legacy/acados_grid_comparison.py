@@ -34,13 +34,13 @@ import time
 
 import numpy as np
 
-from vehicle_params import vehicle_params as P
-from dynamics import AxialDronePlant
-from hybrid_comparison import VirtualNMPC, ProperHybrid
-from vnmpc_acados import AcadosVirtualNMPC
-from mission_sim import (MissionProfile, MissionController, run_mission,
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import AxialDronePlant
+from control.hybrid_comparison import VirtualNMPC, ProperHybrid
+from control.vnmpc_acados import AcadosVirtualNMPC
+from control.mission_sim import (MissionProfile, MissionController, run_mission,
                          compute_phase_metrics, compute_overall)
-from gust_comparison import make_gust_fn
+from control.gust_comparison import make_gust_fn
 
 G3_STEPS = np.array([0.02, 0.02, 0.03, 0.03, 0.05, 0.05,
                      0.08, 0.08, 0.12, 0.12, 0.20, 0.20])

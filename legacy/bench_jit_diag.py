@@ -19,9 +19,9 @@ import time
 import numpy as np
 
 import casadi as ca
-from vehicle_params import vehicle_params as P
-from trim import find_trim
-from hybrid_comparison import build_virtual_dynamics, NX_V, NU_V
+from control.vehicle_params import vehicle_params as P
+from control.trim import find_trim
+from control.hybrid_comparison import build_virtual_dynamics, NX_V, NU_V
 
 f, xs, us = build_virtual_dynamics(P)
 

@@ -19,7 +19,7 @@ import numpy as np
 import casadi as ca
 import time as timer
 
-from dynamics import build_dynamics, NX, NU
+from control.dynamics import build_dynamics, NX, NU
 
 
 class NMPCController:
@@ -222,10 +222,10 @@ class NMPCController:
 # ══════════════════════════════════════════════════════
 
 def run_nmpc_comparison():
-    from vehicle_params import vehicle_params as P
-    from dynamics import AxialDronePlant
-    from trim import find_trim, print_trim
-    from controller import CascadedPID, LQRController
+    from control.vehicle_params import vehicle_params as P
+    from control.dynamics import AxialDronePlant
+    from control.trim import find_trim, print_trim
+    from control.controller import CascadedPID, LQRController
 
     plant = AxialDronePlant(P, dt=0.001)
     dt = plant.dt

@@ -21,11 +21,11 @@ import numpy as np
 import time as timer
 from scipy.spatial.transform import Rotation
 
-from vehicle_params import vehicle_params as P
-from dynamics import AxialDronePlant, NX
-from trim import find_trim
-from controller import CascadedPID, LQRController
-from nmpc_acados import build_ocp_solver, AcadosNMPC
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import AxialDronePlant, NX
+from control.trim import find_trim
+from control.controller import CascadedPID, LQRController
+from legacy.nmpc_acados import build_ocp_solver, AcadosNMPC
 import shutil
 
 

@@ -19,14 +19,14 @@ import time as timer
 
 import numpy as np
 
-from vehicle_params import vehicle_params as P
-from dynamics import AxialDronePlant
-from hybrid_comparison import ProperHybrid
-from vnmpc_acados import AcadosVirtualNMPC
-from fallback_controller import HybridWithFallback
-from controller import ScheduledLQR
-from mission_sim import MissionProfile, MissionController, run_mission
-from gust_comparison import make_gust_fn
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import AxialDronePlant
+from control.hybrid_comparison import ProperHybrid
+from control.vnmpc_acados import AcadosVirtualNMPC
+from control.fallback_controller import HybridWithFallback
+from control.controller import ScheduledLQR
+from control.mission_sim import MissionProfile, MissionController, run_mission
+from control.gust_comparison import make_gust_fn
 
 CONFIGS = {
     'ext5': dict(rate_aug=True, cost_variant='EXT_EXACT',

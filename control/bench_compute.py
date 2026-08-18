@@ -26,12 +26,12 @@ import sys
 import numpy as np
 
 import casadi as ca
-from vehicle_params import vehicle_params as P
-from dynamics import AxialDronePlant
-from trim import find_trim
-from controller import CascadedPID, LQRController, ScheduledLQR, INDIController
-from nmpc import NMPCController
-from hybrid_comparison import VirtualNMPC, ProperHybrid
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import AxialDronePlant
+from control.trim import find_trim
+from control.controller import CascadedPID, LQRController, ScheduledLQR, INDIController
+from control.nmpc import NMPCController
+from control.hybrid_comparison import VirtualNMPC, ProperHybrid
 
 
 def bench_call(fn, n, warmup=5):

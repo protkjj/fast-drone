@@ -5,7 +5,7 @@
 """
 import numpy as np
 
-from fallback_controller import HybridWithFallback
+from control.fallback_controller import HybridWithFallback
 
 
 # ══════════════════════════════════════════════════
@@ -144,11 +144,11 @@ def test_smoke_real_hybrid():
     """실제 ProperHybrid+ScheduledLQR, 70m/s 순항 5s — 새 트리거의 오탐 없음."""
     print("=" * 55)
     print("TEST 5: 실제 Hybrid 스모크 (순항 5s, 오탐 검사)")
-    from vehicle_params import vehicle_params as P
-    from dynamics import AxialDronePlant
-    from trim import find_trim
-    from controller import ScheduledLQR
-    from hybrid_comparison import VirtualNMPC, ProperHybrid
+    from control.vehicle_params import vehicle_params as P
+    from control.dynamics import AxialDronePlant
+    from control.trim import find_trim
+    from control.controller import ScheduledLQR
+    from control.hybrid_comparison import VirtualNMPC, ProperHybrid
 
     plant = AxialDronePlant(P, dt=0.001)
     trim = find_trim(P, 70.0)

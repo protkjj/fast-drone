@@ -55,10 +55,10 @@ import matplotlib
 matplotlib.use('Agg')          # 화면 없이 파일로만 저장
 import matplotlib.pyplot as plt
 
-from vehicle_params import vehicle_params as P
-from dynamics import AxialDronePlant
-from trim import find_trim
-from controller import CascadedPID, ScheduledPID, LQRController, ScheduledLQR
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import AxialDronePlant
+from control.trim import find_trim
+from control.controller import CascadedPID, ScheduledPID, LQRController, ScheduledLQR
 
 # ══════════════════════════════════════════════════
 # 실험 조건

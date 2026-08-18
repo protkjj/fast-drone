@@ -334,7 +334,7 @@ class AxialDronePlant:
     시뮬레이션용 플랜트 래퍼. CasADi RK4 적분기 사용.
 
     사용법:
-        from vehicle_params import vehicle_params
+        from control.vehicle_params import vehicle_params
         plant = AxialDronePlant(vehicle_params, dt=0.001)
 
         x = plant.default_initial_state()

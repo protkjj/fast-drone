@@ -1,19 +1,21 @@
 """SafetyGuard 검증 — 최후 폴백 회전 감쇠(리뷰 Issue 2 근본 개선) 포함.
 
 safety.py는 ros2 패키지에 있지만 상대 import가 없어 직접 import 가능.
-실행: python3 test_safety.py
+실행: python3 -m control.test_safety
 """
 import sys
 import os
 
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+# control/ 안에 있으므로 한 단계 위(저장소 루트)로 올라가야 ros2_ws 가 보인다
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(_REPO,
                                 'ros2_ws/src/fast_drone_ctrl/fast_drone_ctrl'))
 from safety import SafetyGuard, SafetyLevel          # noqa: E402
 
-from vehicle_params import vehicle_params as P       # noqa: E402
-from dynamics import compute_allocation_matrix       # noqa: E402
+from control.vehicle_params import vehicle_params as P       # noqa: E402
+from control.dynamics import compute_allocation_matrix       # noqa: E402
 
 F_TO_TM, TM_TO_F = compute_allocation_matrix(P)
 HOVER = float(np.sqrt(P['mass'] * P['g'] / (4 * P['k_T'])))

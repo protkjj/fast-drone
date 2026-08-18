@@ -17,15 +17,15 @@ import time
 
 import numpy as np
 
-from vehicle_params import vehicle_params as P
-from dynamics import AxialDronePlant
-from hybrid_comparison import ProperHybrid
-from vnmpc_acados import AcadosVirtualNMPC
-from controller import ScheduledLQR
-from mission_sim import (MissionProfile, MissionController, run_mission,
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import AxialDronePlant
+from control.hybrid_comparison import ProperHybrid
+from control.vnmpc_acados import AcadosVirtualNMPC
+from control.controller import ScheduledLQR
+from control.mission_sim import (MissionProfile, MissionController, run_mission,
                          compute_phase_metrics, compute_overall)
-from gust_comparison import make_gust_fn
-from acados_fallback_mc import LoggedFB, omega_metrics
+from control.gust_comparison import make_gust_fn
+from control.acados_fallback_mc import LoggedFB, omega_metrics
 
 FINAL_KW = dict(N=20, dt_nmpc=0.05, dt_ctrl=0.02, rate_aug=True)
 

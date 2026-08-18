@@ -15,8 +15,8 @@ import numpy as np
 from scipy.optimize import fsolve
 from scipy.spatial.transform import Rotation
 
-from vehicle_params import vehicle_params
-from dynamics import AxialDronePlant, NX
+from control.vehicle_params import vehicle_params
+from control.dynamics import AxialDronePlant, NX
 
 
 def find_trim(params, V_cruise):

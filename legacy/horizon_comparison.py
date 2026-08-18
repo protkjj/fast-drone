@@ -17,12 +17,12 @@ import time
 
 import numpy as np
 
-from vehicle_params import vehicle_params as P
-from dynamics import AxialDronePlant
-from hybrid_comparison import VirtualNMPC, ProperHybrid
-from mission_sim import (MissionProfile, MissionController, run_mission,
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import AxialDronePlant
+from control.hybrid_comparison import VirtualNMPC, ProperHybrid
+from control.mission_sim import (MissionProfile, MissionController, run_mission,
                          compute_phase_metrics, compute_overall)
-from gust_comparison import make_gust_fn
+from control.gust_comparison import make_gust_fn
 
 
 def run_variant(label, N, dt_nmpc, plant, profile, gust_fn):

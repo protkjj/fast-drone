@@ -39,7 +39,7 @@ os.environ.setdefault('ACADOS_SOURCE_DIR', os.path.expanduser('~/acados'))
 
 from acados_template import AcadosOcp, AcadosOcpSolver, AcadosModel
 
-from hybrid_comparison import build_virtual_dynamics, NX_V, NU_V
+from control.hybrid_comparison import build_virtual_dynamics, NX_V, NU_V
 
 CODE_DIR_BASE = os.path.expanduser('~/.cache/fast_drone_acados')
 
@@ -496,10 +496,10 @@ class AcadosVirtualNMPC:
 # ══════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    from vehicle_params import vehicle_params as P
-    from dynamics import AxialDronePlant
-    from trim import find_trim
-    from hybrid_comparison import ProperHybrid
+    from control.vehicle_params import vehicle_params as P
+    from control.dynamics import AxialDronePlant
+    from control.trim import find_trim
+    from control.hybrid_comparison import ProperHybrid
 
     print("게이트 1 — acados RTI 전 속도 수렴 (10s 순항, ProperHybrid 폐루프)")
     print("=" * 70)

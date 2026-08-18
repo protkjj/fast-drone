@@ -51,7 +51,7 @@ class CascadedPID:
 
         self.max_tilt = np.radians(35)
 
-        from dynamics import compute_allocation_matrix
+        from control.dynamics import compute_allocation_matrix
         self.f_to_TM, self.TM_to_f = compute_allocation_matrix(params)
         self.J = np.diag([params['Ixx'], params['Iyy'], params['Izz']])
 
@@ -164,7 +164,7 @@ def linearize_error_state(params, x_trim, u_trim):
     변환: δx_full(17) = T(17×15) @ δx_reduced(15)
     축소: A_r = T⁺ A T,  B_r = T⁺ B
     """
-    from dynamics import build_dynamics
+    from control.dynamics import build_dynamics
 
     # 풀 야코비안 (17×17, 17×4)
     f, x_sym, u_sym = build_dynamics(params)
@@ -402,7 +402,7 @@ class ScheduledLQR:
     """
 
     def __init__(self, params, v_ref, z_ref=0.0, V_table=None, Q=None, R=None):
-        from trim import find_trim
+        from control.trim import find_trim
 
         self.p = params
         self.v_ref = np.array(v_ref, dtype=float)
@@ -564,7 +564,7 @@ class INDIController:
         self._alpha = dt / (dt + 1.0 / (2 * np.pi * f_cut))
 
         # ── 폴백용 할당 행렬 (로터 정지 시) ──
-        from dynamics import compute_allocation_matrix
+        from control.dynamics import compute_allocation_matrix
         _, self._TM_to_f = compute_allocation_matrix(params)
 
         # ── 내부 상태 ──
@@ -728,9 +728,9 @@ class INDIController:
 # ══════════════════════════════════════════════════════
 
 def run_comparison():
-    from vehicle_params import vehicle_params as P
-    from dynamics import AxialDronePlant
-    from trim import find_trim, print_trim
+    from control.vehicle_params import vehicle_params as P
+    from control.dynamics import AxialDronePlant
+    from control.trim import find_trim, print_trim
 
     plant = AxialDronePlant(P, dt=0.001)
     dt = plant.dt

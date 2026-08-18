@@ -39,11 +39,11 @@ source .venv/bin/activate        # 끌 때: deactivate
 # 3) 의존성 설치
 pip install -r requirements.txt
 
-# 4) 동작 확인 — 플랜트 테스트
-python3 test_plant.py
+# 4) 동작 확인 — 플랜트 테스트 (반드시 저장소 루트에서, -m 모듈 실행)
+python3 -m control.test_plant
 
 # 5) 메인 진입점 — 통합 미션 시뮬 (이륙→가속→순항+돌풍→감속→호버, 65초)
-python3 mission_sim.py
+python3 -m control.mission_sim
 ```
 
 정상이면 콘솔에 제어기별 RMSE 표가 뜨고 `results/`에 플롯 PNG가 생깁니다.

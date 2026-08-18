@@ -17,10 +17,10 @@ EKF 통합 시뮬레이션 — 센서 노이즈 하에서 제어기 검증
 """
 
 import numpy as np
-from dynamics import AxialDronePlant, NX
-from vehicle_params import vehicle_params as P
-from sensors import SensorSuite, create_default_sensors
-from estimator import ESKF
+from control.dynamics import AxialDronePlant, NX
+from control.vehicle_params import vehicle_params as P
+from control.sensors import SensorSuite, create_default_sensors
+from control.estimator import ESKF
 
 
 def simulate_with_ekf(plant, controller, x0, T,
@@ -258,8 +258,8 @@ def test_eskf_with_pid():
     print("  PID + ESKF 테스트: 호버 교란 복원")
     print("=" * 60)
 
-    from controller import CascadedPID
-    from trim import find_trim
+    from control.controller import CascadedPID
+    from control.trim import find_trim
 
     plant = AxialDronePlant(P, dt=0.001)
     trim = find_trim(P, 0.0)
@@ -316,8 +316,8 @@ def compare_controllers_hover():
     print("  제어기 비교: 호버 교란 (참값 vs EKF)")
     print("=" * 60)
 
-    from controller import CascadedPID, LQRController
-    from trim import find_trim
+    from control.controller import CascadedPID, LQRController
+    from control.trim import find_trim
 
     plant = AxialDronePlant(P, dt=0.001)
     trim = find_trim(P, 0.0)

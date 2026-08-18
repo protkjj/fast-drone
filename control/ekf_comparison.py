@@ -21,17 +21,17 @@
 import numpy as np
 import time as timer
 
-from vehicle_params import vehicle_params as P
-from dynamics import AxialDronePlant
-from trim import find_trim
-from controller import (ScheduledPID, ScheduledLQR, INDIController)
-from nmpc import NMPCController
-from gust_comparison import make_gust_fn
-from hybrid_comparison import VirtualNMPC, ProperHybrid
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import AxialDronePlant
+from control.trim import find_trim
+from control.controller import (ScheduledPID, ScheduledLQR, INDIController)
+from control.nmpc import NMPCController
+from control.gust_comparison import make_gust_fn
+from control.hybrid_comparison import VirtualNMPC, ProperHybrid
 
-from ekf_sim import (simulate_with_ekf, simulate_perfect,
+from control.ekf_sim import (simulate_with_ekf, simulate_perfect,
                       compute_metrics, compute_estimation_metrics)
-from sensors import IMUSensor, GPSSensor, SensorSuite
+from control.sensors import IMUSensor, GPSSensor, SensorSuite
 
 
 def create_sensors(dt, noise_level=1.0, gps_noise_pos=1.5, seed=42):

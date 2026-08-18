@@ -15,14 +15,14 @@ import time as timer
 
 import numpy as np
 
-from vehicle_params import vehicle_params as P
-from dynamics import AxialDronePlant
-from hybrid_comparison import ProperHybrid
-from vnmpc_acados import AcadosVirtualNMPC
-from mission_sim import (MissionProfile, MissionController, run_mission,
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import AxialDronePlant
+from control.hybrid_comparison import ProperHybrid
+from control.vnmpc_acados import AcadosVirtualNMPC
+from control.mission_sim import (MissionProfile, MissionController, run_mission,
                          compute_overall)
-from gust_comparison import make_gust_fn
-from acados_fallback_mc import omega_metrics   # |ω| 실기판정 (기준: MEMORY 주의 6)
+from control.gust_comparison import make_gust_fn
+from control.acados_fallback_mc import omega_metrics   # |ω| 실기판정 (기준: MEMORY 주의 6)
 
 
 def diagnose_deceleration_acados(n_trials=30, seed=0, **vn_kwargs):

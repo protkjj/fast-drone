@@ -17,14 +17,14 @@
 import numpy as np
 import time as timer
 
-from vehicle_params import vehicle_params as P
-from dynamics import AxialDronePlant
-from trim import find_trim
-from controller import ScheduledLQR
-from nmpc import NMPCController
-from hybrid_comparison import VirtualNMPC, ProperHybrid
-from gust_comparison import make_gust_fn
-from ekf_comparison import _reset_controller
+from control.vehicle_params import vehicle_params as P
+from control.dynamics import AxialDronePlant
+from control.trim import find_trim
+from control.controller import ScheduledLQR
+from control.nmpc import NMPCController
+from control.hybrid_comparison import VirtualNMPC, ProperHybrid
+from control.gust_comparison import make_gust_fn
+from control.ekf_comparison import _reset_controller
 
 
 # ════════════════════════════════════════════════════
@@ -169,7 +169,7 @@ def run_mission_ekf(plant, ctrl, x0, profile, sensors, wind_fn=None, seed=42):
     Plant(참값) → Sensors(노이즈) → ESKF(추정) → Controller → Plant.
     성능 평가는 참값(xs_true) 기준.
     """
-    from ekf_sim import simulate_with_ekf
+    from control.ekf_sim import simulate_with_ekf
     sensors.reset()
     ctrl.reset()
     res = simulate_with_ekf(plant, ctrl, x0, profile.T_total,
@@ -807,7 +807,7 @@ def main():
     print("  센서노이즈 하에서 제어기 성능 재검증")
     print(f"{'='*70}")
 
-    from ekf_comparison import create_sensors
+    from control.ekf_comparison import create_sensors
     sensors_rtk = create_sensors(dt, noise_level=1.0, gps_noise_pos=0.02)
 
     ekf_targets = {'LQR': controllers['LQR'], 'Hybrid': controllers['Hybrid']}
