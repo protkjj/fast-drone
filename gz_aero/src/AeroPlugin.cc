@@ -72,7 +72,8 @@ class AeroPlugin : public gzs::System,
   void LogDebugCsv(double _t, const gz::math::Pose3d &_pose,
                    const Vector3d &_vAirW, const Vector3d &_omegaW,
                    const Vec3 &_vB, const Vec3 &_wB, const AeroDebug &_dbg,
-                   const Wrench &_wr, const Vector3d &_fW, const Vector3d &_mW);
+                   const Wrench &_wr, const Vector3d &_fW, const Vector3d &_mW,
+                   const Vector3d &_vLm, const Vector3d &_oLm);
 
   gzs::Model model_{gzs::kNullEntity};
   gzs::Entity link_entity_{gzs::kNullEntity};
@@ -99,6 +100,13 @@ class AeroPlugin : public gzs::System,
   bool override_state_ = false;
   Vector3d test_vel_world_{0, 0, 0};    ///< 월드 ENU 무게중심 속도 [m/s]
   Vector3d test_omega_world_{0, 0, 0};  ///< 월드 ENU 각속도 [rad/s]
+
+  // 겹2b(적용점 검증)용 — 링크의 질량 특성. 로그 머리에 적어 두면 대조
+  // 스크립트가 로그 파일 하나만 보고 omega_dot = J^-1 (M - w x Jw) 를 낼 수 있다.
+  double mass_ = 0.0;
+  Vector3d r_cm_link_{0, 0, 0};   ///< 링크 원점 -> 무게중심 (링크 좌표)
+  Vector3d J_diag_{0, 0, 0};      ///< 관성 주대각 (무게중심 기준, 링크 좌표)
+  Vector3d J_off_{0, 0, 0};       ///< ixy, ixz, iyz
 
   std::string table_source_;
   std::string debug_csv_path_;
@@ -193,6 +201,15 @@ void AeroPlugin::Configure(const gzs::Entity &_entity,
   if (debug_every_ < 1) debug_every_ = 1;
   if (!debug_csv_path_.empty()) OpenDebugCsv();
 
+  // ── 6.5) 질량 특성 캐시 ──────────────────────────────────────────────
+  if (auto *inertial = _ecm.Component<gzs::components::Inertial>(link_entity_)) {
+    const auto &in = inertial->Data();
+    mass_ = in.MassMatrix().Mass();
+    r_cm_link_ = in.Pose().Pos();
+    J_diag_ = in.MassMatrix().DiagonalMoments();
+    J_off_ = in.MassMatrix().OffDiagonalMoments();
+  }
+
   // ── 7) 속도 조회 켜기 ────────────────────────────────────────────────
   // 이걸 안 하면 WorldLinearVelocity 가 아무 값도 안 준다 (gz-sim 기본이 꺼짐).
   gzs::Link link(link_entity_);
@@ -220,6 +237,12 @@ void AeroPlugin::PreUpdate(const gzs::UpdateInfo &_info,
   const auto pose = link.WorldPose(_ecm);
   if (!pose) return;                       // 아직 컴포넌트가 안 만들어진 첫 스텝
 
+  // 실제로 측정된 링크 상태. 주입 모드에서도 **로그에는 남긴다** —
+  // 겹2b 가 "우리가 건 wrench 가 정말 이 가속도를 만들었나" 를 이걸로 잰다.
+  Vector3d v_link_meas{0, 0, 0}, omega_meas{0, 0, 0};
+  if (const auto m = link.WorldLinearVelocity(_ecm)) v_link_meas = *m;
+  if (const auto m = link.WorldAngularVelocity(_ecm)) omega_meas = *m;
+
   Vector3d v_cm_world{0, 0, 0}, omega_world{0, 0, 0};
 
   if (override_state_) {
@@ -236,10 +259,7 @@ void AeroPlugin::PreUpdate(const gzs::UpdateInfo &_info,
     // **원점**의 속도라, 회전 중이면 둘이 다르다:  v_cm = v_o + w x (R * r_cm)
     // gz-sim 에 오프셋 속도 오버로드가 있지만 버전마다 있고 없고 해서 직접 쓴다.
     // 두 줄이고 무엇을 하는지가 눈에 보인다.
-    Vector3d r_cm_link{0, 0, 0};
-    if (auto *inertial = _ecm.Component<gzs::components::Inertial>(link_entity_))
-      r_cm_link = inertial->Data().Pose().Pos();
-    v_cm_world = *v_origin_w + omega_world.Cross(pose->Rot().RotateVector(r_cm_link));
+    v_cm_world = *v_origin_w + omega_world.Cross(pose->Rot().RotateVector(r_cm_link_));
   }
 
   // 대기속도 = 기체 속도 - 바람 (둘 다 월드 ENU)
@@ -281,7 +301,7 @@ void AeroPlugin::PreUpdate(const gzs::UpdateInfo &_info,
   if (debug_csv_.is_open() && (step_ % debug_every_ == 0)) {
     const double t = std::chrono::duration<double>(_info.simTime).count();
     LogDebugCsv(t, *pose, v_air_world, omega_world, v_B, w_B, dbg, wr,
-                f_world, m_world);
+                f_world, m_world, v_link_meas, omega_meas);
   }
   ++step_;
 }
@@ -310,14 +330,23 @@ void AeroPlugin::OpenDebugCsv() {
              << frame_.down[2] << "\n"
              << "# wind: " << wind_world_.X() << " " << wind_world_.Y() << " "
              << wind_world_.Z() << "\n"
+             << "# mass: " << mass_ << "\n"
+             << "# r_cm: " << r_cm_link_.X() << " " << r_cm_link_.Y() << " "
+             << r_cm_link_.Z() << "\n"
+             << "# J_diag: " << J_diag_.X() << " " << J_diag_.Y() << " "
+             << J_diag_.Z() << "\n"
+             << "# J_off: " << J_off_.X() << " " << J_off_.Y() << " "
+             << J_off_.Z() << "\n"
              << "# quaternion: scalar-last (qx,qy,qz,qw), 링크 -> 월드\n"
+             << "# vL*, oL* : **실제로 측정된** 링크 원점 속도/각속도 (월드). 겹2b 용\n"
              << "# u,v,w,p,q,r : 동체(B, FRD) 좌표\n"
              << "# Fx..Mz      : 동체(B) 좌표. 겹1 기준값과 같은 프레임이다\n"
              << "# fWx..mWz    : 월드(ENU) 좌표. 실제로 링크에 건 값\n"
              << "# qx..qw      : 링크 자세 (월드->링크). vaWx.. : 월드 대기속도\n"
              << "t,qx,qy,qz,qw,vaWx,vaWy,vaWz,owWx,owWy,owWz,"
              << "u,v,w,p,q,r,V,V_cf,alpha,q_bar,C_A,C_N,x_cp,"
-             << "Fx,Fy,Fz,Mx,My,Mz,fWx,fWy,fWz,mWx,mWy,mWz\n";
+             << "Fx,Fy,Fz,Mx,My,Mz,fWx,fWy,fWz,mWx,mWy,mWz,"
+             << "vLx,vLy,vLz,oLx,oLy,oLz\n";
   gzmsg << "[fast_drone_aero] 디버그 CSV: " << debug_csv_path_ << " (매 "
         << debug_every_ << " 스텝)\n";
 }
@@ -326,7 +355,8 @@ void AeroPlugin::LogDebugCsv(double _t, const gz::math::Pose3d &_pose,
                              const Vector3d &_vAirW, const Vector3d &_omegaW,
                              const Vec3 &_vB, const Vec3 &_wB,
                              const AeroDebug &_dbg, const Wrench &_wr,
-                             const Vector3d &_fW, const Vector3d &_mW) {
+                             const Vector3d &_fW, const Vector3d &_mW,
+                             const Vector3d &_vLm, const Vector3d &_oLm) {
   const auto &q = _pose.Rot();
   debug_csv_ << _t
              << ',' << q.X() << ',' << q.Y() << ',' << q.Z() << ',' << q.W()
@@ -340,7 +370,9 @@ void AeroPlugin::LogDebugCsv(double _t, const gz::math::Pose3d &_pose,
              << ',' << _wr.force[0] << ',' << _wr.force[1] << ',' << _wr.force[2]
              << ',' << _wr.moment[0] << ',' << _wr.moment[1] << ',' << _wr.moment[2]
              << ',' << _fW.X() << ',' << _fW.Y() << ',' << _fW.Z()
-             << ',' << _mW.X() << ',' << _mW.Y() << ',' << _mW.Z() << '\n';
+             << ',' << _mW.X() << ',' << _mW.Y() << ',' << _mW.Z()
+             << ',' << _vLm.X() << ',' << _vLm.Y() << ',' << _vLm.Z()
+             << ',' << _oLm.X() << ',' << _oLm.Y() << ',' << _oLm.Z() << '\n';
 }
 
 }  // namespace fast_drone
