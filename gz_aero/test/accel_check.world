@@ -1,0 +1,87 @@
+<?xml version="1.0" ?>
+<!-- 자동 생성: gz_aero/tools/gen_gz_test_world.py — 직접 고치지 마세요 -->
+<sdf version="1.9">
+  <world name="aero_frame_check">
+    <!-- 중력 0: 공력만 남긴다. 중력이 있으면 자세가 빨리 무너져 관측 구간이 짧다 -->
+    <gravity>0 0 0</gravity>
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+
+    <model name="q0_com_offset">
+      <pose>0 0 20 0.2 -0.4 0.9</pose>
+      <link name="body">
+        <!-- 관성은 팀 사이징 확정 설계점 값 (장축 = 링크 x = J_xx = 롤).
+             <pose> 의 위치가 무게중심이다 — x_cp 가 CG 기준이므로 여기가
+             틀리면 정적 모멘트가 통째로 어긋난다.
+             겹2b 프로브는 이걸 일부러 원점에서 떼어 적용점 오류를 노출시킨다 -->
+        <inertial>
+          <pose>0.05 0.02 -0.03 0 0 0</pose>
+          <mass>1.660778087</mass>
+          <inertia>
+            <ixx>0.006040705941</ixx><iyy>0.04045326237</iyy><izz>0.04045326237</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <visual name="hull">
+          <pose>0 0 0 0 1.5707963267948966 0</pose>
+          <geometry><cylinder><radius>0.045</radius>
+            <length>0.72</length></cylinder></geometry>
+        </visual>
+      </link>
+      <plugin filename="FastDroneAero" name="fast_drone::AeroPlugin">
+        <link_name>body</link_name>
+        <csv_file>../data/aero_sized.csv</csv_file>
+        <nose>1 0 0</nose>
+        <right>0 -1 0</right>
+        <wind>0 0 0</wind>
+        <test_velocity_world>55 -12 6</test_velocity_world>
+        <test_omega_world>0 0 0</test_omega_world>
+        <debug_csv>/tmp/fast_drone_aero/q0_com_offset.csv</debug_csv>
+        <debug_csv_every>1</debug_csv_every>
+      </plugin>
+    </model>
+
+    <model name="q1_com_spin">
+      <pose>0 6 20 -0.5 0.3 -1.2</pose>
+      <link name="body">
+        <!-- 관성은 팀 사이징 확정 설계점 값 (장축 = 링크 x = J_xx = 롤).
+             <pose> 의 위치가 무게중심이다 — x_cp 가 CG 기준이므로 여기가
+             틀리면 정적 모멘트가 통째로 어긋난다.
+             겹2b 프로브는 이걸 일부러 원점에서 떼어 적용점 오류를 노출시킨다 -->
+        <inertial>
+          <pose>-0.04 0.06 0.02 0 0 0</pose>
+          <mass>1.660778087</mass>
+          <inertia>
+            <ixx>0.006040705941</ixx><iyy>0.04045326237</iyy><izz>0.04045326237</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <visual name="hull">
+          <pose>0 0 0 0 1.5707963267948966 0</pose>
+          <geometry><cylinder><radius>0.045</radius>
+            <length>0.72</length></cylinder></geometry>
+        </visual>
+      </link>
+      <plugin filename="FastDroneAero" name="fast_drone::AeroPlugin">
+        <link_name>body</link_name>
+        <csv_file>../data/aero_sized.csv</csv_file>
+        <nose>1 0 0</nose>
+        <right>0 -1 0</right>
+        <wind>0 0 0</wind>
+        <test_velocity_world>30 8 -20</test_velocity_world>
+        <test_omega_world>1.5 -0.7 2.1</test_omega_world>
+        <debug_csv>/tmp/fast_drone_aero/q1_com_spin.csv</debug_csv>
+        <debug_csv_every>1</debug_csv_every>
+      </plugin>
+    </model>
+
+  </world>
+</sdf>

@@ -37,21 +37,37 @@ for _p in (_REPO, _HERE):
 
 from aero_sources import get_source        # noqa: E402
 
-# (이름, pose "x y z roll pitch yaw", 주입 월드속도, 주입 각속도, 바람)
+# (이름, pose "x y z roll pitch yaw", 주입 월드속도, 주입 각속도, 바람, CoM 오프셋)
 PROBES = [
     # 0. 가장 단순 — 동쪽으로 순항. 여기서 틀리면 기본 변환부터 틀린 것이다
-    ("p0_east",     (0, 0, 20,  0.0,  0.0,  0.0),   (60, 0, 0),  (0, 0, 0),   (0, 0, 0)),
+    ("p0_east",     (0, 0, 20,  0.0,  0.0,  0.0),   (60, 0, 0),  (0, 0, 0),   (0, 0, 0), (0, 0, 0)),
     # 1. 요 90도 — 링크 x 가 월드 북쪽. y/x 뒤바뀜이 여기서 드러난다
-    ("p1_yaw90",    (0, 6, 20,  0.0,  0.0,  math.pi/2), (60, 0, 0), (0, 0, 0), (0, 0, 0)),
+    ("p1_yaw90",    (0, 6, 20,  0.0,  0.0,  math.pi/2), (60, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)),
     # 2. 롤 90도 + 하강 — z/y 뒤바뀜 검출
-    ("p2_roll90",   (0, 12, 20, math.pi/2, 0.0, 0.0),  (0, 0, -30), (0, 0, 2), (0, 0, 0)),
+    ("p2_roll90",   (0, 12, 20, math.pi/2, 0.0, 0.0),  (0, 0, -30), (0, 0, 2), (0, 0, 0), (0, 0, 0)),
     # 3. 완전 비대칭 — 자세 3축, 속도 3축, 각속도 3축이 전부 다르다.
     #    부호 사고 검출기. 대칭 조건만 시험하면 그냥 통과한다
-    ("p3_asym",     (0, 18, 20, 0.3, -0.7, 1.1),      (40, 15, -8), (0.5, -1.2, 0.8), (0, 0, 0)),
+    ("p3_asym",     (0, 18, 20, 0.3, -0.7, 1.1),      (40, 15, -8), (0.5, -1.2, 0.8), (0, 0, 0), (0, 0, 0)),
     # 4. 바람 경로 — 기체는 정지, 순수 측풍. v_air = -wind 가 맞는지 본다
-    ("p4_wind",     (0, 24, 20, 0.0,  0.0,  0.0),     (0, 0, 0),   (0, 0, 0),   (0, 25, 0)),
+    ("p4_wind",     (0, 24, 20, 0.0,  0.0,  0.0),     (0, 0, 0),   (0, 0, 0),   (0, 25, 0), (0, 0, 0)),
     # 5. 고속 고받음각 — 크로스플로가 지배하는 영역
-    ("p5_highalpha",(0, 30, 20, 0.0, -0.6,  0.0),     (83.3, 0, 0), (0, 0, 0),  (0, 0, 0)),
+    ("p5_highalpha",(0, 30, 20, 0.0, -0.6,  0.0),     (83.3, 0, 0), (0, 0, 0),  (0, 0, 0), (0, 0, 0)),
+]
+
+# 겹2b — **적용점** 검증용. 여기가 핵심이다:
+#
+#   무게중심을 링크 원점에서 **일부러 어긋나게** 둔다.
+#   플러그인이 힘을 무게중심이 아니라 링크 원점에 걸고 있다면, 실제 토크에
+#   r_cm x F 가 여분으로 붙는다. r_cm=(0.05,0.02,-0.03), |F|~50 N 이면
+#   여분 토크가 ~3 N·m, J_yy=0.04 라 각가속도 오차가 ~75 rad/s^2 다. 절대 못 숨는다.
+#
+#   무게중심을 원점에 두면(다른 프로브들처럼) r_cm x F = 0 이라 이 오류가
+#   그냥 통과한다. 그래서 프로브를 따로 둔다.
+ACCEL_PROBES = [
+    ("q0_com_offset", (0, 0, 20, 0.2, -0.4, 0.9), (55, -12, 6), (0, 0, 0),
+     (0, 0, 0), (0.05, 0.02, -0.03)),
+    ("q1_com_spin",   (0, 6, 20, -0.5, 0.3, -1.2), (30, 8, -20), (1.5, -0.7, 2.1),
+     (0, 0, 0), (-0.04, 0.06, 0.02)),
 ]
 
 WORLD_TEMPLATE = """<?xml version="1.0" ?>
@@ -79,10 +95,12 @@ MODEL_TEMPLATE = """
     <model name="{name}">
       <pose>{pose}</pose>
       <link name="body">
-        <!-- 링크 원점 = 무게중심. x_cp 가 CG 기준이므로 이렇게 두는 게 맞다.
-             관성은 팀 사이징 확정 설계점 값 (장축 = 링크 x = J_xx = 롤) -->
+        <!-- 관성은 팀 사이징 확정 설계점 값 (장축 = 링크 x = J_xx = 롤).
+             <pose> 의 위치가 무게중심이다 — x_cp 가 CG 기준이므로 여기가
+             틀리면 정적 모멘트가 통째로 어긋난다.
+             겹2b 프로브는 이걸 일부러 원점에서 떼어 적용점 오류를 노출시킨다 -->
         <inertial>
-          <pose>0 0 0 0 0 0</pose>
+          <pose>{com} 0 0 0</pose>
           <mass>{mass:.9f}</mass>
           <inertia>
             <ixx>{ixx:.10g}</ixx><iyy>{iyy:.10g}</iyy><izz>{izz:.10g}</izz>
@@ -135,34 +153,46 @@ def main(argv=None):
     izz = m.get("J_zz", 0.04045326)
     length = m.get("l_body", 0.72)
 
-    models = []
-    for name, pose, vel, omega, wind in PROBES:
-        models.append(MODEL_TEMPLATE.format(
-            name=name,
-            pose=" ".join(f"{x:.9g}" for x in pose),
-            mass=mass, ixx=ixx, iyy=iyy, izz=izz,
-            radius=src.d_ref / 2.0, length=length, half_pi=math.pi / 2,
-            csv=csv,
-            wind=" ".join(f"{x:.9g}" for x in wind),
-            vel=" ".join(f"{x:.9g}" for x in vel),
-            omega=" ".join(f"{x:.9g}" for x in omega),
-            log=os.path.join(args.log_dir, f"{name}.csv"),
-            every=args.every))
+    def build(probes, path, every):
+        models = []
+        for name, pose, vel, omega, wind, com in probes:
+            models.append(MODEL_TEMPLATE.format(
+                name=name,
+                pose=" ".join(f"{x:.9g}" for x in pose),
+                com=" ".join(f"{x:.9g}" for x in com),
+                mass=mass, ixx=ixx, iyy=iyy, izz=izz,
+                radius=src.d_ref / 2.0, length=length, half_pi=math.pi / 2,
+                csv=os.path.relpath(
+                    os.path.join(_REPO, "gz_aero", "data", f"aero_{args.source}.csv"),
+                    os.path.dirname(path)),
+                wind=" ".join(f"{x:.9g}" for x in wind),
+                vel=" ".join(f"{x:.9g}" for x in vel),
+                omega=" ".join(f"{x:.9g}" for x in omega),
+                log=os.path.join(args.log_dir, f"{name}.csv"),
+                every=every))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(WORLD_TEMPLATE.format(models="".join(models)))
 
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    with open(out, "w", encoding="utf-8") as f:
-        f.write(WORLD_TEMPLATE.format(models="".join(models)))
+    accel_out = os.path.join(os.path.dirname(out), "accel_check.world")
+    build(PROBES, out, args.every)
+    # 겹2b 는 각가속도를 수치미분으로 재므로 **매 스텝** 기록해야 한다
+    build(ACCEL_PROBES, accel_out, 1)
 
-    print(f"{out}")
-    print(f"  소스     {args.source}  (표 {csv})")
-    print(f"  프로브   {len(PROBES)}개: {', '.join(p[0] for p in PROBES)}")
-    print(f"  로그     {args.log_dir}/<프로브>.csv  (매 {args.every} 스텝)")
+    print(f"겹2a 프레임 : {out}")
+    print(f"  프로브 {len(PROBES)}개: {', '.join(p[0] for p in PROBES)}  (매 {args.every} 스텝)")
+    print(f"겹2b 적용점 : {accel_out}")
+    print(f"  프로브 {len(ACCEL_PROBES)}개: {', '.join(p[0] for p in ACCEL_PROBES)}  "
+          f"(매 스텝, 무게중심을 링크 원점에서 떼어 놓음)")
+    print(f"소스 {args.source}, 로그 {args.log_dir}/")
     print()
     print("Ubuntu 에서:")
     print(f"  mkdir -p {args.log_dir}")
-    print(f"  export GZ_SIM_SYSTEM_PLUGIN_PATH=$PWD/gz_aero/build:$GZ_SIM_SYSTEM_PLUGIN_PATH")
+    print("  export GZ_SIM_SYSTEM_PLUGIN_PATH=$PWD/gz_aero/build:$GZ_SIM_SYSTEM_PLUGIN_PATH")
     print(f"  gz sim -s -r --iterations 2000 {out}")
     print(f"  python3 gz_aero/tools/check_gz_frames.py --source {args.source}")
+    print(f"  gz sim -s -r --iterations 400 {accel_out}")
+    print(f"  python3 gz_aero/tools/check_gz_accel.py")
     return 0
 
 
