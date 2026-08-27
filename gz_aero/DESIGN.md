@@ -301,21 +301,29 @@ v2 플러그인은 v1 표도 읽을 수 있다 (반대는 막힌다 — 그게 �
 
 ```
 gz_aero/
-  DESIGN.md                       <- 이 문서 (계약)
-  CMakeLists.txt
+  DESIGN.md                       <- 이 문서 (계약). 코드가 여기서 벗어나면 코드가 틀렸다
+  USAGE.md                        <- 쓰는 법 (빌드·SDF 파라미터·CSV 교체·겹2 절차)
+  CMakeLists.txt                  <- 테스트는 항상, 플러그인은 gz-sim8 있을 때만
+  verify.sh                       <- 겹1 한 방 실행
   include/fast_drone/
-    aero_core.hpp                 <- 순수 C++ 공력 코어 (gz 의존 0)  ← 겹1 대상
-    aero_table.hpp                <- CSV 로드 + 이중선형 보간
-    frame.hpp                     <- L↔B 변환 + 유효성 검사
+    frame.hpp                     <- L↔B 변환 + 직교성/오른손계 검사
+    aero_table.hpp                <- CSV 로드 + 이중선형 보간 + 겹0 상식검사
+    aero_core.hpp                 <- 공력 수식. gz 의존 0  ← 겹1 대상
   src/
     AeroPlugin.cc                 <- gz-sim system 플러그인 (얇은 래퍼)
   test/
-    test_aero_core.cc             <- 겹 1 자립 테스트
-    aero_reference.csv            <- 파이썬이 생성 (git 포함)
+    test_aero_core.cc             <- 겹1 자립 테스트
+    aero_reference_*.csv          <- 이름 붙인 격자점 케이스 20개 (커밋)
+    aero_interp_*.csv             <- 격자칸 중점 전수 스윕 (gitignore, 재생성)
+    frame_check.world             <- 겹2 테스트 월드 (생성물)
   tools/
-    gen_reference.py              <- 겹 1 기준값 생성기
-    gen_aero_csv.py               <- 3단계 CSV 생성기 (소스 a/b 선택)
+    aero_sources.py               <- 두 소스의 공통 얼굴 (placeholder | sized)
+    gen_aero_csv.py               <- CSV 생성기 + 힘 기준 적응격자
+    gen_reference.py              <- 겹1 기준값 생성기
     crosscheck_aero.py            <- §3 두 모델 동일성 검증
+    gen_gz_test_world.py          <- 겹2 월드 생성기
+    check_gz_frames.py            <- 겹2 대조 (단계 A~F)
+    selftest_check_gz.py          <- 대조 도구 자체 검증 (gz 불필요)
   data/
     aero_placeholder.csv          <- 소스 (a) dynamics.py 계수 모델
     aero_sized.csv                <- 소스 (b) 팀 aero.py, 사이징 설계점
