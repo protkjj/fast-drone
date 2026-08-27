@@ -1,0 +1,211 @@
+<?xml version="1.0" ?>
+<!-- 자동 생성: gz_aero/tools/gen_gz_test_world.py — 직접 고치지 마세요 -->
+<sdf version="1.9">
+  <world name="aero_frame_check">
+    <!-- 중력 0: 공력만 남긴다. 중력이 있으면 자세가 빨리 무너져 관측 구간이 짧다 -->
+    <gravity>0 0 0</gravity>
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+
+    <model name="p0_east">
+      <pose>0 0 20 0 0 0</pose>
+      <link name="body">
+        <!-- 링크 원점 = 무게중심. x_cp 가 CG 기준이므로 이렇게 두는 게 맞다.
+             관성은 팀 사이징 확정 설계점 값 (장축 = 링크 x = J_xx = 롤) -->
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.660778087</mass>
+          <inertia>
+            <ixx>0.006040705941</ixx><iyy>0.04045326237</iyy><izz>0.04045326237</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <visual name="hull">
+          <pose>0 0 0 0 1.5707963267948966 0</pose>
+          <geometry><cylinder><radius>0.045</radius>
+            <length>0.72</length></cylinder></geometry>
+        </visual>
+      </link>
+      <plugin filename="FastDroneAero" name="fast_drone::AeroPlugin">
+        <link_name>body</link_name>
+        <csv_file>../data/aero_sized.csv</csv_file>
+        <nose>1 0 0</nose>
+        <right>0 -1 0</right>
+        <wind>0 0 0</wind>
+        <test_velocity_world>60 0 0</test_velocity_world>
+        <test_omega_world>0 0 0</test_omega_world>
+        <debug_csv>/tmp/fast_drone_aero/p0_east.csv</debug_csv>
+        <debug_csv_every>5</debug_csv_every>
+      </plugin>
+    </model>
+
+    <model name="p1_yaw90">
+      <pose>0 6 20 0 0 1.57079633</pose>
+      <link name="body">
+        <!-- 링크 원점 = 무게중심. x_cp 가 CG 기준이므로 이렇게 두는 게 맞다.
+             관성은 팀 사이징 확정 설계점 값 (장축 = 링크 x = J_xx = 롤) -->
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.660778087</mass>
+          <inertia>
+            <ixx>0.006040705941</ixx><iyy>0.04045326237</iyy><izz>0.04045326237</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <visual name="hull">
+          <pose>0 0 0 0 1.5707963267948966 0</pose>
+          <geometry><cylinder><radius>0.045</radius>
+            <length>0.72</length></cylinder></geometry>
+        </visual>
+      </link>
+      <plugin filename="FastDroneAero" name="fast_drone::AeroPlugin">
+        <link_name>body</link_name>
+        <csv_file>../data/aero_sized.csv</csv_file>
+        <nose>1 0 0</nose>
+        <right>0 -1 0</right>
+        <wind>0 0 0</wind>
+        <test_velocity_world>60 0 0</test_velocity_world>
+        <test_omega_world>0 0 0</test_omega_world>
+        <debug_csv>/tmp/fast_drone_aero/p1_yaw90.csv</debug_csv>
+        <debug_csv_every>5</debug_csv_every>
+      </plugin>
+    </model>
+
+    <model name="p2_roll90">
+      <pose>0 12 20 1.57079633 0 0</pose>
+      <link name="body">
+        <!-- 링크 원점 = 무게중심. x_cp 가 CG 기준이므로 이렇게 두는 게 맞다.
+             관성은 팀 사이징 확정 설계점 값 (장축 = 링크 x = J_xx = 롤) -->
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.660778087</mass>
+          <inertia>
+            <ixx>0.006040705941</ixx><iyy>0.04045326237</iyy><izz>0.04045326237</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <visual name="hull">
+          <pose>0 0 0 0 1.5707963267948966 0</pose>
+          <geometry><cylinder><radius>0.045</radius>
+            <length>0.72</length></cylinder></geometry>
+        </visual>
+      </link>
+      <plugin filename="FastDroneAero" name="fast_drone::AeroPlugin">
+        <link_name>body</link_name>
+        <csv_file>../data/aero_sized.csv</csv_file>
+        <nose>1 0 0</nose>
+        <right>0 -1 0</right>
+        <wind>0 0 0</wind>
+        <test_velocity_world>0 0 -30</test_velocity_world>
+        <test_omega_world>0 0 2</test_omega_world>
+        <debug_csv>/tmp/fast_drone_aero/p2_roll90.csv</debug_csv>
+        <debug_csv_every>5</debug_csv_every>
+      </plugin>
+    </model>
+
+    <model name="p3_asym">
+      <pose>0 18 20 0.3 -0.7 1.1</pose>
+      <link name="body">
+        <!-- 링크 원점 = 무게중심. x_cp 가 CG 기준이므로 이렇게 두는 게 맞다.
+             관성은 팀 사이징 확정 설계점 값 (장축 = 링크 x = J_xx = 롤) -->
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.660778087</mass>
+          <inertia>
+            <ixx>0.006040705941</ixx><iyy>0.04045326237</iyy><izz>0.04045326237</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <visual name="hull">
+          <pose>0 0 0 0 1.5707963267948966 0</pose>
+          <geometry><cylinder><radius>0.045</radius>
+            <length>0.72</length></cylinder></geometry>
+        </visual>
+      </link>
+      <plugin filename="FastDroneAero" name="fast_drone::AeroPlugin">
+        <link_name>body</link_name>
+        <csv_file>../data/aero_sized.csv</csv_file>
+        <nose>1 0 0</nose>
+        <right>0 -1 0</right>
+        <wind>0 0 0</wind>
+        <test_velocity_world>40 15 -8</test_velocity_world>
+        <test_omega_world>0.5 -1.2 0.8</test_omega_world>
+        <debug_csv>/tmp/fast_drone_aero/p3_asym.csv</debug_csv>
+        <debug_csv_every>5</debug_csv_every>
+      </plugin>
+    </model>
+
+    <model name="p4_wind">
+      <pose>0 24 20 0 0 0</pose>
+      <link name="body">
+        <!-- 링크 원점 = 무게중심. x_cp 가 CG 기준이므로 이렇게 두는 게 맞다.
+             관성은 팀 사이징 확정 설계점 값 (장축 = 링크 x = J_xx = 롤) -->
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.660778087</mass>
+          <inertia>
+            <ixx>0.006040705941</ixx><iyy>0.04045326237</iyy><izz>0.04045326237</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <visual name="hull">
+          <pose>0 0 0 0 1.5707963267948966 0</pose>
+          <geometry><cylinder><radius>0.045</radius>
+            <length>0.72</length></cylinder></geometry>
+        </visual>
+      </link>
+      <plugin filename="FastDroneAero" name="fast_drone::AeroPlugin">
+        <link_name>body</link_name>
+        <csv_file>../data/aero_sized.csv</csv_file>
+        <nose>1 0 0</nose>
+        <right>0 -1 0</right>
+        <wind>0 25 0</wind>
+        <test_velocity_world>0 0 0</test_velocity_world>
+        <test_omega_world>0 0 0</test_omega_world>
+        <debug_csv>/tmp/fast_drone_aero/p4_wind.csv</debug_csv>
+        <debug_csv_every>5</debug_csv_every>
+      </plugin>
+    </model>
+
+    <model name="p5_highalpha">
+      <pose>0 30 20 0 -0.6 0</pose>
+      <link name="body">
+        <!-- 링크 원점 = 무게중심. x_cp 가 CG 기준이므로 이렇게 두는 게 맞다.
+             관성은 팀 사이징 확정 설계점 값 (장축 = 링크 x = J_xx = 롤) -->
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.660778087</mass>
+          <inertia>
+            <ixx>0.006040705941</ixx><iyy>0.04045326237</iyy><izz>0.04045326237</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <visual name="hull">
+          <pose>0 0 0 0 1.5707963267948966 0</pose>
+          <geometry><cylinder><radius>0.045</radius>
+            <length>0.72</length></cylinder></geometry>
+        </visual>
+      </link>
+      <plugin filename="FastDroneAero" name="fast_drone::AeroPlugin">
+        <link_name>body</link_name>
+        <csv_file>../data/aero_sized.csv</csv_file>
+        <nose>1 0 0</nose>
+        <right>0 -1 0</right>
+        <wind>0 0 0</wind>
+        <test_velocity_world>83.3 0 0</test_velocity_world>
+        <test_omega_world>0 0 0</test_omega_world>
+        <debug_csv>/tmp/fast_drone_aero/p5_highalpha.csv</debug_csv>
+        <debug_csv_every>5</debug_csv_every>
+      </plugin>
+    </model>
+
+  </world>
+</sdf>

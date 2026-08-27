@@ -1,3 +1,6 @@
 # 격자칸 중점 전수 스윕 — 3천여 점, 600 KB. verify.sh 가 2초면 다시 만든다.
 # 표(data/*.csv)와 이름 붙인 기준값(test/aero_reference_*.csv)은 커밋한다.
 test/aero_interp_*.csv
+
+# CMake 빌드 디렉토리
+build/
