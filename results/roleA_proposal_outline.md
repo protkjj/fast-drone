@@ -67,8 +67,24 @@
 
 `ṗ=v` / `mv̇ = −mg e₃ + R(F_rotor + F_aero)` / `q̇ = ½ q⊗ω` / `Jω̇ = M − ω×Jω`
 
-**검증**: 자유낙하·호버·복원모멘트·감쇠 등 물리 테스트 **6종 통과**
-(`python3 -m control.test_plant`)
+**검증**: 물리 테스트 **6종 통과** (`python3 -m control.test_plant`)
+
+📊 `results/plant_validation.png` (`python3 -m control.plot_plant_validation`)
+
+| # | 무엇을 확인 | 결과 |
+|---|---|---|
+| 1 자유낙하 | 로터 0 → 해석해 `−gt` | `v_z(1s)` = −9.757 vs −9.81 |
+| 2 호버 | `n_hov` = 571.8 로 무게 지지 | `\|Δz\|`(2s) = 1e-16 m |
+| 3 복원 모멘트 | α 스윕 −30~+30° | 원점 통과 **음의 기울기** = 정적 안정 |
+| 4 감쇠+복원 | `q₀`=2 rad/s 응답 | **진동** (ζ 낮음). 주기가 선형화 `ω_n` 과 1.6% 일치 |
+| 5 전진비 | 상승속도 0~40 m/s | 로터 추력 **73.3% 감소** (`fac` 1.000→0.267) |
+| 6 제어 할당 | `A·A⁻¹` | `1.1e-16`, 롤·피치·요 **결합 없음** |
+
+> **4번이 교차검증이다.** 시간영역 진동 주기를 재면 `ω_n` 8.06 rad/s 가 나오는데,
+> 겹2의 야코비안 선형화가 낸 8.19 와 **1.6% 안에서 일치**한다.
+> 시뮬레이터와 선형화가 서로를 확인한 것이다.
+> (저속 30 m/s 는 28% 어긋난다 — `q₀`=2 가 복원강성(∝V²) 대비 커서 선형 범위를
+>  벗어나기 때문이다. 설계점에서는 잘 맞는다.)
 
 ---
 
@@ -289,11 +305,13 @@ V=20 → 1.926 (선형화 1.93), V=85 → 8.187 (선형화 8.23). **0.2% 이내 
 | 산출물 | 내용 |
 |---|---|
 | `control/dynamics.py` | 17상태 6자유도 플랜트 (공력·추진기 포함) |
+| **`control/plot_plant_validation.py`** | **플랜트 검증 6종 그림 (신규)** |
 | `control/gust_comparison.py` | 1-cosine 돌풍 + 응답 지표 |
 | `control/trim.py` | 트림 탐색 · 속도 스윕 |
 | **`control/flight_envelope.py`** | **4겹 타당성 검토 (신규)** |
 | `results/flight_envelope.txt` | 전 조건 표 (105 격자점 × 2축) |
 | `results/flight_envelope_*.png` | 모드 · 조종권한 · 돌풍 여유비 |
+| `results/plant_validation.png` | 플랜트 검증 6종 (2×3 패널) |
 
 재현: `python3 -m control.flight_envelope` (수 초)
 
