@@ -55,19 +55,34 @@ def main():
     ax[0, 0].legend(); ax[0, 0].grid(alpha=.3)
 
     # ── 2) 호버 ─────────────────────────────────────────────────────
+    # ⚠ 축을 자동 스케일에 맡기면 안 된다. 호버의 Δz·|v| 는 물리적으로 0 인데
+    #   1e-12 스케일로 늘려 그리면 **추세처럼 보인다.** 실제로 |v| 가 단조증가
+    #   하는데, 원인은 dynamics.py:67 의 V_sq = u^2+v^2+w^2 + EPS 다:
+    #     호버에서 진짜 대기속도는 0 인데 V_sq = 1e-8 이라 가짜 동압
+    #     q_bar = 6.13e-9 Pa 이 생기고, 축력 Fx = -q_bar*S*C_A0 = -1.30e-11 N
+    #     -> a_x = -1.62e-12 m/s^2 (일정) -> 2 초에 |v| = 3.25e-12 m/s.
+    #   손계산과 시뮬이 5 자리까지 일치한다. 법선력은 v_b=w_b=0 이라 사라지고
+    #   축력만 남아서 x 방향으로만 나온다. 물리적으로는 무의미한 크기다.
+    #   그래서 **물리 스케일로 고정**하고 실제 값은 글자로 적는다.
     x0 = AxialDronePlant.hover_state(P); x0[2] = 10.0
     ts, xs, _ = plant.simulate(x0, lambda t, x: u_hov, T=2.0)
+    dz = xs[:, 2] - 10.0
+    vmag = np.linalg.norm(xs[:, 3:6], axis=1)
     a2 = ax[0, 1]
-    a2.plot(ts, xs[:, 2] - 10.0, lw=2, color="C0", label=r"$\Delta z$")
-    a2.set_xlabel("t [s]"); a2.set_ylabel(r"$\Delta z$ [m]", color="C0")
-    a2.tick_params(axis="y", labelcolor="C0")
-    a2b = a2.twinx()
-    a2b.plot(ts, np.linalg.norm(xs[:, 3:6], axis=1), lw=2, color="C3", label="|v|")
-    a2b.set_ylabel("|v| [m/s]", color="C3"); a2b.tick_params(axis="y", labelcolor="C3")
+    a2.plot(ts, dz, lw=2, color="C0", label=r"$\Delta z$ [m]")
+    a2.plot(ts, vmag, lw=2, color="C3", label="|v| [m/s]")
+    a2.set_ylim(-0.05, 0.05)
+    a2.axhline(0, color="k", lw=.8)
+    a2.set_xlabel("t [s]"); a2.set_ylabel("m  /  m/s")
     TW = 4 * P["k_T"] * P["n_max"] ** 2 / (P["mass"] * P["g"])
     a2.set_title(f"2. Hover  ($n_{{hov}}$ = {n_hov:.1f} rad/s, T/W$_{{max}}$ = {TW:.1f})\n"
-                 rf"$|\Delta z|$(2s) = {abs(xs[-1,2]-10):.1e} m")
-    a2.grid(alpha=.3)
+                 "both flat at the physical scale")
+    a2.text(0.05, -0.030,
+            f"$|\\Delta z|$(2s) = {abs(dz[-1]):.0e} m\n"
+            f"$|v|$(2s) = {vmag[-1]:.1e} m/s\n"
+            r"($|v|$ drift is the $\epsilon$ = 1e-8 in $V^2$, not physics)",
+            fontsize=7.5, va="bottom")
+    a2.legend(loc="upper right", fontsize=8); a2.grid(alpha=.3)
 
     # ── 3) 복원 모멘트 — 받음각 스윕 ────────────────────────────────
     alphas = np.linspace(-30, 30, 61)
