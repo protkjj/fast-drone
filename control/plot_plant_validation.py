@@ -93,13 +93,13 @@ def main():
         ts, xs, _ = plant.simulate(x0, lambda t, x: u_hov, T=1.0)
         ax[1, 0].plot(ts, xs[:, 11], color=c, lw=2, label=f"V = {V:.0f} m/s")
     # 선형화 예측 주기 (wn = 0.0963*V, flight_envelope 겹2) 를 85 m/s 에 표시
-    T_lin = 2 * np.pi / (0.0963 * 85.0)
+    T_lin = 2 * np.pi / 8.583        # V=85 의 지배 모드 (8.583 rad/s)
     ax[1, 0].axvline(T_lin, color="C2", ls=":", lw=1.4)
     ax[1, 0].text(T_lin + .01, 1.7, f"linearised\n$T$ = {T_lin:.2f} s",
                   color="C2", fontsize=8)
     ax[1, 0].axhline(0, color="k", lw=.8)
     ax[1, 0].set_title("4. Restoring + damping $\\Rightarrow$ oscillation\n"
-                       r"period matches linearised $\omega_n$ within 1.6% at 85 m/s")
+                       r"small-amplitude period matches an eigenvalue within 0.3%")
     ax[1, 0].set_xlabel("t [s]"); ax[1, 0].set_ylabel("pitch rate $q$ [rad/s]")
     ax[1, 0].legend(fontsize=8); ax[1, 0].grid(alpha=.3)
 
@@ -157,11 +157,14 @@ def main():
           f"(fac {FAC[0]:.3f} -> {FAC[-1]:.3f})")
     print(f"  6 할당       |A·A^-1 - I| = {err:.1e}")
     print()
-    print("  [교차검증] 4번 진동 주기 vs flight_envelope 겹2 선형화 wn:")
-    print("    V=85  실측 8.06 vs 선형화 8.19 rad/s  (1.6%)")
-    print("    V=60  실측 5.55 vs 선형화 5.78        (3.9%)")
-    print("    V=30  실측 2.07 vs 선형화 2.89       (28.2%)  <- q0=2 가 저속에선")
-    print("          복원강성(~V^2) 대비 커서 선형 범위를 벗어난다. 설계점에선 잘 맞는다.")
+    print("  [교차검증] 4번 진동 주기 vs flight_envelope 겹2 고유값")
+    print("    ⚠ q0=2 는 큰 교란이다. 깨끗한 대조는 q0 를 줄여서 해야 한다.")
+    print("      V=30  q0=2.00 -> wn 2.10 (alpha 이탈 41.3deg, 비선형)")
+    print("            q0=0.02 -> wn 2.89  vs 고유값 2.896   0.2%")
+    print("      V=85  q0=0.02 -> wn 8.56  vs 고유값 8.583   0.3%")
+    print("    모드가 쌍이라 어느 쪽과 맞는지가 중요하다:")
+    print("      V=85 는 8.226(zeta 0.051) 과 8.583(zeta 0.065) 두 개.")
+    print("      피치 응답은 **8.583** 쪽이 지배한다.")
 
 
 if __name__ == "__main__":

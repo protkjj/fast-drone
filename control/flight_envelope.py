@@ -100,14 +100,22 @@ def layer2_stability(params, trims):
         t["max_re"] = float(np.max(ev.real))
         t["n_integrator"] = int(np.sum(np.abs(ev.real) < 1e-9))
         t["stable"] = t["max_re"] < 1e-9
-        # 감쇠가 가장 나쁜 진동 모드 — 제어 대역폭 요구를 정한다
-        if modes:
-            wn, z = modes[0]
-            t["wn_worst"] = float(wn)
-            t["zeta_worst"] = float(z)
+        # ⚠ 처음엔 "감쇠 최소 모드" 하나만 보고했는데, 실제로는 **비슷한 진동수의
+        #   모드가 쌍으로** 있다 (Iyy = Izz 라 피치·요가 같은 강성을 갖는다).
+        #   V=30 에서는 2.896 / 2.906 으로 거의 겹치지만 V=85 에서 8.23 / 8.58 로
+        #   갈라진다. 시간영역 피치 응답은 **둘째 쪽**이 지배해서, 하나만 보고하면
+        #   교차검증이 4~5% 어긋난 것처럼 보인다. 그래서 쌍으로 남긴다.
+        fast = [m for m in modes if m[0] > 0.1]      # 적분기성 저주파 모드 제외
+        fast_by_wn = sorted(fast, key=lambda m: m[0])
+        if fast:
+            wn, z = min(fast, key=lambda m: m[1])    # 감쇠 최소
+            t["wn_worst"] = float(wn); t["zeta_worst"] = float(z)
             t["f_worst_hz"] = float(wn / (2 * np.pi))
+            t["wn_pair"] = [float(m[0]) for m in fast_by_wn[:2]]
+            t["zeta_pair"] = [float(m[1]) for m in fast_by_wn[:2]]
         else:
             t["wn_worst"] = t["zeta_worst"] = t["f_worst_hz"] = float("nan")
+            t["wn_pair"] = t["zeta_pair"] = []
         # 가장 느린 안정 모드 — 저주파 드리프트
         re_neg = ev.real[ev.real < -1e-9]
         t["tau_slow"] = float(1.0 / abs(re_neg.max())) if len(re_neg) else float("nan")
@@ -280,6 +288,9 @@ def report(params, trims, rows, out_txt="results/flight_envelope.txt"):
         A(f"{t['V']:7.0f} {str(t['stable']):>6} {t['n_integrator']:7d} "
           f"{t['wn_worst']:11.2f} {t['f_worst_hz']:8.2f} {t['zeta_worst']:8.3f} "
           f"{t['tau_slow']:14.1f}")
+    A("     (진동 모드는 **쌍**으로 나온다 — Iyy=Izz 라 피치·요 강성이 같다.")
+    A("      " + " / ".join(f"V={t['V']:.0f}: {t['wn_pair'][0]:.2f}, {t['wn_pair'][1]:.2f}"
+                            for t in trims if len(t.get("wn_pair", [])) == 2) + " rad/s)")
     A("  -> 개루프는 **불안정이 아니라 중립안정**이다 (실수부 <= 0, 0 인 것 2 개는 적분기).")
     A("     동체 정적안정(x_cp 가 CG 뒤) + 공력 감쇠 덕이다.")
     A("     핵심은 감쇠비가 **속도에 무관하게 0.05** 로 낮게 유지된다는 것:")
