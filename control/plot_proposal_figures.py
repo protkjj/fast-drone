@@ -1,5 +1,10 @@
 """연구제안 3분 발표용 그림 3장.
 
+시뮬 조건 (연구계획서 예비단계와 동일):
+  · **참값 제어** — 센서모델·상태추정기 없음. plant 가 참 상태를 제어기에 직접 준다
+  · **IPOPT** — VirtualNMPC 는 ca.nlpsol(..., 'ipopt', ...). acados 미사용
+    (그림 B 의 acados 수치는 기록된 벤치마크이지 이 시뮬의 솔버가 아니다)
+
     python3 -m control.plot_proposal_figures
 
   A. results/prop_fig_gust.png    슬라이드 1 — 강외란에서 스케줄 선형이 무너진다
@@ -94,8 +99,8 @@ def fig_gust():
     ax[1].set_title("Gap widens with gust strength")
     ax[1].set_xticks(GUSTS); ax[1].legend(fontsize=9); ax[1].grid(alpha=.3)
 
-    fig.suptitle(f"Pure gust rejection at {V_CRUISE:.0f} m/s cruise "
-                 "(started from trim) — re-simulated", fontsize=12)
+    fig.suptitle(f"Pure gust rejection at {V_CRUISE:.0f} m/s cruise — "
+                 "ground-truth state, IPOPT NMPC, started from trim", fontsize=12)
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     fig.savefig("results/prop_fig_gust.png", dpi=130); plt.close(fig)
     return peaks
@@ -120,7 +125,7 @@ def fig_solver():
     ax.set_xticks(x); ax.set_xticklabels([b[0] for b in bars], fontsize=9)
     ax.set_ylabel("solve time [ms]  (log)")
     ax.set_title("Why nonlinear is feasible now\n"
-                 "IPOPT sits on the budget (p95 over it); acados clears it by 53×")
+                 "this study runs IPOPT (on the budget); acados is the path to hardware")
     for xi, (m, p) in enumerate(zip(med, p95)):
         ax.text(xi, p * 1.25, f"{m:.2f} / {p:.2f}", ha="center", fontsize=8.5)
     ax.legend(loc="lower left", fontsize=9); ax.grid(alpha=.3, axis="y", which="both")
@@ -149,8 +154,8 @@ def fig_mc():
             ha="center", va="center", fontsize=9, color="C2")
     ax.set_xticks(x); ax.set_xticklabels([d[0] for d in data])
     ax.set_ylabel("mission RMSE $z$ [m]")
-    ax.set_title("Monte Carlo, 10 runs\n"
-                 "randomised initial state + gust 5–15 m/s + gust timing")
+    ax.set_title("Monte Carlo, 10 runs (ground-truth state)\n"
+                 "randomised initial state + gust 5-15 m/s + gust timing")
     ax.grid(alpha=.3, axis="y"); ax.legend(fontsize=9)
     fig.tight_layout(); fig.savefig("results/prop_fig_mc.png", dpi=130)
     plt.close(fig)
