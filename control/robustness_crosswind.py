@@ -214,3 +214,92 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ══════════════════════════════════════════════════════════════════════
+# G — 최종 비교: 감속 제외 (이륙~순항), 허용 기수오차 20도
+# ══════════════════════════════════════════════════════════════════════
+YAW_LIMIT_DEG = 20.0        # kj 지정 허용 기수오차
+OMEGA_FAIL = 35.0           # 자이로 포화 = 실기 실패
+T_END = 43.0                # 감속 시작 직전까지 (이륙·안정화·가속·순항+돌풍)
+CW_FINAL = [0.0, 5.0, 10.0, 15.0]
+
+
+def final_comparison():
+    """감속 구간을 뺀 최종 비교.
+
+    감속(43~58s)에서 맨 ProperHybrid 가 텀블한다(|omega| 90). 그건 제어 구조가
+    아니라 **감속 과도구간의 알려진 문제**이고 확정 아키텍처가 예방형 전환으로
+    따로 다룬다. 여기서는 그 구간을 빼고 **인터페이스 분리 자체**를 본다.
+    그래서 폴백 없이 LQR vs ProperHybrid 순수 비교가 된다.
+
+    판정: 기수오차 20도 이내 **그리고** |omega| < 35 rad/s.
+    """
+    plant = AxialDronePlant(P, dt=0.001)
+    prof = MissionProfile(cruise_speed=70.0, cruise_alt=50.0)
+    x0 = AxialDronePlant.hover_state(P); x0[2] = 2.0
+
+    res, series = [], {}
+    print(f"  [G] 최종 비교 — 감속 제외(t<{T_END:.0f}s), 기수오차 {YAW_LIMIT_DEG:.0f}deg 판정")
+    for W in CW_FINAL:
+        wf = _wind_mission(W)
+        for nm in ("LQR", "Hybrid", "HybridFB"):
+            c = MissionController(_mk(nm, P, [0, 0, 0], 2.0, plant.dt), prof)
+            ts, xs, _ = plant.simulate(x0, c, T=T_END, wind_fn=wf)
+            vr, zr = prof.compute_refs(ts)
+            yw = _yaw_deg(xs)
+            r = dict(W=W, ctrl=nm,
+                     rmse_vx=float(np.sqrt(np.mean((xs[:, 3] - vr[:, 0]) ** 2))),
+                     rmse_z=float(np.sqrt(np.mean((xs[:, 2] - zr) ** 2))),
+                     yaw_max=float(np.max(np.abs(yw))),
+                     dy_max=float(np.max(np.abs(xs[:, 1]))),
+                     w_max=float(np.max(np.linalg.norm(xs[:, 10:13], axis=1))))
+            r["pass"] = (r["yaw_max"] <= YAW_LIMIT_DEG) and (r["w_max"] < OMEGA_FAIL)
+            res.append(r)
+            if abs(W - CW_FINAL[-1]) < 1e-9:
+                series[nm] = (ts, xs, vr, zr, yw)
+            print(f"      W={W:4.0f}  {nm:<7} RMSEvx {r['rmse_vx']:6.2f}  z {r['rmse_z']:5.2f}"
+                  f"  요 {r['yaw_max']:6.2f}deg  dy {r['dy_max']:6.2f}m"
+                  f"  |w| {r['w_max']:5.2f}  {'PASS' if r['pass'] else 'FAIL'}", flush=True)
+
+    fig, ax = plt.subplots(2, 2, figsize=(13, 8))
+    for nm, (ts, xs, vr, zr, yw) in series.items():
+        ax[0, 0].plot(ts, xs[:, 3], color=COL[nm], lw=1.8, label=nm)
+        ax[0, 1].plot(ts, np.linalg.norm(xs[:, 10:13], axis=1),
+                      color=COL[nm], lw=1.8, label=nm)
+    ax[0, 0].plot(series["LQR"][0], series["LQR"][2][:, 0], "k--", lw=1.3,
+                  label="reference")
+    ax[0, 1].axhline(OMEGA_FAIL, color="C3", ls="--", lw=1.6)
+    ax[0, 1].text(1, OMEGA_FAIL + 2, rf"tumble limit $|\omega|$ = {OMEGA_FAIL:.0f} rad/s",
+                  color="C3", fontsize=9)
+    ax[0, 1].set_yscale("symlog", linthresh=1)
+    for a in (ax[0, 0], ax[0, 1]):
+        a.axvspan(35, 36, color="k", alpha=.12); a.axvline(5, color="k", lw=.7, alpha=.4)
+        a.set_xlabel("t [s]"); a.grid(alpha=.3); a.legend(fontsize=8)
+    ax[0, 0].set_ylabel("$v_x$ [m/s]")
+    ax[0, 0].set_title(f"Speed tracking, {CW_FINAL[-1]:.0f} m/s crosswind")
+    ax[0, 1].set_ylabel(r"$|\omega|$ [rad/s]")
+    ax[0, 1].set_title("Body rate — tumble check (log)")
+
+    for nm in ("LQR", "Hybrid", "HybridFB"):
+        v = [r for r in res if r["ctrl"] == nm]
+        ax[1, 0].plot(CW_FINAL, [r["rmse_vx"] for r in v], "o-",
+                      color=COL[nm], lw=2, ms=7, label=nm)
+        ax[1, 1].plot(CW_FINAL, [r["yaw_max"] for r in v], "o-",
+                      color=COL[nm], lw=2, ms=7, label=nm)
+    ax[1, 1].axhline(YAW_LIMIT_DEG, color="C2", ls="--", lw=1.6)
+    ax[1, 1].text(0.2, YAW_LIMIT_DEG + .7, f"tolerance {YAW_LIMIT_DEG:.0f}$\\degree$",
+                  color="C2", fontsize=9)
+    for a, lab, ttl in ((ax[1, 0], r"RMSE $v_x$ [m/s]", "Speed tracking error"),
+                        (ax[1, 1], r"peak $|\Delta\psi|$ [deg]", "Heading held")):
+        a.set_xlabel("sustained crosswind [m/s]"); a.set_ylabel(lab)
+        a.set_title(ttl); a.set_xticks(CW_FINAL); a.grid(alpha=.3); a.legend(fontsize=8)
+
+    fig.suptitle("Take-off to cruise (deceleration excluded) with sustained crosswind "
+                 "+ vertical gust at t=35 s\nground truth, IPOPT NMPC  —  "
+                 f"pass = heading within {YAW_LIMIT_DEG:.0f}$\\degree$ and "
+                 rf"$|\omega|$ < {OMEGA_FAIL:.0f} rad/s", fontsize=11.5)
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
+    fig.savefig(os.path.join(_RES, "prop_fig_final.png"), dpi=130)
+    plt.close(fig)
+    return res
