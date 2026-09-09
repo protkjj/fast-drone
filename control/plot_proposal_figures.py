@@ -17,6 +17,8 @@ B, C 는 이미 실측해 둔 값을 그린다 (results/bench_*.txt, results/MIS
 """
 from __future__ import annotations
 
+import os
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -28,6 +30,9 @@ from control.trim import find_trim
 from control.controller import ScheduledLQR
 from control.hybrid_comparison import VirtualNMPC, ProperHybrid
 from control.gust_comparison import make_gust_fn
+
+_RES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "results")
 
 V_CRUISE, Z_REF = 70.0, 50.0
 T_GUST, D_GUST, W_GUST = 2.0, 1.0, 10.0
@@ -102,7 +107,7 @@ def fig_gust():
     fig.suptitle(f"Pure gust rejection at {V_CRUISE:.0f} m/s cruise — "
                  "ground-truth state, IPOPT NMPC, started from trim", fontsize=12)
     fig.tight_layout(rect=[0, 0, 1, 0.93])
-    fig.savefig("results/prop_fig_gust.png", dpi=130); plt.close(fig)
+    fig.savefig(os.path.join(_RES, "prop_fig_gust.png"), dpi=130); plt.close(fig)
     return peaks
 
 
@@ -129,7 +134,7 @@ def fig_solver():
     for xi, (m, p) in enumerate(zip(med, p95)):
         ax.text(xi, p * 1.25, f"{m:.2f} / {p:.2f}", ha="center", fontsize=8.5)
     ax.legend(loc="lower left", fontsize=9); ax.grid(alpha=.3, axis="y", which="both")
-    fig.tight_layout(); fig.savefig("results/prop_fig_solver.png", dpi=130)
+    fig.tight_layout(); fig.savefig(os.path.join(_RES, "prop_fig_solver.png"), dpi=130)
     plt.close(fig)
     print("  [B] 솔버 속도 (기록된 실측값)")
 
@@ -157,15 +162,118 @@ def fig_mc():
     ax.set_title("Monte Carlo, 10 runs (ground-truth state)\n"
                  "randomised initial state + gust 5-15 m/s + gust timing")
     ax.grid(alpha=.3, axis="y"); ax.legend(fontsize=9)
-    fig.tight_layout(); fig.savefig("results/prop_fig_mc.png", dpi=130)
+    fig.tight_layout(); fig.savefig(os.path.join(_RES, "prop_fig_mc.png"), dpi=130)
     plt.close(fig)
     print("  [C] 몬테카를로 (기록된 실측값)")
 
 
+# ══════════════════════════════════════════════════════════════════════
+CROSSWINDS = [5.0, 10.0, 15.0]      # 연구계획서 §2 과제 2 조건
+T_SUS = 15.0                        # 지속 측풍 관측 시간
+
+
+def _sustained(W, t_on=2.0, ramp=0.5):
+    """지속 측풍 — 1-cosine 이산 돌풍과 달리 계속 분다.
+
+    이산 돌풍은 1 초 뒤 사라져서 '버텼나'를 못 본다. 제어 관점에서 궁금한 것은
+    **계속 부는 바람에서 기수를 얼마나 지키나** 이므로 계단 입력으로 본다.
+    """
+    def f(t):
+        w = np.zeros(3)
+        if t >= t_on:
+            w[1] = W * min((t - t_on) / ramp, 1.0)
+        return w
+    return f
+
+
+def _yaw_deg(xs):
+    from scipy.spatial.transform import Rotation
+    y = np.array([Rotation.from_quat(q).as_euler("zyx")[0] for q in xs[:, 6:10]])
+    return np.degrees(np.unwrap(y) - np.unwrap(y)[0])
+
+
+def fig_crosswind():
+    """D — 측풍. 수직돌풍과 **다른 축**이라 따로 잰다.
+
+    수직돌풍은 피치를 때리고 요를 정확히 0 으로 둔다. 측풍은 요를 때린다
+    (축대칭 무핀 동체는 압력중심이 축 위에 있어 측력이 M_z 만 만든다).
+    그래서 지표가 dv_x 가 아니라 **요각 이탈과 횡편차**다.
+
+    핵심은 '완전 풍향계 선' 이다. 측풍 W 에서 기체가 기수를 완전히 포기하면
+    옆미끄럼이 0 이 될 때까지 도는데, 그 각도가 beta = atan(W/V) 다.
+    제어기가 그 선 **위에** 있으면 기수를 포기한 것이고, 아래면 버틴 것이다.
+    """
+    plant = AxialDronePlant(P, dt=0.001)
+    trim = find_trim(P, V_CRUISE)
+    x0 = trim["state"].copy(); x0[2] = Z_REF
+
+    def build():
+        return {"Gain-scheduled LQR":
+                    ScheduledLQR(P, v_ref=[V_CRUISE, 0, 0], z_ref=Z_REF),
+                "NMPC+INDI (interface split)":
+                    ProperHybrid(VirtualNMPC(P, v_ref=[V_CRUISE, 0, 0], z_ref=Z_REF,
+                                             N=20, dt_nmpc=0.05, dt_ctrl=0.02),
+                                 P, dt=plant.dt)}
+
+    yaw_s, lat_s, series = {k: [] for k in build()}, {k: [] for k in build()}, {}
+    print("  [D] 지속 측풍 스윕 (요 유지 / 횡편차)")
+    for W in CROSSWINDS:
+        for nm, c in build().items():
+            ts, xs, _ = plant.simulate(x0, c, T=T_SUS, wind_fn=_sustained(W))
+            yw = _yaw_deg(xs)
+            k = int(14.0 / plant.dt)
+            yaw_s[nm].append(abs(float(yw[k])))
+            lat_s[nm].append(float(np.max(np.abs(xs[:, 1] - xs[0, 1]))))
+            if abs(W - CROSSWINDS[-1]) < 1e-9:
+                series[nm] = (ts, yw)
+            print(f"      W={W:5.1f}  {nm:<30} settled |dpsi| = "
+                  f"{yaw_s[nm][-1]:5.2f} deg, |dy| = {lat_s[nm][-1]:5.2f} m", flush=True)
+
+    wv = [np.degrees(np.arctan(W / V_CRUISE)) for W in CROSSWINDS]   # 완전 풍향계
+    colors = {"Gain-scheduled LQR": "C3", "NMPC+INDI (interface split)": "C0"}
+    fig, ax = plt.subplots(1, 3, figsize=(15.5, 4.3))
+
+    for nm, (ts, yw) in series.items():
+        ax[0].plot(ts, np.abs(yw), color=colors[nm], lw=2, label=nm)
+    ax[0].axhline(wv[-1], color="k", ls="--", lw=1.4)
+    ax[0].text(T_SUS * .35, wv[-1] + .3, "full weathervane "
+               rf"($\beta$ = {wv[-1]:.1f}$\degree$)", fontsize=8)
+    ax[0].axvline(2.0, color="k", lw=.8, alpha=.4)
+    ax[0].set_xlabel("t [s]"); ax[0].set_ylabel(r"$|\Delta\psi|$ [deg]")
+    ax[0].set_title(f"Sustained {CROSSWINDS[-1]:.0f} m/s crosswind"
+                    "\nboth settle — the disturbance is self-limiting")
+    ax[0].legend(fontsize=8); ax[0].grid(alpha=.3)
+
+    ax[1].plot(CROSSWINDS, wv, "k--", lw=1.6, label="full weathervane (gives up)")
+    for nm, v in yaw_s.items():
+        ax[1].plot(CROSSWINDS, v, "o-", color=colors[nm], lw=2, ms=7, label=nm)
+    for i, W in enumerate(CROSSWINDS):
+        rec = 1.0 - yaw_s["NMPC+INDI (interface split)"][i] / wv[i]
+        ax[1].annotate(f"recovers {rec:.0%}",
+                       (W, yaw_s["NMPC+INDI (interface split)"][i]),
+                       textcoords="offset points", xytext=(4, -13), fontsize=8, color="C0")
+    ax[1].set_xlabel("crosswind [m/s]"); ax[1].set_ylabel(r"settled $|\Delta\psi|$ [deg]")
+    ax[1].set_title("Heading held\nLQR sits on the give-up line; split holds ~2/3")
+    ax[1].set_xticks(CROSSWINDS); ax[1].grid(alpha=.3); ax[1].legend(fontsize=8)
+
+    for nm, v in lat_s.items():
+        ax[2].plot(CROSSWINDS, v, "o-", color=colors[nm], lw=2, ms=7, label=nm)
+    ax[2].set_xlabel("crosswind [m/s]"); ax[2].set_ylabel(r"peak $|\Delta y|$ [m]")
+    ax[2].set_title("Trade-off: holding heading costs lateral drift")
+    ax[2].set_xticks(CROSSWINDS); ax[2].grid(alpha=.3); ax[2].legend(fontsize=8)
+
+    fig.suptitle("Crosswind hits YAW, not pitch — ground-truth state, IPOPT NMPC, "
+                 f"{V_CRUISE:.0f} m/s cruise", fontsize=12)
+    fig.tight_layout(rect=[0, 0, 1, 0.91])
+    fig.savefig(os.path.join(_RES, "prop_fig_crosswind.png"), dpi=130)
+    plt.close(fig)
+    return yaw_s, lat_s, wv
+
+
 def main():
     print("연구제안 발표용 그림 생성")
-    fig_gust(); fig_solver(); fig_mc()
-    for f in ("gust", "solver", "mc"):
+    fig_gust(); fig_solver(); fig_mc(); fig_crosswind()
+    for f in ("gust", "solver", "mc", "crosswind"):
         print(f"  저장: results/prop_fig_{f}.png")
 
 
