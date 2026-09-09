@@ -87,18 +87,32 @@ def _mk(name, params, v_ref, z_ref, dt):
 # ══════════════════════════════════════════════════════════════════════
 # E — 65초 통합미션 + 지속 측풍
 # ══════════════════════════════════════════════════════════════════════
-def _wind_mission(W_cross):
-    """미션 전체에 지속 측풍 + 기존 수직돌풍(t=35s, 10 m/s).
+# 측풍 진입 시각. **순항 시작(28s)** 이 기본이다.
+#
+# 처음엔 이륙 직후(5s)부터 걸었는데, 그러면 기수오차 판정이 무의미해진다:
+# 풍향계 복원 강성이 q_bar ~ V^2 라 V~0 인 이륙·호버에서 0 이고, 제어기가
+# 무엇이든 기체가 그냥 돌아간다 (LQR 도 측풍 5 m/s 에서 35.8 도).
+# 그건 제어 문제가 아니라 물리라서, 제어기를 가르는 지표가 못 된다.
+# 저속 측풍은 별도 케이스(T_ON_TAKEOFF)로 따로 본다.
+T_ON_CRUISE = 28.0
+T_ON_TAKEOFF = 5.0
+
+
+def _wind_mission(W_cross, t_on=T_ON_CRUISE):
+    """지속 측풍 + 기존 수직돌풍(t=35s, 10 m/s).
 
     실제 비행에서 바람은 계속 불고 돌풍이 그 위에 얹힌다. 기존 미션은 돌풍만
     있었으므로 '바람 없는 날의 돌풍' 이었다.
+
+    t_on=28 이면 순항 진입과 함께 측풍이 들어오고, 7 초 뒤 수직돌풍이 겹친다
+    — **조합 외란 시험은 그대로 유지된다.**
     """
     gust = make_gust_fn("vertical", 10.0, 35.0, 1.0)
 
     def f(t):
-        w = gust(t)
-        if t >= 5.0:                       # 이륙 직후부터 계속
-            w = w + np.array([0.0, W_cross * min((t - 5.0) / 1.0, 1.0), 0.0])
+        w = np.array(gust(t), float)
+        if t >= t_on:
+            w = w + np.array([0.0, W_cross * min((t - t_on) / 1.0, 1.0), 0.0])
         return w
     return f
 
@@ -274,7 +288,8 @@ def final_comparison():
                   color="C3", fontsize=9)
     ax[0, 1].set_yscale("symlog", linthresh=1)
     for a in (ax[0, 0], ax[0, 1]):
-        a.axvspan(35, 36, color="k", alpha=.12); a.axvline(5, color="k", lw=.7, alpha=.4)
+        a.axvspan(35, 36, color="k", alpha=.12)
+        a.axvline(T_ON_CRUISE, color="C2", lw=1.0, alpha=.6)
         a.set_xlabel("t [s]"); a.grid(alpha=.3); a.legend(fontsize=8)
     ax[0, 0].set_ylabel("$v_x$ [m/s]")
     ax[0, 0].set_title(f"Speed tracking, {CW_FINAL[-1]:.0f} m/s crosswind")
@@ -295,8 +310,9 @@ def final_comparison():
         a.set_xlabel("sustained crosswind [m/s]"); a.set_ylabel(lab)
         a.set_title(ttl); a.set_xticks(CW_FINAL); a.grid(alpha=.3); a.legend(fontsize=8)
 
-    fig.suptitle("Take-off to cruise (deceleration excluded) with sustained crosswind "
-                 "+ vertical gust at t=35 s\nground truth, IPOPT NMPC  —  "
+    fig.suptitle("Take-off to cruise (deceleration excluded)  —  crosswind enters at "
+                 f"cruise (t={T_ON_CRUISE:.0f} s), vertical gust at t=35 s\n"
+                 "ground truth, IPOPT NMPC  —  "
                  f"pass = heading within {YAW_LIMIT_DEG:.0f}$\\degree$ and "
                  rf"$|\omega|$ < {OMEGA_FAIL:.0f} rad/s", fontsize=11.5)
     fig.tight_layout(rect=[0, 0, 1, 0.93])
