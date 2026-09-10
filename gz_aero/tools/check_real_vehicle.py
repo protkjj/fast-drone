@@ -36,8 +36,14 @@ def load_table(path):
 
 
 def load(path):
-    meta, cols, rows = {}, None, []
-    with open(path, encoding="utf-8") as f:
+    """디버그 로그를 읽는다.
+
+    ⚠ 이 로그는 시뮬이 도는 동안 실시간으로 쓰인다. SITL 을 Ctrl-C 로 끄면
+      마지막 줄이 쓰다 말고 잘린다. 그러면 열 개수가 모자라 파싱이 터진다.
+      정상 상황이므로 **망가진 줄은 세어서 버리고** 나머지로 판정한다.
+    """
+    meta, cols, rows, bad = {}, None, [], 0
+    with open(path, encoding="utf-8", errors="replace") as f:
         for line in f:
             if line.startswith("#"):
                 if ":" in line:
@@ -48,9 +54,16 @@ def load(path):
             if cols is None:
                 cols = p
                 continue
-            if p and p[0] != "":
+            if not p or p[0] == "":
+                continue
+            if len(p) != len(cols):
+                bad += 1
+                continue
+            try:
                 rows.append([float(x) for x in p])
-    return meta, cols, rows
+            except ValueError:
+                bad += 1
+    return meta, cols, rows, bad
 
 
 def main():
@@ -60,7 +73,10 @@ def main():
         print("  model.sdf 에 <debug_csv> 를 넣고 SITL 을 돌렸는지 확인하세요.")
         return 1
 
-    meta, cols, rows = load(path)
+    meta, cols, rows, bad = load(path)
+    if bad:
+        print(f"⚠ 열 개수가 안 맞는 줄 {bad} 개를 건너뜁니다 "
+              "(시뮬을 끄면 마지막 줄이 잘립니다. 1~2 개면 정상입니다)")
     if not rows:
         print(f"로그에 데이터 줄이 없습니다: {path}")
         print("  플러그인이 Configure 는 통과했지만 PreUpdate 가 안 돌았다는 뜻입니다.")
@@ -80,6 +96,7 @@ def main():
     mw = [math.dist((0, 0, 0), (r[ix["mWx"]], r[ix["mWy"]], r[ix["mWz"]])) for r in rows]
 
     print(f"로그      {path}")
+    print(f"          열 {len(cols)} 개")
     print(f"          {len(rows)} 행, t {t[0]:.2f} ~ {t[-1]:.2f} s")
     print(f"질량      {mass:.4g} kg (무게 {W:.1f} N)")
     print(f"속도      V {min(V):.2f} ~ {max(V):.2f} m/s")
