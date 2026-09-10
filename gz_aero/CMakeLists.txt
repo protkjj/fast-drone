@@ -46,6 +46,27 @@ if(gz-sim8_FOUND AND gz-plugin2_FOUND)
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
   target_link_libraries(FastDroneAero
     PRIVATE gz-sim8::gz-sim8 gz-plugin2::register)
+
+  # 힘 화살표(마커)는 있으면 켜고 없으면 끈다. 버전이 안 맞아 여기서 실패해도
+  # 플러그인 본체는 그대로 빌드되어야 한다 — 시각화 때문에 공력을 잃을 순 없다.
+  find_package(gz-transport13 QUIET)
+  find_package(gz-msgs10 QUIET)
+  if(gz-transport13_FOUND AND gz-msgs10_FOUND)
+    target_compile_definitions(FastDroneAero PRIVATE FAST_DRONE_MARKERS=1)
+    # 타깃 이름이 배포판마다 다르다(gz-transport13::gz-transport13 / ::core).
+    # 틀린 이름을 그냥 적으면 CMake 가 죽어 공력까지 못 쓰게 되므로,
+    # **있는 것만** 붙인다. gz-sim8 이 이미 전이 링크하므로 하나도 안 붙어도
+    # 대개 빌드된다.
+    foreach(t gz-transport13::gz-transport13 gz-transport13::core
+              gz-msgs10::gz-msgs10 gz-msgs10::core)
+      if(TARGET ${t})
+        target_link_libraries(FastDroneAero PRIVATE ${t})
+      endif()
+    endforeach()
+    message(STATUS "gz-transport13 + gz-msgs10 발견 -> 힘 화살표를 켭니다")
+  else()
+    message(STATUS "gz-transport13/gz-msgs10 없음 -> 화살표 없이 빌드합니다")
+  endif()
   # gz 는 접두사 없는 파일명(libFastDroneAero.so)을 그대로 찾는다
   set_target_properties(FastDroneAero PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})

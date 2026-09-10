@@ -37,6 +37,13 @@
 #include <gz/sim/System.hh>
 #include <gz/sim/Util.hh>
 #include <gz/sim/components/Inertial.hh>
+
+// 힘 화살표. gz-transport / gz-msgs 버전이 안 맞아도 **플러그인 본체는 살아야**
+// 하므로 CMake 에서 찾았을 때만 켠다 (FAST_DRONE_MARKERS).
+#ifdef FAST_DRONE_MARKERS
+#include <gz/msgs/marker.pb.h>
+#include <gz/transport/Node.hh>
+#endif
 #include <sdf/Element.hh>
 
 #include "fast_drone/aero_core.hpp"
@@ -80,6 +87,15 @@ class AeroPlugin : public gzs::System,
   ///   실제 사용 경로의 버그가 검증을 빠져나갔다.
   bool TryCacheInertial(gzs::EntityComponentManager &_ecm);
 
+#ifdef FAST_DRONE_MARKERS
+  /// 공력·모멘트·바람을 Gazebo 화면에 화살표로 그린다.
+  ///
+  /// 숫자만 보면 부호가 뒤집혀도 눈치채기 어렵다. 화살표는 크기와 **방향**을
+  /// 동시에 보여주므로 좌표계 실수가 즉시 드러난다.
+  void PublishMarkers(const Vector3d &_origin, const Vector3d &_f,
+                      const Vector3d &_m);
+#endif
+
   void OpenDebugCsv();
   void LogDebugCsv(double _t, const gz::math::Pose3d &_pose,
                    const Vector3d &_vAirW, const Vector3d &_omegaW,
@@ -105,6 +121,16 @@ class AeroPlugin : public gzs::System,
   bool inertial_cached_ = false;
   /// 못 읽은 스텝 수. 계속 못 읽으면 **조용히 죽지 말고** 경고한다
   int inertial_miss_ = 0;
+
+#ifdef FAST_DRONE_MARKERS
+  gz::transport::Node node_;
+  bool markers_ = true;
+  double mk_f_scale_ = 0.02;    ///< 화살표 길이 [m] 당 힘 [N]
+  double mk_m_scale_ = 0.10;    ///< 화살표 길이 [m] 당 모멘트 [N·m]
+  double mk_wind_len_ = 0.8;    ///< 바람은 **방향만** 표시 (길이 고정)
+  int mk_every_ = 25;           ///< 250 Hz 기준 10 Hz
+  bool mk_warned_ = false;
+#endif
 
   // ── 검증 훅 (DESIGN.md 4장 겹2) ──
   //
@@ -232,6 +258,13 @@ void AeroPlugin::Configure(const gzs::Entity &_entity,
   table_source_ = csv_path;
   debug_csv_path_ = _sdf->Get<std::string>("debug_csv", std::string()).first;
   debug_every_ = _sdf->Get<int>("debug_csv_every", 1).first;
+#ifdef FAST_DRONE_MARKERS
+  markers_ = _sdf->Get<bool>("markers", markers_).first;
+  mk_f_scale_ = _sdf->Get<double>("marker_force_scale", mk_f_scale_).first;
+  mk_m_scale_ = _sdf->Get<double>("marker_moment_scale", mk_m_scale_).first;
+  mk_every_ = _sdf->Get<int>("marker_every", mk_every_).first;
+  if (mk_every_ < 1) mk_every_ = 1;
+#endif
   if (debug_every_ < 1) debug_every_ = 1;
   // ⚠ 디버그 CSV 는 여기서 열지 않는다. 헤더에 질량 특성이 들어가는데
   //   그건 첫 PreUpdate 까지 못 읽는다 (아래 TryCacheInertial 주석 참고).
@@ -328,6 +361,14 @@ void AeroPlugin::PreUpdate(const gzs::UpdateInfo &_info,
   link.AddWorldForce(_ecm, f_world);
   link.AddWorldWrench(_ecm, Vector3d::Zero, m_world);
 
+#ifdef FAST_DRONE_MARKERS
+  if (markers_ && (step_ % mk_every_ == 0)) {
+    // 화살표는 **무게중심**에서 시작한다. 힘을 실제로 거는 지점이 거기다.
+    PublishMarkers(pose->Pos() + pose->Rot().RotateVector(r_cm_link_),
+                   f_world, m_world);
+  }
+#endif
+
   if (debug_csv_.is_open() && (step_ % debug_every_ == 0)) {
     const double t = std::chrono::duration<double>(_info.simTime).count();
     LogDebugCsv(t, *pose, v_air_world, omega_world, v_B, w_B, dbg, wr,
@@ -335,6 +376,68 @@ void AeroPlugin::PreUpdate(const gzs::UpdateInfo &_info,
   }
   ++step_;
 }
+
+#ifdef FAST_DRONE_MARKERS
+// ══════════════════════════════════════════════════════════════════════
+void AeroPlugin::PublishMarkers(const Vector3d &_origin, const Vector3d &_f,
+                                const Vector3d &_m) {
+  // ARROW 타입은 gz-msgs 버전마다 있고 없고 해서 안 쓴다. LINE_LIST 로 자루를
+  // 긋고 끝에 작은 공을 놓아 방향을 낸다. 둘 다 어느 버전에도 있다.
+  auto vec = [&](int _id, const Vector3d &_dir, double _len,
+                 float _r, float _g, float _b) {
+    if (_len <= 1e-6) return;
+    const Vector3d tip = _origin + _dir * _len;
+
+    gz::msgs::Marker line;
+    line.set_ns("fast_drone_aero");
+    line.set_id(_id);
+    line.set_action(gz::msgs::Marker::ADD_MODIFY);
+    line.set_type(gz::msgs::Marker::LINE_LIST);
+    line.set_visibility(gz::msgs::Marker::GUI);
+    // 수명을 주면 시뮬이 멈췄을 때 화살표가 남아 헷갈리지 않는다.
+    line.mutable_lifetime()->set_sec(0);
+    line.mutable_lifetime()->set_nsec(500000000);
+    // 기본 생성된 pose 는 쿼터니언이 전부 0 이라 **유효하지 않다**. 점을 월드
+    // 좌표로 넣을 것이므로 항등으로 명시한다.
+    line.mutable_pose()->mutable_orientation()->set_w(1.0);
+    for (auto *c : {line.mutable_material()->mutable_ambient(),
+                    line.mutable_material()->mutable_diffuse()}) {
+      c->set_r(_r); c->set_g(_g); c->set_b(_b); c->set_a(1.0f);
+    }
+    for (const auto &pt : {_origin, tip}) {
+      auto *q = line.add_point();
+      q->set_x(pt.X()); q->set_y(pt.Y()); q->set_z(pt.Z());
+    }
+
+    gz::msgs::Marker head(line);
+    head.set_id(_id + 1000);
+    head.set_type(gz::msgs::Marker::SPHERE);
+    head.clear_point();
+    head.mutable_pose()->mutable_position()->set_x(tip.X());
+    head.mutable_pose()->mutable_position()->set_y(tip.Y());
+    head.mutable_pose()->mutable_position()->set_z(tip.Z());
+    head.mutable_scale()->set_x(0.06);
+    head.mutable_scale()->set_y(0.06);
+    head.mutable_scale()->set_z(0.06);
+
+    const bool ok = node_.Request("/marker", line) &&
+                    node_.Request("/marker", head);
+    if (!ok && !mk_warned_) {
+      mk_warned_ = true;
+      gzwarn << "[fast_drone_aero] /marker 서비스가 없어 화살표를 못 그립니다. "
+                "GUI 없이(gz sim -s) 돌리면 정상입니다.\n";
+    }
+  };
+
+  const double fn = _f.Length(), mn = _m.Length();
+  if (fn > 1e-9) vec(1, _f / fn, fn * mk_f_scale_, 0.15f, 0.45f, 1.0f);
+  if (mn > 1e-9) vec(2, _m / mn, mn * mk_m_scale_, 0.15f, 0.9f, 0.3f);
+  const double wn = wind_world_.Length();
+  if (wn > 1e-9)
+    vec(3, wind_world_ / wn, mk_wind_len_, 0.75f, 0.75f, 0.75f);
+}
+#endif
+
 
 // ══════════════════════════════════════════════════════════════════════
 bool AeroPlugin::TryCacheInertial(gzs::EntityComponentManager &_ecm) {
