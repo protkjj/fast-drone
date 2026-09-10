@@ -39,12 +39,14 @@
 #include <gz/sim/components/Inertial.hh>
 
 // 힘 화살표. gz-transport / gz-msgs 버전이 안 맞아도 **플러그인 본체는 살아야**
-// 하므로 CMake 에서 찾았을 때만 켠다 (FAST_DRONE_MARKERS).
-#ifdef FAST_DRONE_MARKERS
+// 하므로 CMake 에서 찾았을 때만 켠다 (FAST_DRONE_GZ_TRANSPORT).
+#ifdef FAST_DRONE_GZ_TRANSPORT
 #include <iomanip>
+#include <mutex>
 #include <sstream>
 
 #include <gz/msgs/marker.pb.h>
+#include <gz/msgs/vector3d.pb.h>
 #include <gz/transport/Node.hh>
 #endif
 #include <sdf/Element.hh>
@@ -90,13 +92,20 @@ class AeroPlugin : public gzs::System,
   ///   실제 사용 경로의 버그가 검증을 빠져나갔다.
   bool TryCacheInertial(gzs::EntityComponentManager &_ecm);
 
-#ifdef FAST_DRONE_MARKERS
+#ifdef FAST_DRONE_GZ_TRANSPORT
   /// 공력·모멘트·바람을 Gazebo 화면에 화살표로 그린다.
   ///
   /// 숫자만 보면 부호가 뒤집혀도 눈치채기 어렵다. 화살표는 크기와 **방향**을
   /// 동시에 보여주므로 좌표계 실수가 즉시 드러난다.
   void PublishMarkers(const Vector3d &_origin, const Vector3d &_f,
                       const Vector3d &_m, const AeroDebug &_dbg);
+
+  /// 바람을 **시뮬 도중에** 바꾼다. 조건을 바꿀 때마다 재시작하면 감이 끊긴다.
+  ///
+  /// ⚠ 이 콜백은 transport 스레드에서 온다. PreUpdate 는 시뮬 스레드다.
+  ///   그래서 여기서 wind_world_ 를 직접 건드리지 않고 잠금으로 받아 둔 뒤
+  ///   PreUpdate 앞에서 옮긴다.
+  void OnWind(const gz::msgs::Vector3d &_msg);
 #endif
 
   void OpenDebugCsv();
@@ -125,7 +134,7 @@ class AeroPlugin : public gzs::System,
   /// 못 읽은 스텝 수. 계속 못 읽으면 **조용히 죽지 말고** 경고한다
   int inertial_miss_ = 0;
 
-#ifdef FAST_DRONE_MARKERS
+#ifdef FAST_DRONE_GZ_TRANSPORT
   gz::transport::Node node_;
   bool markers_ = true;
   double mk_f_scale_ = 0.02;    ///< 화살표 길이 [m] 당 힘 [N]
@@ -135,6 +144,11 @@ class AeroPlugin : public gzs::System,
   bool mk_text_ = true;         ///< 계수값을 글자로 같이 띄운다
   double mk_text_up_ = 0.7;     ///< 글자를 기체 위 몇 m 에 띄우나
   bool mk_warned_ = false;
+
+  std::string wind_topic_;
+  std::mutex wind_mutex_;
+  Vector3d wind_cmd_{0, 0, 0};
+  bool wind_new_ = false;
 #endif
 
   // ── 검증 훅 (DESIGN.md 4장 겹2) ──
@@ -263,7 +277,7 @@ void AeroPlugin::Configure(const gzs::Entity &_entity,
   table_source_ = csv_path;
   debug_csv_path_ = _sdf->Get<std::string>("debug_csv", std::string()).first;
   debug_every_ = _sdf->Get<int>("debug_csv_every", 1).first;
-#ifdef FAST_DRONE_MARKERS
+#ifdef FAST_DRONE_GZ_TRANSPORT
   markers_ = _sdf->Get<bool>("markers", markers_).first;
   mk_f_scale_ = _sdf->Get<double>("marker_force_scale", mk_f_scale_).first;
   mk_m_scale_ = _sdf->Get<double>("marker_moment_scale", mk_m_scale_).first;
@@ -271,6 +285,16 @@ void AeroPlugin::Configure(const gzs::Entity &_entity,
   if (mk_every_ < 1) mk_every_ = 1;
   mk_text_ = _sdf->Get<bool>("marker_text", mk_text_).first;
   mk_text_up_ = _sdf->Get<double>("marker_text_height", mk_text_up_).first;
+  wind_topic_ = _sdf->Get<std::string>("wind_topic",
+                    std::string("/fast_drone/aero/wind")).first;
+  if (!wind_topic_.empty()) {
+    if (node_.Subscribe(wind_topic_, &AeroPlugin::OnWind, this))
+      gzmsg << "[fast_drone_aero] 바람을 실시간으로 바꿀 수 있습니다:\n"
+            << "  gz topic -t " << wind_topic_
+            << " -m gz.msgs.Vector3d -p \"x: 0, y: 60, z: 0\"\n";
+    else
+      gzwarn << "[fast_drone_aero] 바람 토픽 구독 실패: " << wind_topic_ << "\n";
+  }
 #endif
   if (debug_every_ < 1) debug_every_ = 1;
   // ⚠ 디버그 CSV 는 여기서 열지 않는다. 헤더에 질량 특성이 들어가는데
@@ -306,6 +330,18 @@ void AeroPlugin::PreUpdate(const gzs::UpdateInfo &_info,
   // 질량 특성은 여기서 읽는다 (Configure 에서는 아직 없다 — 위 주석 참고).
   // 못 읽으면 이번 스텝은 건너뛴다. r_cm 없이 계산하면 조용히 틀린다.
   if (!TryCacheInertial(_ecm)) return;
+
+#ifdef FAST_DRONE_GZ_TRANSPORT
+  {  // 토픽으로 들어온 새 바람을 여기서 받는다 (스레드 경계)
+    std::lock_guard<std::mutex> lock(wind_mutex_);
+    if (wind_new_) {
+      wind_world_ = wind_cmd_;
+      wind_new_ = false;
+      gzmsg << "[fast_drone_aero] 바람 -> " << wind_world_ << " m/s (크기 "
+            << wind_world_.Length() << ")\n";
+    }
+  }
+#endif
 
   // 실제로 측정된 링크 상태. 주입 모드에서도 **로그에는 남긴다** —
   // 겹2b 가 "우리가 건 wrench 가 정말 이 가속도를 만들었나" 를 이걸로 잰다.
@@ -368,7 +404,7 @@ void AeroPlugin::PreUpdate(const gzs::UpdateInfo &_info,
   link.AddWorldForce(_ecm, f_world);
   link.AddWorldWrench(_ecm, Vector3d::Zero, m_world);
 
-#ifdef FAST_DRONE_MARKERS
+#ifdef FAST_DRONE_GZ_TRANSPORT
   if (markers_ && (step_ % mk_every_ == 0)) {
     // 화살표는 **무게중심**에서 시작한다. 힘을 실제로 거는 지점이 거기다.
     PublishMarkers(pose->Pos() + pose->Rot().RotateVector(r_cm_link_),
@@ -384,7 +420,15 @@ void AeroPlugin::PreUpdate(const gzs::UpdateInfo &_info,
   ++step_;
 }
 
-#ifdef FAST_DRONE_MARKERS
+#ifdef FAST_DRONE_GZ_TRANSPORT
+// ══════════════════════════════════════════════════════════════════════
+void AeroPlugin::OnWind(const gz::msgs::Vector3d &_msg) {
+  std::lock_guard<std::mutex> lock(wind_mutex_);
+  wind_cmd_.Set(_msg.x(), _msg.y(), _msg.z());
+  wind_new_ = true;
+}
+
+
 // ══════════════════════════════════════════════════════════════════════
 void AeroPlugin::PublishMarkers(const Vector3d &_origin, const Vector3d &_f,
                                 const Vector3d &_m, const AeroDebug &_dbg) {

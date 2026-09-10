@@ -52,7 +52,7 @@ if(gz-sim8_FOUND AND gz-plugin2_FOUND)
   find_package(gz-transport13 QUIET)
   find_package(gz-msgs10 QUIET)
   if(gz-transport13_FOUND AND gz-msgs10_FOUND)
-    target_compile_definitions(FastDroneAero PRIVATE FAST_DRONE_MARKERS=1)
+    target_compile_definitions(FastDroneAero PRIVATE FAST_DRONE_GZ_TRANSPORT=1)
     # 타깃 이름이 배포판마다 다르다(gz-transport13::gz-transport13 / ::core).
     # 틀린 이름을 그냥 적으면 CMake 가 죽어 공력까지 못 쓰게 되므로,
     # **있는 것만** 붙인다. gz-sim8 이 이미 전이 링크하므로 하나도 안 붙어도
