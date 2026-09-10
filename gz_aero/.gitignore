@@ -4,3 +4,6 @@ test/aero_interp_*.csv
 
 # CMake 빌드 디렉토리
 build/
+
+# 생성된 테스트 월드 — CSV 절대경로가 박히므로 머신마다 재생성해야 한다
+test/*_check.world
