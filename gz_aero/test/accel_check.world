@@ -26,19 +26,19 @@
           <pose>0.05 0.02 -0.03 0 0 0</pose>
           <mass>1.660778087</mass>
           <inertia>
-            <ixx>0.006040705941</ixx><iyy>0.04045326237</iyy><izz>0.04045326237</izz>
+            <ixx>0.00604071</ixx><iyy>0.04045326</iyy><izz>0.04045326</izz>
             <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
           </inertia>
         </inertial>
         <visual name="hull">
           <pose>0 0 0 0 1.5707963267948966 0</pose>
-          <geometry><cylinder><radius>0.045</radius>
+          <geometry><cylinder><radius>0.075</radius>
             <length>0.72</length></cylinder></geometry>
         </visual>
       </link>
       <plugin filename="FastDroneAero" name="fast_drone::AeroPlugin">
         <link_name>body</link_name>
-        <csv_file>../data/aero_sized.csv</csv_file>
+        <csv_file>/Users/kj/Desktop/dynamic/fast_drone/gz_aero/data/aero_placeholder.csv</csv_file>
         <nose>1 0 0</nose>
         <right>0 -1 0</right>
         <wind>0 0 0</wind>
@@ -60,19 +60,19 @@
           <pose>-0.04 0.06 0.02 0 0 0</pose>
           <mass>1.660778087</mass>
           <inertia>
-            <ixx>0.006040705941</ixx><iyy>0.04045326237</iyy><izz>0.04045326237</izz>
+            <ixx>0.00604071</ixx><iyy>0.04045326</iyy><izz>0.04045326</izz>
             <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
           </inertia>
         </inertial>
         <visual name="hull">
           <pose>0 0 0 0 1.5707963267948966 0</pose>
-          <geometry><cylinder><radius>0.045</radius>
+          <geometry><cylinder><radius>0.075</radius>
             <length>0.72</length></cylinder></geometry>
         </visual>
       </link>
       <plugin filename="FastDroneAero" name="fast_drone::AeroPlugin">
         <link_name>body</link_name>
-        <csv_file>../data/aero_sized.csv</csv_file>
+        <csv_file>/Users/kj/Desktop/dynamic/fast_drone/gz_aero/data/aero_placeholder.csv</csv_file>
         <nose>1 0 0</nose>
         <right>0 -1 0</right>
         <wind>0 0 0</wind>

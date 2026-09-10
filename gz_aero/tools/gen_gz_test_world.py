@@ -162,9 +162,9 @@ def main(argv=None):
                 com=" ".join(f"{x:.9g}" for x in com),
                 mass=mass, ixx=ixx, iyy=iyy, izz=izz,
                 radius=src.d_ref / 2.0, length=length, half_pi=math.pi / 2,
-                csv=os.path.relpath(
-                    os.path.join(_REPO, "gz_aero", "data", f"aero_{args.source}.csv"),
-                    os.path.dirname(path)),
+                # ⚠ 절대경로를 쓴다. gz-sim 이 플러그인 SDF 의 FilePath() 를
+                #   비워서 넘기는 경우가 있어(Harmonic 8.11 실측) 상대경로가 안 풀린다.
+                csv=os.path.join(_REPO, "gz_aero", "data", f"aero_{args.source}.csv"),
                 wind=" ".join(f"{x:.9g}" for x in wind),
                 vel=" ".join(f"{x:.9g}" for x in vel),
                 omega=" ".join(f"{x:.9g}" for x in omega),

@@ -22,6 +22,7 @@
 //    링크의 자세·속도를 여기서 꺼내고, 힘도 여기에 써 넣는다.
 // ──────────────────────────────────────────────────────────────────────────
 #include <chrono>
+#include <cstdlib>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -142,17 +143,34 @@ void AeroPlugin::Configure(const gzs::Entity &_entity,
     gzerr << "[fast_drone_aero] <csv_file> 이 없습니다. 공력 계수 표가 있어야 합니다.\n";
     return;
   }
-  // 상대경로는 이 SDF 파일 기준으로 푼다 (모델 폴더 안에 CSV 를 두는 게 자연스럽다)
-  std::string csv_path = gzs::asFullPath(csv_rel, _sdf->FilePath());
-  std::string err;
-  if (!AeroTable::Load(csv_path, &table_, &err)) {
-    // asFullPath 가 엉뚱하게 풀렸을 수 있으니 원문 그대로도 한 번 시도한다
-    if (!AeroTable::Load(csv_rel, &table_, &err)) {
-      gzerr << "[fast_drone_aero] 표 로드 실패: " << err << "\n"
-            << "  시도한 경로: " << csv_path << " / " << csv_rel << "\n";
-      return;
-    }
-    csv_path = csv_rel;
+  // 상대경로 해석 — 후보를 순서대로 시도한다.
+  //
+  // ⚠ asFullPath 하나만 믿으면 안 된다. gz-sim 이 플러그인 SDF 요소를 넘길 때
+  //   FilePath() 가 **비어 있는 경우가 있다** (실측: Harmonic 8.11 에서 빈 값).
+  //   그러면 asFullPath 는 상대경로를 그대로 돌려주고, 로드가 조용히 실패한다.
+  //   스텁 헤더로는 못 잡히는 자리라 실제 Gazebo 에서 처음 드러났다.
+  const std::string sdf_dir = _sdf->FilePath();
+  std::vector<std::string> cands;
+  cands.push_back(csv_rel);                                  // 절대경로거나 cwd 기준
+  if (!sdf_dir.empty())
+    cands.push_back(gzs::asFullPath(csv_rel, sdf_dir));      // SDF 파일 기준
+  if (const char *d = std::getenv("GZ_AERO_CSV_DIR"))        // 마지막 탈출구
+    cands.push_back(std::string(d) + "/" + csv_rel);
+
+  std::string csv_path, err, tried;
+  bool loaded = false;
+  for (const auto &c : cands) {
+    tried += "\n    " + c;
+    if (AeroTable::Load(c, &table_, &err)) { csv_path = c; loaded = true; break; }
+  }
+  if (!loaded) {
+    gzerr << "[fast_drone_aero] 표 로드 실패: " << err << "\n"
+          << "  SDF FilePath() = '" << sdf_dir << "'"
+          << (sdf_dir.empty() ? "  <- 비어 있어 상대경로를 못 풉니다. "
+                                "<csv_file> 에 절대경로를 쓰거나 "
+                                "GZ_AERO_CSV_DIR 를 설정하세요." : "")
+          << "\n  시도한 경로:" << tried << "\n";
+    return;
   }
 
   // ── 3) 기준량 ────────────────────────────────────────────────────────
