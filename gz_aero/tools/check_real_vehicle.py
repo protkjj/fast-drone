@@ -101,8 +101,21 @@ def main():
     print(f"질량      {mass:.4g} kg (무게 {W:.1f} N)")
     print(f"속도      V {min(V):.2f} ~ {max(V):.2f} m/s")
     print(f"받음각    {math.degrees(min(al)):.1f} ~ {math.degrees(max(al)):.1f} deg")
+    # 기울임 = 링크의 +Z 축이 월드 +Z 에서 얼마나 벗어났나.
+    #   쿼터니언은 scalar-last (qx,qy,qz,qw), 링크 -> 월드.
+    #   R*(0,0,1) 의 z 성분이 1 - 2(qx^2 + qy^2) 이므로 acos 하면 된다.
+    #
+    # ★ 이게 결정적 증거다. PX4 는 바람을 모른다. 위치 오차만 본다.
+    #   공력이 **실제로 걸리면** 기체가 밀리고 PX4 가 버티려고 기운다.
+    #   힘을 계산만 하고 안 걸면 밀리지 않으니 기울지도 않는다.
+    tilt = [math.degrees(math.acos(max(-1.0, min(1.0,
+            1.0 - 2.0 * (r[ix["qx"]] ** 2 + r[ix["qy"]] ** 2)))))
+            for r in rows]
+
+    print(f"바람      {meta.get('wind', '(없음)')} m/s (월드 ENU)")
     print(f"공력      |F| 최대 {max(fw):.3f} N (무게의 {100 * max(fw) / W:.2f}%)")
     print(f"          |M| 최대 {max(mw):.4f} N·m")
+    print(f"기울임    최대 {max(tilt):.1f} deg  (수평에서 벗어난 각)")
 
     # 자기일관성: 동체력 크기가 q_bar * S * sqrt(C_A^2 + C_N^2) 와 맞아야 한다.
     worst = 0.0
@@ -114,17 +127,28 @@ def main():
 
     print()
     ok = True
+    frac = 100 * max(fw) / W
+    need = math.degrees(math.atan2(max(fw), W))
+
     if max(fw) < 1e-9:
         print("❌ 힘이 0 입니다. 플러그인은 돌지만 공력이 안 나옵니다.")
         print(f"   V 최대가 {max(V):.2f} m/s 입니다. 너무 느리면 원래 힘이 거의 없습니다.")
         ok = False
-    elif 100 * max(fw) / W < 1.0:
-        print("⚠ 힘이 무게의 1% 미만입니다. 돌고는 있지만 이 속도에선 "
-              "기체 거동으로 확인이 안 됩니다.")
-        print("   <wind> 로 상대풍을 넣어 크게 만드세요 (아래 표 참고).")
+    elif frac < 1.0:
+        print(f"⚠ 힘이 무게의 {frac:.2f}% 입니다. 플러그인은 정상이지만 이 속도에선")
+        print("   기체 거동으로 확인이 안 됩니다. <wind> 로 상대풍을 넣으세요.")
+    elif max(tilt) < 2.0:
+        print(f"❌ 공력이 무게의 {frac:.1f}% 인데 기체가 {max(tilt):.1f} deg 밖에 안 기울었습니다.")
+        print(f"   이 힘이면 {need:.1f} deg 기울어야 버팁니다. 둘 중 하나입니다:")
+        print("     · 아직 지상에 있다 (착륙 상태면 바닥이 힘을 받는다)")
+        print("     · 힘이 계산만 되고 물리에 안 걸린다")
+        print("   commander takeoff 로 띄운 뒤 다시 재세요.")
+        ok = False
     else:
-        print(f"✅ 공력이 무게의 {100 * max(fw) / W:.1f}% 까지 걸리고 있습니다. "
-              "기체 거동으로 확인 가능한 크기입니다.")
+        print(f"✅ 공력 {frac:.1f}% 에 기울임 {max(tilt):.1f} deg "
+              f"(이 힘이 필요로 하는 각 {need:.1f} deg).")
+        print("   PX4 는 바람을 모릅니다. 기울었다는 건 기체가 실제로 밀렸다는 뜻입니다.")
+
     if worst > 1e-6:
         print(f"❌ 자기일관성이 깨졌습니다 ({worst:.3e} N).")
         ok = False
