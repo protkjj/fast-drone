@@ -388,10 +388,37 @@ void AeroPlugin::PreUpdate(const gzs::UpdateInfo &_info,
 // ══════════════════════════════════════════════════════════════════════
 void AeroPlugin::PublishMarkers(const Vector3d &_origin, const Vector3d &_f,
                                 const Vector3d &_m, const AeroDebug &_dbg) {
+  // 글자 마커. 화살표 이름표와 계수 표시가 같은 코드를 쓴다.
+  auto text = [&](int _id, const Vector3d &_at, double _size,
+                  float _r, float _g, float _b, const std::string &_str) {
+    gz::msgs::Marker t;
+    t.set_ns("fast_drone_aero");
+    t.set_id(_id);
+    t.set_action(gz::msgs::Marker::ADD_MODIFY);
+    t.set_type(gz::msgs::Marker::TEXT);
+    t.set_visibility(gz::msgs::Marker::GUI);
+    t.set_text(_str);
+    t.mutable_lifetime()->set_sec(0);
+    t.mutable_lifetime()->set_nsec(500000000);
+    t.mutable_pose()->mutable_orientation()->set_w(1.0);
+    t.mutable_pose()->mutable_position()->set_x(_at.X());
+    t.mutable_pose()->mutable_position()->set_y(_at.Y());
+    t.mutable_pose()->mutable_position()->set_z(_at.Z());
+    t.mutable_scale()->set_x(_size);
+    t.mutable_scale()->set_y(_size);
+    t.mutable_scale()->set_z(_size);
+    for (auto *c : {t.mutable_material()->mutable_ambient(),
+                    t.mutable_material()->mutable_diffuse()}) {
+      c->set_r(_r); c->set_g(_g); c->set_b(_b); c->set_a(1.0f);
+    }
+    node_.Request("/marker", t);
+  };
+
   // ARROW 타입은 gz-msgs 버전마다 있고 없고 해서 안 쓴다. LINE_LIST 로 자루를
   // 긋고 끝에 작은 공을 놓아 방향을 낸다. 둘 다 어느 버전에도 있다.
+  // 이름표를 끝에 같이 띄운다 — 색만으로는 어느 화살표인지 알 수 없다.
   auto vec = [&](int _id, const Vector3d &_dir, double _len,
-                 float _r, float _g, float _b) {
+                 float _r, float _g, float _b, const std::string &_label) {
     if (_len <= 1e-6) return;
     const Vector3d tip = _origin + _dir * _len;
 
@@ -434,14 +461,25 @@ void AeroPlugin::PublishMarkers(const Vector3d &_origin, const Vector3d &_f,
       gzwarn << "[fast_drone_aero] /marker 서비스가 없어 화살표를 못 그립니다. "
                 "GUI 없이(gz sim -s) 돌리면 정상입니다.\n";
     }
+    if (mk_text_)
+      text(_id + 2000, tip + Vector3d(0, 0, 0.08), 0.09, _r, _g, _b, _label);
+  };
+
+  auto fmt = [](const char *_name, double _v, const char *_unit) {
+    std::ostringstream o;
+    o << _name << " " << std::fixed << std::setprecision(1) << _v << " " << _unit;
+    return o.str();
   };
 
   const double fn = _f.Length(), mn = _m.Length();
-  if (fn > 1e-9) vec(1, _f / fn, fn * mk_f_scale_, 0.15f, 0.45f, 1.0f);
-  if (mn > 1e-9) vec(2, _m / mn, mn * mk_m_scale_, 0.15f, 0.9f, 0.3f);
+  if (fn > 1e-9)
+    vec(1, _f / fn, fn * mk_f_scale_, 0.15f, 0.45f, 1.0f, fmt("F", fn, "N"));
+  if (mn > 1e-9)
+    vec(2, _m / mn, mn * mk_m_scale_, 0.15f, 0.9f, 0.3f, fmt("M", mn, "Nm"));
   const double wn = wind_world_.Length();
   if (wn > 1e-9)
-    vec(3, wind_world_ / wn, mk_wind_len_, 0.75f, 0.75f, 0.75f);
+    vec(3, wind_world_ / wn, mk_wind_len_, 0.75f, 0.75f, 0.75f,
+        fmt("wind", wn, "m/s"));
 
   if (!mk_text_) return;
 
@@ -449,36 +487,15 @@ void AeroPlugin::PublishMarkers(const Vector3d &_origin, const Vector3d &_f,
   // 그대로 보여야 "이 받음각에서 이 값이 나올 리 없다" 는 판단이 가능하다.
   std::ostringstream os;
   os << std::fixed << std::setprecision(1)
-     << "V "      << _dbg.V         << " m/s   alpha " << _dbg.alpha * 180.0 / M_PI << " deg\n"
+     << "V "      << _dbg.V  << " m/s   alpha " << _dbg.alpha * 180.0 / M_PI
+     << " deg\n"
      << std::setprecision(0)
-     << "q_bar "  << _dbg.q_bar     << " Pa\n"
+     << "q_bar "  << _dbg.q_bar << " Pa\n"
      << std::setprecision(3)
-     << "C_A "    << _dbg.c.C_A     << "   C_N " << _dbg.c.C_N << "\n"
-     << "x_cp "   << _dbg.c.x_cp    << " m\n"
-     << std::setprecision(2)
-     << "|F| "    << _f.Length()    << " N   |M| " << _m.Length() << " Nm";
-
-  gz::msgs::Marker txt;
-  txt.set_ns("fast_drone_aero");
-  txt.set_id(9);
-  txt.set_action(gz::msgs::Marker::ADD_MODIFY);
-  txt.set_type(gz::msgs::Marker::TEXT);
-  txt.set_visibility(gz::msgs::Marker::GUI);
-  txt.set_text(os.str());
-  txt.mutable_lifetime()->set_sec(0);
-  txt.mutable_lifetime()->set_nsec(500000000);
-  txt.mutable_pose()->mutable_orientation()->set_w(1.0);
-  txt.mutable_pose()->mutable_position()->set_x(_origin.X());
-  txt.mutable_pose()->mutable_position()->set_y(_origin.Y());
-  txt.mutable_pose()->mutable_position()->set_z(_origin.Z() + mk_text_up_);
-  txt.mutable_scale()->set_x(0.12);
-  txt.mutable_scale()->set_y(0.12);
-  txt.mutable_scale()->set_z(0.12);
-  for (auto *c : {txt.mutable_material()->mutable_ambient(),
-                  txt.mutable_material()->mutable_diffuse()}) {
-    c->set_r(1.0f); c->set_g(1.0f); c->set_b(0.25f); c->set_a(1.0f);
-  }
-  node_.Request("/marker", txt);
+     << "C_A "    << _dbg.c.C_A << "   C_N " << _dbg.c.C_N << "\n"
+     << "x_cp "   << _dbg.c.x_cp << " m";
+  text(9, _origin + Vector3d(0, 0, mk_text_up_), 0.12,
+       1.0f, 1.0f, 0.25f, os.str());
 }
 #endif
 
