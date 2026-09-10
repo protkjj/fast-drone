@@ -41,6 +41,9 @@
 // 힘 화살표. gz-transport / gz-msgs 버전이 안 맞아도 **플러그인 본체는 살아야**
 // 하므로 CMake 에서 찾았을 때만 켠다 (FAST_DRONE_MARKERS).
 #ifdef FAST_DRONE_MARKERS
+#include <iomanip>
+#include <sstream>
+
 #include <gz/msgs/marker.pb.h>
 #include <gz/transport/Node.hh>
 #endif
@@ -93,7 +96,7 @@ class AeroPlugin : public gzs::System,
   /// 숫자만 보면 부호가 뒤집혀도 눈치채기 어렵다. 화살표는 크기와 **방향**을
   /// 동시에 보여주므로 좌표계 실수가 즉시 드러난다.
   void PublishMarkers(const Vector3d &_origin, const Vector3d &_f,
-                      const Vector3d &_m);
+                      const Vector3d &_m, const AeroDebug &_dbg);
 #endif
 
   void OpenDebugCsv();
@@ -129,6 +132,8 @@ class AeroPlugin : public gzs::System,
   double mk_m_scale_ = 0.10;    ///< 화살표 길이 [m] 당 모멘트 [N·m]
   double mk_wind_len_ = 0.8;    ///< 바람은 **방향만** 표시 (길이 고정)
   int mk_every_ = 25;           ///< 250 Hz 기준 10 Hz
+  bool mk_text_ = true;         ///< 계수값을 글자로 같이 띄운다
+  double mk_text_up_ = 0.7;     ///< 글자를 기체 위 몇 m 에 띄우나
   bool mk_warned_ = false;
 #endif
 
@@ -264,6 +269,8 @@ void AeroPlugin::Configure(const gzs::Entity &_entity,
   mk_m_scale_ = _sdf->Get<double>("marker_moment_scale", mk_m_scale_).first;
   mk_every_ = _sdf->Get<int>("marker_every", mk_every_).first;
   if (mk_every_ < 1) mk_every_ = 1;
+  mk_text_ = _sdf->Get<bool>("marker_text", mk_text_).first;
+  mk_text_up_ = _sdf->Get<double>("marker_text_height", mk_text_up_).first;
 #endif
   if (debug_every_ < 1) debug_every_ = 1;
   // ⚠ 디버그 CSV 는 여기서 열지 않는다. 헤더에 질량 특성이 들어가는데
@@ -365,7 +372,7 @@ void AeroPlugin::PreUpdate(const gzs::UpdateInfo &_info,
   if (markers_ && (step_ % mk_every_ == 0)) {
     // 화살표는 **무게중심**에서 시작한다. 힘을 실제로 거는 지점이 거기다.
     PublishMarkers(pose->Pos() + pose->Rot().RotateVector(r_cm_link_),
-                   f_world, m_world);
+                   f_world, m_world, dbg);
   }
 #endif
 
@@ -380,7 +387,7 @@ void AeroPlugin::PreUpdate(const gzs::UpdateInfo &_info,
 #ifdef FAST_DRONE_MARKERS
 // ══════════════════════════════════════════════════════════════════════
 void AeroPlugin::PublishMarkers(const Vector3d &_origin, const Vector3d &_f,
-                                const Vector3d &_m) {
+                                const Vector3d &_m, const AeroDebug &_dbg) {
   // ARROW 타입은 gz-msgs 버전마다 있고 없고 해서 안 쓴다. LINE_LIST 로 자루를
   // 긋고 끝에 작은 공을 놓아 방향을 낸다. 둘 다 어느 버전에도 있다.
   auto vec = [&](int _id, const Vector3d &_dir, double _len,
@@ -435,6 +442,43 @@ void AeroPlugin::PublishMarkers(const Vector3d &_origin, const Vector3d &_f,
   const double wn = wind_world_.Length();
   if (wn > 1e-9)
     vec(3, wind_world_ / wn, mk_wind_len_, 0.75f, 0.75f, 0.75f);
+
+  if (!mk_text_) return;
+
+  // 화살표는 크기·방향을 주지만 **계수 자체**는 안 보인다. 표에서 뽑힌 값이
+  // 그대로 보여야 "이 받음각에서 이 값이 나올 리 없다" 는 판단이 가능하다.
+  std::ostringstream os;
+  os << std::fixed << std::setprecision(1)
+     << "V "      << _dbg.V         << " m/s   alpha " << _dbg.alpha * 180.0 / M_PI << " deg\n"
+     << std::setprecision(0)
+     << "q_bar "  << _dbg.q_bar     << " Pa\n"
+     << std::setprecision(3)
+     << "C_A "    << _dbg.c.C_A     << "   C_N " << _dbg.c.C_N << "\n"
+     << "x_cp "   << _dbg.c.x_cp    << " m\n"
+     << std::setprecision(2)
+     << "|F| "    << _f.Length()    << " N   |M| " << _m.Length() << " Nm";
+
+  gz::msgs::Marker txt;
+  txt.set_ns("fast_drone_aero");
+  txt.set_id(9);
+  txt.set_action(gz::msgs::Marker::ADD_MODIFY);
+  txt.set_type(gz::msgs::Marker::TEXT);
+  txt.set_visibility(gz::msgs::Marker::GUI);
+  txt.set_text(os.str());
+  txt.mutable_lifetime()->set_sec(0);
+  txt.mutable_lifetime()->set_nsec(500000000);
+  txt.mutable_pose()->mutable_orientation()->set_w(1.0);
+  txt.mutable_pose()->mutable_position()->set_x(_origin.X());
+  txt.mutable_pose()->mutable_position()->set_y(_origin.Y());
+  txt.mutable_pose()->mutable_position()->set_z(_origin.Z() + mk_text_up_);
+  txt.mutable_scale()->set_x(0.12);
+  txt.mutable_scale()->set_y(0.12);
+  txt.mutable_scale()->set_z(0.12);
+  for (auto *c : {txt.mutable_material()->mutable_ambient(),
+                  txt.mutable_material()->mutable_diffuse()}) {
+    c->set_r(1.0f); c->set_g(1.0f); c->set_b(0.25f); c->set_a(1.0f);
+  }
+  node_.Request("/marker", txt);
 }
 #endif
 
