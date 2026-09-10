@@ -335,10 +335,14 @@ void AeroPlugin::PreUpdate(const gzs::UpdateInfo &_info,
   {  // 토픽으로 들어온 새 바람을 여기서 받는다 (스레드 경계)
     std::lock_guard<std::mutex> lock(wind_mutex_);
     if (wind_new_) {
-      wind_world_ = wind_cmd_;
       wind_new_ = false;
-      gzmsg << "[fast_drone_aero] 바람 -> " << wind_world_ << " m/s (크기 "
-            << wind_world_.Length() << ")\n";
+      // 값이 **바뀌었을 때만** 찍는다. GUI 의 Publisher 위젯은 같은 값을 1 Hz 로
+      // 계속 쏠 수 있어서, 무조건 찍으면 로그가 도배된다.
+      if (wind_cmd_ != wind_world_) {
+        wind_world_ = wind_cmd_;
+        gzmsg << "[fast_drone_aero] 바람 -> " << wind_world_ << " m/s (크기 "
+              << wind_world_.Length() << ")\n";
+      }
     }
   }
 #endif
