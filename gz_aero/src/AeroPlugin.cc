@@ -69,6 +69,17 @@ class AeroPlugin : public gzs::System,
     return true;
   }
 
+  /// 링크의 질량 특성을 읽는다. **Configure 가 아니라 첫 PreUpdate 에서** 부른다.
+  ///
+  /// ⚠ Configure 시점에는 components::Inertial 이 아직 없다 (Harmonic 8.11 실측:
+  ///   mass=0, J_diag=0 0 0 이 그대로 로그에 찍혔다). Physics 시스템이 컴포넌트를
+  ///   만들기 전이기 때문이다. 그대로 두면
+  ///     · r_cm 이 0 이라 **무게중심 속도 보정이 통째로 빠지고**
+  ///     · 겹2b 가 J 특이행렬로 죽는다
+  ///   겹2a 는 상태 주입 모드라 이 경로를 안 타서 멀쩡히 통과했다 — 그래서
+  ///   실제 사용 경로의 버그가 검증을 빠져나갔다.
+  bool TryCacheInertial(gzs::EntityComponentManager &_ecm);
+
   void OpenDebugCsv();
   void LogDebugCsv(double _t, const gz::math::Pose3d &_pose,
                    const Vector3d &_vAirW, const Vector3d &_omegaW,
@@ -89,6 +100,11 @@ class AeroPlugin : public gzs::System,
   /// Configure 가 성공했을 때만 true. 실패하면 **힘을 하나도 걸지 않는다.**
   /// 반쯤 설정된 채로 절반만 맞는 힘을 거는 것이 가장 나쁜 실패다.
   bool valid_ = false;
+
+  /// 질량 특성을 읽었는가 (첫 PreUpdate 에서 채워진다)
+  bool inertial_cached_ = false;
+  /// 못 읽은 스텝 수. 계속 못 읽으면 **조용히 죽지 말고** 경고한다
+  int inertial_miss_ = 0;
 
   // ── 검증 훅 (DESIGN.md 4장 겹2) ──
   //
@@ -217,16 +233,8 @@ void AeroPlugin::Configure(const gzs::Entity &_entity,
   debug_csv_path_ = _sdf->Get<std::string>("debug_csv", std::string()).first;
   debug_every_ = _sdf->Get<int>("debug_csv_every", 1).first;
   if (debug_every_ < 1) debug_every_ = 1;
-  if (!debug_csv_path_.empty()) OpenDebugCsv();
-
-  // ── 6.5) 질량 특성 캐시 ──────────────────────────────────────────────
-  if (auto *inertial = _ecm.Component<gzs::components::Inertial>(link_entity_)) {
-    const auto &in = inertial->Data();
-    mass_ = in.MassMatrix().Mass();
-    r_cm_link_ = in.Pose().Pos();
-    J_diag_ = in.MassMatrix().DiagonalMoments();
-    J_off_ = in.MassMatrix().OffDiagonalMoments();
-  }
+  // ⚠ 디버그 CSV 는 여기서 열지 않는다. 헤더에 질량 특성이 들어가는데
+  //   그건 첫 PreUpdate 까지 못 읽는다 (아래 TryCacheInertial 주석 참고).
 
   // ── 7) 속도 조회 켜기 ────────────────────────────────────────────────
   // 이걸 안 하면 WorldLinearVelocity 가 아무 값도 안 준다 (gz-sim 기본이 꺼짐).
@@ -254,6 +262,10 @@ void AeroPlugin::PreUpdate(const gzs::UpdateInfo &_info,
 
   const auto pose = link.WorldPose(_ecm);
   if (!pose) return;                       // 아직 컴포넌트가 안 만들어진 첫 스텝
+
+  // 질량 특성은 여기서 읽는다 (Configure 에서는 아직 없다 — 위 주석 참고).
+  // 못 읽으면 이번 스텝은 건너뛴다. r_cm 없이 계산하면 조용히 틀린다.
+  if (!TryCacheInertial(_ecm)) return;
 
   // 실제로 측정된 링크 상태. 주입 모드에서도 **로그에는 남긴다** —
   // 겹2b 가 "우리가 건 wrench 가 정말 이 가속도를 만들었나" 를 이걸로 잰다.
@@ -323,6 +335,42 @@ void AeroPlugin::PreUpdate(const gzs::UpdateInfo &_info,
   }
   ++step_;
 }
+
+// ══════════════════════════════════════════════════════════════════════
+bool AeroPlugin::TryCacheInertial(gzs::EntityComponentManager &_ecm) {
+  if (inertial_cached_) return true;
+
+  auto *inertial = _ecm.Component<gzs::components::Inertial>(link_entity_);
+  if (!inertial) {
+    // 보통 한두 스텝이면 생긴다. 그 이상이면 SDF 에 <inertial> 이 없다는 뜻이라
+    // 딱 한 번 경고한다 — 경고 없이 넘어가면 공력이 안 걸린 걸 눈치 못 챈다.
+    if (++inertial_miss_ == 100) {
+      gzwarn << "[fast_drone_aero] 링크 '" << link_name_
+             << "' 의 관성을 100 스텝째 못 읽었습니다. <inertial> 이 있는지 "
+                "확인하세요. 그때까지 공력은 걸리지 않습니다.\n";
+    }
+    return false;
+  }
+
+  const auto &in = inertial->Data();
+  mass_ = in.MassMatrix().Mass();
+  r_cm_link_ = in.Pose().Pos();
+  J_diag_ = in.MassMatrix().DiagonalMoments();
+  J_off_ = in.MassMatrix().OffDiagonalMoments();
+  inertial_cached_ = true;
+
+  if (!(mass_ > 0.0)) {
+    gzwarn << "[fast_drone_aero] 링크 질량이 " << mass_
+           << " 입니다. <inertial> 을 확인하세요.\n";
+  }
+  gzmsg << "[fast_drone_aero] 질량 특성: m " << mass_ << " kg, r_cm ("
+        << r_cm_link_ << "), J_diag (" << J_diag_ << ")\n";
+
+  // 헤더에 질량 특성이 들어가므로 CSV 는 이제서야 연다
+  if (!debug_csv_path_.empty()) OpenDebugCsv();
+  return true;
+}
+
 
 // ══════════════════════════════════════════════════════════════════════
 void AeroPlugin::OpenDebugCsv() {
