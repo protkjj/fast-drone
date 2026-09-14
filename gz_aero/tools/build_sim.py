@@ -600,6 +600,276 @@ function nmpcSolve(x0, vref, zref){
   return nmpcApplied.slice();
 }
 
+/* ══ SQP-RTI ═══════════════════════════════════════════════════════════
+   실시간 반복(Real-Time Iteration). 매 제어 주기에 SQP 를 **딱 한 번** 돈다.
+   수렴할 때까지 돌리지 않고, 직전 해 주변에서 선형화한 QP 를 한 번 풀어
+   바로 적용한다. 다음 주기에 상태가 갱신되면 거기서 또 한 번 돈다.
+
+   왜 이걸 쓰나. 투영경사는 한 번 푸는 데 150 ms 인데 20 Hz 예산이 50 ms 다.
+   그 시간의 거의 전부가 유한차분 기울기다 — 비용평가 81 회 x 20 스텝 x
+   RK4 4 단 = 259200 회의 미분방정식 평가. RTI 는 **한 스텝짜리** 야코비안만
+   있으면 되어 (13 상태 + 4 입력) x 20 스텝 x 4 단 = 1360 회로 끝난다.
+
+   구조:
+     1) 공칭 궤적을 한 번 굴린다.
+     2) 스텝마다 A_k = dx_{k+1}/dx_k, B_k = dx_{k+1}/du_k 를 유한차분으로.
+     3) 압축 — S[k][j] = dx_{k+1}/du_j 를 재귀로 쌓아 상태를 소거한다.
+        그러면 상자제약만 남은 QP 가 된다 (등식제약이 사라진다).
+     4) 가우스-뉴턴 헤시안. 비용이 상태·입력에 대해 이차식이라 이게 곧 정확한
+        헤시안이다 (선형화된 모델 기준).
+     5) 투영 뉴턴으로 상자 QP 를 푼다. 경계에 붙은 변수를 빼고 자유변수만
+        촐레스키로 푼 뒤, 투영 선탐색으로 받는다.
+   ------------------------------------------------------------------ */
+// nuMax 를 100 에서 40 으로 내렸다. 100 rad/s^2 는 이 기체의 피치 권한
+// (98 rad/s^2) 과 같은 값이라, 솔버가 매 주기 그 한계에 붙어 bang-bang 이
+// 됐다. 가중치 스윕(nuMax 10/20/30/40/50 x Qw 1/50 x R_nu 0.01/0.1)에서
+// 고도를 지킨 것은 nu40/Qw1/R0.01 하나뿐이었다 — 섬이 아주 좁다.
+const RTI = {N:20, dt:0.08, rate:0.05,
+             Qv:[5,5,10], Qz:20, Qw:1, R:[1e-5,0.01,0.01,0.01],
+             Rdu:[1e-3,0.01,0.01,0.01], nuMax:40,
+             reg:1e-6,        // 촐레스키 정칙화
+             asIters:4};      // 능동집합 갱신 횟수
+const RTI_WIDX = [2, 3, 4, 5, 10, 11, 12];   // 비용에 가중치가 걸린 상태만
+let rtiU = null, rtiLast = -1e9, rtiOut = null, rtiApplied = null, rtiStat = null;
+
+// 자유변수만 뽑아 촐레스키로 푼다. H 는 대칭 양정. 실패하면 null.
+function cholSolve(H, b, m){
+  const L = new Float64Array(m*m);
+  for (let i=0;i<m;i++){
+    for (let j=0;j<=i;j++){
+      let s = H[i*m+j];
+      for (let k=0;k<j;k++) s -= L[i*m+k]*L[j*m+k];
+      if (i === j){
+        if (s <= 0) return null;
+        L[i*m+i] = Math.sqrt(s);
+      } else {
+        L[i*m+j] = s / L[j*m+j];
+      }
+    }
+  }
+  const y = new Float64Array(m);
+  for (let i=0;i<m;i++){
+    let s = b[i];
+    for (let k=0;k<i;k++) s -= L[i*m+k]*y[k];
+    y[i] = s / L[i*m+i];
+  }
+  const z = new Float64Array(m);
+  for (let i=m-1;i>=0;i--){
+    let s = y[i];
+    for (let k=i+1;k<m;k++) s -= L[k*m+i]*z[k];
+    z[i] = s / L[i*m+i];
+  }
+  return z;
+}
+
+function rtiSolve(x0, vref, zref){
+  const t_start = (typeof performance !== "undefined") ? performance.now() : 0;
+  const C = RTI, N = C.N, m = NUV, n = N*m, NS = NV;
+  const Tmax = 4*P.k_T*P.n_max*P.n_max;
+  const uref = [P.mass*P.g, 0, 0, 0];
+  const lo = [0, -C.nuMax, -C.nuMax, -C.nuMax];
+  const hi = [Tmax, C.nuMax, C.nuMax, C.nuMax];
+  const uL = rtiApplied || uref;
+
+  // 워밍스타트. 한 칸 밀고 마지막은 그대로 둔다.
+  if (!rtiU || rtiU.length !== n){
+    rtiU = new Float64Array(n);
+    for (let k=0;k<N;k++) for (let i=0;i<m;i++) rtiU[k*m+i] = uref[i];
+  } else {
+    for (let k=0;k<N-1;k++) for (let i=0;i<m;i++) rtiU[k*m+i] = rtiU[(k+1)*m+i];
+  }
+  const clampU = U => { for (let k=0;k<N;k++) for (let i=0;i<m;i++){
+    const j=k*m+i; if (U[j]<lo[i]) U[j]=lo[i]; else if (U[j]>hi[i]) U[j]=hi[i]; } };
+  clampU(rtiU);
+
+  // 1) 공칭 궤적
+  const xs = new Array(N+1); xs[0] = x0.slice();
+  const uk = new Array(m);
+  for (let k=0;k<N;k++){
+    for (let i=0;i<m;i++) uk[i] = rtiU[k*m+i];
+    xs[k+1] = vStep(xs[k], uk, C.dt, P);
+  }
+
+  // 2) 한 스텝 야코비안. 전진차분이면 충분하다 — RTI 는 어차피 한 번만 돈다.
+  const A = new Array(N), B = new Array(N);
+  for (let k=0;k<N;k++){
+    for (let i=0;i<m;i++) uk[i] = rtiU[k*m+i];
+    const base = xs[k+1];
+    const Ak = new Float64Array(NS*NS), Bk = new Float64Array(NS*m);
+    for (let c=0;c<NS;c++){
+      const h = 1e-6*(1 + Math.abs(xs[k][c]));
+      const xp = xs[k].slice(); xp[c] += h;
+      const yp = vStep(xp, uk, C.dt, P);
+      for (let r=0;r<NS;r++) Ak[r*NS+c] = (yp[r]-base[r])/h;
+    }
+    for (let c=0;c<m;c++){
+      const sc = (c===0) ? Tmax : C.nuMax;
+      const h = 1e-6*sc;
+      const up = uk.slice(); up[c] += h;
+      const yp = vStep(xs[k], up, C.dt, P);
+      for (let r=0;r<NS;r++) Bk[r*m+c] = (yp[r]-base[r])/h;
+    }
+    A[k] = Ak; B[k] = Bk;
+  }
+
+  // 3) 압축. S[k][j] = dx_{k+1}/du_j  (j <= k). 상태가 사라지고 상자제약만 남는다.
+  const S = new Array(N);
+  for (let k=0;k<N;k++){
+    S[k] = new Array(k+1);
+    S[k][k] = B[k];
+    for (let j=0;j<k;j++){
+      const prev = S[k-1][j], cur = new Float64Array(NS*m), Ak = A[k];
+      for (let r=0;r<NS;r++) for (let c=0;c<m;c++){
+        let s = 0;
+        for (let q=0;q<NS;q++) s += Ak[r*NS+q]*prev[q*m+c];
+        cur[r*m+c] = s;
+      }
+      S[k][j] = cur;
+    }
+  }
+
+  // 4) 가우스-뉴턴 헤시안과 기울기. 비용이 이차식이라 이게 정확한 헤시안이다.
+  //
+  //   ★ 가중치가 걸린 상태는 13 개 중 7 개뿐이다 (고도 1, 속도 3, 각속도 3).
+  //     나머지 6 개는 0 을 곱한다. 그래서 sqrt(q) 를 미리 곱해 7 행짜리로
+  //     줄인 G 를 만들고 H += G^T G 로 쌓는다. 처음엔 13 행을 다 돌았고
+  //     헤시안이 21.6 ms 로 전체의 절반이었다.
+  const WI = RTI_WIDX;                       // [2,3,4,5,10,11,12]
+  const NW = WI.length;
+  const H = new Float64Array(n*n), g = new Float64Array(n);
+  const qs = new Float64Array(NW), eh = new Float64Array(NW);
+  const Gbuf = new Float64Array(N*NW*m);     // G[j] 를 한 버퍼에
+  for (let k=0;k<N;k++){
+    const term = (k === N-1) ? 11 : 1;       // 종단에 10 배를 더한다
+    const xn = xs[k+1];
+    qs[0]=Math.sqrt(C.Qz*term);    eh[0]=qs[0]*(xn[2]-zref);
+    qs[1]=Math.sqrt(C.Qv[0]*term); eh[1]=qs[1]*(xn[3]-vref[0]);
+    qs[2]=Math.sqrt(C.Qv[1]*term); eh[2]=qs[2]*(xn[4]-vref[1]);
+    qs[3]=Math.sqrt(C.Qv[2]*term); eh[3]=qs[3]*(xn[5]-vref[2]);
+    qs[4]=Math.sqrt(C.Qw);         eh[4]=qs[4]*xn[10];
+    qs[5]=Math.sqrt(C.Qw);         eh[5]=qs[5]*xn[11];
+    qs[6]=Math.sqrt(C.Qw);         eh[6]=qs[6]*xn[12];
+    const Sk = S[k];
+    for (let j=0;j<=k;j++){
+      const Sj = Sk[j], off = j*NW*m;
+      for (let w=0;w<NW;w++){
+        const row = WI[w]*m, qw2 = qs[w];
+        for (let c=0;c<m;c++) Gbuf[off + w*m + c] = qw2*Sj[row+c];
+      }
+      // g += G^T eh
+      for (let c=0;c<m;c++){
+        let s = 0;
+        for (let w=0;w<NW;w++) s += Gbuf[off + w*m + c]*eh[w];
+        g[j*m+c] += s;
+      }
+    }
+    // H += G^T G  (아래 삼각만 쌓고 뒤에서 대칭 복사)
+    for (let j=0;j<=k;j++){
+      const oj = j*NW*m;
+      for (let i2=0;i2<=j;i2++){
+        const oi = i2*NW*m;
+        for (let a=0;a<m;a++){
+          const ra = j*m+a;
+          for (let b=0;b<m;b++){
+            const cb = i2*m+b;
+            if (cb > ra) continue;
+            let s = 0;
+            for (let w=0;w<NW;w++) s += Gbuf[oj + w*m + a]*Gbuf[oi + w*m + b];
+            H[ra*n + cb] += s;
+          }
+        }
+      }
+    }
+  }
+  for (let i=0;i<n;i++) for (let j2=0;j2<i;j2++) H[j2*n+i] = H[i*n+j2];
+  // 입력 항: R(u-uref) 와 Rdu(u_k - u_{k-1})
+  for (let k=0;k<N;k++) for (let i=0;i<m;i++){
+    const j = k*m+i;
+    g[j] += C.R[i]*(rtiU[j]-uref[i]);
+    H[j*n+j] += C.R[i];
+    const uPrev = (k===0) ? uL[i] : rtiU[(k-1)*m+i];
+    const d = rtiU[j] - uPrev;
+    g[j] += C.Rdu[i]*d;
+    H[j*n+j] += C.Rdu[i];
+    if (k>0){
+      const jp = (k-1)*m+i;
+      g[jp] -= C.Rdu[i]*d;
+      H[jp*n+jp] += C.Rdu[i];
+      H[j*n+jp] -= C.Rdu[i];
+      H[jp*n+j] -= C.Rdu[i];
+    }
+  }
+
+  // 5) 상자 QP 를 투영 뉴턴으로. min 0.5 d^T H d + g^T d,  dlo <= d <= dhi
+  const dlo = new Float64Array(n), dhi = new Float64Array(n);
+  for (let k=0;k<N;k++) for (let i=0;i<m;i++){
+    const j=k*m+i; dlo[j] = lo[i]-rtiU[j]; dhi[j] = hi[i]-rtiU[j];
+  }
+  const d = new Float64Array(n);
+  const grad = new Float64Array(n), Hd = new Float64Array(n);
+  // H 가 대칭이라 아래 삼각만 돌고 비대각을 두 번 센다. 선탐색에서 여러 번
+  // 부르는 자리라 이 절반이 그대로 시간이 된다.
+  const qobj = v => {
+    let s = 0;
+    for (let i=0;i<n;i++){
+      const vi = v[i];
+      if (vi !== 0){
+        let hv = 0;
+        for (let j=0;j<i;j++) hv += H[i*n+j]*v[j];
+        s += vi*hv + 0.5*vi*vi*H[i*n+i];
+      }
+      s += g[i]*vi;
+    }
+    return s;
+  };
+  let J0 = qobj(d), used = 0;
+  for (let it=0; it<C.asIters; it++){
+    for (let i=0;i<n;i++){
+      let s = 0;
+      for (let j=0;j<n;j++) s += H[i*n+j]*d[j];
+      Hd[i] = s; grad[i] = s + g[i];
+    }
+    // 능동집합: 경계에 붙었는데 기울기가 바깥으로 밀면 고정한다.
+    const free = [];
+    for (let i=0;i<n;i++){
+      const atLo = d[i] <= dlo[i] + 1e-12, atHi = d[i] >= dhi[i] - 1e-12;
+      if ((atLo && grad[i] > 0) || (atHi && grad[i] < 0)) continue;
+      free.push(i);
+    }
+    if (!free.length) break;
+    const mf = free.length;
+    const Hf = new Float64Array(mf*mf), bf = new Float64Array(mf);
+    for (let a=0;a<mf;a++){
+      bf[a] = -grad[free[a]];
+      for (let b=0;b<mf;b++) Hf[a*mf+b] = H[free[a]*n+free[b]];
+      Hf[a*mf+a] += C.reg;
+    }
+    const step = cholSolve(Hf, bf, mf);
+    if (!step) break;
+    // 투영 선탐색
+    const cand = new Float64Array(n);
+    let ok = false;
+    for (let al=1.0, t=0; t<8; t++, al*=0.5){
+      cand.set(d);
+      for (let a=0;a<mf;a++){
+        const i = free[a];
+        let v = d[i] + al*step[a];
+        cand[i] = v < dlo[i] ? dlo[i] : (v > dhi[i] ? dhi[i] : v);
+      }
+      const J2 = qobj(cand);
+      if (J2 < J0 - 1e-12){ d.set(cand); J0 = J2; ok = true; used = it+1; break; }
+    }
+    if (!ok) break;
+  }
+
+  for (let i=0;i<n;i++) rtiU[i] += d[i];
+  clampU(rtiU);
+  rtiApplied = [rtiU[0], rtiU[1], rtiU[2], rtiU[3]];
+  rtiStat = {ms: ((typeof performance!=="undefined")?performance.now():0) - t_start,
+             qpDrop: J0, asUsed: used};
+  return rtiApplied.slice();
+}
+
 /* ══ 제어기 ═══════════════════════════════════════════════════════════
    PX4 를 옮긴 것이 아니다. 평범한 종속 루프(속도 -> 자세 -> 모멘트)다.
    여기서 보려는 것은 제어 성능이 아니라 **기체가 어디서 한계에 걸리나** 이므로
@@ -652,6 +922,15 @@ const CTRLS = {
                  + "비용이 2배 낮습니다. 남은 문제는 한 번 푸는 데 150 ms 라 "
                  + "20 Hz 예산 50 ms 를 3배 넘는 것과, 비용함수에 자세 기준이 없어 "
                  + "롤을 바깥에서 얹어야 하는 것입니다. 실시간은 SQP/acados 가 필요합니다."},
+  sqprti:  {name:"하이브리드 SQP-RTI (실험)", ff:true, tilt:80, indi:true, nmpc:true, rti:true,
+            note:"같은 13차 가상모델을 실시간 반복(RTI)으로 푼다. 매 주기 SQP 한 번 — "
+                 + "직전 해에서 선형화하고, 압축으로 상태를 소거해 상자제약만 남긴 QP 를 "
+                 + "투영 뉴턴으로 푼다. 솔버는 성공했다: 평균 7.4 ms (투영경사 184.7 ms, "
+                 + "25배), 같은 비용 수준, 20 Hz 예산 50 ms 에 6.8배 여유. "
+                 + "⚠ 그런데 문제 정의가 아직 비행 가능하지 않다. 제대로 풀고 나니 "
+                 + "해가 각가속도 한계에 계속 붙는다 — 비용의 Qw 가 고도항 앞에서 "
+                 + "너무 약하다. 스윕 12 조합 중 고도를 지킨 것은 하나뿐이고 그것도 "
+                 + "|ω| 37 로 실기 실패선 35 를 넘는다. 다음은 솔버가 아니라 비용함수다."},
   indi:    {name:"INDI 내부루프", ff:true, tilt:55, indi:true,
             note:"측정 각가속도를 되먹여 증분으로 모멘트를 낸다. 모델오차에 강하다. "
                  + "⚠ 롤 |p| 가 40 rad/s 로 튄다. 포화 인지 할당이 필요하다."},
@@ -953,14 +1232,26 @@ function controlHybrid(x, cmd){
   //   778 N(상한) 에서 안 움직였다 — 솔버가 덜 수렴한 게 아니라 비용함수의
   //   진짜 최적점이 거기였다. 83 m/s 정상비행 트림은 222 N 이면 된다.
   //   종속 루프가 고도 오차를 상승률로 바꿔 쓰는 것(clamp +-15)과 같은 처리다.
-  const dzCap = VZ_REF_MAX * NMPC.N * NMPC.dt;
+  const useRti = !!CTRLS[CTRL].rti;
+  const SOL = useRti ? RTI : NMPC;
+  const dzCap = VZ_REF_MAX * SOL.N * SOL.dt;
   const dz = cmd.alt - x[2];
   const zr = x[2] + (dz > dzCap ? dzCap : (dz < -dzCap ? -dzCap : dz));
-  if (nmpcOut === null || T - nmpcLast >= NMPC.rate - 1e-9){
-    nmpcOut = nmpcSolve(x.slice(0, 13), vref, zr);
-    nmpcLast = T;
+  let out;
+  if (useRti){
+    if (rtiOut === null || T - rtiLast >= RTI.rate - 1e-9){
+      rtiOut = rtiSolve(x.slice(0, 13), vref, zr);
+      rtiLast = T;
+    }
+    out = rtiOut;
+  } else {
+    if (nmpcOut === null || T - nmpcLast >= NMPC.rate - 1e-9){
+      nmpcOut = nmpcSolve(x.slice(0, 13), vref, zr);
+      nmpcLast = T;
+    }
+    out = nmpcOut;
   }
-  const Tc = nmpcOut[0], nu = [nmpcOut[1], nmpcOut[2], nmpcOut[3]];
+  const Tc = out[0], nu = [out[1], out[2], out[3]];
   // ★ 롤은 NMPC 가 안 본다. 비용함수에 자세 기준이 없어서 nu_roll 이 어떤
   //   반복수에서도 0.01 이었다 — 솔버를 아무리 좋게 해도 롤은 안 잡힌다.
   //   NMPC 가 "얼마나 돌릴지" 만 정하는 인터페이스 분리 원칙 그대로,
@@ -1032,6 +1323,7 @@ function reset(){
   X = D.x0.slice(); X[2] = 0; T = 0; sat = 0; cmdSpd = 0; altI = 0;
   omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;
   nmpcU = null; nmpcLast = -1e9; nmpcOut = null; nmpcApplied = null;
+  rtiU = null; rtiLast = -1e9; rtiOut = null; rtiApplied = null; rtiStat = null;
   trailN = 0;
   if (trail) trail.geometry.setDrawRange(0, 0);
 }
@@ -1573,6 +1865,7 @@ function initUI(){
     $("#ctrlNote").textContent = CTRLS[CTRL].note;
     omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;
   nmpcU = null; nmpcLast = -1e9; nmpcOut = null; nmpcApplied = null;   // 전환 시 INDI 초기화
+  rtiU = null; rtiLast = -1e9; rtiOut = null; rtiApplied = null; rtiStat = null;
   };
   sel.addEventListener("change", updCtrl); updCtrl();
   buildCoefs();
