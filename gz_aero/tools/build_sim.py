@@ -94,17 +94,32 @@ header .sub{color:var(--ink-3); font-size:12.5px}
   border:1px solid var(--rule); border-radius:999px; font-size:12px;
   color:var(--ink-2); background:var(--panel-2)}
 .badge .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--ok)}
+details.vchk{position:relative}
+details.vchk summary{list-style:none; cursor:pointer}
+details.vchk summary::-webkit-details-marker{display:none}
+details.vchk .vbody{position:absolute; right:0; top:calc(100% + 7px); z-index:5;
+  width:262px; padding:12px 14px; border:1px solid var(--rule);
+  border-radius:10px; background:var(--panel-2);
+  box-shadow:0 10px 26px rgba(0,0,0,.45)}
+details.vchk .vbody div{display:flex; justify-content:space-between; gap:10px;
+  font:400 12px/1.9 "IBM Plex Mono",monospace; color:var(--ink-3)}
+details.vchk .vbody div b{color:var(--ink)}
+details.vchk .vbody p{margin:8px 0 0; font-size:11.5px; color:var(--ink-3);
+  line-height:1.55}
 .badge.bad .dot{background:var(--bad)} .badge b{color:var(--ink);font-weight:600}
 
-.body{display:grid; grid-template-columns:246px 1fr 246px; min-height:0}
-@media(max-width:1100px){.body{grid-template-columns:220px 1fr}
-  .col.right{grid-column:1/-1; border-left:0; border-top:1px solid var(--rule)}}
-@media(max-width:760px){.body{grid-template-columns:1fr}
-  .col.left{border-right:0; border-bottom:1px solid var(--rule)}}
+/* 폭을 사용자가 끌어서 바꾼다. 글이 좁은 칸에서 지저분하게 접히던 문제라
+   고정폭 대신 변수로 두고 손잡이로 민다. */
+.body{display:grid; min-height:0;
+  grid-template-columns:var(--colL,268px) 5px 1fr 5px var(--colR,262px)}
+.grip{cursor:col-resize; background:var(--rule); position:relative}
+.grip::after{content:""; position:absolute; inset:0 -4px}
+.grip:hover, .grip.on{background:var(--accent)}
+@media(max-width:900px){.body{grid-template-columns:1fr}
+  .grip{display:none}
+  .col{border:0; border-bottom:1px solid var(--rule)}}
 
 .col{padding:14px 16px; overflow-y:auto; background:var(--panel); min-height:0}
-.col.left{border-right:1px solid var(--rule)}
-.col.right{border-left:1px solid var(--rule)}
 .col h2{margin:0 0 12px; font:600 11px/1 "IBM Plex Mono",monospace;
   letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3)}
 .col h2+h2{margin-top:22px}
@@ -163,8 +178,17 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
 @media(max-width:760px){.plots{grid-template-columns:1fr}
   .stage{grid-template-rows:340px auto}}
 
-.note{font-size:11.5px; color:var(--ink-3); line-height:1.5; margin:10px 0 0}
+.note{font-size:12px; color:var(--ink-3); line-height:1.6; margin:10px 0 0;
+  overflow-wrap:anywhere}
 .note b{color:var(--ink-2)}
+details.more{margin-top:16px; border-top:1px solid var(--rule); padding-top:10px}
+details.more summary{cursor:pointer; font:600 11px/1 "IBM Plex Mono",monospace;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3);
+  list-style:none; padding:3px 0}
+details.more summary::-webkit-details-marker{display:none}
+details.more summary::before{content:"+ "; color:var(--accent)}
+details.more[open] summary::before{content:"\2212 "}
+details.more summary:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 </style>
 
 <div class="app">
@@ -177,10 +201,10 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
 </header>
 
 <div class="body">
-  <div class="col left">
+  <div class="col left" id="colL">
     <h2>비행 명령</h2>
     <div class="btns">
-      <button type="button" id="go" class="go">▶ 시작</button>
+      <button type="button" id="go" class="go">▶ 시작  (Space)</button>
       <button type="button" id="rst">↺ 초기화</button>
     </div>
     <div class="fld"><div class="row"><label for="spd">목표 속도</label>
@@ -201,18 +225,21 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
 
     <h2>계기</h2>
     <div class="gauges" id="gauges"></div>
-    <p class="note">목표 속도를 올렸다 내리면 기체가 따라갑니다.
-      <b>명령과 실측이 벌어지면</b> 거기가 이 기체의 한계입니다.</p>
-    <h2>교차 확인</h2>
-    <p class="note">기본 설정(83 m/s 목표, 무풍)에서 이 시뮬은
-      <b>280 km/h</b> 에 수렴합니다. 같은 기체를 PX4 + Gazebo 로 실제로 날렸을 때는
-      <b>281 km/h</b> 였습니다. 제어기도 적분기도 공력 경로도 다른 두 스택이
-      <b>0.4% 안에서 일치</b>합니다 — 이 한계는 설정이 아니라 물리입니다.
-      로터는 포화하지 않았으니 추력 부족도 아닙니다.</p>
-    <p class="note">고도가 조금 가라앉는 것은 제어기 탓입니다.
-      여기 제어기는 PX4 가 아니라 단순한 종속 루프라, 크게 기울인 동안
-      고도 권한을 일부 잃습니다. 검증한 것은 <b>플랜트이지 제어기가 아닙니다.</b></p>
+    <details class="more">
+      <summary>이 시뮬에 대해</summary>
+      <p class="note">목표 속도를 올렸다 내리면 기체가 따라갑니다.
+        <b>명령과 실측이 벌어지면</b> 거기가 이 기체의 한계입니다.</p>
+      <p class="note">기본 설정(83 m/s 목표, 무풍)에서 <b>280 km/h</b> 에 수렴합니다.
+        같은 기체를 PX4 + Gazebo 로 날렸을 때는 <b>281 km/h</b> 였습니다.
+        제어기도 적분기도 공력 경로도 다른 두 스택이 <b>0.4% 안에서 일치</b>합니다 —
+        이 한계는 설정이 아니라 물리입니다.</p>
+      <p class="note">고도가 조금 가라앉는 것은 제어기 탓입니다. 여기 제어기는
+        PX4 가 아니라 단순한 종속 루프라, 크게 기울인 동안 고도 권한을 일부
+        잃습니다. 검증한 것은 <b>플랜트이지 제어기가 아닙니다.</b></p>
+    </details>
   </div>
+
+  <div class="grip" id="gripL" role="separator" aria-label="왼쪽 폭 조절"></div>
 
   <div class="stage">
     <div id="view"><div class="hud" id="hud"></div>
@@ -223,7 +250,7 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
       <div class="legend3d">
         <span><i style="background:#f2aa4c"></i>공력</span>
         <span><i style="background:#2d94bd"></i>속도</span>
-        <span>끌기 = 회전 · 휠 = 확대 · Shift+끌기 = 이동</span>
+        <span>끌기 = 회전 · 휠 = 확대 · Shift+끌기 = 이동 · Space = 정지 · R = 리셋 · F = 따라가기</span>
       </div>
       <div class="warnbox" id="warn"></div></div>
     <div class="plots">
@@ -233,17 +260,21 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
     </div>
   </div>
 
-  <div class="col right">
+  <div class="grip" id="gripR" role="separator" aria-label="오른쪽 폭 조절"></div>
+
+  <div class="col right" id="colR">
     <h2>동체 공력 계수</h2>
     <div id="coefs"></div>
     <div class="btns"><button type="button" id="def">기본값으로</button></div>
-    <p class="note">계수를 바꾸면 <b>다음 스텝부터 즉시</b> 반영됩니다.
-      <code>C_A0</code>를 올리면 항력이 커져 최고 속도가 떨어지고,
-      <code>x_cp</code>를 0에 가깝게 하면 정적 안정이 사라집니다.</p>
-    <h2>주의</h2>
-    <p class="note">로터 전진비는 담겨 있지만(<code>J_max</code>) Gazebo 기본
-      모터 모델에는 없습니다. 이 시뮬이 그쪽보다 보수적입니다.
-      <code>α&gt;90°</code> 역류 영역은 어느 쪽도 검증되지 않았습니다.</p>
+    <details class="more">
+      <summary>계수에 대해</summary>
+      <p class="note">계수를 바꾸면 <b>다음 스텝부터 즉시</b> 반영됩니다.
+        <code>C_A0</code>를 올리면 항력이 커져 최고 속도가 떨어지고,
+        <code>x_cp</code>를 0에 가깝게 하면 정적 안정이 사라집니다.</p>
+      <p class="note">로터 전진비는 담겨 있지만(<code>J_max</code>) Gazebo 기본
+        모터 모델에는 없습니다. 이 시뮬이 그쪽보다 보수적입니다.
+        <code>α&gt;90°</code> 역류 영역은 어느 쪽도 검증되지 않았습니다.</p>
+    </details>
   </div>
 </div>
 </div>
@@ -479,7 +510,7 @@ let ren, scene, cam, veh, arrow, velArrow, trail, trailPos, trailN = 0;
 const PROPS = [];   // 프로펠러를 실제 회전수만큼 돌린다
 // RViz 처럼 마우스로 궤도·이동·확대. OrbitControls 는 three 핵심 번들에 없어서
 // 직접 쓴다 (CDN 에서 따로 받으면 막힐 수 있다).
-const ORB = {az: -2.3, el: 0.38, dist: 26, follow: true,
+const ORB = {az: -2.3, el: 0.32, dist: 15, follow: true,
              tgt: new THREE.Vector3()};
 function init3D(){
   const host = $("#view");
@@ -712,6 +743,11 @@ function tick(ts){
     paint(d);
   }
 }
+function toggleRun(){
+  running = !running;
+  $("#go").textContent = running ? "❚❚ 정지  (Space)" : "▶ 시작  (Space)";
+  lastFrame = 0;
+}
 function paint(d){
   render3D(d);
   plot("#p1", HIST.V, HIST.cmd);
@@ -771,11 +807,19 @@ function buildCoefs(){
 function initUI(){
   const err = selfCheck();
   const good = err < 1e-9;
+  // 배지는 이 페이지의 숫자를 믿어도 되는지에 대한 답이라 없앨 수 없다.
+  // 다만 늘 두 줄을 차지할 이유는 없어서 하나로 접고 자세한 값은 펼쳐서 본다.
   $("#badges").innerHTML =
-    "<span class='badge " + (good ? "" : "bad") + "'><span class='dot'></span>"
-    + "JS↔파이썬 <b>" + err.toExponential(1) + "</b></span>"
-    + "<span class='badge'><span class='dot'></span>파이썬↔CasADi <b>"
-    + D.casadi_max_diff.toExponential(1) + "</b></span>";
+    "<details class='vchk'><summary class='badge " + (good ? "" : "bad") + "'>"
+    + "<span class='dot'></span>검증 <b>"
+    + (good ? "통과" : "실패") + "</b></summary>"
+    + "<div class='vbody'>"
+    + "<div><span>JS ↔ 파이썬</span><b>" + err.toExponential(1) + "</b></div>"
+    + "<div><span>파이썬 ↔ CasADi</span><b>"
+    + D.casadi_max_diff.toExponential(1) + "</b></div>"
+    + "<p>같은 물리를 세 번 구현했습니다. 이 값은 구현끼리의 최대 차이이고,"
+    + " 기계정밀도(1e-15) 수준이면 셋이 같은 답을 낸다는 뜻입니다.</p>"
+    + "</div></details>";
   for (const [id, fn] of [["spd", v => v + " m/s · " + (v*3.6).toFixed(0) + " km/h"],
                           ["alt", v => v + " m"],
                           ["wsp", v => v + " m/s"],
@@ -791,10 +835,23 @@ function initUI(){
     for (const [k] of COEFS){ P[k] = P0[k]; $("#c_"+k).value = P0[k];
       $("#o_"+k).textContent = P0[k].toFixed(2); }
   });
-  $("#go").addEventListener("click", () => {
-    running = !running;
-    $("#go").textContent = running ? "❚❚ 정지" : "▶ 시작";
-    lastFrame = 0;
+  $("#go").addEventListener("click", toggleRun);
+
+  // 스페이스로 정지·재생. 슬라이더를 만지는 중에는 가로채지 않고, 버튼에
+  // 포커스가 있을 때도 비워 둔다 — 버튼은 브라우저가 이미 스페이스로 누른다.
+  // 둘 다 처리하면 두 번 토글되어 아무 일도 안 일어난다.
+  addEventListener("keydown", e => {
+    const t = e.target;
+    const tag = t && t.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if (e.code === "Space"){
+      if (tag === "BUTTON" || tag === "SUMMARY") return;
+      e.preventDefault(); toggleRun();
+    } else if (e.key === "r" || e.key === "R"){
+      $("#rst").click();
+    } else if (e.key === "f" || e.key === "F"){
+      $("#follow").click();
+    }
   });
   $("#follow").addEventListener("click", e => {
     ORB.follow = !ORB.follow;
@@ -802,7 +859,7 @@ function initUI(){
     if (!running) paint(diag());
   });
   $("#reset3d").addEventListener("click", () => {
-    ORB.az = -2.3; ORB.el = 0.38; ORB.dist = 26; ORB.follow = true;
+    ORB.az = -2.3; ORB.el = 0.32; ORB.dist = 15; ORB.follow = true;
     $("#follow").setAttribute("aria-pressed", "true");
     if (!running) paint(diag());
   });
@@ -811,7 +868,40 @@ function initUI(){
   });
   addEventListener("resize", () => { resize3D(); paint(diag()); });
 }
+function bindGrips(){
+  for (const [id, varName, side] of [["#gripL", "--colL", 1], ["#gripR", "--colR", -1]]){
+    const el = $(id);
+    let on = false, x0 = 0, w0 = 0;
+    const col = side > 0 ? $("#colL") : $("#colR");
+    el.addEventListener("pointerdown", e => {
+      on = true; x0 = e.clientX; w0 = col.getBoundingClientRect().width;
+      el.classList.add("on"); el.setPointerCapture(e.pointerId);
+    });
+    el.addEventListener("pointermove", e => {
+      if (!on) return;
+      const w = Math.max(190, Math.min(560, w0 + side * (e.clientX - x0)));
+      document.documentElement.style.setProperty(varName, w + "px");
+      try { localStorage.setItem("fd" + varName, String(w)); } catch (_) {}
+      resize3D(); if (!running) paint(diag());
+    });
+    el.addEventListener("pointerup", e => {
+      on = false; el.classList.remove("on"); el.releasePointerCapture(e.pointerId);
+    });
+    el.addEventListener("dblclick", () => {
+      document.documentElement.style.removeProperty(varName);
+      try { localStorage.removeItem("fd" + varName); } catch (_) {}
+      resize3D(); if (!running) paint(diag());
+    });
+    // 지난번 폭을 기억한다. 못 읽어도(사생활 모드 등) 기본값으로 그냥 선다.
+    try {
+      const v = localStorage.getItem("fd" + varName);
+      if (v) document.documentElement.style.setProperty(varName, v + "px");
+    } catch (_) {}
+  }
+}
+
 init3D();
+bindGrips();
 reset();
 initUI();
 paint(diag());

@@ -1,0 +1,49 @@
+name: Pages
+
+# 공력 페이지(시뮬레이터·대시보드)를 GitHub Pages 로 올린다.
+# 두 페이지가 자립형 HTML 이라 빌드 단계가 필요 없다 — results/ 를 그대로 옮긴다.
+# 생성기를 CI 에서 돌리지 않는 이유: casadi·numpy·matplotlib 가 필요한데, 그 의존성
+# 때문에 배포가 깨지면 페이지까지 같이 죽는다. 갱신은 로컬에서 돌려 커밋한다.
+
+on:
+  push:
+    branches: [main, bulnabi]
+    paths:
+      - 'results/*.html'
+      - 'gz_aero/tools/build_site.py'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: site/ 조립
+        run: python3 gz_aero/tools/build_site.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
