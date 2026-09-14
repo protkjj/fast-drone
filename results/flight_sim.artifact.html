@@ -1063,8 +1063,14 @@ const CTRLS = {
                  + "즉 모든 축에 똑같이 25 rad/s² 인 것. Ixx 가 Iyy 의 1/35 라 롤에서는 "
                  + "0.5 N·m 뿐이라 구조적으로 못 따라잡는다. 한계를 **권한 비례**(0.16)로 "
                  + "바꾸니 |ω| 47.5 → 14.4 로 떨어지고 텀블이 사라졌다. "
-                 + "지금 측풍 12 m/s + 교란에서 338 km/h 로 건전성·미션 둘 다 통과한다 — "
-                 + "LQR(299 km/h)보다 빠르다. 통과 구간은 비율 0.15~0.18."},
+                 + "측풍 12 m/s + 교란에서도 텀블 없이 난다. "
+                 + "⚠ 그런데 **속도를 못 지킨다**. 명령 83 m/s 에 90.6 으로 정착한다 "
+                 + "(+27 km/h, 9 % 초과). 게다가 이 기체의 트림 상한이 85 m/s 라 "
+                 + "평형점 밖에서 나는 것이다. Qv 를 올리면 속도는 잡히는데 추력을 깎느라 "
+                 + "로터가 0 으로 내려간다 — Qv ×2 에서 바닥 포화 25 %, ×4 에서 67 %. "
+                 + "속도와 구동기 여유를 맞바꾸는 구조이고 둘 다 만족하는 지점이 없다. "
+                 + "LQR 은 같은 조건에서 83.0 m/s 정확, 순항 |ω| 평균 0.0, 포화 0 % 다 — "
+                 + "선형화가 트림에서 나와 추력과 자세를 함께 잡기 때문이다."},
   lqr:     {name:"오차상태 LQR (게인표)", ff:true, tilt:55, indi:false, lqr:true,
             note:"속도별로 파이썬에서 ARE 를 미리 풀어 게인표로 구워 왔다 "
                  + "(2.5 m/s 간격 21 점, 폐루프 최대 실수부 -0.18 ~ -0.61 로 전부 안정). "
@@ -2020,9 +2026,17 @@ function score(){
   const crashed = REC.some(r => r.x[2] < 1 && r.t > 20);
   // ★ 속도 추종을 판정에 넣는다. 예전엔 없어서, '권장' 제어기가 명령
   //   83 m/s 에 실측 48.2 m/s(35 m/s 미달) 인데도 통과로 찍혔다.
+  //   ★★ 그리고 **초과도 본다**. 처음엔 부족만 봤는데, 그러면 명령 83 m/s 에
+  //   94 m/s 로 나는(= 40 km/h 초과) 하이브리드가 통과로 찍힌다. 추종 실패는
+  //   양쪽 다 실패다. 게다가 이 기체는 트림 상한이 85 m/s 라, 초과한다는 것은
+  //   **정상비행 평형점 밖에서 날고 있다**는 뜻이기도 하다.
   const last = REC[n-1];
-  const vShort = last.cmd - last.V;
-  const vMiss = vShort > Math.max(3.0, 0.1 * Math.max(last.cmd, 1e-9));
+  const vErr = last.V - last.cmd;                    // +초과 / -부족
+  // 허용치 10 % 는 너무 헐렁했다. 명령 83 m/s 에 90.6 으로 나는(9 % 초과)
+  // 하이브리드가 통과로 찍혔다. 순항 속도 규격으로 ±5 % 가 보통이다.
+  const vTol = Math.max(2.0, 0.05 * Math.max(last.cmd, 1e-9));
+  const vMiss = Math.abs(vErr) > vTol;
+  const vShort = -vErr;
 
   // 판정을 둘로 나눈다.
   //   비행 건전성 — 기체가 제어 아래 있었나 (제어기 비교의 축)
@@ -2036,14 +2050,16 @@ function score(){
   if (crashed) sound.push("추락 — 고도 1 m 아래");
   if (satHiN/n > 0.2) sound.push("모터 천장 포화 " + (100*satHiN/n).toFixed(0) + "%");
   if (satLoN/n > 0.2) sound.push("모터 바닥 포화 " + (100*satLoN/n).toFixed(0) + "%");
-  if (vMiss) miss.push("속도 미달 — 명령 " + last.cmd.toFixed(1)
-                      + " 대비 " + vShort.toFixed(1) + " m/s 부족");
+  if (vMiss) miss.push("속도 추종 실패 — 명령 " + last.cmd.toFixed(1)
+                      + " m/s 대비 " + Math.abs(vErr).toFixed(1) + " m/s "
+                      + (vErr > 0 ? "초과" : "부족")
+                      + " (" + (Math.abs(vErr)*3.6).toFixed(0) + " km/h)");
   if (rmseZ >= 20) miss.push("고도 RMSE " + rmseZ.toFixed(1) + " m");
 
   return {rmseV, rmseZ, rmseVc, rmseZc, bySeg,
           maxOm, run25, ms25, maxTilt, maxTiltEx,
           satHi: satHiN/n, satLo: satLoN/n,
-          tumble, crashed, diverged, divWhy, vMiss, vShort,
+          tumble, crashed, diverged, divWhy, vMiss, vShort, vErr, vTol,
           vmax: Math.max(...REC.map(r => r.V)), n,
           nCruise: cruise ? cruise.n : 0,
           nSettled: settled.length, tSettle: settled.length ? settled[0].t : null,
