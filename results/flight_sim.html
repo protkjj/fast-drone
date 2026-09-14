@@ -1440,7 +1440,7 @@ function reset(){
   omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;
   nmpcU = null; nmpcLast = -1e9; nmpcOut = null; nmpcApplied = null;
   rtiU = null; rtiLast = -1e9; rtiOut = null; rtiApplied = null; rtiStat = null;
-  trailN = 0;
+  trailN = 0; trailDrawn = 0;
   if (trail) trail.geometry.setDrawRange(0, 0);
 }
 // 지면. 아래로 뚫고 내려가지 않게 막고, 닿아 있으면 수직속도를 죽인다.
@@ -1495,6 +1495,9 @@ function diag(){
 }
 
 /* ══ 3D ═══════════════════════════════════════════════════════════════ */
+// 궤적선 버퍼는 REC 상한과 같게 둔다. 그래야 '타임라인이 갈 수 있는 곳'
+// 과 '선이 그려진 곳' 이 어긋나지 않는다.
+const TRAIL_MAX = 6000;
 let ren, scene, cam, veh, arrow, velArrow, trail, trailPos, trailN = 0;
 const PROPS = [];   // 프로펠러를 실제 회전수만큼 돌린다
 // RViz 처럼 마우스로 궤도·이동·확대. OrbitControls 는 three 핵심 번들에 없어서
@@ -1580,7 +1583,7 @@ function init3D(){
                                    1, 0x2d94bd, .8, .35);
   scene.add(velArrow);
 
-  trailPos = new Float32Array(3 * 4000);
+  trailPos = new Float32Array(3 * TRAIL_MAX);
   const tg = new THREE.BufferGeometry();
   tg.setAttribute("position", new THREE.BufferAttribute(trailPos, 3));
   tg.setDrawRange(0, 0);
@@ -1632,6 +1635,33 @@ function resize3D(){
   if (!w || !h) return;
   ren.setSize(w, h); cam.aspect = w/h; cam.updateProjectionMatrix();
 }
+// 궤적선. **기록(REC)에서 직접 그린다.**
+//
+// 예전에는 프레임마다 지금 위치를 하나씩 쌓았고 4000 개에서 그냥 멈췄다.
+// 그래서 (a) 오래 날리면 선이 도중에 끊기고, (b) 배속을 올리면 점 간격이
+// 벌어지고, (c) 되감아도 선이 안 따라와 지나간 미래가 그대로 남았다.
+//
+// REC 에서 그리면 셋 다 사라지고, **타임라인으로 갈 수 있는 구간과 궤적선이
+// 정확히 같아진다**. 되감으면 REC 가 잘리고 선도 같이 잘린다.
+// 전부 다시 채우는 건 비싸니 길이만 보고 늘어난 만큼만 이어 붙인다.
+let trailDrawn = 0;
+function syncTrail(){
+  if (!trail) return;
+  const n = Math.min(REC.length, TRAIL_MAX);
+  const upTo = (viewIdx === null) ? n : Math.min(viewIdx + 1, n);
+  if (upTo < trailDrawn || REC.length < trailDrawn){   // 되감겨 잘렸다 -> 다시
+    trailDrawn = 0;
+  }
+  for (let i = trailDrawn; i < upTo; i++){
+    const q = REC[i].x;
+    trailPos[i*3] = q[0]; trailPos[i*3+1] = q[1]; trailPos[i*3+2] = q[2];
+  }
+  if (upTo !== trailDrawn){
+    trailDrawn = upTo;
+    trail.geometry.setDrawRange(0, trailDrawn);
+    trail.geometry.attributes.position.needsUpdate = true;
+  }
+}
 function render3D(d){
   const p = new THREE.Vector3(X[0], X[1], X[2]);
   veh.position.copy(p);
@@ -1639,12 +1669,7 @@ function render3D(d){
   // 로터를 실제 회전수 n [rad/s] 로 돌린다. 방향은 rotor_directions 대로.
   for (let i = 0; i < PROPS.length; i++)
     PROPS[i].rotation.x += P.rotor_directions[i] * X[13+i] * 0.016;
-  if (trailN < 4000){
-    trailPos[trailN*3] = X[0]; trailPos[trailN*3+1] = X[1]; trailPos[trailN*3+2] = X[2];
-    trailN++;
-    trail.geometry.setDrawRange(0, trailN);
-    trail.geometry.attributes.position.needsUpdate = true;
-  }
+  syncTrail();
   const W = P.mass * P.g;
   const fv = new THREE.Vector3(d.Fw[0], d.Fw[1], d.Fw[2]);
   if (fv.length() > 1e-3){
@@ -2072,7 +2097,7 @@ function initUI(){
       if (!running) paint(diag());
     });
   $("#rst").addEventListener("click", () => {
-    reset(); trailN = 0; trail.geometry.setDrawRange(0,0); paint(diag());
+    reset(); trailN = 0; trailDrawn = 0; trail.geometry.setDrawRange(0,0); paint(diag());
   });
   addEventListener("resize", () => { resize3D(); paint(diag()); });
 }
