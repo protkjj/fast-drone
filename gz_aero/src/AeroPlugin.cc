@@ -23,6 +23,7 @@
 // ──────────────────────────────────────────────────────────────────────────
 #include <chrono>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -282,6 +283,7 @@ void AeroPlugin::Configure(const gzs::Entity &_entity,
   mk_f_scale_ = _sdf->Get<double>("marker_force_scale", mk_f_scale_).first;
   mk_m_scale_ = _sdf->Get<double>("marker_moment_scale", mk_m_scale_).first;
   mk_every_ = _sdf->Get<int>("marker_every", mk_every_).first;
+  mk_wind_len_ = _sdf->Get<double>("marker_wind_length", mk_wind_len_).first;
   if (mk_every_ < 1) mk_every_ = 1;
   mk_text_ = _sdf->Get<bool>("marker_text", mk_text_).first;
   mk_text_up_ = _sdf->Get<double>("marker_text_height", mk_text_up_).first;
@@ -519,11 +521,17 @@ void AeroPlugin::PublishMarkers(const Vector3d &_origin, const Vector3d &_f,
     return o.str();
   };
 
+  // 스케일이 0 이하면 **자동**: 무게만큼의 힘이 1 m 화살표가 되게 한다.
+  // 고정 0.02 m/N 이면 호버 근처(수 N)에서 화살표가 수 cm 라 안 보였다.
+  const double W = (mass_ > 0.0) ? (mass_ * 9.80665) : 1.0;
+  const double fs = (mk_f_scale_ > 0.0) ? mk_f_scale_ : (1.0 / W);
+  const double ms = (mk_m_scale_ > 0.0) ? mk_m_scale_ : (1.0 / (0.1 * W));
+
   const double fn = _f.Length(), mn = _m.Length();
   if (fn > 1e-9)
-    vec(1, _f / fn, fn * mk_f_scale_, 0.15f, 0.45f, 1.0f, fmt("F", fn, "N"));
+    vec(1, _f / fn, fn * fs, 0.15f, 0.45f, 1.0f, fmt("F", fn, "N"));
   if (mn > 1e-9)
-    vec(2, _m / mn, mn * mk_m_scale_, 0.15f, 0.9f, 0.3f, fmt("M", mn, "Nm"));
+    vec(2, _m / mn, mn * ms, 0.15f, 0.9f, 0.3f, fmt("M", mn, "Nm"));
   const double wn = wind_world_.Length();
   if (wn > 1e-9)
     vec(3, wind_world_ / wn, mk_wind_len_, 0.75f, 0.75f, 0.75f,
@@ -586,6 +594,13 @@ bool AeroPlugin::TryCacheInertial(gzs::EntityComponentManager &_ecm) {
 
 // ══════════════════════════════════════════════════════════════════════
 void AeroPlugin::OpenDebugCsv() {
+  // 상위 폴더가 없으면 만든다. /tmp 아래를 쓰는데 재부팅하면 사라져서,
+  // 안 만들면 "디버그 CSV 를 못 엽니다" 만 찍고 로그 없이 돈다 —
+  // 판정 도구가 "로그가 없습니다" 로 끝나 원인이 한 단계 멀어진다.
+  std::error_code ec;
+  const auto dir = std::filesystem::path(debug_csv_path_).parent_path();
+  if (!dir.empty()) std::filesystem::create_directories(dir, ec);
+
   debug_csv_.open(debug_csv_path_);
   debug_csv_.precision(17);
   if (!debug_csv_.is_open()) {
@@ -606,8 +621,10 @@ void AeroPlugin::OpenDebugCsv() {
              << frame_.right[2] << "\n"
              << "# down: " << frame_.down[0] << " " << frame_.down[1] << " "
              << frame_.down[2] << "\n"
-             << "# wind: " << wind_world_.X() << " " << wind_world_.Y() << " "
-             << wind_world_.Z() << "\n"
+             << "# wind_initial: " << wind_world_.X() << " "
+             << wind_world_.Y() << " " << wind_world_.Z() << "\n"
+             << "# ⚠ 바람은 시뮬 도중 토픽으로 바뀔 수 있다. 위 값은 **처음**\n"
+             << "#   설정일 뿐이니 판정에는 매 줄의 wWx,wWy,wWz 를 써야 한다.\n"
              << "# mass: " << mass_ << "\n"
              << "# r_cm: " << r_cm_link_.X() << " " << r_cm_link_.Y() << " "
              << r_cm_link_.Z() << "\n"
@@ -624,7 +641,7 @@ void AeroPlugin::OpenDebugCsv() {
              << "t,qx,qy,qz,qw,vaWx,vaWy,vaWz,owWx,owWy,owWz,"
              << "u,v,w,p,q,r,V,V_cf,alpha,q_bar,C_A,C_N,x_cp,"
              << "Fx,Fy,Fz,Mx,My,Mz,fWx,fWy,fWz,mWx,mWy,mWz,"
-             << "vLx,vLy,vLz,oLx,oLy,oLz\n";
+             << "vLx,vLy,vLz,oLx,oLy,oLz,wWx,wWy,wWz\n";
   gzmsg << "[fast_drone_aero] 디버그 CSV: " << debug_csv_path_ << " (매 "
         << debug_every_ << " 스텝)\n";
 }
@@ -650,7 +667,9 @@ void AeroPlugin::LogDebugCsv(double _t, const gz::math::Pose3d &_pose,
              << ',' << _fW.X() << ',' << _fW.Y() << ',' << _fW.Z()
              << ',' << _mW.X() << ',' << _mW.Y() << ',' << _mW.Z()
              << ',' << _vLm.X() << ',' << _vLm.Y() << ',' << _vLm.Z()
-             << ',' << _oLm.X() << ',' << _oLm.Y() << ',' << _oLm.Z() << '\n';
+             << ',' << _oLm.X() << ',' << _oLm.Y() << ',' << _oLm.Z()
+             << ',' << wind_world_.X() << ',' << wind_world_.Y() << ','
+             << wind_world_.Z() << '\n';
 }
 
 }  // namespace fast_drone
