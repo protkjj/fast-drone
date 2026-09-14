@@ -105,7 +105,17 @@ input[type=range]:focus-visible{outline:2px solid var(--s1); outline-offset:3px}
   font:400 12px/1.65 "IBM Plex Mono",monospace; color:#cfd8e6;
   text-shadow:0 1px 3px rgba(0,0,0,.8)}
 .hud b{color:#fff; font-weight:600}
-.warnbox{position:absolute; left:14px; bottom:12px; right:14px;
+.viewbtns{position:absolute; right:12px; top:12px; display:flex; gap:6px}
+.viewbtns button{padding:5px 10px; border:1px solid #2b3644; border-radius:7px;
+  background:rgba(18,23,31,.85); color:#c6d0de; cursor:pointer;
+  font:500 12px/1 "IBM Plex Sans",sans-serif}
+.viewbtns button[aria-pressed=true]{border-color:#3987e5; color:#fff}
+.viewbtns button:focus-visible{outline:2px solid #3987e5; outline-offset:2px}
+.legend3d{position:absolute; right:12px; bottom:12px; display:flex; gap:14px;
+  align-items:center; font:400 11.5px/1 "IBM Plex Mono",monospace; color:#8e9bad}
+.legend3d span{display:inline-flex; align-items:center; gap:5px}
+.legend3d i{width:12px; height:3px; border-radius:2px; display:inline-block}
+.warnbox{position:absolute; left:14px; bottom:34px; right:14px;
   pointer-events:none; font-size:12.5px; color:#ffd9a8}
 .plots{border-top:1px solid var(--rule); background:var(--stage-2);
   display:grid; grid-template-columns:1fr 1fr 1fr; gap:1px}
@@ -170,6 +180,15 @@ input[type=range]:focus-visible{outline:2px solid var(--s1); outline-offset:3px}
 
   <div class="stage">
     <div id="view"><div class="hud" id="hud"></div>
+      <div class="viewbtns">
+        <button type="button" id="follow" aria-pressed="true">기체 따라가기</button>
+        <button type="button" id="reset3d">시점 초기화</button>
+      </div>
+      <div class="legend3d">
+        <span><i style="background:#eb6834"></i>공력</span>
+        <span><i style="background:#3987e5"></i>속도</span>
+        <span>끌기 = 회전 · 휠 = 확대 · Shift+끌기 = 이동</span>
+      </div>
       <div class="warnbox" id="warn"></div></div>
     <div class="plots">
       <figure><figcaption>속도 m/s</figcaption><canvas id="p1" height="132"></canvas></figure>
@@ -410,12 +429,21 @@ function diag(){
   const C_A = P.C_A0 + P.C_Aa2*(vb*vb+wb*wb)/(V*V+EPS);
   const Fx = -q_bar*P.S_ref*C_A;
   const tilt = Math.acos(Math.max(-1,Math.min(1, -R[2][2])))*180/Math.PI;
-  return {V, alpha, q_bar, F:Math.hypot(Fx,Fy,Fz), tilt,
+  // 동체 공력을 월드로 돌린다. 화살표가 **실제 힘 방향**을 가리켜야 한다.
+  // 예전엔 기수 방향을 그대로 써서 항력이 앞을 가리켰다.
+  const Fw = [R[0][0]*Fx + R[0][1]*Fy + R[0][2]*Fz,
+              R[1][0]*Fx + R[1][1]*Fy + R[1][2]*Fz,
+              R[2][0]*Fx + R[2][1]*Fy + R[2][2]*Fz];
+  return {V, alpha, q_bar, F:Math.hypot(Fx,Fy,Fz), tilt, Fw,
           gs:Math.hypot(X[3],X[4]), alt:X[2]};
 }
 
 /* ══ 3D ═══════════════════════════════════════════════════════════════ */
-let ren, scene, cam, veh, arrow, trail, trailPos, trailN = 0;
+let ren, scene, cam, veh, arrow, velArrow, trail, trailPos, trailN = 0;
+// RViz 처럼 마우스로 궤도·이동·확대. OrbitControls 는 three 핵심 번들에 없어서
+// 직접 쓴다 (CDN 에서 따로 받으면 막힐 수 있다).
+const ORB = {az: -2.3, el: 0.38, dist: 26, follow: true,
+             tgt: new THREE.Vector3()};
 function init3D(){
   const host = $("#view");
   ren = new THREE.WebGLRenderer({antialias:true});
@@ -432,26 +460,44 @@ function init3D(){
   const g1 = new THREE.GridHelper(3000, 120, 0x39465a, 0x232d3c);
   g1.rotation.x = Math.PI/2; scene.add(g1);
 
-  const skin = new THREE.MeshStandardMaterial({color:0x2b3440, roughness:.55, metalness:.3});
-  const tip = new THREE.MeshStandardMaterial({color:0xd8402f, roughness:.45});
+  const skin = new THREE.MeshStandardMaterial({color:0x2f3945, roughness:.5, metalness:.35});
+  const tip = new THREE.MeshStandardMaterial({color:0xd8402f, roughness:.4});
+  const prop = new THREE.MeshStandardMaterial({color:0x18202b, roughness:.7,
+                 transparent:true, opacity:.55, side:THREE.DoubleSide});
+
+  // 동체는 **링크 +X 가 기수** (DESIGN.md 9 장에서 확정). 동체 z 는 아래,
+  // 로터 추력은 동체 -z 이므로 디스크는 z 가 음수 쪽에 놓인다.
   veh = new THREE.Group();
-  const b = new THREE.Mesh(new THREE.CylinderGeometry(.075,.075,.78,26), skin);
-  b.rotation.z = -Math.PI/2; veh.add(b);
-  const c = new THREE.Mesh(new THREE.ConeGeometry(.075,.24,26), tip);
-  c.rotation.z = -Math.PI/2; c.position.x = .51; veh.add(c);
-  for (const [dx,dy] of [[.177,.177],[.177,-.177],[-.177,-.177],[-.177,.177]]){
-    const a = new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.25,10), skin);
-    a.rotation.z = Math.PI/2; a.position.set(dx/2, dy/2, 0);
-    a.lookAt(new THREE.Vector3(dx, dy, 0)); veh.add(a);
-    const r = new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,.012,18), skin);
-    r.position.set(dx, dy, -.03); r.rotation.x = Math.PI/2; veh.add(r);
+  const fus = new THREE.Mesh(new THREE.CylinderGeometry(.075, .075, .82, 30), skin);
+  fus.rotation.z = -Math.PI/2; veh.add(fus);
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(.075, .30, 30), tip);
+  cone.rotation.z = -Math.PI/2; cone.position.x = .56; veh.add(cone);
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(.062, .05, .10, 24), skin);
+  tail.rotation.z = -Math.PI/2; tail.position.x = -.46; veh.add(tail);
+
+  const ARM = 0.25 / Math.SQRT2;      // vehicle_params 의 arm/√2 = 0.1768
+  for (const ph of [Math.PI/4, 3*Math.PI/4, -3*Math.PI/4, -Math.PI/4]){
+    const cx = Math.cos(ph), cy = Math.sin(ph);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(ARM, .022, .022), skin);
+    arm.position.set(ARM/2*cx, ARM/2*cy, 0);
+    arm.rotation.z = ph;
+    veh.add(arm);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,.055,14), skin);
+    hub.rotation.x = Math.PI/2; hub.position.set(ARM*cx, ARM*cy, -.028);
+    veh.add(hub);
+    const disk = new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,.008,26), prop);
+    disk.rotation.x = Math.PI/2; disk.position.set(ARM*cx, ARM*cy, -.056);
+    veh.add(disk);
   }
   veh.scale.setScalar(5);
   scene.add(veh);
 
   arrow = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(),
-                                1, 0xeb6834, .8, .45);
+                                1, 0xeb6834, .8, .35);
   scene.add(arrow);
+  velArrow = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(),
+                                   1, 0x3987e5, .8, .35);
+  scene.add(velArrow);
 
   trailPos = new Float32Array(3 * 4000);
   const tg = new THREE.BufferGeometry();
@@ -459,7 +505,45 @@ function init3D(){
   tg.setDrawRange(0, 0);
   trail = new THREE.Line(tg, new THREE.LineBasicMaterial({color:0x3987e5}));
   scene.add(trail);
+  bindMouse(ren.domElement);
   resize3D();
+}
+
+function bindMouse(el){
+  let drag = null, px = 0, py = 0;
+  el.style.cursor = "grab";
+  el.addEventListener("contextmenu", e => e.preventDefault());
+  el.addEventListener("pointerdown", e => {
+    drag = (e.button === 2 || e.shiftKey) ? "pan" : "orbit";
+    px = e.clientX; py = e.clientY;
+    el.setPointerCapture(e.pointerId); el.style.cursor = "grabbing";
+  });
+  el.addEventListener("pointerup", e => {
+    drag = null; el.releasePointerCapture(e.pointerId); el.style.cursor = "grab";
+  });
+  el.addEventListener("pointermove", e => {
+    if (!drag) return;
+    const dx = e.clientX - px, dy = e.clientY - py;
+    px = e.clientX; py = e.clientY;
+    if (drag === "orbit"){
+      ORB.az -= dx * 0.006;
+      ORB.el = Math.max(-1.45, Math.min(1.45, ORB.el + dy * 0.006));
+    } else {
+      // 화면 기준으로 민다. 미는 순간 따라가기를 끈다 — 안 그러면 튕겨 돌아온다.
+      ORB.follow = false;
+      const f = ORB.dist * 0.0016;
+      const right = new THREE.Vector3(-Math.sin(ORB.az), Math.cos(ORB.az), 0);
+      const upv = new THREE.Vector3(0, 0, 1);
+      ORB.tgt.addScaledVector(right, -dx * f).addScaledVector(upv, dy * f);
+      $("#follow").setAttribute("aria-pressed", "false");
+    }
+    if (!running) paint(diag());
+  });
+  el.addEventListener("wheel", e => {
+    e.preventDefault();
+    ORB.dist = Math.max(4, Math.min(600, ORB.dist * (1 + Math.sign(e.deltaY)*0.12)));
+    if (!running) paint(diag());
+  }, {passive:false});
 }
 function resize3D(){
   const host = $("#view");
@@ -478,24 +562,28 @@ function render3D(d){
     trail.geometry.attributes.position.needsUpdate = true;
   }
   const W = P.mass * P.g;
-  if (d.F > 1e-3){
-    const R = new THREE.Matrix4().makeRotationFromQuaternion(veh.quaternion);
+  const fv = new THREE.Vector3(d.Fw[0], d.Fw[1], d.Fw[2]);
+  if (fv.length() > 1e-3){
     arrow.visible = true; arrow.position.copy(p);
-    // 화살표는 표시용이라 동체 좌표 힘을 월드로 돌려 방향만 쓴다
-    const fw = new THREE.Vector3(1,0,0).applyMatrix4(R);
-    arrow.setDirection(fw.normalize());
-    const L = Math.max(2, 16*d.F/W);
-    arrow.setLength(L, L*.22, L*.13);
+    arrow.setDirection(fv.clone().normalize());
+    const L = Math.min(26, Math.max(2.5, 14*d.F/W));
+    arrow.setLength(L, Math.min(3.2, L*.2), Math.min(1.6, L*.1));
   } else arrow.visible = false;
 
-  const vdir = new THREE.Vector3(X[3], X[4], 0);
-  if (vdir.lengthSq() < 1e-4) vdir.set(1,0,0);
-  vdir.normalize();
-  const up = new THREE.Vector3(0,0,1);
-  const side = new THREE.Vector3().crossVectors(vdir, up).normalize();
-  cam.position.copy(p).addScaledVector(vdir, -17).addScaledVector(side, 13)
-     .addScaledVector(up, 7);
-  cam.lookAt(p);
+  const vv = new THREE.Vector3(X[3], X[4], X[5]);
+  if (vv.length() > .5){
+    velArrow.visible = true; velArrow.position.copy(p);
+    velArrow.setDirection(vv.clone().normalize());
+    const L = Math.min(26, Math.max(2.5, vv.length()*.22));
+    velArrow.setLength(L, Math.min(3.2, L*.2), Math.min(1.6, L*.1));
+  } else velArrow.visible = false;
+
+  if (ORB.follow) ORB.tgt.copy(p);
+  const ce = Math.cos(ORB.el), se = Math.sin(ORB.el);
+  cam.position.set(ORB.tgt.x + ORB.dist*ce*Math.cos(ORB.az),
+                   ORB.tgt.y + ORB.dist*ce*Math.sin(ORB.az),
+                   ORB.tgt.z + ORB.dist*se);
+  cam.lookAt(ORB.tgt);
   ren.render(scene, cam);
 }
 
@@ -645,6 +733,16 @@ function initUI(){
     running = !running;
     $("#go").textContent = running ? "❚❚ 정지" : "▶ 시작";
     lastFrame = 0;
+  });
+  $("#follow").addEventListener("click", e => {
+    ORB.follow = !ORB.follow;
+    e.target.setAttribute("aria-pressed", String(ORB.follow));
+    if (!running) paint(diag());
+  });
+  $("#reset3d").addEventListener("click", () => {
+    ORB.az = -2.3; ORB.el = 0.38; ORB.dist = 26; ORB.follow = true;
+    $("#follow").setAttribute("aria-pressed", "true");
+    if (!running) paint(diag());
   });
   $("#rst").addEventListener("click", () => {
     reset(); trailN = 0; trail.geometry.setDrawRange(0,0); paint(diag());
