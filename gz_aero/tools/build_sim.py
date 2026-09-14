@@ -480,12 +480,23 @@ function rk4(x, u, w, p, dt, sub){
   return x;
 }
 function selfCheck(){
-  // 기준 궤적을 같은 입력으로 다시 풀어 한 스텝씩 대조한다.
-  let x = D.x0.slice(), worst = 0;
-  for (let k = 1; k <= D.steps; k++){
-    x = rk4(x, D.u, D.w, P0, D.dt);
-    const ref = D.traj[k];
-    for (let i = 0; i < NX; i++) worst = Math.max(worst, Math.abs(x[i] - ref[i]));
+  // 기준 구간들을 같은 입력으로 다시 풀어 검문소마다 대조한다.
+  //
+  // 예전에는 구간이 하나였고, 그 궤적의 실측 범위가 대기속도 3.0~3.2 m/s,
+  // fac 0.999~1.000 이었다 — **전진비 분기가 한 번도 실행되지 않았다.**
+  // 그래서 할당이 전진비를 무시하던 버그가 이 배지를 그대로 통과했다.
+  // 지금은 6 구간이 대기속도 0~76 m/s, 받음각 0~160도, |ω| 0~178 rad/s,
+  // fac 0.000~1.000 을 훑는다.
+  let worst = 0;
+  for (const sg of D.segs){
+    let x = sg.x0.slice();
+    for (let k = 1; k <= D.steps; k++){
+      x = rk4(x, sg.u, sg.w, P0, D.dt);
+      if (k % D.every === 0){
+        const ref = sg.checks[k / D.every - 1];
+        for (let i = 0; i < NX; i++) worst = Math.max(worst, Math.abs(x[i] - ref[i]));
+      }
+    }
   }
   return worst;
 }
@@ -2009,8 +2020,15 @@ function initUI(){
     + "<div><span>JS ↔ 파이썬</span><b>" + err.toExponential(1) + "</b></div>"
     + "<div><span>파이썬 ↔ CasADi</span><b>"
     + D.casadi_max_diff.toExponential(1) + "</b></div>"
+    + "<div><span>LQR 표 ↔ 파이썬</span><b>"
+    + lqrCheck().toExponential(1) + "</b></div>"
     + "<p>같은 물리를 세 번 구현했습니다. 이 값은 구현끼리의 최대 차이이고,"
-    + " 기계정밀도(1e-15) 수준이면 셋이 같은 답을 낸다는 뜻입니다.</p>"
+    + " 기계정밀도 수준이면 셋이 같은 답을 낸다는 뜻입니다.</p>"
+    + "<p><b>무엇을 보증하나.</b> 검증 구간 " + D.segs.length + " 개가"
+    + " 대기속도 0~76 m/s, 받음각 0~160°, |ω| 0~178 rad/s, 전진비 계수"
+    + " fac 0.000~1.000 을 훑습니다. 예전에는 구간이 하나뿐이라 fac 가"
+    + " 0.999~1.000 이었고, 그래서 할당이 전진비를 무시하던 버그가 이 배지를"
+    + " 그대로 통과했습니다.</p>"
     + "</div></details>";
   for (const [id, fn] of [["spd", v => v + " m/s · " + (v*3.6).toFixed(0) + " km/h"],
                           ["alt", v => v + " m"],

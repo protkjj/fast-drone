@@ -207,7 +207,105 @@ def hover_state(p):
     return x
 
 
-def crosscheck(p, dt, steps):
+def seg_defs(p, dt):
+    """검증 구간들. **운용영역을 실제로 훑어야** 배지가 뜻을 갖는다.
+
+    예전에는 호버에서 정지 상태로 0.8 초를 도는 구간 하나뿐이었다. 그 궤적의
+    실측 범위가 대기속도 3.0~3.2 m/s, fac 0.999~1.000 이었다 — 즉 **전진비
+    분기가 한 번도 실행되지 않았다.** 그래서 할당이 전진비를 무시하던 버그가
+    이 배지를 그대로 통과했다. 그 일을 되풀이하지 않으려고 구간을 늘린다.
+
+    각 구간은 하나씩 '이 항이 죽어 있지 않다' 를 담당한다.
+    """
+    n_h = math.sqrt(p["mass"] * p["g"] / (4.0 * p["k_T"]))
+    segs = []
+
+    # 1) 호버 비대칭 — 예전 구간 그대로. 네 로터가 다 다르고 바람도 비스듬하다.
+    segs.append(("호버 비대칭", hover_state(p),
+                 [n_h * 1.03, n_h * 0.98, n_h * 1.01, n_h * 0.99],
+                 [3.0, -1.0, 0.5]))
+
+    # 2~5) 고속 구간. 트림을 못 구하면 손으로 자세를 만들어서라도 넣는다 —
+    #      트림이 없다고 검증 범위를 좁히면 본말이 전도된다.
+    def tilted(V, deg, wz=0.0):
+        """기수를 deg 만큼 눕히고 월드 +x 로 V 로 나는 상태."""
+        x = [0.0] * NX
+        a = -math.pi / 2.0 + math.radians(deg)      # y 축 둘레
+        x[7], x[9] = math.sin(a / 2.0), math.cos(a / 2.0)
+        x[2] = 200.0
+        x[3] = V
+        x[5] = wz
+        for i in range(13, 17):
+            x[i] = n_h
+        return x
+
+    # 2) 고속 순항 — 전진비가 실제로 물린다 (fac < 1).
+    x2 = tilted(45.0, 60.0)
+    for i in range(13, 17):
+        x2[i] = 900.0
+    segs.append(("고속 순항 45 m/s", x2,
+                 [930.0, 880.0, 870.0, 920.0], [0.0, 0.0, 0.0]))
+
+    # 3) 고속 + 큰 차동 — 로터마다 fac 가 갈리고 자이로 항이 산다.
+    x3 = tilted(60.0, 70.0)
+    for i in range(13, 17):
+        x3[i] = 950.0
+    x3[10], x3[11], x3[12] = 1.5, -2.5, 0.8
+    segs.append(("고속 차동 + 각속도", x3,
+                 [1300.0, 600.0, 1250.0, 620.0], [0.0, 0.0, 0.0]))
+
+    # 4) 저회전 고속 — fac 가 0 으로 내려가는 영역. 오늘 버그가 살던 자리다.
+    x4 = tilted(50.0, 65.0)
+    for i in range(13, 17):
+        x4[i] = 500.0
+    segs.append(("저회전 고속 (fac→0)", x4,
+                 [520.0, 430.0, 510.0, 440.0], [0.0, 0.0, 0.0]))
+
+    # 5) 측풍 — 횡류 항(C_dc)과 큰 받음각.
+    x5 = tilted(35.0, 45.0, wz=-4.0)
+    for i in range(13, 17):
+        x5[i] = 800.0
+    segs.append(("측풍 + 받음각", x5,
+                 [850.0, 760.0, 830.0, 780.0], [0.0, 18.0, -3.0]))
+
+    # 6) 큰 각속도 — 자이로 항과 쿼터니언 정규화가 일하는 구간.
+    x6 = hover_state(p)
+    x6[2] = 100.0
+    x6[10], x6[11], x6[12] = 4.0, -6.0, 3.0
+    for i in range(13, 17):
+        x6[i] = n_h
+    segs.append(("큰 각속도", x6,
+                 [n_h * 1.15, n_h * 0.85, n_h * 1.10, n_h * 0.90],
+                 [0.0, 0.0, 0.0]))
+    return segs
+
+
+def coverage(p, x, u):
+    """이 상태에서 무엇이 실제로 물리는지. 배지가 보증하는 범위를 숫자로 남긴다."""
+    qx, qy, qz, qw = x[6], x[7], x[8], x[9]
+    R = ((1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - qz * qw), 2 * (qx * qz + qy * qw)),
+         (2 * (qx * qy + qz * qw), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz - qx * qw)),
+         (2 * (qx * qz - qy * qw), 2 * (qy * qz + qx * qw), 1 - 2 * (qx * qx + qy * qy)))
+    d = [x[3], x[4], x[5]]
+    ub = R[0][0] * d[0] + R[1][0] * d[1] + R[2][0] * d[2]
+    vb = R[0][1] * d[0] + R[1][1] * d[1] + R[2][1] * d[2]
+    wb = R[0][2] * d[0] + R[1][2] * d[1] + R[2][2] * d[2]
+    V = math.sqrt(ub * ub + vb * vb + wb * wb)
+    alpha = math.degrees(math.atan2(math.sqrt(vb * vb + wb * wb), ub))
+    om = math.sqrt(x[10] ** 2 + x[11] ** 2 + x[12] ** 2)
+    axial = ub if ub > 0 else 0.0
+    facs = []
+    for i in range(4):
+        ni = x[13 + i]
+        nr = ni / (2.0 * math.pi)
+        J = axial / (nr * p["D_prop"] + 1e-12)
+        facs.append(max(0.0, 1.0 - J / p["J_max"]))
+    return {"V": V, "alpha": alpha, "om": om,
+            "fac_min": min(facs), "fac_max": max(facs),
+            "n_min": min(x[13:17]), "n_max": max(x[13:17])}
+
+
+def crosscheck_seg(p, dt, steps, x0, u, w):
     """CasADi 원본과 대조. 없으면 건너뛴다."""
     try:
         import numpy as np
@@ -215,11 +313,8 @@ def crosscheck(p, dt, steps):
     except Exception as e:
         return None, f"CasADi 대조 생략: {type(e).__name__}"
     plant = AxialDronePlant(VP, dt=dt)
-    n_h = math.sqrt(p["mass"] * p["g"] / (4.0 * p["k_T"]))
-    u = [n_h * 1.03, n_h * 0.98, n_h * 1.01, n_h * 0.99]
-    w = [3.0, -1.0, 0.5]
-    xs = hover_state(p)
-    xc = np.array(xs)
+    xs = list(x0)
+    xc = np.array(x0, dtype=float)
     worst = 0.0
     for _ in range(steps):
         xs = rk4_step(xs, u, w, p, dt)
@@ -232,51 +327,76 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-o", "--out",
                     default=str(ROOT / "gz_aero" / "data" / "sim_reference.json"))
-    ap.add_argument("--dt", type=float, default=0.002)
+    ap.add_argument("--dt", type=float, default=0.005)
     ap.add_argument("--steps", type=int, default=400)
+    ap.add_argument("--every", type=int, default=20,
+                    help="검문소 간격. 전 스텝을 담으면 파일이 커지는데, "
+                         "오차는 쌓이므로 간격을 둬도 판별력은 같다.")
     a = ap.parse_args()
 
     p = params()
     n_h = math.sqrt(p["mass"] * p["g"] / (4.0 * p["k_T"]))
 
-    # 일부러 비대칭인 입력. 네 로터가 다 다르고 바람도 비스듬해야
-    # 부호가 틀린 항이 숨지 못한다.
-    u = [n_h * 1.03, n_h * 0.98, n_h * 1.01, n_h * 0.99]
-    w = [3.0, -1.0, 0.5]
+    segs_out, cov_all, worst_all, note = [], [], 0.0, ""
+    for name, x0, u, w in seg_defs(p, a.dt):
+        x = list(x0)
+        checks, cov = [], [coverage(p, x, u)]
+        for k in range(1, a.steps + 1):
+            x = rk4_step(x, u, w, p, a.dt)
+            if k % a.every == 0:
+                checks.append(list(x))
+            cov.append(coverage(p, x, u))
+        worst, note = crosscheck_seg(p, a.dt, a.steps, x0, u, w)
+        if worst is not None:
+            worst_all = max(worst_all, worst)
+        segs_out.append({"name": name, "x0": list(x0), "u": u, "w": w,
+                         "checks": checks})
+        cov_all.append((name, cov))
 
-    x = hover_state(p)
-    traj = [list(x)]
-    for _ in range(a.steps):
-        x = rk4_step(x, u, w, p, a.dt)
-        traj.append(list(x))
-
-    # 제어 할당 [T_total, Mx, My, Mz] -> [T1..T4].
-    # JS 에서 4x4 역행렬을 풀 필요 없게 여기서 미리 구해 넘긴다.
     from control.dynamics import compute_allocation_matrix   # noqa: E402
     _A, A_inv = compute_allocation_matrix(VP)
     alloc_inv = [[float(v) for v in row] for row in A_inv]
 
-    worst, note = crosscheck(p, a.dt, a.steps)
-    ref = {"dt": a.dt, "steps": a.steps, "u": u, "w": w,
-           "x0": hover_state(p), "traj": traj,
-           "n_hover": n_h,
-           "casadi_max_diff": worst, "casadi_note": note,
-           "alloc_inv": alloc_inv,
-           "params": p}
+    hov = hover_state(p)
+    ref = {"dt": a.dt, "steps": a.steps, "every": a.every,
+           "segs": segs_out,
+           "x0": hov, "n_hover": n_h,
+           "casadi_max_diff": (worst_all if note == "" else None),
+           "casadi_note": note,
+           "alloc_inv": alloc_inv, "params": p}
 
     out = pathlib.Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(ref, separators=(",", ":")), encoding="utf-8")
     print(f"저장 {out}  ({out.stat().st_size / 1024:.0f} KB)")
-    print(f"  dt {a.dt} s × {a.steps} 스텝 = {a.dt * a.steps:.2f} s")
-    print(f"  호버 로터속도 {n_h:.2f} rad/s")
-    print(f"  마지막 상태  pos ({x[0]:+.4f} {x[1]:+.4f} {x[2]:+.4f})  "
-          f"vel ({x[3]:+.4f} {x[4]:+.4f} {x[5]:+.4f})")
-    if worst is None:
+    print(f"  구간 {len(segs_out)} 개 × {a.dt} s × {a.steps} 스텝"
+          f" = 각 {a.dt * a.steps:.1f} s, 검문소 {a.steps // a.every} 곳")
+    print()
+    print(f"  {'구간':<20s} {'대기속도':>12s} {'받음각°':>12s} {'|ω|':>10s} {'fac':>14s}")
+    g = {"V": [1e9, -1e9], "alpha": [1e9, -1e9], "om": [1e9, -1e9], "fac": [1e9, -1e9]}
+    for name, cov in cov_all:
+        V = (min(c["V"] for c in cov), max(c["V"] for c in cov))
+        al = (min(c["alpha"] for c in cov), max(c["alpha"] for c in cov))
+        om = (min(c["om"] for c in cov), max(c["om"] for c in cov))
+        fc = (min(c["fac_min"] for c in cov), max(c["fac_max"] for c in cov))
+        for key, v in (("V", V), ("alpha", al), ("om", om), ("fac", fc)):
+            g[key][0] = min(g[key][0], v[0]); g[key][1] = max(g[key][1], v[1])
+        print(f"  {name:<20s} {V[0]:5.1f}~{V[1]:5.1f} {al[0]:5.1f}~{al[1]:5.1f}"
+              f" {om[0]:4.1f}~{om[1]:4.1f} {fc[0]:6.3f}~{fc[1]:6.3f}")
+    print(f"  {'── 전체 ──':<20s} {g['V'][0]:5.1f}~{g['V'][1]:5.1f}"
+          f" {g['alpha'][0]:5.1f}~{g['alpha'][1]:5.1f}"
+          f" {g['om'][0]:4.1f}~{g['om'][1]:4.1f}"
+          f" {g['fac'][0]:6.3f}~{g['fac'][1]:6.3f}")
+    if g["fac"][0] > 0.99:
+        print("  ❌ fac 가 전 구간 1.0 입니다 — 전진비 분기가 한 번도 안 돕니다.")
+        return 1
+    print()
+    if note:
         print(f"  {note}")
     else:
-        ok = worst < 1e-9
-        print(f"  {'✅' if ok else '❌'} CasADi 원본과 최대차 {worst:.3e}")
+        ok = worst_all < 1e-9
+        print(f"  {'✅' if ok else '❌'} CasADi 원본과 최대차 {worst_all:.3e}"
+              f"  (구간 {len(segs_out)} 개 전체)")
         if not ok:
             print("     순수 파이썬 포트가 원본과 어긋납니다. JS 로 넘기기 전에 고쳐야 합니다.")
             return 1
