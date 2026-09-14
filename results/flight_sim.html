@@ -549,6 +549,15 @@ function nmpcSolve(x0, vref, zref){
 // 기수를 바람 쪽으로 미는데, 비례 제어만으로는 그 모멘트를 상쇄하며 정상편차가
 // 남는다. Jy*KW*KR 이 약하면 30~60도까지 벌어져 추력축이 누워 고도를 못 버틴다.
 const KV = 1.2, KZ = 1.0, KR = 8.0, KW = 18.0;
+// 롤 전용 게인. 롤은 Ixx 가 Iyy 의 1/35 라 로터 항력토크만으로도
+// 1620 rad/s^2 까지 난다 (피치는 98). 같은 게인을 쓰면 과잉하다.
+// 순항 자세는 살려야 하니 롤은 느리게 수십 초가 아니라 몇 초에 돌아오면 된다.
+// 롤 전용 게인. 자세루프(KR/KW)보다 훨씬 느리게 잡는다. 롤은 Ixx 가 Iyy 의
+// 1/35 라 로터 항력토크만으로 1620 rad/s^2 까지 나는 빠른 축이고(피치는 98),
+// 축대칭 동체라 공력상 급할 이유도 없다. 스윕으로 고른 값이다.
+// 오차를 +-20 도로 잘라 천천히 되돌리는 안도 재봤는데 되레 나빴다 —
+// 요구 회전율이 0.14 rad/s 로 줄어 trim 이 80 도에서 못 돌아왔다. 안 쓴다.
+let KR_R = 0.4, KW_R = 2.0, W_R_MAX = 25.0;
 // 가속도 상한. 실제 PX4 시험은 0 -> 83 m/s 를 30 초에 올렸다 (2.8 m/s^2).
 // 이보다 크게 잡으면 기체가 즉시 70 도씩 누워 아무것도 안 읽힌다.
 const A_MAX = 12.0, RAMP = 3.0;
@@ -565,7 +574,8 @@ const TILT_MAX = 55.0 * Math.PI / 180.0;
 // 부르면 거짓이 된다. 대신 프로젝트의 내부루프인 INDI 는 그대로 이식했다.
 const CTRLS = {
   cascade: {name:"종속 PID (기본)", ff:true, tilt:55, indi:false,
-            note:"속도→자세→모멘트 종속 루프. 공력 앞먹임 켬."},
+            note:"속도→자세→모멘트 종속 루프. 공력 앞먹임 켬. "
+                 + "⚠ 전이 구간에서 롤 |p| 가 29~41 rad/s 로 튄다 (trim 은 0.6)."},
   noff:    {name:"앞먹임 없음", ff:false, tilt:55, indi:false,
             note:"동체가 내는 힘을 모르는 상태. 트림을 못 찾아 더 느리다."},
   fast:    {name:"틸트 60° (빠름·위험)", ff:true, tilt:60, indi:false,
@@ -573,13 +583,15 @@ const CTRLS = {
   trim:    {name:"트림 기반 (권장)", ff:true, tilt:58, indi:false, trim:true,
             note:"정상비행 트림을 플랜트에서 직접 풀어 앞먹임한다. 자세 한계 58도. "
                  + "62도로 풀면 568 km/h 까지 가지만 고도를 잃고 떨어진다 — "
-                 + "그 사이를 찾는 것이 NMPC 의 일이다."},
+                 + "그 사이를 찾는 것이 NMPC 의 일이다. "
+                 + "롤까지 유지되는 유일한 제어기다 (|p| 0.6, 롤 오차 0도)."},
   hybrid:  {name:"하이브리드 NMPC+INDI (실험)", ff:true, tilt:80, indi:true, nmpc:true,
             note:"⚠ 아직 안정적으로 못 법니다. 13차 가상모델을 브라우저에서 직접 "
                  + "풀지만(압축+투영경사), 추력 0·최대 회전율 같은 나쁜 국소해에 "
                  + "갇혀 고도를 잃습니다. 제대로 된 SQP/내점법이 필요하다는 증거입니다."},
   indi:    {name:"INDI 내부루프", ff:true, tilt:55, indi:true,
-            note:"측정 각가속도를 되먹여 증분으로 모멘트를 낸다. 모델오차에 강하다."},
+            note:"측정 각가속도를 되먹여 증분으로 모멘트를 낸다. 모델오차에 강하다. "
+                 + "⚠ 롤 |p| 가 40 rad/s 로 튄다. 포화 인지 할당이 필요하다."},
 };
 let CTRL = "cascade";
 // INDI 상태: 직전 각속도·모멘트와 걸러낸 각가속도
@@ -667,6 +679,30 @@ function aeroWorld(x){
           R[2][0]*Fx + R[2][1]*Fy + R[2][2]*Fz];
 }
 
+// ★ 추력 -> 회전수. 그냥 sqrt(T/k_T) 로 풀면 안 된다.
+// 플랜트는 T = k_T n^2 * fac 를 내는데 fac = 1 - J/J_max 이고 J = 2 pi V_ax/(n D)
+// 라 회전수 자신에 달려 있다. 순항에서 fac 가 로터마다 0.003~0.51 로 170 배
+// 벌어져, 제어기가 요구한 롤 모멘트 0.16 N.m 이 플랜트에서 0.0000 이 됐다.
+// (메모리의 "INDI G: 전진비 반영 필수" 가 바로 이 얘기다. 파이썬은 반영했고
+//  브라우저 이식에서 빠져 있었다.)
+// 다행히 닫힌 형태로 풀린다:
+//   T = k_T n^2 - b n,  b = k_T * 2 pi V_ax / (D J_max)
+//   n = [b + sqrt(b^2 + 4 k_T T)] / (2 k_T)
+// T=0 이면 n = b/k_T 로, 추력이 0 이 되는 풍차회전수와 정확히 맞는다.
+function nFromThrust(Ti, V_ax){
+  if (Ti < 0) Ti = 0;
+  const b = P.k_T * 2*Math.PI * V_ax / (P.D_prop * P.J_max);
+  const n = (b + Math.sqrt(b*b + 4*P.k_T*Ti)) / (2*P.k_T);
+  return n > P.n_max ? P.n_max : n;
+}
+// 지금 기수방향 유입속도. 할당이 쓰는 값과 플랜트가 쓰는 값이 같아야 한다.
+function axialInflow(x){
+  const qx=x[6], qy=x[7], qz=x[8], qw=x[9];
+  const w = windNow();
+  const d0=x[3]-w[0], d1=x[4]-w[1], d2=x[5]-w[2];
+  const ub = (1-2*(qy*qy+qz*qz))*d0 + 2*(qx*qy+qz*qw)*d1 + 2*(qx*qz-qy*qw)*d2;
+  return ub > 0 ? ub : 0;
+}
 function control(x, cmd){
   if (CTRLS[CTRL].nmpc) return controlHybrid(x, cmd);
   const m = P.mass, g = P.g;
@@ -692,7 +728,7 @@ function control(x, cmd){
     //   522 km/h 로 가속하다 지면에 닿았다). 앞먹임은 지금 상태와 맞아야 한다.
     const vNow = Math.hypot(x[3], x[4]);
     const [thT, nT] = getTrim(Math.min(vNow, cmd.spd));
-    const T_ff = 4.0 * P.k_T * nT * nT;
+    const T_ff = 4.0 * P.k_T * nT * nT;   // 트림은 플랜트로 직접 풀었으므로 fac 가 이미 들어 있다
     const st = Math.sin(thT), ct = Math.cos(thT);
     tx = T_ff*st*Math.cos(psi) + m*ax;
     ty = T_ff*st*Math.sin(psi) + m*ay;
@@ -742,6 +778,7 @@ function control(x, cmd){
     yn = Math.hypot(yb[0], yb[1], yb[2]) || 1e-9;
   }
   yb = [yb[0]/yn, yb[1]/yn, yb[2]/yn];
+
   const zb = [xb[1]*yb[2] - xb[2]*yb[1],
               xb[2]*yb[0] - xb[0]*yb[2],
               xb[0]*yb[1] - xb[1]*yb[0]];
@@ -764,6 +801,40 @@ function control(x, cmd){
   // 원하는 각가속도. 두 제어기가 여기까지는 같고, 이걸 모멘트로 바꾸는
   // 방식만 다르다.
   const wdes = [KW*(KR*ex - p_), KW*(KR*ey - q_), KW*(KR*ez - r_)];
+
+  // ★ 롤 유지. 위 Rd 는 목표 y 를 현재 y 에서 투영해 만들므로
+  //   기수축 둘레 오차 ex 가 **구조적으로 0** 이다. 그러면 롤에는
+  //   -KW*p 감쇠만 남아 각속도는 죽지만 각도는 그 자리에 남는다 —
+  //   측풍 12 m/s 한 번에 90 도가 돌아가 영영 안 돌아오는 것을 실측했다.
+  //   (화면에서는 매끄한 축대칭 동체 대신 로터 팔만 돌아 보인다.)
+  //
+  //   목표 프레임을 건드리지 않고 **롤 오차를 스칼라 하나로** 뽑아
+  //   wdes[0] 을 덮어쓴다. 이유가 있다 — 목표 y 를 수평 기준으로 바꿔
+  //   넣었더니, 롤 오차가 90 도 근처일 때 부호 맞춤(yh·yb ≈ 0)이 매
+  //   스텝 뒤집혀 기준이 180 도씩 튀고 |ω| 가 46 rad/s 로 텀블했다.
+  //   atan2 는 부호가 정의되어 그 모호함이 없다.
+  //
+  //   기준은 "동체 y 를 수평로". 순항에서는 추력축이 기울어 있어
+  //   xb x z_hat 이 충분히 크다. 호버에서는 xb 가 월드 z 와 나란해
+  //   퇴화하는데, 그때는 롤이 실제로 무의미하므로 그냥 놓아둔다.
+  const hxy = Math.hypot(xb[0], xb[1]);
+  if (hxy > 0.25){
+    const yh = [xb[1]/hxy, -xb[0]/hxy, 0];          // 수평이면서 xb 에 수직
+    const ybc = [R0[0][1], R0[1][1], R0[2][1]];      // 지금 동체 y
+    const cr = [ybc[1]*yh[2]-ybc[2]*yh[1],           // yb_cur x yh
+                ybc[2]*yh[0]-ybc[0]*yh[2],
+                ybc[0]*yh[1]-ybc[1]*yh[0]];
+    const sn = cr[0]*xb[0] + cr[1]*xb[1] + cr[2]*xb[2];
+    const cs = ybc[0]*yh[0] + ybc[1]*yh[1] + ybc[2]*yh[2];
+    const phi = Math.atan2(sn, cs);                  // (-pi, pi], 부호 확정
+    const t = Math.min(1, (hxy - 0.25) / 0.20);
+    const wgt = t*t*(3 - 2*t);                       // smoothstep 으로 서서히 개입
+    // 롤은 급할 것이 없다. 자세루프보다 훨씬 느리게 잡고 상한을 둔다.
+    let wr = KW_R*(KR_R*phi - p_);
+    if (wr >  W_R_MAX) wr =  W_R_MAX;
+    else if (wr < -W_R_MAX) wr = -W_R_MAX;
+    wdes[0] = wdes[0] + wgt*(wr - wdes[0]);
+  }
 
   let Mx, My, Mz;
   if (CTRLS[CTRL].indi){
@@ -799,12 +870,10 @@ function control(x, cmd){
   let T = tx*axw + ty*ayw + tz*azw;
   if (T < 0) T = 0;
 
-  const A = D.alloc_inv, n = [0,0,0,0];
+  const A = D.alloc_inv, n = [0,0,0,0], Vax = axialInflow(x);
   for (let i=0;i<4;i++){
-    let Ti = A[i][0]*T + A[i][1]*Mx + A[i][2]*My + A[i][3]*Mz;
-    if (Ti < 0) Ti = 0;
-    const ni = Math.sqrt(Ti / P.k_T);
-    n[i] = ni > P.n_max ? P.n_max : ni;
+    const Ti = A[i][0]*T + A[i][1]*Mx + A[i][2]*My + A[i][3]*Mz;
+    n[i] = nFromThrust(Ti, Vax);
   }
   return n;
 }
@@ -836,12 +905,10 @@ function controlHybrid(x, cmd){
   }
   omPrev = om.slice(); Mprev = M.slice();
 
-  const A = D.alloc_inv, nOut = [0,0,0,0];
+  const A = D.alloc_inv, nOut = [0,0,0,0], Vax = axialInflow(x);
   for (let i=0;i<4;i++){
-    let Ti = A[i][0]*Tc + A[i][1]*M[0] + A[i][2]*M[1] + A[i][3]*M[2];
-    if (Ti < 0) Ti = 0;
-    const ni = Math.sqrt(Ti / P.k_T);
-    nOut[i] = ni > P.n_max ? P.n_max : ni;
+    const Ti = A[i][0]*Tc + A[i][1]*M[0] + A[i][2]*M[1] + A[i][3]*M[2];
+    nOut[i] = nFromThrust(Ti, Vax);
   }
   return nOut;
 }
@@ -971,6 +1038,11 @@ function init3D(){
   tail.rotation.z = -Math.PI/2; tail.position.x = -.41; veh.add(tail);
   const ring = new THREE.Mesh(new THREE.CylinderGeometry(.0785, .0785, .07, 28), accent);
   ring.rotation.z = -Math.PI/2; veh.add(ring);
+  // 롤 기준선. 매끈한 축대칭 동체는 기수축 둘레로 돌아도 화면에서 안 보인다.
+  // 그래서 로터 팔만 도는 것처럼 읽혔다 — 실제로는 강체로 같이 돌고 있었다.
+  // 동체 +z 쪽에 줄을 하나 그어 롤이 눈에 보이게 한다.
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(.62, .010, .004), accent);
+  stripe.position.set(-.02, 0, .0755); veh.add(stripe);
 
   const ARM = 0.25 / Math.SQRT2;      // 기수축 둘레 반지름 (vehicle_params)
   const RPROP = 0.30 / 2;
