@@ -267,6 +267,7 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
       <div class="legend3d">
         <span><i style="background:#f2aa4c"></i>공력</span>
         <span><i style="background:#2d94bd"></i>속도</span>
+        <span><i style="background:#59c8f5"></i>궤적</span>
         <span>끌기 = 회전 · 휠 = 확대 · Shift+끌기 = 이동 · Space = 정지 · R = 리셋 · F = 따라가기</span>
       </div>
       <div class="warnbox" id="warn"></div>
@@ -495,6 +496,22 @@ function qmul(p, q){   // Hamilton, scalar-last [x,y,z,w]
           p[3]*q[1] - p[0]*q[2] + p[1]*q[3] + p[2]*q[0],
           p[3]*q[2] + p[0]*q[1] - p[1]*q[0] + p[2]*q[3],
           p[3]*q[3] - p[0]*q[0] - p[1]*q[1] - p[2]*q[2]];
+}
+// 그 속도 트림에서 로터가 실제로 내는 총추력. 전진비(fac)까지 반영한다.
+// NMPC 의 입력 기준값으로 쓴다 — 지금은 속도와 무관하게 호버 추력을 쓴다.
+function trimThrust(V){
+  const [xt] = lqrPick(Math.min(V, LQ.V_max_table));
+  const qx=xt[6], qy=xt[7], qz=xt[8], qw=xt[9];
+  const ub = (1-2*(qy*qy+qz*qz))*xt[3] + 2*(qx*qy+qz*qw)*xt[4] + 2*(qx*qz-qy*qw)*xt[5];
+  const Vax = ub > 0 ? ub : 0;
+  let T = 0;
+  for (let i=0;i<4;i++){
+    const ni = xt[13+i], nrps = ni/(2*Math.PI);
+    const J = Vax/(nrps*P.D_prop + EPS);
+    const fac = Math.max(0, 1 - J/P.J_max);
+    T += P.k_T*ni*ni*fac;
+  }
+  return T;
 }
 function lqrLaw(V, x, zref){
   const [xt, ut, K] = lqrPick(V);
@@ -791,6 +808,11 @@ function rtiSolve(x0, vref, zref){
   const t_start = (typeof performance !== "undefined") ? performance.now() : 0;
   const C = RTI, N = C.N, m = NUV, n = N*m, NS = NV;
   const Tmax = 4*P.k_T*P.n_max*P.n_max;
+  // 입력 기준값을 그 속도의 트림 추력(trimThrust)으로 바꿔 봤는데 되레
+  // 나빴다 — 속도 초과가 27 -> 35 km/h. R[0]=1e-5 라 당기는 힘이 약해
+  // 방향만 바뀌고 도움이 안 된다. 호버 추력으로 둔다.
+  //   (재보며 알게 된 것: 83 m/s 트림 총추력은 43.3 N 으로 호버 78.5 N 의
+  //    절반이다. 순항에서는 동체가 양력의 절반 이상을 낸다.)
   const uref = [P.mass*P.g, 0, 0, 0];
   const lo = [0, -C.nuMax, -C.nuMax, -C.nuMax];
   const hi = [Tmax, C.nuMax, C.nuMax, C.nuMax];
@@ -1576,6 +1598,7 @@ function reset(){
   rtiU = null; rtiLast = -1e9; rtiOut = null; rtiApplied = null; rtiStat = null;
   trailN = 0; trailDrawn = 0;
   if (trail) trail.geometry.setDrawRange(0, 0);
+  if (trailDots) trailDots.geometry.setDrawRange(0, 0);
 }
 // 지면. 아래로 뚫고 내려가지 않게 막고, 닿아 있으면 수직속도를 죽인다.
 function ground(){
@@ -1632,7 +1655,11 @@ function diag(){
 // 궤적선 버퍼는 REC 상한과 같게 둔다. 그래야 '타임라인이 갈 수 있는 곳'
 // 과 '선이 그려진 곳' 이 어긋나지 않는다.
 const TRAIL_MAX = 6000;
-let ren, scene, cam, veh, arrow, velArrow, trail, trailPos, trailN = 0;
+// 점 간격. 촘촘히 찍어 사실상 굵은 선이 되게 한다 — WebGL 이 선 굵기를
+// 무시해서(항상 1 px) 이것 말고는 굵게 만들 방법이 없다.
+const TRAIL_DOT_EVERY = 3;   // 0.12 s 마다
+let ren, scene, cam, veh, arrow, velArrow, trail, trailDots,
+    trailPos, trailDotPos, trailN = 0;
 const PROPS = [];   // 프로펠러를 실제 회전수만큼 돌린다
 // RViz 처럼 마우스로 궤도·이동·확대. OrbitControls 는 three 핵심 번들에 없어서
 // 직접 쓴다 (CDN 에서 따로 받으면 막힐 수 있다).
@@ -1721,8 +1748,31 @@ function init3D(){
   const tg = new THREE.BufferGeometry();
   tg.setAttribute("position", new THREE.BufferAttribute(trailPos, 3));
   tg.setDrawRange(0, 0);
-  trail = new THREE.Line(tg, new THREE.LineBasicMaterial({color:0x2d94bd}));
+  // ★ 각도와 확대에 상관없이 보이게 한다.
+  //   · depthTest 를 끈다 — 지면 격자나 기체에 가려 사라지지 않는다.
+  //   · WebGL 은 linewidth 를 무시하므로(항상 1 px) 선만으로는 멀리서 흐리다.
+  //     같은 버퍼에 점을 겹쳐 그리고 sizeAttenuation 을 꺼서 **화면 크기가
+  //     일정**하게 한다. 확대하든 축소하든 점이 같은 굵기로 남는다.
+  const trailMat = new THREE.LineBasicMaterial({color:0x59c8f5,
+    depthTest:false, transparent:true, opacity:0.95});
+  trail = new THREE.Line(tg, trailMat);
+  trail.renderOrder = 3; trail.frustumCulled = false;
   scene.add(trail);
+  // 점은 **따로 성기게** 찍는다. 같은 버퍼에 다 찍으면 0.04 s 간격이라
+  //   뭉쳐서 그냥 두꺼운 선이 되고, 어디가 어느 시각인지도 안 읽힌다.
+  //   TRAIL_DOT_EVERY 간격으로 찍으면 굵기도 생기고 속도도 읽힌다
+  //   (점 간격이 넓으면 빠른 구간이다).
+  const dg = new THREE.BufferGeometry();
+  trailDotPos = new Float32Array(3 * Math.ceil(TRAIL_MAX / TRAIL_DOT_EVERY));
+  dg.setAttribute("position", new THREE.BufferAttribute(trailDotPos, 3));
+  dg.setDrawRange(0, 0);
+  trailDots = new THREE.Points(dg, new THREE.PointsMaterial({color:0x8fe0ff,
+    // gl_PointSize 는 **장치 픽셀**이라 devicePixelRatio 2 면 화면에선 절반이다.
+    // 3.6 으로 뒀더니 1.8 CSS px 라 1 px 선과 구분이 안 됐다.
+    size:7.0, sizeAttenuation:false, depthTest:false,
+    transparent:true, opacity:0.95}));
+  trailDots.renderOrder = 4; trailDots.frustumCulled = false;
+  scene.add(trailDots);
   bindMouse(ren.domElement);
   resize3D();
 }
@@ -1794,6 +1844,15 @@ function syncTrail(){
     trailDrawn = upTo;
     trail.geometry.setDrawRange(0, trailDrawn);
     trail.geometry.attributes.position.needsUpdate = true;
+    // 점은 성기게. 선이 1 px 라 멀리서 흐린데, 점이 굵기를 만들어 준다.
+    let m = 0;
+    for (let i = 0; i < upTo; i += TRAIL_DOT_EVERY){
+      const q = REC[i].x;
+      trailDotPos[m*3] = q[0]; trailDotPos[m*3+1] = q[1]; trailDotPos[m*3+2] = q[2];
+      m++;
+    }
+    trailDots.geometry.setDrawRange(0, m);
+    trailDots.geometry.attributes.position.needsUpdate = true;
   }
 }
 function render3D(d){
@@ -2647,7 +2706,9 @@ function initUI(){
       if (!running) paint(diag());
     });
   $("#rst").addEventListener("click", () => {
-    reset(); trailN = 0; trailDrawn = 0; trail.geometry.setDrawRange(0,0); paint(diag());
+    reset(); trailN = 0; trailDrawn = 0;
+    trail.geometry.setDrawRange(0,0); trailDots.geometry.setDrawRange(0,0);
+    paint(diag());
   });
   addEventListener("resize", () => { resize3D(); paint(diag()); });
 }
