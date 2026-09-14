@@ -743,6 +743,7 @@ RTI.horizon = RTI.dts.reduce((x, y) => x + y, 0);
 const RTI_WIDX = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 let rtiU = null, rtiLast = -1e9, rtiOut = null, rtiApplied = null, rtiStat = null;
 let vTrimRef = 0;   // 자세 기준을 뽑을 속도 (controlHybrid 가 넣는다)
+let ROLL_HOLD_OUTSIDE = true;   // A/B 로 재보려고 let
 
 // 자유변수만 뽑아 촐레스키로 푼다. H 는 대칭 양정. 실패하면 null.
 function cholSolve(H, b, m){
@@ -1394,11 +1395,23 @@ function controlHybrid(x, cmd){
     out = nmpcOut;
   }
   const Tc = out[0], nu = [out[1], out[2], out[3]];
-  // ★ 롤은 NMPC 가 안 본다. 비용함수에 자세 기준이 없어서 nu_roll 이 어떤
-  //   반복수에서도 0.01 이었다 — 솔버를 아무리 좋게 해도 롤은 안 잡힌다.
-  //   NMPC 가 "얼마나 돌릴지" 만 정하는 인터페이스 분리 원칙 그대로,
-  //   롤 유지는 바깥에서 얹는다.
-  {
+  // ★ 롤은 인터페이스 층에서 잡는다. 두 솔버 모두.
+  //
+  //   투영경사(hybrid)는 비용에 자세 항이 아예 없어 nu_roll 이 어떤 반복수
+  //   에서도 0.01 이었다 — 솔버를 아무리 좋게 해도 롤은 안 잡힌다.
+  //   RTI 는 q_ref(트림 자세)에 롤이 들어 있는데도 여기서 덮어쓴다. 재보고
+  //   내린 결정이다: 끄면 |ω| 가 47.5 -> 64.7 로 나빠지고 NMPC 가 낸
+  //   |ν_roll| 이 한계 25 에 붙는다.
+  //
+  //   이유가 있다. 비용이 |q - q_ref|^2 라 세 축을 **같은 무게**로 잰다.
+  //   그런데 Ixx 가 Iyy 의 1/35 라 같은 자세 오차를 롤로 지우는 비용이
+  //   훨씬 싸다 — 최적해가 롤을 과하게 쓴다. 축별로 다르게 재려면 쿼터니언
+  //   차가 아니라 동체 프레임 오차로 써야 하는데, 그러면 지금의 대각 가중치
+  //   기계(상태에 바로 가중)를 못 쓴다. 그건 다음 일이다.
+  //
+  //   축대칭 동체라 기수축 둘레 롤은 공력상 결합이 없다. NMPC 가 추력축
+  //   기동을 정하고 롤은 인터페이스 층이 맡는 분리가 물리적으로도 맞다.
+  if (ROLL_HOLD_OUTSIDE){
     const qx=x[6], qy=x[7], qz=x[8], qw=x[9];
     const xb=[1-2*(qy*qy+qz*qz), 2*(qx*qy+qz*qw), 2*(qx*qz-qy*qw)];
     const yb=[2*(qx*qy-qz*qw), 1-2*(qx*qx+qz*qz), 2*(qy*qz+qx*qw)];
