@@ -33,17 +33,20 @@ from control.trim import find_trim
 from control.controller import LQRController
 
 V_STEP = 2.5
-V_MAX = 50.0
+V_MAX = 85.0      # 동체 90 mm 로 트림 상한이 84 m/s 까지 열렸다
 RES_TOL = 1e-6          # 트림 잔차 상한. 이보다 크면 평형점이 아니다.
 OUT = ROOT / "gz_aero" / "data" / "lqr_rocket.json"
 
 
 def build_table():
     rows = []
-    V = 0.0
+    V, guess = 0.0, None
     while V <= V_MAX + 1e-9:
-        tr = find_trim(rocket_params, V)
+        # ★ 연속법. 냉시동 fsolve 는 고속에서 엉뚱한 가지로 빠진다.
+        tr = find_trim(rocket_params, V, guess=guess, quiet=True)
         res = float(tr["residual"])
+        if tr.get("converged"):
+            guess = tr["guess"]
         x, u = np.asarray(tr["state"], float), np.asarray(tr["control"], float)
         if res > RES_TOL:
             print(f"  V={V:5.1f}  잔차 {res:.2e} > {RES_TOL:.0e} — 평형점이 아니라 버립니다")

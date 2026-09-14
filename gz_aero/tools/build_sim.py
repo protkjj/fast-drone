@@ -599,7 +599,9 @@ function controlLQR(x, cmd){
   // 트림이 곧 현재 상태라 속도 오차가 0 이 되어 가속 명령이 안 나온다.
   // cmdSpd 자체가 RAMP 로 천천히 오르므로 '아직 느린데 80도 자세를 요구'
   // 하는 문제도 안 생긴다 (종속 루프가 겪었던 그 함정).
-  const V = Math.min(cmd.spd, LQ.V_max_table);
+  // 표가 85 m/s 까지 열려 명령 속도를 그대로 써도 되지만, 아직 느린데
+  // 순항 자세를 요구하면 고도 권한을 잃는다. 현재 속도로 제한한다.
+  const V = Math.min(Math.hypot(x[3], x[4]) + 5.0, cmd.spd, LQ.V_max_table);
   // 움직이는 고도 기준. 기체가 오르면 기준도 같이 오른다.
   const dz = cmd.alt - x[2];
   const zr = x[2] + (dz > LQR_ZCAP ? LQR_ZCAP : (dz < -LQR_ZCAP ? -LQR_ZCAP : dz));
@@ -649,7 +651,24 @@ function vXdot(x, u, p){
           -p.g + (R20*Fx+R21*Fy+R22*Fz)/m,
           qd0, qd1, qd2, qd3, u[1], u[2], u[3]];
 }
+// ★ 큰 스텝은 쪼갠다. 등급 격자의 끝은 0.30 s 인데 그 크기로 RK4 를 한 번에
+//   밟으면 자세 동역학이 터진다 — |ω| 가 1008 rad/s 까지 갔다. 그건 제어가
+//   아니라 **예측 적분기가 발산한 것**이고, 그러면 기울기가 쓰레기가 되어
+//   솔버가 아무리 좋아도 소용이 없다.
+//   지평선은 길게 두고 적분 보폭만 0.05 s 이하로 묶는다. RTI 가 4~7 ms 라
+//   여유가 있다.
+const VSTEP_MAX_H = 0.05;
 function vStep(x, u, dt, p){
+  const nsub = dt > VSTEP_MAX_H ? Math.ceil(dt / VSTEP_MAX_H) : 1;
+  if (nsub > 1){
+    const h = dt / nsub;
+    let y = x;
+    for (let i = 0; i < nsub; i++) y = vStep1(y, u, h, p);
+    return y;
+  }
+  return vStep1(x, u, dt, p);
+}
+function vStep1(x, u, dt, p){
   const k1=vXdot(x,u,p);
   const a=x.map((v,i)=>v+0.5*dt*k1[i]), k2=vXdot(a,u,p);
   const b=x.map((v,i)=>v+0.5*dt*k2[i]), k3=vXdot(b,u,p);
@@ -749,17 +768,43 @@ function nmpcSolve(x0, vref, zref){
      5) 투영 뉴턴으로 상자 QP 를 푼다. 경계에 붙은 변수를 빼고 자유변수만
         촐레스키로 푼 뒤, 투영 선탐색으로 받는다.
    ------------------------------------------------------------------ */
-// nuMax 를 100 에서 40 으로 내렸다. 100 rad/s^2 는 이 기체의 피치 권한
-// (98 rad/s^2) 과 같은 값이라, 솔버가 매 주기 그 한계에 붙어 bang-bang 이
-// 됐다. 가중치 스윕(nuMax 10/20/30/40/50 x Qw 1/50 x R_nu 0.01/0.1)에서
-// 고도를 지킨 것은 nu40/Qw1/R0.01 하나뿐이었다 — 섬이 아주 좁다.
-const RTI = {N:20, dt:0.08, rate:0.05,
-             Qv:[5,5,10], Qz:20, Qw:1, R:[1e-5,0.01,0.01,0.01],
-             Rdu:[1e-3,0.01,0.01,0.01], nuMax:40,
+/* 비용함수를 다시 짰다. 솔버를 25 배 빠르게 만들고 나니 진짜 병목이
+   드러났기 때문이다 — 제대로 풀린 해가 각가속도 한계에 계속 붙었고,
+   가중치 12 조합 중 고도를 지킨 것이 하나뿐이었다. 원인이 셋이었다.
+
+   (1) **자세 기준이 없었다.** 비용에 Qv(속도)·Qz(고도)·Qw(각속도)뿐이라
+       자세를 붙잡는 것이 아무것도 없었다. nu_roll 이 어떤 반복수에서도
+       0.01 이었던 이유다 — 솔버를 아무리 좋게 해도 롤은 안 잡힌다.
+       고치는 법이 마침 싸다: **LQR 게인표에 속도별 트림 자세가 이미 들어
+       있다.** 쿼터니언은 상태(6~9)라 지금의 대각 가중치 기계에 그대로
+       들어간다. |q - q_ref|^2 은 작은 오차에서 (Δφ/2)^2 이라 자세 오차의
+       제곱과 같다. 이 한 항이 자세와 롤을 같이 잡는다.
+
+   (2) **지평선이 짧았다.** N*dt = 1.6 s 인데 가속은 30 s 짜리다. 균일
+       격자로 늘리면 앞쪽이 거칠어져 적용할 첫 수가 나빠진다. 그래서
+       **등급 격자** — 앞은 30 ms 로 촘촘하고 뒤로 갈수록 벌어져(1.18 배,
+       상한 0.30 s) 같은 20 스텝으로 약 4 s 를 본다.
+
+   (3) **nu 상한이 내부루프가 낼 수 있는 값보다 컸다.** INDI 증분 한계가
+       J*25 이므로 25 rad/s^2 인데 상자는 100(뒤에 40)이었다. NMPC 가 지키지
+       못할 약속을 하고 있었던 셈이다. 메모리의 "FC/CC 분리" 가 정한 인터페이스
+       계약이 곧 이 값이다. 25 로 맞춘다.                                   */
+const RTI = {N:20, dt0:0.03, dtGrow:1.18, dtMax:0.30, rate:0.05,
+             Qv:[5,5,10], Qz:20, Qw:20, Qq:400, R:[1e-5,0.01,0.01,0.01],
+             Rdu:[1e-3,0.01,0.01,0.01], nuMax:25,
              reg:1e-6,        // 촐레스키 정칙화
              asIters:4};      // 능동집합 갱신 횟수
-const RTI_WIDX = [2, 3, 4, 5, 10, 11, 12];   // 비용에 가중치가 걸린 상태만
+// 등급 시간격자. 앞은 촘촘하고 뒤는 벌어진다.
+RTI.dts = (() => {
+  const a = []; let d = RTI.dt0;
+  for (let k = 0; k < RTI.N; k++){ a.push(Math.min(d, RTI.dtMax)); d *= RTI.dtGrow; }
+  return a;
+})();
+RTI.horizon = RTI.dts.reduce((x, y) => x + y, 0);
+// 자세(6~9)가 들어와 7 -> 11 개가 됐다.
+const RTI_WIDX = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 let rtiU = null, rtiLast = -1e9, rtiOut = null, rtiApplied = null, rtiStat = null;
+let vTrimRef = 0;   // 자세 기준을 뽑을 속도 (controlHybrid 가 넣는다)
 
 // 자유변수만 뽑아 촐레스키로 푼다. H 는 대칭 양정. 실패하면 null.
 function cholSolve(H, b, m){
@@ -816,8 +861,11 @@ function rtiSolve(x0, vref, zref){
   const uk = new Array(m);
   for (let k=0;k<N;k++){
     for (let i=0;i<m;i++) uk[i] = rtiU[k*m+i];
-    xs[k+1] = vStep(xs[k], uk, C.dt, P);
+    xs[k+1] = vStep(xs[k], uk, C.dts[k], P);
   }
+  // 자세 기준. 명령 속도의 트림 자세를 그대로 쓴다 — 롤까지 그 안에 있다.
+  const qr0 = lqrPick(Math.min(vTrimRef, LQ.V_max_table))[0];
+  const qref = [qr0[6], qr0[7], qr0[8], qr0[9]];
 
   // 2) 한 스텝 야코비안. 전진차분이면 충분하다 — RTI 는 어차피 한 번만 돈다.
   const A = new Array(N), B = new Array(N);
@@ -828,14 +876,14 @@ function rtiSolve(x0, vref, zref){
     for (let c=0;c<NS;c++){
       const h = 1e-6*(1 + Math.abs(xs[k][c]));
       const xp = xs[k].slice(); xp[c] += h;
-      const yp = vStep(xp, uk, C.dt, P);
+      const yp = vStep(xp, uk, C.dts[k], P);
       for (let r=0;r<NS;r++) Ak[r*NS+c] = (yp[r]-base[r])/h;
     }
     for (let c=0;c<m;c++){
       const sc = (c===0) ? Tmax : C.nuMax;
       const h = 1e-6*sc;
       const up = uk.slice(); up[c] += h;
-      const yp = vStep(xs[k], up, C.dt, P);
+      const yp = vStep(xs[k], up, C.dts[k], P);
       for (let r=0;r<NS;r++) Bk[r*m+c] = (yp[r]-base[r])/h;
     }
     A[k] = Ak; B[k] = Bk;
@@ -871,13 +919,20 @@ function rtiSolve(x0, vref, zref){
   for (let k=0;k<N;k++){
     const term = (k === N-1) ? 11 : 1;       // 종단에 10 배를 더한다
     const xn = xs[k+1];
+    // 쿼터니언 이중덮개. q 와 -q 가 같은 자세라, 기준의 부호를 공칭 궤적
+    // 쪽으로 맞추지 않으면 멀쩡한 자세가 '180도 틀렸다' 로 읽힌다.
+    const sgn = (xn[6]*qref[0] + xn[7]*qref[1] + xn[8]*qref[2] + xn[9]*qref[3]) < 0 ? -1 : 1;
     qs[0]=Math.sqrt(C.Qz*term);    eh[0]=qs[0]*(xn[2]-zref);
     qs[1]=Math.sqrt(C.Qv[0]*term); eh[1]=qs[1]*(xn[3]-vref[0]);
     qs[2]=Math.sqrt(C.Qv[1]*term); eh[2]=qs[2]*(xn[4]-vref[1]);
     qs[3]=Math.sqrt(C.Qv[2]*term); eh[3]=qs[3]*(xn[5]-vref[2]);
-    qs[4]=Math.sqrt(C.Qw);         eh[4]=qs[4]*xn[10];
-    qs[5]=Math.sqrt(C.Qw);         eh[5]=qs[5]*xn[11];
-    qs[6]=Math.sqrt(C.Qw);         eh[6]=qs[6]*xn[12];
+    for (let j=0;j<4;j++){
+      qs[4+j]=Math.sqrt(C.Qq*term); eh[4+j]=qs[4+j]*(xn[6+j] - sgn*qref[j]);
+    }
+    // 종단에도 각속도를 벌해 봤는데 되레 나빴다 (|ω| 47.5 -> 83.0). 안 쓴다.
+    qs[8]=Math.sqrt(C.Qw);         eh[8]=qs[8]*xn[10];
+    qs[9]=Math.sqrt(C.Qw);         eh[9]=qs[9]*xn[11];
+    qs[10]=Math.sqrt(C.Qw);        eh[10]=qs[10]*xn[12];
     const Sk = S[k];
     for (let j=0;j<=k;j++){
       const Sj = Sk[j], off = j*NW*m;
@@ -1056,10 +1111,14 @@ const CTRLS = {
                  + "직전 해에서 선형화하고, 압축으로 상태를 소거해 상자제약만 남긴 QP 를 "
                  + "투영 뉴턴으로 푼다. 솔버는 성공했다: 평균 7.4 ms (투영경사 184.7 ms, "
                  + "25배), 같은 비용 수준, 20 Hz 예산 50 ms 에 6.8배 여유. "
-                 + "⚠ 그런데 문제 정의가 아직 비행 가능하지 않다. 제대로 풀고 나니 "
-                 + "해가 각가속도 한계에 계속 붙는다 — 비용의 Qw 가 고도항 앞에서 "
-                 + "너무 약하다. 스윕 12 조합 중 고도를 지킨 것은 하나뿐이고 그것도 "
-                 + "|ω| 37 로 실기 실패선 35 를 넘는다. 다음은 솔버가 아니라 비용함수다."},
+                 + "비용함수도 다시 짰다: 자세 기준(LQR 표의 트림 자세)·등급 시간격자"
+                 + "(30 ms~0.30 s, 지평선 3.3 s)·ν 상한을 INDI 한계 25 로 맞춤·"
+                 + "예측 적분 보폭 0.05 s 제한. 추락하던 것이 고도를 지키며 325 km/h "
+                 + "까지 간다. ⚠ 그래도 |ω| 47.5 로 실기 실패선 35 를 넘는다. "
+                 + "남은 원인은 가중치가 아니라 **가상모델이 ω̇ = ν 를 즉시 이룬다고 "
+                 + "가정**하는 것이다 — 실제 플랜트에는 공력 감쇠·모터 지연·자이로 "
+                 + "결합이 있어 그 약속이 지켜지지 않는다. 지금은 LQR 이 299 km/h 를 "
+                 + "|ω| 3.8 로 깨끗이 낸다."},
   lqr:     {name:"오차상태 LQR (게인표)", ff:true, tilt:55, indi:false, lqr:true,
             note:"속도별로 파이썬에서 ARE 를 미리 풀어 게인표로 구워 왔다 "
                  + "(2.5 m/s 간격 21 점, 폐루프 최대 실수부 -0.18 ~ -0.61 로 전부 안정). "
@@ -1373,7 +1432,13 @@ function controlHybrid(x, cmd){
   //   종속 루프가 고도 오차를 상승률로 바꿔 쓰는 것(clamp +-15)과 같은 처리다.
   const useRti = !!CTRLS[CTRL].rti;
   const SOL = useRti ? RTI : NMPC;
-  const dzCap = VZ_REF_MAX * SOL.N * SOL.dt;
+  // ★ **현재** 속도의 트림을 기준으로 삼는다. 명령 속도로 잡으면 아직 느린
+  //   상태에서 순항 자세(64도)를 요구해 고도 권한을 잃는다 — 종속 루프가
+  //   같은 함정에 빠졌던 자리이고, 여기서도 |ω| 67 로 추락했다.
+  const vNowH = Math.hypot(x[3], x[4]);
+  vTrimRef = Math.min(vNowH, cmd.spd, LQ.V_max_table);
+  const hz = useRti ? RTI.horizon : (NMPC.N * NMPC.dt);
+  const dzCap = VZ_REF_MAX * hz;
   const dz = cmd.alt - x[2];
   const zr = x[2] + (dz > dzCap ? dzCap : (dz < -dzCap ? -dzCap : dz));
   let out;

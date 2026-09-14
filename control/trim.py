@@ -19,7 +19,7 @@ from control.vehicle_params import vehicle_params
 from control.dynamics import AxialDronePlant, NX
 
 
-def find_trim(params, V_cruise):
+def find_trim(params, V_cruise, guess=None, quiet=False):
     """
     수평 순항 트림 조건 탐색.
 
@@ -71,13 +71,18 @@ def find_trim(params, V_cruise):
                 xdot[5],            # v̇_z = 0 (수직 힘 균형)
                 xdot[11]]           # ω̇_y = 0 (피치 모멘트 균형)
 
-    # 초기 추정: 약간 기수 하강, 호버 RPM 근처
-    theta0 = -0.05
-    x0_guess = [theta0, n_hov * 1.01, 0.0]
+    # 초기 추정: 약간 기수 하강, 호버 RPM 근처.
+    # guess 를 주면 그걸 쓴다 — 연속법(trim_continuation)이 직전 해를 넘긴다.
+    # 냉시동으로는 고속에서 fsolve 가 엉뚱한 가지로 빠져 발산한다 (실측:
+    # 로켓 배치 83 m/s 에서 잔차 7.6). 브라우저 쪽은 이미 연속법으로 푼다.
+    if guess is None:
+        x0_guess = [-0.05, n_hov * 1.01, 0.0]
+    else:
+        x0_guess = list(guess)
 
     sol, info, ier, msg = fsolve(residual, x0_guess, full_output=True)
 
-    if ier != 1:
+    if ier != 1 and not quiet:
         print(f"  [경고] 트림 수렴 실패: {msg}")
 
     theta_sol, n_eq_sol, dn_sol = sol
@@ -95,7 +100,24 @@ def find_trim(params, V_cruise):
     xdot_check = plant.evaluate_xdot(x_trim, u_trim)
     res_norm = np.linalg.norm([xdot_check[3], xdot_check[5], xdot_check[11]])
 
+    # ★ 왜 안 됐는지를 남긴다. 상한은 회전수 천장이 아니라 **후방 로터가
+    #   음추력을 요구**하는 데서 온다 (로켓 배치 52.09 m/s 에서 T_rear=0,
+    #   60 m/s 에서 -4.45 N). 그런데 trim_speed_sweep 은 천장만 보므로
+    #   "✗ 수렴 실패" 로만 찍히고 진짜 이유가 감춰졌다.
+    n_front_s = n_eq_sol + dn_sol
+    n_rear_s = n_eq_sol - dn_sol
+    why = ""
+    if n_rear_s < params['n_min'] - 1e-9:
+        why = f"후방 로터가 하한 미만 ({n_rear_s:.1f} < {params['n_min']:.1f}) — 음추력 요구"
+    elif n_front_s > params['n_max'] + 1e-9:
+        why = f"전방 로터가 상한 초과 ({n_front_s:.1f} > {params['n_max']:.1f})"
+    elif res_norm > 1e-6:
+        why = "뉴턴 미수렴"
+
     return {
+        'converged': bool(ier == 1 and res_norm <= 1e-6 and not why),
+        'why':     why,
+        'guess':   [theta_sol, n_eq_sol, dn_sol],
         'state':   x_trim,
         'control': u_trim,
         'theta':   theta_sol,
@@ -106,6 +128,37 @@ def find_trim(params, V_cruise):
         'residual': res_norm,
         'xdot':    xdot_check,
     }
+
+
+def trim_continuation(params, V_cruise, step=5.0, quiet=True):
+    """0 에서 V_cruise 까지 걸어 올라가며 직전 해를 다음 초기값으로 쓴다.
+
+    트림 곡선을 따라가는 표준 방법이다. 냉시동 fsolve 는 고속에서 엉뚱한
+    가지로 빠진다 — 로켓 배치 83 m/s 를 바로 주면 잔차 7.6 으로 발산하고,
+    기수가 뒤를 보는(u_b<0) 가짜 해로 '수렴' 하기도 한다. 그러면 항력이
+    추진력으로 둔갑한다.
+
+    Returns
+    -------
+    (trim, reached) : 마지막으로 성공한 트림과 그때의 속도.
+        reached < V_cruise 면 그 위에는 정상비행점이 없다는 뜻이다.
+    """
+    guess, last, reached = None, None, 0.0
+    v = 0.0
+    while True:
+        v = min(V_cruise, v + step) if v > 0 or step <= V_cruise else V_cruise
+        if v <= 0:
+            v = min(step, V_cruise)
+        tr = find_trim(params, v, guess=guess, quiet=quiet)
+        if not tr['converged']:
+            break
+        last, reached, guess = tr, v, tr['guess']
+        if v >= V_cruise - 1e-9:
+            break
+    if last is None:
+        last = find_trim(params, 0.0, quiet=quiet)
+        reached = 0.0
+    return last, reached
 
 
 def print_trim(trim, V_cruise, params):
