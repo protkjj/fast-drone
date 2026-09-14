@@ -201,6 +201,16 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
   font-variant-numeric:tabular-nums; color:var(--ink)}
 .score .ok{color:var(--ok)} .score .bad{color:var(--bad)} .score .warn{color:var(--warn)}
 .score p{margin:9px 0 0; font-size:11.5px; color:var(--ink-3); line-height:1.55}
+.score p.bad{color:var(--bad)} .score p.warn{color:var(--warn)}
+/* 구간별 표는 값 열이 여럿이라 마지막 열만 우측정렬하는 규칙을 덮어쓴다 */
+.score table.segtab{margin-top:10px}
+.score table.segtab th{font-size:10px; letter-spacing:.04em; color:var(--ink-3);
+  text-align:right; padding:3px 0 4px; font-weight:500; text-transform:uppercase}
+.score table.segtab th:first-child{text-align:left}
+.score table.segtab td{text-align:right; font-family:"IBM Plex Mono",monospace;
+  font-variant-numeric:tabular-nums; color:var(--ink); padding:3px 0}
+.score table.segtab td:first-child{text-align:left; color:var(--ink-3);
+  font-family:inherit}
 .legend3d{position:absolute; right:12px; bottom:12px; display:flex; gap:14px;
   align-items:center; font:400 11.5px/1 "IBM Plex Mono",monospace; color:#7C8A98}
 .legend3d span{display:inline-flex; align-items:center; gap:5px}
@@ -1428,6 +1438,18 @@ function controlHybrid(x, cmd){
 /* ══ 상태 ═════════════════════════════════════════════════════════════ */
 const DT = 0.002;
 let X = D.x0.slice(), T = 0, running = false, sat = 0;
+let lastSatHi = false, lastSatLo = false;   // 천장/바닥 포화, 기록에 같이 담는다
+// ★ 고도 판정의 기준점. 지상 0 m 에서 목표 200 m 를 그대로 기준으로 쓰면
+//   **이륙 자체가 고도 오차 200 m** 로 찍혀 RMSE 가 이륙에 먹히고 발산
+//   판정도 매번 터진다.
+//   공통 램프를 기준으로 두는 안을 먼저 재봤는데 더 나빴다. 제어기마다
+//   상승률이 크게 달라서다 — trim/cascade 는 15 m/s 로 올라 14 초에 닿고,
+//   LQR 은 6.7 m/s 로 32 초에 닿는다. 어떤 램프값을 잡아도 한쪽은 앞질러서,
+//   다른 쪽은 뒤처져서 억울하게 발산으로 찍힌다 (실측: 램프 3/5/8 m/s 에서
+//   최대 기준지연이 각각 160/130/86 m).
+//   그래서 램프를 버리고 **'도달한 뒤 지켰나'** 로 바꾼다. 목표 고도에 한 번
+//   닿기 전은 이륙이지 발산이 아니다.
+let zSettled = false;
 // 슬라이더를 확 올려도 명령은 RAMP [m/s^2] 로 따라간다. 실제 비행이 그렇고,
 // 안 그러면 기체가 즉시 드러누워 화면에서 아무것도 안 읽힌다.
 let cmdSpd = 0;
@@ -1461,7 +1483,7 @@ function windNow(){
    빼면 NMPC 계열만 되감기 재생이 갈린다.                                */
 function ctrlSnap(){
   return {
-    altI: altI, sat: sat,
+    altI: altI, sat: sat, zS: zSettled,
     om: omPrev.slice(), od: omDotF.slice(), mp: Mprev.slice(),
     tV: trimV, tTh: trimTh, tN: trimN, tOK: trimOK,
     nAge: T - nmpcLast, nOut: nmpcOut ? nmpcOut.slice() : null,
@@ -1474,7 +1496,7 @@ function ctrlSnap(){
 }
 function ctrlLoad(c){
   if (!c) return;
-  altI = c.altI; sat = c.sat;
+  altI = c.altI; sat = c.sat; zSettled = c.zS;
   omPrev = c.om.slice(); omDotF = c.od.slice(); Mprev = c.mp.slice();
   trimV = c.tV; trimTh = c.tTh; trimN = c.tN; trimOK = c.tOK;
   // 경과시간으로 되돌린다. 저장 시점에 한 번도 안 풀었으면 nAge 가 아주 커서
@@ -1498,7 +1520,7 @@ function reset(){
   REC.length = 0; viewIdx = null; recAcc = 0;
   // 지상에서 시작한다. 예전엔 목표 고도에 바로 놓고 시작해 이륙 단계가 아예
   // 없었다 — 미션의 첫 구간이 통째로 빠져 있던 셈이다.
-  X = D.x0.slice(); X[2] = 0; T = 0; sat = 0; cmdSpd = 0; altI = 0;
+  X = D.x0.slice(); X[2] = 0; T = 0; sat = 0; cmdSpd = 0; altI = 0; zSettled = false;
   omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;
   nmpcU = null; nmpcLast = -1e9; nmpcOut = null; nmpcApplied = null;
   rtiU = null; rtiLast = -1e9; rtiOut = null; rtiApplied = null; rtiStat = null;
@@ -1815,7 +1837,12 @@ function tick(ts){
       X = rk4(X, u, w, P, DT);
       ground();
       T += DT; budget -= DT;
-      if (u.some(v => v >= P.n_max - 1e-6)) sat = Math.min(1, sat + .02);
+      // 포화는 천장만 보면 안 된다. 할당이 Ti<0 을 0 으로 눕히면 로터가
+      // 완전히 멈추는데(n_min=0) 그건 권한을 잃은 것이지 여유가 아니다.
+      lastSatHi = u.some(v => v >= P.n_max - 1e-6);
+      lastSatLo = u.some(v => v <= P.n_min + 1e-6);
+      if (!zSettled && Math.abs(X[2] - cmd.alt) < 5.0) zSettled = true;
+      if (lastSatHi || lastSatLo) sat = Math.min(1, sat + .02);
       else sat = Math.max(0, sat - .01);
     }
     const d = diag();
@@ -1823,7 +1850,12 @@ function tick(ts){
     if (recAcc >= REC_EVERY || !REC.length){
       recAcc = 0;
       const prev = REC.length ? REC[REC.length-1].cmd : 0;
+      // zr(그때의 목표 고도)를 같이 담는다. 예전엔 채점이 슬라이더의 **지금**
+      // 값을 읽어서, 같은 기록 한 판에 고도 슬라이더만 움직이면 RMSEz 가
+      // 1.23(통과) 에서 198.80(실패) 으로 뒤집혔다. 소급 채점이었다.
+      // satHi/satLo 도 담는다. 바닥 포화(Ti<0 -> n=0)는 지금 화면에 안 뜬다.
       REC.push({t:T, x:X.slice(), cmd:cmdSpd, V:d.gs, al:d.alpha, F:d.F,
+                zr:cmd.alt, st:zSettled, satHi:lastSatHi, satLo:lastSatLo,
                 seg:segNow(d, cmd, prev), cs:ctrlSnap()});
       if (REC.length > 6000) REC.shift();
     }
@@ -1866,44 +1898,130 @@ function drawSegs(){
 // ── 채점 ─────────────────────────────────────────────────────────────
 // 옛 미션 평가와 같은 기준이다. 속도·고도 추종 RMSE 에 **|ω| 를 반드시 함께**
 // 본다 — RMSE 만으로는 텀블을 못 잡는다 (|ω| 79 인데 z 오차 1.46 인 사례가 있었다).
+// 트림 기울임. 기울임 한계는 상수로 재면 안 된다 — 로켓 트림 자체가
+// V=50 에서 63.9도, V=85 에서 80.7도라 상수 70도면 정상 순항이 전부 실패로
+// 찍힌다. 트림 대비 **초과분**으로 재야 뜻이 있다.
+function trimTiltDeg(V){
+  const [xt] = lqrPick(Math.min(V, LQ.V_max_table));
+  const qx=xt[6], qy=xt[7], qz=xt[8], qw=xt[9];
+  return Math.acos(Math.max(-1, Math.min(1, 2*(qx*qz - qy*qw)))) * 180/Math.PI;
+}
+function tiltOf(r){
+  const qx=r.x[6], qy=r.x[7], qz=r.x[8], qw=r.x[9];
+  return Math.acos(Math.max(-1, Math.min(1, 2*(qx*qz - qy*qw)))) * 180/Math.PI;
+}
 function score(){
   const n = REC.length;
   if (n < 20) return null;
-  // 순항 구간만 본다. 상승·가속 중의 오차는 추종 성능이 아니다.
-  const cruise = REC.filter(r => r.seg === "cruise");
-  const use = cruise.length > 20 ? cruise : REC.slice(Math.floor(n * 0.5));
-  let sv = 0, sz = 0, maxOm = 0, maxTilt = 0, over25 = 0;
-  const alt = +$("#alt").value;
-  for (const r of use){
-    sv += (r.V - r.cmd) ** 2;
-    sz += (r.x[2] - alt) ** 2;
+
+  // ★ 발산 판정을 **제일 먼저**. 상태가 NaN 이면 아래 비교가 전부 false 라
+  //   텀블도 추락도 안 잡히고, 엉뚱하게 rmseZ 때문에 실패로 찍힌다.
+  //   파이썬 기준과 같게 |z - z_ref| > 50 도 발산으로 본다
+  //   (control/mission_sim.py:201).
+  let diverged = false, divWhy = "";
+  for (const r of REC){
+    for (let i = 0; i < NX; i++)
+      if (!isFinite(r.x[i])) { diverged = true; divWhy = "상태가 NaN/Inf"; break; }
+    if (diverged) break;
+    // ★ 목표 고도에 한 번 닿은 **뒤**에만 본다. 닿기 전은 이륙이다.
+    if (r.st && Math.abs(r.x[2] - r.zr) > 50){
+      diverged = true; divWhy = "고도에 닿은 뒤 50 m 이탈";
+    }
+    if (diverged) break;
   }
+  const settled = REC.filter(r => r.st);
+
+  // ★ |ω| 판정은 **최장 연속** 구간으로. 파이썬이 그렇게 센다
+  //   (control/acados_fallback_mc.py:76-90 의 run25). 예전엔 총합이었고,
+  //   게다가 `> 0.2` 가 5 샘플에서 IEEE754 상 거짓이라 실효 기준이 240 ms
+  //   였다. 총합과 최장연속은 서로 다른 방향으로 둘 다 틀린다.
+  let maxOm = 0, run = 0, run25 = 0, ms25 = 0;
+  let maxTiltEx = -1e9, maxTilt = 0, satHiN = 0, satLoN = 0;
   for (const r of REC){
     const om = Math.hypot(r.x[10], r.x[11], r.x[12]);
     maxOm = Math.max(maxOm, om);
-    if (om > 25) over25 += REC_EVERY;
-    const qx=r.x[6], qy=r.x[7], qz=r.x[8], qw=r.x[9];
-    maxTilt = Math.max(maxTilt,
-      Math.acos(Math.max(-1, Math.min(1, 2*(qx*qz - qy*qw)))) * 180/Math.PI);
+    if (om > 25){ run += REC_EVERY; ms25 += REC_EVERY; run25 = Math.max(run25, run); }
+    else run = 0;
+    const tl = tiltOf(r);
+    maxTilt = Math.max(maxTilt, tl);
+    maxTiltEx = Math.max(maxTiltEx, tl - trimTiltDeg(r.V));
+    if (r.satHi) satHiN++;
+    if (r.satLo) satLoN++;
   }
-  const rmseV = Math.sqrt(sv / use.length), rmseZ = Math.sqrt(sz / use.length);
-  // 실기 실패 판정 (프로젝트 기준): |ω| > 35 자이로 포화, 또는 |ω| > 25 가 0.2 s 지속
-  const tumble = maxOm > 35 || over25 > 0.2;
+
+  // ★ 구간별로 잰다. 예전엔 순항만 집계했는데, segNow 가 |alt-z|>5 를
+  //   'climb' 으로 걸러낸 **뒤** 순항만 보므로 RMSEz <= 5 가 구조적으로
+  //   보장됐다. 제일 어려운 구간(감속·호버 복귀)이 통째로 빠져 있었다.
+  const segs = {};
+  for (const r of REC){
+    const g = segs[r.seg] || (segs[r.seg] = {n:0, sv:0, sz:0, mz:0, mo:0});
+    g.n++;
+    g.sv += (r.V - r.cmd) ** 2;
+    g.sz += (r.x[2] - r.zr) ** 2;
+    g.mz = Math.max(g.mz, Math.abs(r.x[2] - r.zr));
+    g.mo = Math.max(g.mo, Math.hypot(r.x[10], r.x[11], r.x[12]));
+  }
+  const bySeg = [];
+  for (const k of ["ground","climb","accel","cruise","decel","hover"]){
+    const g = segs[k];
+    if (!g) continue;
+    bySeg.push({seg:k, name:SEGS[k][0], n:g.n,
+                rmseV:Math.sqrt(g.sv/g.n), rmseZ:Math.sqrt(g.sz/g.n),
+                maxZ:g.mz, maxOm:g.mo});
+  }
+  // 대표값은 **정착 이후** 표본으로 낸다. 이륙 구간을 섞으면 RMSE 가
+  // 이륙에 통째로 먹혀 제어기 차이가 안 보인다. 구간별 표에는 이륙도 있다.
+  const use = settled.length > 20 ? settled : REC;
+  let SV = 0, SZ = 0;
+  for (const r of use){ SV += (r.V - r.cmd)**2; SZ += (r.x[2] - r.zr)**2; }
+  const rmseV = Math.sqrt(SV/use.length), rmseZ = Math.sqrt(SZ/use.length);
+  const cruise = segs.cruise;
+  const rmseVc = cruise ? Math.sqrt(cruise.sv/cruise.n) : null;
+  const rmseZc = cruise ? Math.sqrt(cruise.sz/cruise.n) : null;
+
+  const tumble = maxOm > 35 || run25 >= 0.2;
   const crashed = REC.some(r => r.x[2] < 1 && r.t > 20);
-  return {rmseV, rmseZ, maxOm, maxTilt, tumble, crashed,
-          vmax: Math.max(...REC.map(r => r.V)), n: use.length,
-          pass: !tumble && !crashed && rmseZ < 20};
+  // ★ 속도 추종을 판정에 넣는다. 예전엔 없어서, '권장' 제어기가 명령
+  //   83 m/s 에 실측 48.2 m/s(35 m/s 미달) 인데도 통과로 찍혔다.
+  const last = REC[n-1];
+  const vShort = last.cmd - last.V;
+  const vMiss = vShort > Math.max(3.0, 0.1 * Math.max(last.cmd, 1e-9));
+
+  // 판정을 둘로 나눈다.
+  //   비행 건전성 — 기체가 제어 아래 있었나 (제어기 비교의 축)
+  //   미션 달성   — 시킨 일을 해냈나 (300 km/h 목표의 축)
+  // 하나로 묶으면 "로켓이 83 m/s 를 못 낸다" 는 사실이 모든 제어기를 똑같이
+  // 실패로 만들어 제어기 사이의 차이를 덮어 버린다. 둘 다 봐야 한다.
+  const sound = [], miss = [];
+  if (diverged) sound.push("발산 — " + divWhy);
+  if (tumble) sound.push("텀블 — |ω|max " + maxOm.toFixed(1)
+                       + ", 25 초과 최장연속 " + (run25*1000).toFixed(0) + " ms");
+  if (crashed) sound.push("추락 — 고도 1 m 아래");
+  if (satHiN/n > 0.2) sound.push("모터 천장 포화 " + (100*satHiN/n).toFixed(0) + "%");
+  if (satLoN/n > 0.2) sound.push("모터 바닥 포화 " + (100*satLoN/n).toFixed(0) + "%");
+  if (vMiss) miss.push("속도 미달 — 명령 " + last.cmd.toFixed(1)
+                      + " 대비 " + vShort.toFixed(1) + " m/s 부족");
+  if (rmseZ >= 20) miss.push("고도 RMSE " + rmseZ.toFixed(1) + " m");
+
+  return {rmseV, rmseZ, rmseVc, rmseZc, bySeg,
+          maxOm, run25, ms25, maxTilt, maxTiltEx,
+          satHi: satHiN/n, satLo: satLoN/n,
+          tumble, crashed, diverged, divWhy, vMiss, vShort,
+          vmax: Math.max(...REC.map(r => r.V)), n,
+          nCruise: cruise ? cruise.n : 0,
+          nSettled: settled.length, tSettle: settled.length ? settled[0].t : null,
+          sound, miss, why: sound.concat(miss),
+          soundOk: sound.length === 0, pass: sound.length === 0 && miss.length === 0};
 }
 // RMSE 를 시간에 따라. 한 숫자로만 보면 어느 구간이 나빴는지 안 보인다.
 function rmseSeries(win){
   win = win || 25;
   const out = {t:[], v:[], z:[]};
-  const alt = +$("#alt").value;
   for (let i = win; i < REC.length; i++){
     let sv = 0, sz = 0;
     for (let k = i - win; k < i; k++){
       sv += (REC[k].V - REC[k].cmd) ** 2;
-      sz += (REC[k].x[2] - alt) ** 2;
+      sz += (REC[k].x[2] - REC[k].zr) ** 2;   // 그때의 기준값. 슬라이더 지금 값이 아니다
     }
     out.t.push(REC[i].t);
     out.v.push(Math.sqrt(sv / win));
@@ -1942,13 +2060,16 @@ function scoreCsv(){
     + "# 목표속도: " + $("#spd").value + " m/s, 목표고도: " + alt + " m\n"
     + "# 측풍: " + $("#wsp").value + " m/s, 방위 " + $("#wdir").value + " deg\n"
     + "# 계수: " + COEFS.map(([k]) => k + "=" + P[k]).join(", ") + "\n"
-    + "t_s,seg,cmd_mps,V_mps,alt_m,alpha_deg,F_N,omega_rad_s,rmse_v,rmse_z\n";
+    + "t_s,seg,cmd_mps,V_mps,alt_m,z_ref_m,alpha_deg,F_N,omega_rad_s,"
+    + "tilt_deg,sat_hi,sat_lo,rmse_v,rmse_z\n";
   const off = REC.length - S.t.length;
   return head + REC.map((r, i) => {
     const om = Math.hypot(r.x[10], r.x[11], r.x[12]);
     const j = i - off;
     return [r.t.toFixed(3), r.seg, r.cmd.toFixed(3), r.V.toFixed(4),
-            r.x[2].toFixed(3), r.al.toFixed(3), r.F.toFixed(4), om.toFixed(5),
+            r.x[2].toFixed(3), r.zr.toFixed(2), r.al.toFixed(3), r.F.toFixed(4),
+            om.toFixed(5), tiltOf(r).toFixed(2),
+            r.satHi ? 1 : 0, r.satLo ? 1 : 0,
             j >= 0 ? S.v[j].toFixed(4) : "", j >= 0 ? S.z[j].toFixed(4) : ""].join(",");
   }).join("\n") + "\n";
 }
@@ -1961,17 +2082,51 @@ function drawScore(){
     "<p>기록이 모자랍니다. ▶ 로 좀 더 날려보세요.</p>"; return; }
   const row = (k, v, cls) => "<tr><td>" + k + "</td><td"
     + (cls ? " class='" + cls + "'" : "") + ">" + v + "</td></tr>";
-  $("#scoreBody").innerHTML = "<table>"
+  const pct = v => (100*v).toFixed(0) + "%";
+  let html = "<table>"
     + row("최고 속도", s2.vmax.toFixed(1) + " m/s · " + (s2.vmax*3.6).toFixed(0) + " km/h")
-    + row("속도 RMSE", s2.rmseV.toFixed(2) + " m/s", s2.rmseV < 3 ? "ok" : "warn")
-    + row("고도 RMSE", s2.rmseZ.toFixed(2) + " m", s2.rmseZ < 5 ? "ok" : (s2.rmseZ < 20 ? "warn" : "bad"))
-    + row("최대 |ω|", s2.maxOm.toFixed(2) + " rad/s", s2.tumble ? "bad" : "ok")
-    + row("최대 기울임", s2.maxTilt.toFixed(0) + "°")
+    + row("속도 RMSE (전 구간)", s2.rmseV.toFixed(2) + " m/s", s2.rmseV < 3 ? "ok" : "warn")
+    + row("고도 RMSE (전 구간)", s2.rmseZ.toFixed(2) + " m",
+          s2.rmseZ < 5 ? "ok" : (s2.rmseZ < 20 ? "warn" : "bad"))
+    + row("최대 |ω|", s2.maxOm.toFixed(2) + " rad/s", s2.maxOm > 35 ? "bad" : "ok")
+    + row("|ω|&gt;25 최장연속", (s2.run25*1000).toFixed(0) + " ms"
+          + (s2.ms25 > s2.run25 + 1e-9 ? " (총합 " + (s2.ms25*1000).toFixed(0) + ")" : ""),
+          s2.run25 >= 0.2 ? "bad" : "ok")
+    + row("기울임 (트림 대비)", s2.maxTilt.toFixed(0) + "° · 초과 "
+          + (s2.maxTiltEx >= 0 ? "+" : "") + s2.maxTiltEx.toFixed(0) + "°",
+          s2.maxTiltEx > 15 ? "bad" : (s2.maxTiltEx > 8 ? "warn" : "ok"))
+    + row("모터 포화 (천장/바닥)", pct(s2.satHi) + " / " + pct(s2.satLo),
+          (s2.satHi + s2.satLo) > 0.2 ? "bad" : ((s2.satHi + s2.satLo) > 0.02 ? "warn" : "ok"))
     + row("지면 접촉", s2.crashed ? "있음" : "없음", s2.crashed ? "bad" : "ok")
-    + row("판정", s2.pass ? "통과" : "실패", s2.pass ? "ok" : "bad")
-    + "</table>"
-    + "<p>순항 구간 " + s2.n + " 샘플. <b>RMSE 만 보면 안 됩니다</b> — 텀블은 "
-    + "|ω| 로만 잡힙니다. 실기 실패 기준은 |ω| &gt; 35 rad/s 또는 25 초과가 0.2 s 지속입니다.</p>";
+    + row("발산", s2.diverged ? s2.divWhy : "없음", s2.diverged ? "bad" : "ok")
+    + row("비행 건전성", s2.soundOk ? "통과" : "실패", s2.soundOk ? "ok" : "bad")
+    + row("미션 달성", s2.pass ? "통과" : "실패", s2.pass ? "ok" : "warn")
+    + "</table>";
+  if (s2.sound.length)
+    html += "<p class='bad'><b>건전성 실패</b><br>· " + s2.sound.join("<br>· ") + "</p>";
+  if (s2.miss.length)
+    html += "<p class='warn'><b>미션 미달</b><br>· " + s2.miss.join("<br>· ") + "</p>";
+  if (s2.bySeg.length > 1){
+    html += "<table class='segtab'><tr><th>구간</th><th>표본</th>"
+          + "<th>RMSE v</th><th>RMSE z</th><th>최대 Δz</th><th>|ω|max</th></tr>";
+    for (const g of s2.bySeg)
+      html += "<tr><td>" + g.name + "</td><td>" + g.n + "</td><td>"
+            + g.rmseV.toFixed(2) + "</td><td>" + g.rmseZ.toFixed(2) + "</td><td>"
+            + g.maxZ.toFixed(1) + "</td><td>" + g.maxOm.toFixed(1) + "</td></tr>";
+    html += "</table>";
+  }
+  html += "<p>전 구간 " + s2.n + " 샘플 · 대표값은 <b>목표 고도 도달 이후</b> "
+    + s2.nSettled + " 샘플로 냅니다"
+    + (s2.tSettle !== null ? " (도달 t=" + s2.tSettle.toFixed(0) + " s)" : " — 아직 도달 못함")
+    + ".</p>"
+    + "<p><b>왜 구간별로 보나.</b> 예전에는 순항 구간만 집계했는데, 구간 판정이 "
+    + "고도 오차 5 m 초과를 '상승' 으로 걸러낸 <b>뒤</b> 순항만 보므로 "
+    + "고도 RMSE 가 5 이하로 <b>구조적으로 보장</b>됐습니다. 제일 어려운 "
+    + "구간(감속·호버 복귀)이 통째로 빠져 있었습니다.</p>"
+    + "<p><b>RMSE 만 보면 안 됩니다</b> — 텀블은 |ω| 로만 잡힙니다. 실기 실패 "
+    + "기준은 |ω| &gt; 35 rad/s 또는 25 초과가 <b>연속</b> 200 ms 이상입니다 "
+    + "(총합이 아니라 최장연속 — 파이썬 판정과 같은 정의).</p>";
+  $("#scoreBody").innerHTML = html;
 }
 function paint(d){
   render3D(d);
