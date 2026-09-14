@@ -641,7 +641,7 @@ void AeroPlugin::OpenDebugCsv() {
              << "t,qx,qy,qz,qw,vaWx,vaWy,vaWz,owWx,owWy,owWz,"
              << "u,v,w,p,q,r,V,V_cf,alpha,q_bar,C_A,C_N,x_cp,"
              << "Fx,Fy,Fz,Mx,My,Mz,fWx,fWy,fWz,mWx,mWy,mWz,"
-             << "vLx,vLy,vLz,oLx,oLy,oLz,wWx,wWy,wWz\n";
+             << "vLx,vLy,vLz,oLx,oLy,oLz,wWx,wWy,wWz,pWx,pWy,pWz\n";
   gzmsg << "[fast_drone_aero] 디버그 CSV: " << debug_csv_path_ << " (매 "
         << debug_every_ << " 스텝)\n";
 }
@@ -669,7 +669,10 @@ void AeroPlugin::LogDebugCsv(double _t, const gz::math::Pose3d &_pose,
              << ',' << _vLm.X() << ',' << _vLm.Y() << ',' << _vLm.Z()
              << ',' << _oLm.X() << ',' << _oLm.Y() << ',' << _oLm.Z()
              << ',' << wind_world_.X() << ',' << wind_world_.Y() << ','
-             << wind_world_.Z() << '\n';
+             << wind_world_.Z()
+             // 위치. 웹에서 비행을 3D 로 되감으려면 있어야 한다.
+             << ',' << _pose.Pos().X() << ',' << _pose.Pos().Y() << ','
+             << _pose.Pos().Z() << '\n';
 }
 
 }  // namespace fast_drone

@@ -16,7 +16,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt   # noqa: E402
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from check_real_vehicle import load, load_table   # noqa: E402
+from aero_log import load, load_table, Flight, verdict   # noqa: E402, F401
 
 
 def table_curve(tbl, V, n=181):
