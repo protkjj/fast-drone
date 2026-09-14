@@ -172,6 +172,11 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
 .segbar{height:26px; border-top:1px solid var(--rule); background:var(--stage-2);
   display:flex; align-items:stretch; position:relative; overflow:hidden}
 .segbar i{display:block; height:100%}
+.segbar{cursor:col-resize}
+.segbar .head{position:absolute; top:0; bottom:0; width:2px; background:#fff;
+  box-shadow:0 0 6px rgba(255,255,255,.8); pointer-events:none; margin-left:-1px}
+.segbar .leg{margin-left:16px; display:inline-flex; gap:9px; opacity:.8}
+.segbar .leg span{margin-right:2px}
 .segbar .lab{position:absolute; left:10px; top:0; bottom:0; display:flex;
   align-items:center; gap:12px; pointer-events:none;
   font:400 10.5px/1 "IBM Plex Mono",monospace; letter-spacing:.08em; color:#c8d2dd;
@@ -569,7 +574,12 @@ let X = D.x0.slice(), T = 0, running = false, sat = 0;
 // 슬라이더를 확 올려도 명령은 RAMP [m/s^2] 로 따라간다. 실제 비행이 그렇고,
 // 안 그러면 기체가 즉시 드러누워 화면에서 아무것도 안 읽힌다.
 let cmdSpd = 0;
-const HIST = {t:[], V:[], al:[], F:[], cmd:[], seg:[]};
+// 기록. 상태까지 담아 **시간을 앞뒤로 오갈 수 있게** 한다.
+// 되감아서 재생을 누르면 그 지점부터 다시 난다 (뒤 기록은 버린다).
+const REC = [];
+let viewIdx = null;        // null = 실시간, 숫자 = 그 프레임을 보는 중
+const REC_EVERY = 0.04;    // [s] 기록 간격
+let recAcc = 0;
 function cmdNow(){
   return {spd:cmdSpd, alt:+$("#alt").value, psi:0, target:+$("#spd").value};
 }
@@ -578,12 +588,12 @@ function windNow(){
   return [s*Math.cos(d), s*Math.sin(d), 0];
 }
 function reset(){
+  REC.length = 0; viewIdx = null; recAcc = 0;
   // 지상에서 시작한다. 예전엔 목표 고도에 바로 놓고 시작해 이륙 단계가 아예
   // 없었다 — 미션의 첫 구간이 통째로 빠져 있던 셈이다.
   X = D.x0.slice(); X[2] = 0; T = 0; sat = 0; cmdSpd = 0; altI = 0;
   trailN = 0;
   if (trail) trail.geometry.setDrawRange(0, 0);
-  for (const k in HIST) HIST[k].length = 0;
 }
 // 지면. 아래로 뚫고 내려가지 않게 막고, 닿아 있으면 수직속도를 죽인다.
 function ground(){
@@ -867,43 +877,59 @@ function tick(ts){
       else sat = Math.max(0, sat - .01);
     }
     const d = diag();
-    HIST.t.push(T); HIST.V.push(d.gs); HIST.al.push(d.alpha);
-    HIST.F.push(d.F); HIST.cmd.push(cmdSpd);
-    HIST.seg.push(segNow(d, cmd, HIST.cmd.length > 1
-                  ? HIST.cmd[HIST.cmd.length-2] : 0));
-    if (HIST.t.length > 900) for (const k in HIST) HIST[k].shift();
+    recAcc += dtReal * rtf;
+    if (recAcc >= REC_EVERY || !REC.length){
+      recAcc = 0;
+      const prev = REC.length ? REC[REC.length-1].cmd : 0;
+      REC.push({t:T, x:X.slice(), cmd:cmdSpd, V:d.gs, al:d.alpha, F:d.F,
+                seg:segNow(d, cmd, prev)});
+      if (REC.length > 6000) REC.shift();
+    }
     paint(d);
   }
 }
 function toggleRun(){
+  // 되감아 둔 상태에서 재생하면 그 지점부터 이어 난다. 뒤 기록은 버린다.
+  if (!running && viewIdx !== null){
+    REC.length = viewIdx + 1;
+    X = REC[viewIdx].x.slice();
+    T = REC[viewIdx].t;
+    cmdSpd = REC[viewIdx].cmd;
+    viewIdx = null;
+  }
   running = !running;
   $("#go").textContent = running ? "❚❚ 정지  (Space)" : "▶ 시작  (Space)";
   lastFrame = 0;
 }
+function curIdx(){ return viewIdx === null ? REC.length - 1 : viewIdx; }
 function drawSegs(){
   const bar = $("#segbar");
-  const n = HIST.seg.length;
-  if (!n){ bar.innerHTML = ""; return; }
-  // 같은 구간이 이어지면 하나로 묶어 그린다.
+  const n = REC.length;
+  if (!n){ bar.innerHTML = "<div class='lab'>기록 없음 — ▶ 를 누르세요</div>"; return; }
   let html = "", run = 1;
   for (let i = 1; i <= n; i++){
-    if (i < n && HIST.seg[i] === HIST.seg[i-1]){ run++; continue; }
-    const key = HIST.seg[i-1], c = SEGS[key] || SEGS.ground;
+    if (i < n && REC[i].seg === REC[i-1].seg){ run++; continue; }
+    const c = SEGS[REC[i-1].seg] || SEGS.ground;
     html += "<i style='flex:" + run + ";background:" + c[1] + "'></i>";
     run = 1;
   }
-  const cur = SEGS[HIST.seg[n-1]] || SEGS.ground;
-  bar.innerHTML = html + "<div class='lab'><b>" + cur[0] + "</b>"
-    + Object.values(SEGS).map(c =>
-        "<span style='color:" + c[1] + "'>■</span> " + c[0]).join(" ")
-    + "</div>";
+  const i = curIdx(), cur = SEGS[REC[i].seg] || SEGS.ground;
+  const pct = n > 1 ? (i / (n - 1)) * 100 : 0;
+  bar.innerHTML = html
+    + "<div class='head' style='left:" + pct + "%'></div>"
+    + "<div class='lab'><b>" + cur[0] + "</b> "
+    + REC[i].t.toFixed(1) + " s"
+    + (viewIdx !== null ? " · 되감기" : "")
+    + "<span class='leg'>" + Object.values(SEGS).map(c =>
+        "<span style='color:" + c[1] + "'>■</span>" + c[0]).join(" ") + "</span></div>";
 }
 function paint(d){
   render3D(d);
   drawSegs();
-  plot("#p1", HIST.V, HIST.cmd);
-  plot("#p2", HIST.al);
-  plot("#p3", HIST.F);
+  const upto = curIdx() + 1;
+  plot("#p1", REC.slice(0, upto).map(r => r.V), REC.slice(0, upto).map(r => r.cmd));
+  plot("#p2", REC.slice(0, upto).map(r => r.al));
+  plot("#p3", REC.slice(0, upto).map(r => r.F));
   const W = P.mass * P.g;
   const cmd = cmdNow();
   $("#hud").innerHTML =
@@ -1028,6 +1054,31 @@ function initUI(){
   });
   addEventListener("resize", () => { resize3D(); paint(diag()); });
 }
+// 구간 띠를 타임라인으로 쓴다. 끌면 그 시점의 기록을 보여주고, 재생을 누르면
+// **그 지점부터 다시 난다** (뒤 기록은 버린다). 조건을 바꿔 다시 돌려보는
+// 흐름이 자연스러워진다.
+function bindTimeline(){
+  const bar = $("#segbar");
+  let on = false;
+  const pick = e => {
+    if (!REC.length) return;
+    const r = bar.getBoundingClientRect();
+    const f = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    viewIdx = Math.round(f * (REC.length - 1));
+    if (running){ running = false; $("#go").textContent = "▶ 시작  (Space)"; }
+    X = REC[viewIdx].x.slice();
+    T = REC[viewIdx].t;
+    paint(diag());
+  };
+  bar.addEventListener("pointerdown", e => {
+    on = true; bar.setPointerCapture(e.pointerId); pick(e);
+  });
+  bar.addEventListener("pointermove", e => { if (on) pick(e); });
+  bar.addEventListener("pointerup", e => {
+    on = false; bar.releasePointerCapture(e.pointerId);
+  });
+}
+
 function bindGrips(){
   for (const [id, varName, side] of [["#gripL", "--colL", 1], ["#gripR", "--colR", -1]]){
     const el = $(id);
@@ -1062,6 +1113,7 @@ function bindGrips(){
 
 init3D();
 bindGrips();
+bindTimeline();
 reset();
 initUI();
 paint(diag());
