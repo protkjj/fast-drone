@@ -22,6 +22,30 @@ PAGES = [
      "표의 특성 곡선과 실기체 비행 결과. 계수를 만져보고 검증 상태를 확인합니다."),
 ]
 
+# 페이지에서 목록으로 돌아가는 길. Artifact 판에는 목록이 없으므로 **사이트를
+# 조립할 때만** 넣는다. 두 페이지의 머리글 구조가 달라서, 있으면 머리글 안에
+# 끼우고 없으면 화면 구석에 띄운다.
+NAV = """
+<style>
+#site-home{display:inline-flex;align-items:center;gap:6px;text-decoration:none;
+ padding:5px 11px;border:1px solid #2C3A48;border-radius:999px;background:#18212B;
+ color:#AEBAC6;font:500 12px/1 "IBM Plex Sans",Arial,sans-serif;white-space:nowrap}
+#site-home:hover{border-color:#F2AA4C;color:#EEF2F6}
+#site-home:focus-visible{outline:2px solid #F2AA4C;outline-offset:2px}
+#site-home.float{position:fixed;left:14px;bottom:14px;z-index:9999}
+</style>
+<script>
+(function(){
+  var a = document.createElement("a");
+  a.id = "site-home"; a.href = "./"; a.textContent = "\u2190 목록";
+  a.setAttribute("aria-label", "페이지 목록으로");
+  var h = document.querySelector("header");
+  if (h) { h.insertBefore(a, h.firstChild); a.style.marginRight = "14px"; }
+  else { a.className = "float"; document.body.appendChild(a); }
+})();
+</script>
+"""
+
 INDEX = """<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -77,7 +101,14 @@ def main():
         if not f.is_file():
             missing.append(src)
             continue
-        shutil.copy2(f, site / dst)
+        # 되돌아가기 링크를 끼워 넣는다. </body> 바로 앞이면 본문이 다 만들어진
+        # 뒤라 머리글을 찾을 수 있다.
+        html = f.read_text(encoding="utf-8")
+        if "</body>" in html:
+            html = html.replace("</body>", NAV + "\n</body>", 1)
+        else:
+            html += NAV
+        (site / dst).write_text(html, encoding="utf-8")
         cards.append(f'<a class="card" href="{dst}"><h2>{title}</h2>'
                      f'<p>{desc}</p><span class="go">열기 →</span></a>')
     if not cards:
