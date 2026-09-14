@@ -213,7 +213,7 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
       <input type="range" id="spd" min="0" max="120" step="1" value="83"></div>
     <div class="fld"><div class="row"><label for="alt">목표 고도</label>
       <output id="o_alt"></output></div>
-      <input type="range" id="alt" min="10" max="200" step="5" value="60"></div>
+      <input type="range" id="alt" min="10" max="400" step="10" value="200"></div>
     <div class="fld"><div class="row"><label for="wsp">측풍</label>
       <output id="o_wsp"></output></div>
       <input type="range" id="wsp" min="0" max="40" step="1" value="0"></div>
