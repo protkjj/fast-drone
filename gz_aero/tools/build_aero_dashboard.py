@@ -245,26 +245,12 @@ TEMPLATE = r"""<title>축대칭 동체 공력 계수</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
 :root{
-  --ground:#f5f7fa; --panel:#ffffff; --panel-2:#e9edf3; --rule:#d5dbe4;
-  --ink:#0f141b; --ink-2:#4b5665; --ink-3:#7a8697;
-  --s1:#2a78d6; --s2:#eb6834; --ok:#0f8d61; --warn:#a87200; --bad:#c93a39;
-  --grid:#e3e8ef;
-  color-scheme:light;
-}
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --ground:#11151b; --panel:#181d25; --panel-2:#212934; --rule:#2b333f;
-    --ink:#e9eef5; --ink-2:#a6b2c2; --ink-3:#78859a;
-    --s1:#3987e5; --s2:#d95926; --ok:#199e70; --warn:#c98500; --bad:#e66767;
-    --grid:#242c37;
-    color-scheme:dark;
-  }
-}
-:root[data-theme="dark"]{
-  --ground:#11151b; --panel:#181d25; --panel-2:#212934; --rule:#2b333f;
-  --ink:#e9eef5; --ink-2:#a6b2c2; --ink-3:#78859a;
-  --s1:#3987e5; --s2:#d95926; --ok:#199e70; --warn:#c98500; --bad:#e66767;
-  --grid:#242c37;
+  /* 계기판 세계로 확실히 잡은 단일 테마 (시뮬레이터와 같은 토큰). */
+  --ground:#101820; --panel:#18212B; --panel-2:#202B37; --rule:#2C3A48;
+  --ink:#EEF2F6; --ink-2:#AEBAC6; --ink-3:#7C8A98;
+  --accent:#F2AA4C;
+  --s1:#c17f2a; --s2:#2d94bd; --ok:#4fb894; --warn:#F2AA4C; --bad:#e0766a;
+  --grid:#1E2A35;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -715,18 +701,18 @@ function init3D(){
   //   사고가 잦은 자리라, 변환을 아예 안 하는 쪽을 골랐다.
   const cam = new THREE.PerspectiveCamera(52, host.clientWidth / H, 0.5, 40000);
   cam.up.set(0, 0, 1);
-  sc.add(new THREE.HemisphereLight(0xffffff, 0x404050, 1.15));
+  sc.add(new THREE.HemisphereLight(0xdfe8f2, 0x141c26, 1.15));
   const sun = new THREE.DirectionalLight(0xffffff, .75);
   sun.position.set(-1, -2, 3); sc.add(sun);
 
-  const grid = new THREE.GridHelper(4000, 80, 0x5a6270, 0x5a6270);
+  const grid = new THREE.GridHelper(4000, 80, 0x35495d, 0x1c2733);
   grid.rotation.x = Math.PI / 2;
   grid.material.opacity = .35; grid.material.transparent = true;
   sc.add(grid);
 
   // 기체. 장축 = 링크 +X (DESIGN.md 9 장에서 확정한 축).
-  const skin = new THREE.MeshStandardMaterial({color:0x222a35, roughness:.55, metalness:.25});
-  const tip  = new THREE.MeshStandardMaterial({color:0xd8402f, roughness:.5});
+  const skin = new THREE.MeshStandardMaterial({color:0x1b2530, roughness:.45, metalness:.35});
+  const tip  = new THREE.MeshStandardMaterial({color:0xb8802f, roughness:.45});
   const veh = new THREE.Group();
   const body = new THREE.Mesh(new THREE.CylinderGeometry(.075, .075, .78, 28), skin);
   body.rotation.z = -Math.PI / 2; veh.add(body);
@@ -742,11 +728,11 @@ function init3D(){
   const path = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints(
       f.px.map((x, i) => new THREE.Vector3(x, f.py[i], f.pz[i]))),
-    new THREE.LineBasicMaterial({color:0x3987e5}));
+    new THREE.LineBasicMaterial({color:0x2d94bd}));
   sc.add(path);
 
   const arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0),
-    new THREE.Vector3(), 1, 0xeb6834, .6, .35);
+    new THREE.Vector3(), 1, 0xf2aa4c, .6, .35);
   sc.add(arrow);
 
   let i = 0, playing = false, last = 0;

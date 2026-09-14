@@ -63,29 +63,14 @@ TEMPLATE = r"""<title>축대칭 동체 비행 시뮬레이터</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
 :root{
-  --ground:#f5f7fa; --panel:#ffffff; --panel-2:#eef1f6; --rule:#d5dbe4;
-  --stage:#0d1117; --stage-2:#161c25;
-  --ink:#0f141b; --ink-2:#4b5665; --ink-3:#7a8697;
-  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
-  --ok:#0f8d61; --warn:#a87200; --bad:#c93a39; --grid:#e3e8ef;
-  color-scheme:light;
-}
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --ground:#0f131a; --panel:#161b23; --panel-2:#1e242e; --rule:#2a313c;
-    --stage:#090c11; --stage-2:#12171f;
-    --ink:#e9eef5; --ink-2:#a6b2c2; --ink-3:#78859a;
-    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
-    --ok:#199e70; --warn:#c98500; --bad:#e66767; --grid:#222932;
-    color-scheme:dark;
-  }
-}
-:root[data-theme="dark"]{
-  --ground:#0f131a; --panel:#161b23; --panel-2:#1e242e; --rule:#2a313c;
-  --stage:#090c11; --stage-2:#12171f;
-  --ink:#e9eef5; --ink-2:#a6b2c2; --ink-3:#78859a;
-  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
-  --ok:#199e70; --warn:#c98500; --bad:#e66767; --grid:#222932;
+  /* 계기판 세계로 확실히 잡은 단일 테마. 밝은 변형을 두지 않는 대신
+     배경과 모든 색을 명시해 어느 환경에서도 그대로 선다. */
+  --ground:#101820; --panel:#18212B; --panel-2:#202B37; --rule:#2C3A48;
+  --stage:#0A0F15; --stage-2:#141C25;
+  --ink:#EEF2F6; --ink-2:#AEBAC6; --ink-3:#7C8A98;
+  --accent:#F2AA4C;
+  --s1:#c17f2a; --s2:#2d94bd; --s3:#4fb894;
+  --ok:#4fb894; --warn:#F2AA4C; --bad:#e0766a; --grid:#1E2A35;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -128,15 +113,15 @@ header .sub{color:var(--ink-3); font-size:12.5px}
 .fld .row{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
 .fld label{font-size:12.5px; color:var(--ink-2)}
 .fld output{font:600 14px/1 "IBM Plex Mono",monospace; color:var(--ink)}
-input[type=range]{width:100%; margin:5px 0 0; accent-color:var(--s1)}
-input[type=range]:focus-visible{outline:2px solid var(--s1); outline-offset:3px}
+input[type=range]{width:100%; margin:5px 0 0; accent-color:var(--accent)}
+input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
 
 .btns{display:flex; gap:8px; margin:4px 0 16px}
 .btns button{flex:1; padding:9px 8px; border:1px solid var(--rule);
   border-radius:8px; background:var(--panel-2); color:var(--ink); cursor:pointer;
   font:600 13px/1 "IBM Plex Sans",sans-serif}
-.btns button.go{background:var(--s1); border-color:var(--s1); color:#fff}
-.btns button:focus-visible{outline:2px solid var(--s1); outline-offset:2px}
+.btns button.go{background:var(--accent); border-color:var(--accent); color:#101820}
+.btns button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 
 .gauges{display:grid; grid-template-columns:1fr 1fr; gap:1px;
   background:var(--rule); border:1px solid var(--rule); border-radius:9px;
@@ -153,27 +138,27 @@ input[type=range]:focus-visible{outline:2px solid var(--s1); outline-offset:3px}
 #view{position:relative; min-height:0}
 #view canvas{display:block}
 .hud{position:absolute; left:14px; top:12px; pointer-events:none;
-  font:400 12px/1.65 "IBM Plex Mono",monospace; color:#cfd8e6;
+  font:400 12px/1.65 "IBM Plex Mono",monospace; color:#D3DCE6;
   text-shadow:0 1px 3px rgba(0,0,0,.8)}
-.hud b{color:#fff; font-weight:600}
+.hud b{color:#ffffff; font-weight:600}
 .viewbtns{position:absolute; right:12px; top:12px; display:flex; gap:6px}
-.viewbtns button{padding:5px 10px; border:1px solid #2b3644; border-radius:7px;
-  background:rgba(18,23,31,.85); color:#c6d0de; cursor:pointer;
+.viewbtns button{padding:5px 10px; border:1px solid #2C3A48; border-radius:7px;
+  background:rgba(10,15,21,.9); color:#AEBAC6; cursor:pointer;
   font:500 12px/1 "IBM Plex Sans",sans-serif}
-.viewbtns button[aria-pressed=true]{border-color:#3987e5; color:#fff}
-.viewbtns button:focus-visible{outline:2px solid #3987e5; outline-offset:2px}
+.viewbtns button[aria-pressed=true]{border-color:#F2AA4C; color:#ffffff}
+.viewbtns button:focus-visible{outline:2px solid #F2AA4C; outline-offset:2px}
 .legend3d{position:absolute; right:12px; bottom:12px; display:flex; gap:14px;
-  align-items:center; font:400 11.5px/1 "IBM Plex Mono",monospace; color:#8e9bad}
+  align-items:center; font:400 11.5px/1 "IBM Plex Mono",monospace; color:#7C8A98}
 .legend3d span{display:inline-flex; align-items:center; gap:5px}
 .legend3d i{width:12px; height:3px; border-radius:2px; display:inline-block}
 .warnbox{position:absolute; left:14px; bottom:34px; right:14px;
-  pointer-events:none; font-size:12.5px; color:#ffd9a8}
+  pointer-events:none; font-size:12.5px; color:#F2AA4C}
 .plots{border-top:1px solid var(--rule); background:var(--stage-2);
   display:grid; grid-template-columns:1fr 1fr 1fr; gap:1px}
 .plots figure{margin:0; background:var(--stage); padding:8px 10px 4px;
   min-width:0}
 .plots figcaption{font:400 10.5px/1.3 "IBM Plex Mono",monospace;
-  color:#8794a6; letter-spacing:.06em; text-transform:uppercase}
+  color:#7C8A98; letter-spacing:.06em; text-transform:uppercase}
 .plots canvas{width:100%; display:block}
 @media(max-width:760px){.plots{grid-template-columns:1fr}
   .stage{grid-template-rows:340px auto}}
@@ -236,8 +221,8 @@ input[type=range]:focus-visible{outline:2px solid var(--s1); outline-offset:3px}
         <button type="button" id="reset3d">시점 초기화</button>
       </div>
       <div class="legend3d">
-        <span><i style="background:#eb6834"></i>공력</span>
-        <span><i style="background:#3987e5"></i>속도</span>
+        <span><i style="background:#f2aa4c"></i>공력</span>
+        <span><i style="background:#2d94bd"></i>속도</span>
         <span>끌기 = 회전 · 휠 = 확대 · Shift+끌기 = 이동</span>
       </div>
       <div class="warnbox" id="warn"></div></div>
@@ -491,6 +476,7 @@ function diag(){
 
 /* ══ 3D ═══════════════════════════════════════════════════════════════ */
 let ren, scene, cam, veh, arrow, velArrow, trail, trailPos, trailN = 0;
+const PROPS = [];   // 프로펠러를 실제 회전수만큼 돌린다
 // RViz 처럼 마우스로 궤도·이동·확대. OrbitControls 는 three 핵심 번들에 없어서
 // 직접 쓴다 (CDN 에서 따로 받으면 막힐 수 있다).
 const ORB = {az: -2.3, el: 0.38, dist: 26, follow: true,
@@ -501,60 +487,82 @@ function init3D(){
   ren.setPixelRatio(Math.min(devicePixelRatio, 2));
   host.appendChild(ren.domElement);
   scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x0d1117, 120, 900);
+  scene.fog = new THREE.Fog(0x0a0f15, 140, 1000);
   cam = new THREE.PerspectiveCamera(52, 1, .5, 5000);
   cam.up.set(0, 0, 1);      // 월드는 z-up. 쿼터니언을 변환하지 않는다.
-  scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x1a2030, 1.2));
+  scene.add(new THREE.HemisphereLight(0xdfe8f2, 0x141c26, 1.15));
   const sun = new THREE.DirectionalLight(0xffffff, .8);
   sun.position.set(-1,-2,3); scene.add(sun);
 
-  const g1 = new THREE.GridHelper(3000, 120, 0x39465a, 0x232d3c);
+  const g1 = new THREE.GridHelper(3000, 120, 0x35495d, 0x1c2733);
   g1.rotation.x = Math.PI/2; scene.add(g1);
 
-  const skin = new THREE.MeshStandardMaterial({color:0x2f3945, roughness:.5, metalness:.35});
-  const tip = new THREE.MeshStandardMaterial({color:0xd8402f, roughness:.4});
-  const prop = new THREE.MeshStandardMaterial({color:0x18202b, roughness:.7,
-                 transparent:true, opacity:.55, side:THREE.DoubleSide});
+  // 레드불 레이싱 드론 배치. 어뢰형 동체가 수평이고 주황 X암이 동체를 감싼다.
+  // 로터 추력은 동체축과 수직 — dynamics.py 의 V_axial = -w_b 가 이 배치다.
+  // 물리는 처음부터 이랬고, 예전엔 프로펠러를 반투명 통짜 원판으로 그려서
+  // 동체를 덮는 덩어리처럼 보였을 뿐이다.
+  const skin = new THREE.MeshStandardMaterial({color:0x1b2530, roughness:.42, metalness:.4});
+  const accent = new THREE.MeshStandardMaterial({color:0xb8802f, roughness:.45, metalness:.25});
+  const dark = new THREE.MeshStandardMaterial({color:0x0c131a, roughness:.6, metalness:.3});
+  const blade = new THREE.MeshStandardMaterial({color:0x18222c, roughness:.65,
+                  transparent:true, opacity:.5, side:THREE.DoubleSide});
 
-  // 동체는 **링크 +X 가 기수** (DESIGN.md 9 장에서 확정). 동체 z 는 아래,
-  // 로터 추력은 동체 -z 이므로 디스크는 z 가 음수 쪽에 놓인다.
   veh = new THREE.Group();
-  const fus = new THREE.Mesh(new THREE.CylinderGeometry(.075, .075, .82, 30), skin);
+  // CapsuleGeometry 는 three r128 에 없다 (r140 대에 들어왔다). 원통 + 구 캡으로
+  // 만든다. 최신 API 를 그냥 쓰면 페이지가 통째로 죽는다 — 실제로 그랬다.
+  const fus = new THREE.Mesh(new THREE.CylinderGeometry(.075, .075, .68, 26), skin);
   fus.rotation.z = -Math.PI/2; veh.add(fus);
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(.075, .30, 30), tip);
-  cone.rotation.z = -Math.PI/2; cone.position.x = .56; veh.add(cone);
-  const tail = new THREE.Mesh(new THREE.CylinderGeometry(.062, .05, .10, 24), skin);
-  tail.rotation.z = -Math.PI/2; tail.position.x = -.46; veh.add(tail);
+  for (const sx of [.34, -.34]){
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(.075, 26, 16), skin);
+    cap.position.x = sx; veh.add(cap);
+  }
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(.0775, .0775, .075, 26), accent);
+  band.rotation.z = -Math.PI/2; band.position.x = .17; veh.add(band);
+  const duct = new THREE.Mesh(new THREE.CylinderGeometry(.062, .07, .10, 24), dark);
+  duct.rotation.z = -Math.PI/2; duct.position.x = -.44; veh.add(duct);
 
-  const ARM = 0.25 / Math.SQRT2;      // vehicle_params 의 arm/√2 = 0.1768
+  const ARM = 0.25 / Math.SQRT2;              // vehicle_params: arm/√2 = 0.1768
+  const RPROP = 0.30 / 2;                     // D_prop = 0.30 m
+  PROPS.length = 0;
   for (const ph of [Math.PI/4, 3*Math.PI/4, -3*Math.PI/4, -Math.PI/4]){
     const cx = Math.cos(ph), cy = Math.sin(ph);
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(ARM, .022, .022), skin);
-    arm.position.set(ARM/2*cx, ARM/2*cy, 0);
+    const L = ARM * 1.02;
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(L, .030, .018), accent);
+    arm.position.set(L/2*cx, L/2*cy, -.012);
     arm.rotation.z = ph;
     veh.add(arm);
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,.055,14), skin);
-    hub.rotation.x = Math.PI/2; hub.position.set(ARM*cx, ARM*cy, -.028);
-    veh.add(hub);
-    const disk = new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,.008,26), prop);
-    disk.rotation.x = Math.PI/2; disk.position.set(ARM*cx, ARM*cy, -.056);
-    veh.add(disk);
+    const pod = new THREE.Mesh(new THREE.CylinderGeometry(.026,.030,.070,16), accent);
+    pod.rotation.x = Math.PI/2; pod.position.set(ARM*cx, ARM*cy, -.030);
+    veh.add(pod);
+    // 프로펠러는 원판이 아니라 날 두 장으로. 원판으로 그리면 서로 겹쳐 보여
+    // 기체가 덩어리가 된다.
+    const prop = new THREE.Group();
+    for (let k = 0; k < 2; k++){
+      const bl = new THREE.Mesh(new THREE.BoxGeometry(RPROP*.96, .030, .004), blade);
+      bl.position.x = RPROP*.48;
+      const holder = new THREE.Group();
+      holder.add(bl); holder.rotation.z = k * Math.PI;
+      prop.add(holder);
+    }
+    prop.position.set(ARM*cx, ARM*cy, -.068);
+    veh.add(prop);
+    PROPS.push(prop);
   }
   veh.scale.setScalar(5);
   scene.add(veh);
 
   arrow = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(),
-                                1, 0xeb6834, .8, .35);
+                                1, 0xf2aa4c, .8, .35);
   scene.add(arrow);
   velArrow = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(),
-                                   1, 0x3987e5, .8, .35);
+                                   1, 0x2d94bd, .8, .35);
   scene.add(velArrow);
 
   trailPos = new Float32Array(3 * 4000);
   const tg = new THREE.BufferGeometry();
   tg.setAttribute("position", new THREE.BufferAttribute(trailPos, 3));
   tg.setDrawRange(0, 0);
-  trail = new THREE.Line(tg, new THREE.LineBasicMaterial({color:0x3987e5}));
+  trail = new THREE.Line(tg, new THREE.LineBasicMaterial({color:0x2d94bd}));
   scene.add(trail);
   bindMouse(ren.domElement);
   resize3D();
@@ -606,6 +614,9 @@ function render3D(d){
   const p = new THREE.Vector3(X[0], X[1], X[2]);
   veh.position.copy(p);
   veh.quaternion.set(X[6], X[7], X[8], X[9]);
+  // 로터를 실제 회전수 n [rad/s] 로 돌린다. 방향은 rotor_directions 대로.
+  for (let i = 0; i < PROPS.length; i++)
+    PROPS[i].rotation.z += P.rotor_directions[i] * X[13+i] * 0.016;
   if (trailN < 4000){
     trailPos[trailN*3] = X[0]; trailPos[trailN*3+1] = X[1]; trailPos[trailN*3+2] = X[2];
     trailN++;
@@ -655,9 +666,9 @@ function plot(id, ys, ys2, color2){
   const X0 = 30, Y0 = 8, Y1 = h - 16;
   const fx = i => X0 + i/(ys.length-1)*(w-X0-6);
   const fy = v => Y1 - (v-lo)/(hi-lo)*(Y1-Y0);
-  c.strokeStyle = "#2a3444"; c.lineWidth = 1;
+  c.strokeStyle = "#1e2a35"; c.lineWidth = 1;
   c.beginPath(); c.moveTo(X0, Y1+.5); c.lineTo(w-6, Y1+.5); c.stroke();
-  c.font = '400 10px "IBM Plex Mono", monospace'; c.fillStyle = "#7d8b9e";
+  c.font = '400 10px "IBM Plex Mono", monospace'; c.fillStyle = "#7C8A98";
   c.textAlign = "right"; c.textBaseline = "middle";
   c.fillText(hi.toFixed(0), X0-4, Y0+4);
   c.fillText(lo.toFixed(0), X0-4, Y1-2);
@@ -667,8 +678,8 @@ function plot(id, ys, ys2, color2){
       i ? c.lineTo(x,y) : c.moveTo(x,y); }
     c.stroke();
   };
-  if (ys2) draw(ys2, color2 || "#7d8b9e");
-  draw(ys, "#3987e5");
+  if (ys2) draw(ys2, color2 || "#7C8A98");
+  draw(ys, "#f2aa4c");
 }
 
 /* ══ 루프 ═════════════════════════════════════════════════════════════ */
