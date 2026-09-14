@@ -246,7 +246,12 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
       <div class="score" id="score" hidden>
         <div class="hd"><b>미션 채점</b>
           <button type="button" id="scoreClose" aria-label="닫기">✕</button></div>
+        <canvas id="scoreCv" height="96"></canvas>
         <div id="scoreBody"></div>
+        <div class="exp">
+          <button type="button" id="expCsv">CSV 저장</button>
+          <button type="button" id="expCopy">값 복사</button>
+        </div>
       </div></div>
     <div class="segbar" id="segbar" title="미션 구간"></div>
     <div class="plots">
@@ -404,6 +409,121 @@ function selfCheck(){
   return worst;
 }
 
+/* ══ 가상 NMPC ════════════════════════════════════════════════════════
+   hybrid_comparison.py 의 VirtualNMPC 를 옮긴 것이다. 입력이 [T, ν_ω] 이고
+   ω̇ = ν_ω 라 자세 동역학이 곧 입력이다. 그래서 상태를 앞으로 굴려 소거하면
+   **상자제약만 남는 문제**가 되어 브라우저에서도 풀 수 있다.
+
+   IPOPT 를 옮기지 않았다. 압축 + 투영경사 + 되추적 선탐색으로 푼다. 지평선을
+   8 로 줄였고(파이썬은 20) 20 Hz 로만 다시 푼다. 같은 해를 준다고 주장하지
+   않는다 — 구조가 같고 같은 비용을 줄일 뿐이다.                              */
+const NV = 13, NUV = 4;
+const NMPC = {N:20, dt:0.08, rate:0.05, iters:40,
+              Qv:[5,5,10], Qz:20, Qw:1, R:[1e-5,1e-3,1e-3,1e-3],
+              Rdu:[1e-4,0.01,0.01,0.01], nuMax:100};
+let nmpcU = null, nmpcLast = -1e9, nmpcOut = null;
+
+function vXdot(x, u, p){
+  const qx=x[6], qy=x[7], qz=x[8], qw=x[9];
+  const R00=1-2*(qy*qy+qz*qz), R01=2*(qx*qy-qz*qw), R02=2*(qx*qz+qy*qw);
+  const R10=2*(qx*qy+qz*qw), R11=1-2*(qx*qx+qz*qz), R12=2*(qy*qz-qx*qw);
+  const R20=2*(qx*qz-qy*qw), R21=2*(qy*qz+qx*qw), R22=1-2*(qx*qx+qy*qy);
+  const ub=R00*x[3]+R10*x[4]+R20*x[5];
+  const vb=R01*x[3]+R11*x[4]+R21*x[5];
+  const wb=R02*x[3]+R12*x[4]+R22*x[5];
+  const V_sq = ub*ub+vb*vb+wb*wb+EPS, V_cf = Math.sqrt(vb*vb+wb*wb+EPS);
+  const fac = 0.5*p.rho*p.S_ref*(p.C_Na*ub + p.C_dc*V_cf);
+  let Fx = -0.5*p.rho*V_sq*p.S_ref*(p.C_A0 + p.C_Aa2*(vb*vb+wb*wb)/V_sq);
+  let Fy = -fac*vb, Fz = -fac*wb;
+  // 추력축. 로켓형은 동체 +x, 평면형은 동체 -z.
+  if (p.thrust_axis === "x") Fx += u[0]; else Fz += -u[0];
+  const m = p.mass;
+  const pw=x[10], qq=x[11], rr=x[12];
+  let qd0=0.5*(qw*pw - qz*qq + qy*rr), qd1=0.5*(qz*pw + qw*qq - qx*rr);
+  let qd2=0.5*(-qy*pw + qx*qq + qw*rr), qd3=0.5*(-qx*pw - qy*qq - qz*rr);
+  const nrm = qx*qx+qy*qy+qz*qz+qw*qw-1;
+  qd0-=nrm*qx; qd1-=nrm*qy; qd2-=nrm*qz; qd3-=nrm*qw;
+  return [x[3], x[4], x[5],
+          (R00*Fx+R01*Fy+R02*Fz)/m, (R10*Fx+R11*Fy+R12*Fz)/m,
+          -p.g + (R20*Fx+R21*Fy+R22*Fz)/m,
+          qd0, qd1, qd2, qd3, u[1], u[2], u[3]];
+}
+function vStep(x, u, dt, p){
+  const k1=vXdot(x,u,p);
+  const a=x.map((v,i)=>v+0.5*dt*k1[i]), k2=vXdot(a,u,p);
+  const b=x.map((v,i)=>v+0.5*dt*k2[i]), k3=vXdot(b,u,p);
+  const c=x.map((v,i)=>v+dt*k3[i]),     k4=vXdot(c,u,p);
+  const y=new Array(NV);
+  for(let i=0;i<NV;i++) y[i]=x[i]+(dt/6)*(k1[i]+2*k2[i]+2*k3[i]+k4[i]);
+  const qn=Math.hypot(y[6],y[7],y[8],y[9]);
+  if (qn>1e-10) for(let i=6;i<10;i++) y[i]/=qn;
+  return y;
+}
+function nmpcCost(x0, U, vref, zref, uref){
+  const C = NMPC; let J = 0, x = x0, uPrev = uref;
+  for (let k=0;k<C.N;k++){
+    const u = U.slice(k*NUV, k*NUV+NUV);
+    x = vStep(x, u, C.dt, P);
+    const ev=[x[3]-vref[0], x[4]-vref[1], x[5]-vref[2]], ez=x[2]-zref;
+    let st = C.Qv[0]*ev[0]*ev[0] + C.Qv[1]*ev[1]*ev[1] + C.Qv[2]*ev[2]*ev[2]
+           + C.Qz*ez*ez
+           + C.Qw*(x[10]*x[10]+x[11]*x[11]+x[12]*x[12]);
+    for (let i=0;i<NUV;i++){
+      const du=u[i]-uPrev[i], e=u[i]-uref[i];
+      st += C.R[i]*e*e + C.Rdu[i]*du*du;
+    }
+    J += st; uPrev = u;
+    if (k === C.N-1){
+      J += 10*(C.Qv[0]*ev[0]*ev[0] + C.Qv[1]*ev[1]*ev[1] + C.Qv[2]*ev[2]*ev[2])
+         + 10*C.Qz*ez*ez;
+    }
+  }
+  return J;
+}
+function nmpcSolve(x0, vref, zref){
+  const C = NMPC, n = C.N*NUV;
+  const Tmax = 4*P.k_T*P.n_max*P.n_max, Tref = P.mass*P.g;
+  const uref = [Tref, 0, 0, 0];
+  const lo = [0, -C.nuMax, -C.nuMax, -C.nuMax];
+  const hi = [Tmax, C.nuMax, C.nuMax, C.nuMax];
+  if (!nmpcU || nmpcU.length !== n){
+    nmpcU = new Array(n);
+    for (let k=0;k<C.N;k++) for (let i=0;i<NUV;i++) nmpcU[k*NUV+i]=uref[i];
+  } else {                       // 워밍 스타트: 한 칸 밀고 마지막을 복제
+    for (let k=0;k<C.N-1;k++) for (let i=0;i<NUV;i++)
+      nmpcU[k*NUV+i] = nmpcU[(k+1)*NUV+i];
+  }
+  const clamp = U => { for (let k=0;k<C.N;k++) for (let i=0;i<NUV;i++){
+      const j=k*NUV+i; U[j] = U[j]<lo[i]?lo[i]:(U[j]>hi[i]?hi[i]:U[j]); } };
+  clamp(nmpcU);
+  // 스케일. T 는 수십~수백 N, ν 는 수십 rad/s^2 라 한 걸음 크기가 다르다.
+  const sc = []; for (let k=0;k<C.N;k++) sc.push(Tmax, C.nuMax, C.nuMax, C.nuMax);
+  let J0 = nmpcCost(x0, nmpcU, vref, zref, uref);
+  let step = 0.08;
+  for (let it=0; it<C.iters; it++){
+    const g = new Array(n);
+    for (let j=0;j<n;j++){
+      const h = sc[j]*1e-4, save = nmpcU[j];
+      nmpcU[j] = save + h;
+      g[j] = (nmpcCost(x0, nmpcU, vref, zref, uref) - J0) / h;
+      nmpcU[j] = save;
+    }
+    let gn = 0; for (let j=0;j<n;j++) gn += (g[j]*sc[j])**2;
+    gn = Math.sqrt(gn); if (!(gn > 1e-12)) break;
+    let ok = false;
+    for (let ls=0; ls<6; ls++){
+      const U2 = nmpcU.slice();
+      for (let j=0;j<n;j++) U2[j] -= step*sc[j]*sc[j]*g[j]/gn;
+      clamp(U2);
+      const J2 = nmpcCost(x0, U2, vref, zref, uref);
+      if (J2 < J0){ nmpcU = U2; J0 = J2; step *= 1.3; ok = true; break; }
+      step *= 0.4;
+    }
+    if (!ok) break;
+  }
+  return nmpcU.slice(0, NUV);
+}
+
 /* ══ 제어기 ═══════════════════════════════════════════════════════════
    PX4 를 옮긴 것이 아니다. 평범한 종속 루프(속도 -> 자세 -> 모멘트)다.
    여기서 보려는 것은 제어 성능이 아니라 **기체가 어디서 한계에 걸리나** 이므로
@@ -437,6 +557,10 @@ const CTRLS = {
             note:"정상비행 트림을 플랜트에서 직접 풀어 앞먹임한다. 자세 한계 58도. "
                  + "62도로 풀면 568 km/h 까지 가지만 고도를 잃고 떨어진다 — "
                  + "그 사이를 찾는 것이 NMPC 의 일이다."},
+  hybrid:  {name:"하이브리드 NMPC+INDI (실험)", ff:true, tilt:80, indi:true, nmpc:true,
+            note:"⚠ 아직 안정적으로 못 법니다. 13차 가상모델을 브라우저에서 직접 "
+                 + "풀지만(압축+투영경사), 추력 0·최대 회전율 같은 나쁜 국소해에 "
+                 + "갇혀 고도를 잃습니다. 제대로 된 SQP/내점법이 필요하다는 증거입니다."},
   indi:    {name:"INDI 내부루프", ff:true, tilt:55, indi:true,
             note:"측정 각가속도를 되먹여 증분으로 모멘트를 낸다. 모델오차에 강하다."},
 };
@@ -527,6 +651,7 @@ function aeroWorld(x){
 }
 
 function control(x, cmd){
+  if (CTRLS[CTRL].nmpc) return controlHybrid(x, cmd);
   const m = P.mass, g = P.g;
   const psi = cmd.psi;
   const eAlt = cmd.alt - x[2];
@@ -667,6 +792,43 @@ function control(x, cmd){
   return n;
 }
 
+// ProperHybrid: NMPC 가 [T, ω̇] 를 내고 INDI 가 모터로 실현한다.
+// 인터페이스 분리 — NMPC 는 "얼마나 돌릴지" 만 정하고, 모터 할당·자이로·공력
+// 모멘트는 INDI 가 측정으로 처리한다.
+function controlHybrid(x, cmd){
+  const psi = cmd.psi;
+  const vref = [cmd.spd*Math.cos(psi), cmd.spd*Math.sin(psi), 0];
+  if (nmpcOut === null || T - nmpcLast >= NMPC.rate - 1e-9){
+    nmpcOut = nmpcSolve(x.slice(0, 13), vref, cmd.alt);
+    nmpcLast = T;
+  }
+  const Tc = nmpcOut[0], nu = [nmpcOut[1], nmpcOut[2], nmpcOut[3]];
+
+  // INDI 내부루프: 측정 각가속도를 되먹여 증분으로 모멘트를 낸다.
+  const J = [P.Ixx, P.Iyy, P.Izz], om = [x[10], x[11], x[12]];
+  const a = 0.06;
+  for (let i=0;i<3;i++){
+    const raw = (om[i] - omPrev[i]) / DT;
+    omDotF[i] += a * (raw - omDotF[i]);
+  }
+  const M = [0,0,0];
+  for (let i=0;i<3;i++){
+    const lim = J[i]*25.0;
+    let m2 = Mprev[i] + J[i]*(nu[i] - omDotF[i]);
+    M[i] = m2 > lim ? lim : (m2 < -lim ? -lim : m2);
+  }
+  omPrev = om.slice(); Mprev = M.slice();
+
+  const A = D.alloc_inv, nOut = [0,0,0,0];
+  for (let i=0;i<4;i++){
+    let Ti = A[i][0]*Tc + A[i][1]*M[0] + A[i][2]*M[1] + A[i][3]*M[2];
+    if (Ti < 0) Ti = 0;
+    const ni = Math.sqrt(Ti / P.k_T);
+    nOut[i] = ni > P.n_max ? P.n_max : ni;
+  }
+  return nOut;
+}
+
 /* ══ 상태 ═════════════════════════════════════════════════════════════ */
 const DT = 0.002;
 let X = D.x0.slice(), T = 0, running = false, sat = 0;
@@ -692,6 +854,7 @@ function reset(){
   // 없었다 — 미션의 첫 구간이 통째로 빠져 있던 셈이다.
   X = D.x0.slice(); X[2] = 0; T = 0; sat = 0; cmdSpd = 0; altI = 0;
   omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;
+  nmpcU = null; nmpcLast = -1e9; nmpcOut = null;
   trailN = 0;
   if (trail) trail.geometry.setDrawRange(0, 0);
 }
@@ -1056,9 +1219,68 @@ function score(){
           vmax: Math.max(...REC.map(r => r.V)), n: use.length,
           pass: !tumble && !crashed && rmseZ < 20};
 }
+// RMSE 를 시간에 따라. 한 숫자로만 보면 어느 구간이 나빴는지 안 보인다.
+function rmseSeries(win){
+  win = win || 25;
+  const out = {t:[], v:[], z:[]};
+  const alt = +$("#alt").value;
+  for (let i = win; i < REC.length; i++){
+    let sv = 0, sz = 0;
+    for (let k = i - win; k < i; k++){
+      sv += (REC[k].V - REC[k].cmd) ** 2;
+      sz += (REC[k].x[2] - alt) ** 2;
+    }
+    out.t.push(REC[i].t);
+    out.v.push(Math.sqrt(sv / win));
+    out.z.push(Math.sqrt(sz / win));
+  }
+  return out;
+}
+function drawScoreCv(){
+  const cv = $("#scoreCv");
+  if (!cv._h) cv._h = +cv.getAttribute("height");
+  const r = Math.min(devicePixelRatio, 2), w = cv.clientWidth, h = cv._h;
+  cv.width = w*r; cv.height = h*r; cv.style.height = h + "px";
+  const c = cv.getContext("2d"); c.setTransform(r,0,0,r,0,0); c.clearRect(0,0,w,h);
+  const S = rmseSeries();
+  if (S.t.length < 2) return;
+  const hi = Math.max(1e-6, Math.max(...S.v), Math.max(...S.z));
+  const X = i => 34 + i/(S.t.length-1)*(w-40);
+  const Y = v => h-14 - v/hi*(h-22);
+  c.strokeStyle = "#1e2a35"; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(34, h-13.5); c.lineTo(w-6, h-13.5); c.stroke();
+  c.font = '400 9.5px "IBM Plex Mono", monospace'; c.fillStyle = "#7C8A98";
+  c.textAlign = "right"; c.textBaseline = "middle";
+  c.fillText(hi.toFixed(0), 30, 10); c.fillText("0", 30, h-14);
+  const line = (arr, col) => { c.strokeStyle = col; c.lineWidth = 1.6;
+    c.beginPath(); arr.forEach((v,i)=>{ const x=X(i), y=Y(v); i?c.lineTo(x,y):c.moveTo(x,y); });
+    c.stroke(); };
+  line(S.z, "#2d94bd"); line(S.v, "#f2aa4c");
+  c.textAlign = "left"; c.fillStyle = "#f2aa4c"; c.fillText("RMSE v", 38, 9);
+  c.fillStyle = "#2d94bd"; c.fillText("RMSE z", 88, 9);
+}
+function scoreCsv(){
+  const S = rmseSeries();
+  const alt = +$("#alt").value;
+  const head = "# fast_drone 비행 시뮬 채점\n"
+    + "# 제어기: " + CTRLS[CTRL].name + "\n"
+    + "# 목표속도: " + $("#spd").value + " m/s, 목표고도: " + alt + " m\n"
+    + "# 측풍: " + $("#wsp").value + " m/s, 방위 " + $("#wdir").value + " deg\n"
+    + "# 계수: " + COEFS.map(([k]) => k + "=" + P[k]).join(", ") + "\n"
+    + "t_s,seg,cmd_mps,V_mps,alt_m,alpha_deg,F_N,omega_rad_s,rmse_v,rmse_z\n";
+  const off = REC.length - S.t.length;
+  return head + REC.map((r, i) => {
+    const om = Math.hypot(r.x[10], r.x[11], r.x[12]);
+    const j = i - off;
+    return [r.t.toFixed(3), r.seg, r.cmd.toFixed(3), r.V.toFixed(4),
+            r.x[2].toFixed(3), r.al.toFixed(3), r.F.toFixed(4), om.toFixed(5),
+            j >= 0 ? S.v[j].toFixed(4) : "", j >= 0 ? S.z[j].toFixed(4) : ""].join(",");
+  }).join("\n") + "\n";
+}
 function drawScore(){
   const el = $("#score");
   if (el.hidden) return;
+  drawScoreCv();
   const s2 = score();
   if (!s2){ $("#scoreBody").innerHTML =
     "<p>기록이 모자랍니다. ▶ 로 좀 더 날려보세요.</p>"; return; }
@@ -1167,7 +1389,8 @@ function initUI(){
   const updCtrl = () => {
     CTRL = sel.value;
     $("#ctrlNote").textContent = CTRLS[CTRL].note;
-    omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;   // 전환 시 INDI 초기화
+    omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;
+  nmpcU = null; nmpcLast = -1e9; nmpcOut = null;   // 전환 시 INDI 초기화
   };
   sel.addEventListener("change", updCtrl); updCtrl();
   buildCoefs();
@@ -1197,6 +1420,22 @@ function initUI(){
     const el = $("#score"); el.hidden = !el.hidden; drawScore();
   });
   $("#scoreClose").addEventListener("click", () => { $("#score").hidden = true; });
+  $("#expCsv").addEventListener("click", () => {
+    const b = new Blob([scoreCsv()], {type:"text/csv;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(b);
+    a.download = "flight_score_" + CTRL + "_" + Math.round(T) + "s.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  });
+  $("#expCopy").addEventListener("click", async e => {
+    // ⚠ 내려받기는 Artifact 보기창에서 막힌다 (샌드박스). 복사는 된다.
+    //   GitHub Pages 로 열면 둘 다 된다.
+    try { await navigator.clipboard.writeText(scoreCsv());
+          e.target.textContent = "복사됨"; }
+    catch (_) { e.target.textContent = "복사 실패"; }
+    setTimeout(() => { e.target.textContent = "값 복사"; }, 1600);
+  });
   $("#follow").addEventListener("click", e => {
     ORB.follow = !ORB.follow;
     e.target.setAttribute("aria-pressed", String(ORB.follow));
