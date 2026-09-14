@@ -1437,13 +1437,33 @@ function initUI(){
     const el = $("#score"); el.hidden = !el.hidden; drawScore();
   });
   $("#scoreClose").addEventListener("click", () => { $("#score").hidden = true; });
-  $("#expCsv").addEventListener("click", () => {
-    const b = new Blob([scoreCsv()], {type:"text/csv;charset=utf-8"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(b);
-    a.download = "flight_score_" + CTRL + "_" + Math.round(T) + "s.csv";
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  // 내려받기는 두 곳에서 다르게 동작한다.
+  //   GitHub Pages — 평범한 페이지라 <a download> 가 그냥 된다.
+  //   Artifact 뷰어 — 샌드박스가 <a download> 와 blob 저장을 막는다.
+  //                   대신 downloads 능력을 선언하고 claude.use 로 저장한다.
+  // 둘 다 안 되면 버튼이 그렇게 말한다. 조용히 아무 일도 안 하는 것이 최악이다.
+  $("#expCsv").addEventListener("click", async e => {
+    const name = "flight_score_" + CTRL + "_" + Math.round(T) + "s.csv";
+    const text = scoreCsv();
+    let dl = null;
+    try { dl = window.claude && claude.use ? await claude.use("downloads") : null; }
+    catch (_) { dl = null; }
+    if (dl){
+      try {
+        await dl.save({filename:name, data:new Blob([text], {type:"text/csv"})});
+        e.target.textContent = "저장됨";
+      } catch (err) {
+        e.target.textContent = (err && err.code === "declined") ? "취소됨" : "저장 실패";
+      }
+    } else {
+      const b = new Blob([text], {type:"text/csv;charset=utf-8"});
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(b); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      e.target.textContent = "저장됨";
+    }
+    setTimeout(() => { e.target.textContent = "CSV 저장"; }, 1800);
   });
   $("#expCopy").addEventListener("click", async e => {
     // ⚠ 내려받기는 Artifact 보기창에서 막힌다 (샌드박스). 복사는 된다.
