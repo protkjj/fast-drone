@@ -10,9 +10,13 @@ Artifact 는 Claude 가 호스팅해서 GitHub Actions 로 못 올린다. 대신
 발행용(.artifact.html)은 감싸는 쪽이 doctype·charset 을 붙여 주는 판이라
 Pages 에는 로컬용(.html, charset 포함)을 올린다.
 """
+import os
 import pathlib
+import re
 import shutil
+import subprocess
 import sys
+import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PAGES = [
@@ -95,7 +99,7 @@ def main():
     if site.exists():
         shutil.rmtree(site)
     site.mkdir()
-    cards, missing = [], []
+    cards, missing, out_names = [], [], []
     for src, dst, title, desc in PAGES:
         f = ROOT / "results" / src
         if not f.is_file():
@@ -105,15 +109,53 @@ def main():
         # 뒤라 머리글을 찾을 수 있다.
         html = f.read_text(encoding="utf-8")
         if "</body>" in html:
-            html = html.replace("</body>", NAV + "\n</body>", 1)
+            # ★ **마지막** </body> 앞에 넣는다. 첫 번째로 하면 JS 문자열 안에
+            #   들어 있는 "</body>" 를 문서의 끝으로 오해해 그 문자열을 반으로
+            #   자른다 — 실제로 채점 별창 문서를 담은 문자열이 그렇게 깨져
+            #   Pages 판이 SyntaxError 로 통째로 죽었다.
+            head, sep, tail = html.rpartition("</body>")
+            html = head + NAV + "\n" + sep + tail
         else:
             html += NAV
         (site / dst).write_text(html, encoding="utf-8")
+        out_names.append(dst)
         cards.append(f'<a class="card" href="{dst}"><h2>{title}</h2>'
                      f'<p>{desc}</p><span class="go">열기 →</span></a>')
     if not cards:
         print("올릴 페이지가 없습니다. 먼저 생성기를 돌리세요.", file=sys.stderr)
         return 1
+    # ★ 사이트 사본을 실제로 파싱해 본다. 지금까지 results/ 만 검사하고
+    #   site/ 는 안 봐서, 주입이 JS 를 깨뜨린 것을 배포 뒤에야 알았다.
+    bad = []
+    for _n in out_names:
+        _t = (site / _n).read_text(encoding="utf-8")
+        _blocks = re.findall(r"<script>([\s\S]*?)</script>", _t)
+        if not _blocks:
+            bad.append(f"{_n}: <script> 블록이 없습니다")
+            continue
+        for _i, _b in enumerate(_blocks):
+            if not _b.strip():
+                continue                     # <script src=...> 는 본문이 없다
+            # node --check 는 파일만 받는다 (표준입력 '-' 는 안 통한다).
+            with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                             encoding="utf-8") as _f:
+                _f.write(_b)
+                _path = _f.name
+            _r = subprocess.run(["node", "--check", _path],
+                                capture_output=True, text=True)
+            os.unlink(_path)
+            if _r.returncode != 0:
+                _lines = [l for l in _r.stderr.splitlines()
+                          if "SyntaxError" in l or "Error" in l]
+                bad.append(f"{_n} 블록 {_i}: "
+                           + (_lines[0][:140] if _lines else _r.stderr[:140]))
+    if bad:
+        print("사이트 산출물의 JS 가 깨졌습니다:", file=sys.stderr)
+        for b in bad:
+            print("  " + b, file=sys.stderr)
+        return 1
+    print(f"  JS 문법 검사 통과 ({len(out_names)} 쪽)")
+
     (site / "index.html").write_text(INDEX.replace("%%CARDS%%", "\n".join(cards)),
                                      encoding="utf-8")
     # Jekyll 이 밑줄로 시작하는 경로를 건너뛰지 않게 한다
