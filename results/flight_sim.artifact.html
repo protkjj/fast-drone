@@ -71,6 +71,10 @@ details.vchk .vbody p{margin:8px 0 0; font-size:11.5px; color:var(--ink-3);
 .fld label{font-size:12.5px; color:var(--ink-2)}
 .fld output{font:600 14px/1 "IBM Plex Mono",monospace; color:var(--ink)}
 input[type=range]{width:100%; margin:5px 0 0; accent-color:var(--accent)}
+select{width:100%; margin-top:5px; padding:7px 8px; border:1px solid var(--rule);
+  border-radius:7px; background:var(--panel-2); color:var(--ink);
+  font:500 13px/1.2 "IBM Plex Sans",sans-serif}
+select:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
 
 .btns{display:flex; gap:8px; margin:4px 0 16px}
@@ -163,6 +167,9 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
       <button type="button" id="go" class="go">▶ 시작  (Space)</button>
       <button type="button" id="rst">↺ 초기화</button>
     </div>
+    <div class="fld"><label for="ctrl">제어기</label>
+      <select id="ctrl"></select>
+      <p class="note" id="ctrlNote" style="margin-top:6px"></p></div>
     <div class="fld"><div class="row"><label for="spd">목표 속도</label>
       <output id="o_spd"></output></div>
       <input type="range" id="spd" min="0" max="120" step="1" value="83"></div>
@@ -395,6 +402,23 @@ const KI = 0.35, I_LIM = 6.0;
 // 10 rad/s 로 텀블한다 (메모리의 "RMSE 만으론 텀블 못 잡음" 그대로다).
 // 55도가 안전선이고 거기선 170 km/h 다. 이 트레이드오프가 곧 NMPC 가 필요한 이유다.
 const TILT_MAX = 55.0 * Math.PI / 180.0;
+
+// ── 제어기 선택 ───────────────────────────────────────────────────────
+// NMPC 계열은 solver 가 필요해 브라우저에 넣지 않았다. 흉내만 낸 것을 NMPC 라
+// 부르면 거짓이 된다. 대신 프로젝트의 내부루프인 INDI 는 그대로 이식했다.
+const CTRLS = {
+  cascade: {name:"종속 PID (기본)", ff:true, tilt:55, indi:false,
+            note:"속도→자세→모멘트 종속 루프. 공력 앞먹임 켬."},
+  noff:    {name:"앞먹임 없음", ff:false, tilt:55, indi:false,
+            note:"동체가 내는 힘을 모르는 상태. 트림을 못 찾아 더 느리다."},
+  fast:    {name:"틸트 60° (빠름·위험)", ff:true, tilt:60, indi:false,
+            note:"351 km/h 까지 가지만 |ω| 가 10 rad/s 로 텀블한다."},
+  indi:    {name:"INDI 내부루프", ff:true, tilt:55, indi:true,
+            note:"측정 각가속도를 되먹여 증분으로 모멘트를 낸다. 모델오차에 강하다."},
+};
+let CTRL = "cascade";
+// INDI 상태: 직전 각속도·모멘트와 걸러낸 각가속도
+let omPrev = [0,0,0], omDotF = [0,0,0], Mprev = [0,0,0];
 let altI = 0;
 // 지금 상태에서 동체 공력을 월드 좌표로. 제어기 앞먹임과 계기 표시가 같은
 // 값을 쓰도록 한 곳에서 계산한다.
@@ -434,7 +458,7 @@ function control(x, cmd){
   //   로켓형은 순항에서 동체가 받음각으로 양력을 내는데, 그걸 모르면 그 트림을
   //   못 찾아 170 km/h 에서 멈춘다. 지금 동체가 실제로 내는 힘을 빼 주면
   //   제어기가 남은 몫만 추력으로 채운다.
-  const Fa = aeroWorld(x);
+  const Fa = CTRLS[CTRL].ff ? aeroWorld(x) : [0, 0, 0];
   let tx = m*ax - Fa[0], ty = m*ay - Fa[1];
   const tz = m*(az + g) - Fa[2];
 
@@ -443,7 +467,7 @@ function control(x, cmd){
   //   추력의 수직성분이 사라져 양력에만 매달리고, 받음각이 조금만 변해도
   //   떨어진다 — 실제로 383 km/h 로 날면서 고도를 계속 잃었다.
   const hz = Math.hypot(tx, ty);
-  const lim = Math.max(tz, 1e-6) * Math.tan(TILT_MAX);
+  const lim = Math.max(tz, 1e-6) * Math.tan(CTRLS[CTRL].tilt * Math.PI / 180);
   if (hz > lim && hz > 1e-9){ const s2 = lim/hz; tx *= s2; ty *= s2; }
   const tn = Math.hypot(tx, ty, tz) || 1e-9;
 
@@ -491,9 +515,39 @@ function control(x, cmd){
 
   const Jx=P.Ixx, Jy=P.Iyy, Jz=P.Izz;
   const p_=x[10], q_=x[11], r_=x[12];
-  const Mx = Jx*KW*(KR*ex-p_) + (q_*(Jz*r_) - r_*(Jy*q_));
-  const My = Jy*KW*(KR*ey-q_) + (r_*(Jx*p_) - p_*(Jz*r_));
-  const Mz = Jz*KW*(KR*ez-r_) + (p_*(Jy*q_) - q_*(Jx*p_));
+  const J = [Jx, Jy, Jz], om = [p_, q_, r_];
+  // 원하는 각가속도. 두 제어기가 여기까지는 같고, 이걸 모멘트로 바꾸는
+  // 방식만 다르다.
+  const wdes = [KW*(KR*ex - p_), KW*(KR*ey - q_), KW*(KR*ez - r_)];
+
+  let Mx, My, Mz;
+  if (CTRLS[CTRL].indi){
+    // INDI: 모델로 역산하지 않고 **측정 각가속도**를 되먹여 증분만 더한다.
+    //   M = M_prev + J (ω̇_des - ω̇_meas)
+    // 관성·공력 모델이 틀려도 측정된 ω̇ 이 그 오차를 이미 담고 있어 강건하다.
+    // 프로젝트가 FC 쪽 내부루프로 고른 방식이다.
+    const a = 0.06;   // ω̇ 추정 저역통과. 미분은 잡음을 키운다.
+    for (let i = 0; i < 3; i++){
+      const raw = (om[i] - omPrev[i]) / DT;
+      omDotF[i] += a * (raw - omDotF[i]);
+    }
+    // 증분에 한계를 둔다. 모터가 1 차 지연(tau_m)으로 따라오는데 증분을 무한정
+    // 쌓으면 감기(windup)로 발산한다. 첫 시도에서 |ω| 가 45 rad/s 까지 갔다.
+    const M = [0, 0, 0];
+    for (let i = 0; i < 3; i++){
+      const lim = J[i] * 25.0;
+      let m2 = Mprev[i] + J[i] * (wdes[i] - omDotF[i]);
+      if (m2 > lim) m2 = lim; else if (m2 < -lim) m2 = -lim;
+      M[i] = m2;
+    }
+    Mx = M[0]; My = M[1]; Mz = M[2];
+  } else {
+    Mx = Jx*wdes[0] + (q_*(Jz*r_) - r_*(Jy*q_));
+    My = Jy*wdes[1] + (r_*(Jx*p_) - p_*(Jz*r_));
+    Mz = Jz*wdes[2] + (p_*(Jy*q_) - q_*(Jx*p_));
+  }
+  omPrev = om.slice();
+  Mprev = [Mx, My, Mz];
 
   // 총추력은 **현재** 추력축(동체 x 를 월드로)에 투영한다
   const axw = R[0][0], ayw = R[1][0], azw = R[2][0];
@@ -534,6 +588,7 @@ function reset(){
   // 지상에서 시작한다. 예전엔 목표 고도에 바로 놓고 시작해 이륙 단계가 아예
   // 없었다 — 미션의 첫 구간이 통째로 빠져 있던 셈이다.
   X = D.x0.slice(); X[2] = 0; T = 0; sat = 0; cmdSpd = 0; altI = 0;
+  omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0];
   trailN = 0;
   if (trail) trail.geometry.setDrawRange(0, 0);
 }
@@ -806,12 +861,14 @@ function tick(ts){
     const w = windNow();
     const target = +$("#spd").value;
     let guard = 0;
+    // cmd 를 루프 밖에 둔다. 안에서 const 로 잡으면 아래 기록 단계에서
+    // 스코프를 벗어나 매 프레임 예외가 나고 시간이 아예 안 간다 — 실제로 그랬다.
+    let cmd = cmdNow();
     while (budget > 0 && guard++ < 600){
       const dv = target - cmdSpd, step = RAMP * DT;
       cmdSpd += Math.abs(dv) < step ? dv : (dv > 0 ? step : -step);
-      const cmd = cmdNow();
+      cmd = cmdNow();
       const u = control(X, cmd);
-      const prevCmd = cmdSpd - (Math.abs(target - cmdSpd) < RAMP*DT ? 0 : 0);
       X = rk4(X, u, w, P, DT);
       ground();
       T += DT; budget -= DT;
@@ -949,6 +1006,15 @@ function initUI(){
     el.addEventListener("input", upd); upd();
   }
   $("#alt").addEventListener("input", () => { if (!running) { X[2] = +$("#alt").value; paint(diag()); } });
+  const sel = $("#ctrl");
+  sel.innerHTML = Object.entries(CTRLS).map(([k, c]) =>
+    "<option value='" + k + "'>" + c.name + "</option>").join("");
+  const updCtrl = () => {
+    CTRL = sel.value;
+    $("#ctrlNote").textContent = CTRLS[CTRL].note;
+    omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0];   // 전환 시 INDI 초기화
+  };
+  sel.addEventListener("change", updCtrl); updCtrl();
   buildCoefs();
   $("#def").addEventListener("click", () => {
     for (const [k] of COEFS){ P[k] = P0[k]; $("#c_"+k).value = P0[k];
