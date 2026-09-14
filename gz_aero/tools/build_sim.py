@@ -29,6 +29,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-o", "--out", default="results/flight_sim.html")
     ap.add_argument("--ref", default=str(HERE / "data" / "sim_reference.json"))
+    ap.add_argument("--lqr", default=str(HERE / "data" / "lqr_rocket.json"))
     a = ap.parse_args()
 
     ref_path = pathlib.Path(a.ref)
@@ -39,7 +40,17 @@ def main():
         return 1
     ref = json.loads(ref_path.read_text(encoding="utf-8"))
 
-    html = TEMPLATE.replace("%%DATA%%", json.dumps(ref, separators=(",", ":")))
+    lqr_path = pathlib.Path(a.lqr)
+    if not lqr_path.is_file():
+        print(f"LQR 게인표가 없습니다: {lqr_path}\n"
+              "  먼저 python3 gz_aero/tools/gen_lqr_table.py 를 돌리세요.",
+              file=sys.stderr)
+        return 1
+    lqr = json.loads(lqr_path.read_text(encoding="utf-8"))
+
+    html = (TEMPLATE
+            .replace("%%DATA%%", json.dumps(ref, separators=(",", ":")))
+            .replace("%%LQR%%", json.dumps(lqr, separators=(",", ":"))))
     out = pathlib.Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     bare = out.with_suffix(".artifact.html")
@@ -477,6 +488,100 @@ function selfCheck(){
     for (let i = 0; i < NX; i++) worst = Math.max(worst, Math.abs(x[i] - ref[i]));
   }
   return worst;
+}
+
+/* ══ 오차상태 LQR (게인표) ═════════════════════════════════════════════
+   브라우저에는 solver 가 없다. ARE 도 CasADi 야코비안도 런타임에 못 돈다.
+   그런데 LQR 은 게인이 **설계 시점에 한 번** 정해지는 제어기라, 속도별로
+   미리 풀어 표로 넘기면 런타임에는 보간과 행렬곱만 남는다. 그래서 이 저장소의
+   최적제어 자산 중 브라우저로 옮길 수 있는 유일한 것이다.
+   표는 gz_aero/tools/gen_lqr_table.py 가 굽는다 (2.5 m/s 간격, 21 점).
+
+   오차상태 14D:  [δz, δv(3), δφ(3), δω(3), δn(4)]
+   제어법:        u = u_trim − K_r·δx,  그리고 [n_min, n_max] 로 자른다
+   controller.py 의 LQRController 와 같다. 고도만 트림의 z 가 아니라
+   **명령 고도**를 기준으로 삼는다 (트림은 위치를 정하지 않는다).
+
+   ★ 표는 0~50 m/s (180 km/h) 까지다. 로켓 배치는 52 m/s 위에 정상비행
+     트림이 아예 없다 — 후방 로터가 음추력을 요구한다. 그 위에서는 마지막
+     게인을 유지하는데, 이건 '빠르게 못 난다' 를 숨기는 게 아니라 기체에
+     그 속도의 평형점이 없다는 사실을 그대로 드러내는 것이다.              */
+const LQ = %%LQR%%;
+
+function lqrPick(V){
+  const R = LQ.rows, n = R.length;
+  if (V <= R[0].V) return [R[0].x, R[0].u, R[0].K];
+  if (V >= R[n-1].V) return [R[n-1].x, R[n-1].u, R[n-1].K];
+  let i = 0;
+  while (i + 1 < n && R[i+1].V < V) i++;
+  const a = R[i], b = R[i+1], t = (V - a.V) / (b.V - a.V);
+  const x = new Array(17);
+  for (let k = 0; k < 17; k++) x[k] = a.x[k] + t*(b.x[k] - a.x[k]);
+  // 쿼터니언은 선형 보간 후 정규화. 격자가 2.5 m/s 라 이웃 사이 자세차가
+  // 몇 도뿐이라 slerp 와 사실상 같다. gen_lqr_table.py 의 interp() 와 동일.
+  const qn = Math.hypot(x[6], x[7], x[8], x[9]);
+  if (qn > 1e-12) for (let k = 6; k < 10; k++) x[k] /= qn;
+  const u = new Array(4);
+  for (let k = 0; k < 4; k++) u[k] = a.u[k] + t*(b.u[k] - a.u[k]);
+  const K = new Array(4);
+  for (let r = 0; r < 4; r++){
+    K[r] = new Array(14);
+    for (let c = 0; c < 14; c++) K[r][c] = a.K[r][c] + t*(b.K[r][c] - a.K[r][c]);
+  }
+  return [x, u, K];
+}
+function qmul(p, q){   // Hamilton, scalar-last [x,y,z,w]
+  return [p[3]*q[0] + p[0]*q[3] + p[1]*q[2] - p[2]*q[1],
+          p[3]*q[1] - p[0]*q[2] + p[1]*q[3] + p[2]*q[0],
+          p[3]*q[2] + p[0]*q[1] - p[1]*q[0] + p[2]*q[3],
+          p[3]*q[3] - p[0]*q[0] - p[1]*q[1] - p[2]*q[2]];
+}
+function lqrLaw(V, x, zref){
+  const [xt, ut, K] = lqrPick(V);
+  const qti = [-xt[6], -xt[7], -xt[8], xt[9]];
+  let dq = qmul(qti, [x[6], x[7], x[8], x[9]]);
+  // 최단경로 보정. 이 기체는 부호 경계가 정상 비행자세 근처라, 안 하면
+  // δφ 가 반전되어 정피드백이 된다 (controller.py 의 같은 처리).
+  if (dq[3] < 0) dq = [-dq[0], -dq[1], -dq[2], -dq[3]];
+  const dx = [x[2] - zref,
+              x[3]-xt[3], x[4]-xt[4], x[5]-xt[5],
+              2*dq[0], 2*dq[1], 2*dq[2],
+              x[10]-xt[10], x[11]-xt[11], x[12]-xt[12],
+              x[13]-xt[13], x[14]-xt[14], x[15]-xt[15], x[16]-xt[16]];
+  const out = new Array(4);
+  for (let r = 0; r < 4; r++){
+    let s = 0;
+    for (let c = 0; c < 14; c++) s += K[r][c]*dx[c];
+    let v = ut[r] - s;
+    out[r] = v < LQ.n_min ? LQ.n_min : (v > LQ.n_max ? LQ.n_max : v);
+  }
+  return out;
+}
+// 표를 제대로 읽었는지, 보간까지 파이썬과 같은지 페이지에서 확인한다.
+// 샘플 절반은 격자 사이에서 뽑혀 있다.
+function lqrCheck(){
+  let worst = 0;
+  for (const sm of LQ.samples){
+    const got = lqrLaw(sm.V, sm.x, sm.zref);
+    for (let i = 0; i < 4; i++) worst = Math.max(worst, Math.abs(got[i] - sm.u[i]));
+  }
+  return worst;
+}
+// 고도 기준을 한 번에 얼마나 멀리 둘지. LQR 은 트림 **주위**의 국소
+// 조정기라 선형영역을 벗어난 오차를 주면 안 된다. 지상 0 m 에서 목표
+// 200 m 를 그대로 주면 δz = -200 이라 명령이 폭주해 포화율 99 %,
+// |ω| 72 로 추락한다 (실측). NMPC 가 겪은 것과 같은 종류의 실수다.
+let LQR_ZCAP = 10.0;
+function controlLQR(x, cmd){
+  // 스케줄 속도는 **명령 속도**(램프된 값)로 잡는다. 현재 속도로 잡으면
+  // 트림이 곧 현재 상태라 속도 오차가 0 이 되어 가속 명령이 안 나온다.
+  // cmdSpd 자체가 RAMP 로 천천히 오르므로 '아직 느린데 80도 자세를 요구'
+  // 하는 문제도 안 생긴다 (종속 루프가 겪었던 그 함정).
+  const V = Math.min(cmd.spd, LQ.V_max_table);
+  // 움직이는 고도 기준. 기체가 오르면 기준도 같이 오른다.
+  const dz = cmd.alt - x[2];
+  const zr = x[2] + (dz > LQR_ZCAP ? LQR_ZCAP : (dz < -LQR_ZCAP ? -LQR_ZCAP : dz));
+  return lqrLaw(V, x, zr);
 }
 
 /* ══ 가상 NMPC ════════════════════════════════════════════════════════
@@ -933,6 +1038,15 @@ const CTRLS = {
                  + "해가 각가속도 한계에 계속 붙는다 — 비용의 Qw 가 고도항 앞에서 "
                  + "너무 약하다. 스윕 12 조합 중 고도를 지킨 것은 하나뿐이고 그것도 "
                  + "|ω| 37 로 실기 실패선 35 를 넘는다. 다음은 솔버가 아니라 비용함수다."},
+  lqr:     {name:"오차상태 LQR (게인표)", ff:true, tilt:55, indi:false, lqr:true,
+            note:"속도별로 파이썬에서 ARE 를 미리 풀어 게인표로 구워 왔다 "
+                 + "(2.5 m/s 간격 21 점, 폐루프 최대 실수부 -0.18 ~ -0.61 로 전부 안정). "
+                 + "런타임에는 보간과 4x14 행렬곱뿐이라 solver 가 필요 없다. "
+                 + "표를 제대로 읽었는지는 파이썬이 계산한 기준 샘플 16 개와 "
+                 + "페이지에서 대조한다 — 절반은 격자 사이라 보간까지 검사한다. "
+                 + "⚠ 표가 180 km/h 에서 끝난다. 로켓 배치는 52 m/s 위에 정상비행 "
+                 + "트림이 아예 없다 (후방 로터가 음추력을 요구). 제어기 한계가 "
+                 + "아니라 기체에 그 평형점이 없는 것이다."},
   indi:    {name:"INDI 내부루프", ff:true, tilt:55, indi:true,
             note:"측정 각가속도를 되먹여 증분으로 모멘트를 낸다. 모델오차에 강하다. "
                  + "⚠ 롤 |p| 가 40 rad/s 로 튄다. 포화 인지 할당이 필요하다."},
@@ -1049,6 +1163,7 @@ function axialInflow(x){
 }
 function control(x, cmd){
   if (CTRLS[CTRL].nmpc) return controlHybrid(x, cmd);
+  if (CTRLS[CTRL].lqr)  return controlLQR(x, cmd);
   const m = P.mass, g = P.g;
   const psi = cmd.psi;
   const eAlt = cmd.alt - x[2];
