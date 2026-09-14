@@ -114,11 +114,38 @@ def load_speedrun(path):
             "alt": [r[ix["alt_m"]] for r in rows]}
 
 
-def load_flight(path, stride=8):
+def trajectory(f):
+    """월드 위치 궤적. 로그에 위치 열이 있으면 그걸 쓰고, 없으면 속도를 적분한다.
+
+    위치 열(pWx..)은 나중에 추가돼서 그 전에 찍은 로그에는 없다. 다시 날리지
+    않고도 재생할 수 있게 사다리꼴 적분으로 메운다. 적분은 드리프트가 쌓이지만
+    **자세는 기록된 쿼터니언 그대로**라 보고 싶은 것(기울임·풍향계)은 정확하다.
+    """
+    ix = f.ix
+    if "pWx" in ix:
+        return ([r[ix["pWx"]] for r in f.rows], [r[ix["pWy"]] for r in f.rows],
+                [r[ix["pWz"]] for r in f.rows], True)
+    x = y = z = 0.0
+    xs, ys, zs = [], [], []
+    for i, r in enumerate(f.rows):
+        if i:
+            dt = f.t[i] - f.t[i - 1]
+            if 0.0 < dt < 1.0:
+                pr = f.rows[i - 1]
+                x += 0.5 * dt * (r[ix["vLx"]] + pr[ix["vLx"]])
+                y += 0.5 * dt * (r[ix["vLy"]] + pr[ix["vLy"]])
+                z += 0.5 * dt * (r[ix["vLz"]] + pr[ix["vLz"]])
+        xs.append(x); ys.append(y); zs.append(z)
+    return xs, ys, zs, False
+
+
+def load_flight(path, stride=4):
     """실측 공력 로그를 얇게 만들어 심는다. 4800 행을 다 심을 필요는 없다."""
     f, err = A.open_flight(path)
     if f is None:
         return None, err
+    px, py, pz, pos_logged = trajectory(f)
+    ix = f.ix
     k = range(0, len(f.rows), stride)
     ok, lines = A.verdict(f)
     i_peak = max(range(len(f.F)), key=lambda j: f.F[j])
@@ -134,6 +161,17 @@ def load_flight(path, stride=8):
         "peak": {"t": f.t[i_peak], "V": f.V[i_peak], "alpha": f.alpha[i_peak],
                  "F": f.F[i_peak], "tilt": f.tilt[i_peak]},
         "n_rows": len(f.rows), "stride": stride,
+        # 재생용. 자세는 기록된 쿼터니언 그대로 (scalar-last, 링크 -> 월드).
+        "qx": [sig(f.rows[i][ix["qx"]], 9) for i in k],
+        "qy": [sig(f.rows[i][ix["qy"]], 9) for i in k],
+        "qz": [sig(f.rows[i][ix["qz"]], 9) for i in k],
+        "qw": [sig(f.rows[i][ix["qw"]], 9) for i in k],
+        "px": [sig(px[i]) for i in k], "py": [sig(py[i]) for i in k],
+        "pz": [sig(pz[i]) for i in k],
+        "pos_logged": pos_logged,
+        "fx": [sig(f.rows[i][ix["fWx"]]) for i in k],
+        "fy": [sig(f.rows[i][ix["fWy"]]) for i in k],
+        "fz": [sig(f.rows[i][ix["fWz"]]) for i in k],
     }, ""
 
 
@@ -204,6 +242,7 @@ TEMPLATE = r"""<title>축대칭 동체 공력 계수</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
 :root{
   --ground:#f5f7fa; --panel:#ffffff; --panel-2:#e9edf3; --rule:#d5dbe4;
@@ -322,6 +361,14 @@ ul.notes li{padding-left:18px; position:relative; color:var(--ink-2);
 ul.notes li::before{content:""; position:absolute; left:0; top:9px;
   width:6px; height:6px; border-radius:50%; background:var(--warn)}
 ul.notes li b{color:var(--ink); font-weight:600}
+.play{display:flex; align-items:center; gap:14px; padding:12px 16px;
+  border-top:1px solid var(--rule)}
+.play button{width:38px; height:38px; flex:none; border:1px solid var(--rule);
+  border-radius:8px; background:var(--panel); color:var(--ink); cursor:pointer;
+  font-size:14px}
+.play button:focus-visible{outline:2px solid var(--s1); outline-offset:2px}
+.play input{flex:1; margin:0; accent-color:var(--s1)}
+.play .num{font-size:12.5px; color:var(--ink-2); white-space:nowrap}
 footer{padding:30px 0 0; color:var(--ink-3); font-size:13px}
 </style>
 
@@ -381,6 +428,20 @@ footer{padding:30px 0 0; color:var(--ink-3); font-size:13px}
     <figure><canvas id="cRun" height="380"></canvas>
       <figcaption id="runCap"></figcaption></figure>
   </div>
+</section>
+
+<section id="sec3d" hidden>
+  <div class="shead"><h2>비행 재생</h2><span class="q">기체가 실제로 어떻게 움직였나</span></div>
+  <div class="panel" style="margin-top:22px;overflow:hidden">
+    <div id="view3d" style="position:relative;background:var(--panel-2)"></div>
+    <div class="play">
+      <button type="button" id="pp" aria-label="재생">▶</button>
+      <input type="range" id="scrub" min="0" max="100" step="1" value="0">
+      <span class="num" id="tnow"></span>
+      <span class="num" id="hud"></span>
+    </div>
+  </div>
+  <p id="cap3d" style="margin-top:12px"></p>
 </section>
 
 <section id="secFlight" hidden>
@@ -628,6 +689,129 @@ function drawFlight(){
     "</ul>";
 }
 
+/* ── 3D 재생 ─────────────────────────────────────────────────────── */
+let R3 = null;
+function init3D(){
+  const f = D.flight;
+  if (!f || !f.px || !window.THREE) return;
+  const host = $("#view3d");
+  $("#sec3d").hidden = false;
+  const H = 460;
+  const ren = new THREE.WebGLRenderer({antialias:true, alpha:true});
+  ren.setPixelRatio(Math.min(devicePixelRatio, 2));
+  ren.setSize(host.clientWidth, H);
+  host.style.height = H + "px";
+  host.appendChild(ren.domElement);
+
+  const sc = new THREE.Scene();
+  // ★ 월드를 Gazebo 그대로 ENU 로 둔다. 카메라의 위쪽만 +Z 로 바꾸면
+  //   쿼터니언을 변환할 필요가 없다. 이 프로젝트에서 좌표 변환은 가장
+  //   사고가 잦은 자리라, 변환을 아예 안 하는 쪽을 골랐다.
+  const cam = new THREE.PerspectiveCamera(52, host.clientWidth / H, 0.5, 40000);
+  cam.up.set(0, 0, 1);
+  sc.add(new THREE.HemisphereLight(0xffffff, 0x404050, 1.15));
+  const sun = new THREE.DirectionalLight(0xffffff, .75);
+  sun.position.set(-1, -2, 3); sc.add(sun);
+
+  const grid = new THREE.GridHelper(4000, 80, 0x5a6270, 0x5a6270);
+  grid.rotation.x = Math.PI / 2;
+  grid.material.opacity = .35; grid.material.transparent = true;
+  sc.add(grid);
+
+  // 기체. 장축 = 링크 +X (DESIGN.md 9 장에서 확정한 축).
+  const skin = new THREE.MeshStandardMaterial({color:0x222a35, roughness:.55, metalness:.25});
+  const tip  = new THREE.MeshStandardMaterial({color:0xd8402f, roughness:.5});
+  const veh = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(.075, .075, .78, 28), skin);
+  body.rotation.z = -Math.PI / 2; veh.add(body);
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(.075, .24, 28), tip);
+  cone.rotation.z = -Math.PI / 2; cone.position.x = .51; veh.add(cone);
+  const arms = new THREE.Mesh(new THREE.BoxGeometry(.04, .5, .04), skin);
+  veh.add(arms);
+  const arms2 = new THREE.Mesh(new THREE.BoxGeometry(.04, .04, .5), skin);
+  veh.add(arms2);
+  veh.scale.setScalar(4);   // 수 km 궤적 옆에서 1 m 기체는 안 보인다
+  sc.add(veh);
+
+  const path = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(
+      f.px.map((x, i) => new THREE.Vector3(x, f.py[i], f.pz[i]))),
+    new THREE.LineBasicMaterial({color:0x3987e5}));
+  sc.add(path);
+
+  const arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(), 1, 0xeb6834, .6, .35);
+  sc.add(arrow);
+
+  let i = 0, playing = false, last = 0;
+  const n = f.t.length;
+  $("#scrub").max = n - 1;
+  const W = f.W;
+
+  function frame(){
+    const p = new THREE.Vector3(f.px[i], f.py[i], f.pz[i]);
+    veh.position.copy(p);
+    veh.quaternion.set(f.qx[i], f.qy[i], f.qz[i], f.qw[i]);
+    const F = new THREE.Vector3(f.fx[i], f.fy[i], f.fz[i]);
+    const m = F.length();
+    if (m > 1e-6){
+      arrow.visible = true;
+      arrow.position.copy(p);
+      arrow.setDirection(F.normalize());
+      arrow.setLength(Math.max(2, 14 * m / W), Math.max(.7, 2.4 * m / W),
+                      Math.max(.4, 1.4 * m / W));
+    } else arrow.visible = false;
+
+    // 카메라는 **비스듬히 뒤옆**에서 따라간다. 정면 뒤에 두면 직선 비행이
+    // 점 하나로 보여 아무것도 안 읽힌다 (처음에 그렇게 만들었다가 고쳤다).
+    const j = Math.min(i + 4, n - 1), k2 = Math.max(i - 4, 0);
+    const dir = new THREE.Vector3(f.px[j] - f.px[k2], f.py[j] - f.py[k2],
+                                  f.pz[j] - f.pz[k2]);
+    if (dir.lengthSq() < 1e-9) dir.set(1, 0, 0);
+    dir.normalize();
+    const up = new THREE.Vector3(0, 0, 1);
+    let side = new THREE.Vector3().crossVectors(dir, up);
+    if (side.lengthSq() < 1e-6) side.set(0, 1, 0);   // 수직 비행일 때 퇴화 방지
+    side.normalize();
+    cam.position.copy(p)
+       .addScaledVector(dir, -15)
+       .addScaledVector(side, 12)
+       .addScaledVector(up, 6);
+    cam.lookAt(p);
+
+    $("#scrub").value = i;
+    $("#tnow").textContent = "t " + f.t[i].toFixed(1) + " s";
+    $("#hud").textContent =
+      "V " + f.V[i].toFixed(1) + " m/s · α " + f.alpha[i].toFixed(0)
+      + "° · |F| " + f.F[i].toFixed(1) + " N (" + (100 * f.F[i] / W).toFixed(0) + "% W)";
+    ren.render(sc, cam);
+  }
+  function loop(ts){
+    if (playing){
+      if (ts - last > 33){ last = ts; i = (i + 1) % n; frame(); }
+    }
+    requestAnimationFrame(loop);
+  }
+  $("#pp").addEventListener("click", () => {
+    playing = !playing;
+    $("#pp").textContent = playing ? "❚❚" : "▶";
+    $("#pp").setAttribute("aria-label", playing ? "일시정지" : "재생");
+  });
+  $("#scrub").addEventListener("input", e => {
+    playing = false; $("#pp").textContent = "▶";
+    i = +e.target.value; frame();
+  });
+  $("#cap3d").textContent =
+    "자세는 기록된 쿼터니언 그대로입니다. 위치는 "
+    + (f.pos_logged ? "로그에 기록된 값입니다."
+       : "속도를 적분해 메운 값이라 드리프트가 쌓입니다. 보려는 것(기울임·기수 방향)은 자세라 정확합니다.")
+    + " 기체는 궤적 옆에서 보이도록 6배로 키웠습니다. 주황 화살표가 공력입니다.";
+  frame();
+  R3 = () => { ren.setSize(host.clientWidth, H);
+               cam.aspect = host.clientWidth / H; cam.updateProjectionMatrix(); frame(); };
+  requestAnimationFrame(loop);
+}
+
 /* ── 표 · 배지 ───────────────────────────────────────────────────── */
 function readout(){
   const V = +$("#sv").value, Ad = +$("#sa").value, A = Ad * Math.PI / 180;
@@ -706,10 +890,10 @@ function init(){
   });
   for (const id of ["#sv", "#sa"])
     $(id).addEventListener("input", () => { readout(); draw(); });
-  readout(); draw();
+  readout(); draw(); init3D();
 }
 init();
-addEventListener("resize", draw);
+addEventListener("resize", () => { draw(); if (R3) R3(); });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
 </script>
 """
