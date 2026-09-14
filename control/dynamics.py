@@ -150,9 +150,18 @@ def _rotor_forces_moments(v_body, n_vec, omega, p):
             M_tot += ca.vertcat(ri[1] * (-Ti), -ri[0] * (-Ti), 0.0)
             M_tot += ca.vertcat(0.0, 0.0, di * Qi)
 
-        h_net += p['I_rotor'] * ni * di
+        # ★ 로터 각운동량의 부호. 반작용 토크를 위에서 `+d_i*Q_i` 로 썼다는 것은
+        #   d_i = -sigma_i (sigma_i = 로터가 실제로 도는 방향) 라는 뜻이다:
+        #     공기가 로터를 -sigma*Q 로 막고, 모터가 +sigma*Q 를 공급하며,
+        #     그 반작용으로 동체가 -sigma*Q 를 받는다.  -sigma*Q = +d*Q  ->  sigma = -d.
+        #   따라서 h = I_r * sum(sigma_i * n_i) = **-** I_r * sum(d_i * n_i) 다.
+        #   예전에는 +로 쌓아 자이로 항의 부호가 통째로 반대였다.
+        #   주의: k_Q=0 으로 끄는 각운동량 보존 시험은 이 부호를 판별하지 못한다
+        #   (반토크와 h 가 같이 뒤집혀 똑같이 통과한다). 근거는 보존법칙이 아니라
+        #   위의 반토크 규약이다.
+        h_net -= p['I_rotor'] * ni * di
 
-    # 자이로: tau = -omega x h,  h 는 로터 스핀축 방향
+    # 자이로: tau = -omega x h,  h 는 로터 스핀축 방향 (위에서 부호를 이미 반영)
     if axis == 'x':
         # h = [h,0,0];  omega x h = [0, w_z·h, -w_y·h];  tau = -그것
         M_tot += ca.vertcat(0.0, -omega[2] * h_net, omega[1] * h_net)

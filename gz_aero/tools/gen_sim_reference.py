@@ -122,7 +122,9 @@ def plain_xdot(x, u, w, p):
             Mx += ri[1] * (-Ti)
             My += -ri[0] * (-Ti)
             Mz += di * Qi
-        h_net += p["I_rotor"] * ni * di
+        # 반토크를 +d_i*Q_i 로 쓰므로 로터는 -d_i 로 돈다 -> h = -I_r*sum(d_i*n_i).
+        # dynamics.py 와 같은 부호. 연산 순서까지 같게 둔다.
+        h_net -= p["I_rotor"] * ni * di
 
     if ax_is_x:
         My += -om[2] * h_net

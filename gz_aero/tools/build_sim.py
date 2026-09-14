@@ -412,7 +412,9 @@ function xdot(x, u, w, p){
       My += -ri[0] * (-Ti);
       Mz += di * Qi;
     }
-    h_net += p.I_rotor * ni * di;
+    // 반토크를 +d_i*Q_i 로 쓰므로 로터는 -d_i 로 돈다 -> h = -I_r*sum(d_i*n_i).
+    // dynamics.py / gen_sim_reference.py 와 같은 부호·같은 연산 순서.
+    h_net -= p.I_rotor * ni * di;
   }
   if (axIsX){
     My += -om2 * h_net;
