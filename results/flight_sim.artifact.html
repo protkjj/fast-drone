@@ -90,7 +90,7 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
 .gauges .v small{font-size:11px; font-weight:400; color:var(--ink-3)}
 .gauges .wide{grid-column:1/-1}
 
-.stage{display:grid; grid-template-rows:1fr 172px; min-height:0;
+.stage{display:grid; grid-template-rows:1fr 26px 172px; min-height:0;
   background:var(--stage)}
 #view{position:relative; min-height:0}
 #view canvas{display:block}
@@ -111,6 +111,14 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
 .legend3d i{width:12px; height:3px; border-radius:2px; display:inline-block}
 .warnbox{position:absolute; left:14px; bottom:34px; right:14px;
   pointer-events:none; font-size:12.5px; color:#F2AA4C}
+.segbar{height:26px; border-top:1px solid var(--rule); background:var(--stage-2);
+  display:flex; align-items:stretch; position:relative; overflow:hidden}
+.segbar i{display:block; height:100%}
+.segbar .lab{position:absolute; left:10px; top:0; bottom:0; display:flex;
+  align-items:center; gap:12px; pointer-events:none;
+  font:400 10.5px/1 "IBM Plex Mono",monospace; letter-spacing:.08em; color:#c8d2dd;
+  text-shadow:0 1px 3px rgba(0,0,0,.9)}
+.segbar .lab b{font-weight:600; color:#fff}
 .plots{border-top:1px solid var(--rule); background:var(--stage-2);
   display:grid; grid-template-columns:1fr 1fr 1fr; gap:1px}
 .plots figure{margin:0; background:var(--stage); padding:8px 10px 4px;
@@ -119,7 +127,7 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
   color:#7C8A98; letter-spacing:.06em; text-transform:uppercase}
 .plots canvas{width:100%; display:block}
 @media(max-width:760px){.plots{grid-template-columns:1fr}
-  .stage{grid-template-rows:340px auto}}
+  .stage{grid-template-rows:340px 26px auto}}
 
 .note{font-size:12px; color:var(--ink-3); line-height:1.6; margin:10px 0 0;
   overflow-wrap:anywhere}
@@ -208,6 +216,7 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
         <span>끌기 = 회전 · 휠 = 확대 · Shift+끌기 = 이동 · Space = 정지 · R = 리셋 · F = 따라가기</span>
       </div>
       <div class="warnbox" id="warn"></div></div>
+    <div class="segbar" id="segbar" title="미션 구간"></div>
     <div class="plots">
       <figure><figcaption>속도 m/s</figcaption><canvas id="p1" height="132"></canvas></figure>
       <figure><figcaption>받음각 deg</figcaption><canvas id="p2" height="132"></canvas></figure>
@@ -377,7 +386,34 @@ const A_MAX = 12.0, RAMP = 3.0;
 // 고도 적분. 기체가 크게 기울면 추력의 수직성분이 줄고 동체가 반양력을 내
 // 고도가 서서히 가라앉는다. P 만으로는 정상편차가 남아 결국 지면에 닿았다.
 const KI = 0.35, I_LIM = 6.0;
+// 추력축이 수직에서 눕는 한계. 스윕 결과 60도면 351 km/h 까지 가지만 |w| 가
+// 10 rad/s 로 텀블한다 (메모리의 "RMSE 만으론 텀블 못 잡음" 그대로다).
+// 55도가 안전선이고 거기선 170 km/h 다. 이 트레이드오프가 곧 NMPC 가 필요한 이유다.
+const TILT_MAX = 55.0 * Math.PI / 180.0;
 let altI = 0;
+// 지금 상태에서 동체 공력을 월드 좌표로. 제어기 앞먹임과 계기 표시가 같은
+// 값을 쓰도록 한 곳에서 계산한다.
+function aeroWorld(x){
+  const w = windNow();
+  const qx=x[6], qy=x[7], qz=x[8], qw=x[9];
+  const R = [[1-2*(qy*qy+qz*qz), 2*(qx*qy-qz*qw), 2*(qx*qz+qy*qw)],
+             [2*(qx*qy+qz*qw), 1-2*(qx*qx+qz*qz), 2*(qy*qz-qx*qw)],
+             [2*(qx*qz-qy*qw), 2*(qy*qz+qx*qw), 1-2*(qx*qx+qy*qy)]];
+  const d0=x[3]-w[0], d1=x[4]-w[1], d2=x[5]-w[2];
+  const ub = R[0][0]*d0+R[1][0]*d1+R[2][0]*d2;
+  const vb = R[0][1]*d0+R[1][1]*d1+R[2][1]*d2;
+  const wb = R[0][2]*d0+R[1][2]*d1+R[2][2]*d2;
+  const V_sq = ub*ub + vb*vb + wb*wb + EPS;
+  const V_cf = Math.sqrt(vb*vb + wb*wb + EPS);
+  const fac = 0.5*P.rho*P.S_ref*(P.C_Na*ub + P.C_dc*V_cf);
+  const Fy = -fac*vb, Fz = -fac*wb;
+  const C_A = P.C_A0 + P.C_Aa2*(vb*vb + wb*wb)/V_sq;
+  const Fx = -0.5*P.rho*V_sq*P.S_ref*C_A;
+  return [R[0][0]*Fx + R[0][1]*Fy + R[0][2]*Fz,
+          R[1][0]*Fx + R[1][1]*Fy + R[1][2]*Fz,
+          R[2][0]*Fx + R[2][1]*Fy + R[2][2]*Fz];
+}
+
 function control(x, cmd){
   const m = P.mass, g = P.g;
   const psi = cmd.psi;
@@ -385,11 +421,25 @@ function control(x, cmd){
   altI += eAlt * DT;
   if (altI > I_LIM) altI = I_LIM; else if (altI < -I_LIM) altI = -I_LIM;
   const vdes = [cmd.spd*Math.cos(psi), cmd.spd*Math.sin(psi),
-                Math.max(-8, Math.min(8, KZ*eAlt + KI*altI))];
+                Math.max(-15, Math.min(15, KZ*eAlt + KI*altI))];
   let ax = KV*(vdes[0]-x[3]), ay = KV*(vdes[1]-x[4]), az = KV*(vdes[2]-x[5]);
   const an = Math.hypot(ax, ay);
   if (an > A_MAX){ ax *= A_MAX/an; ay *= A_MAX/an; }
-  const tx = m*ax, ty = m*ay, tz = m*(az + g);
+  // ★ 공력 앞먹임. 이게 없으면 제어기는 "뜨는 힘은 전부 추력" 이라고 믿는다.
+  //   로켓형은 순항에서 동체가 받음각으로 양력을 내는데, 그걸 모르면 그 트림을
+  //   못 찾아 170 km/h 에서 멈춘다. 지금 동체가 실제로 내는 힘을 빼 주면
+  //   제어기가 남은 몫만 추력으로 채운다.
+  const Fa = aeroWorld(x);
+  let tx = m*ax - Fa[0], ty = m*ay - Fa[1];
+  const tz = m*(az + g) - Fa[2];
+
+  // ★ 추력축이 수직에서 너무 눕지 않게 **수평 요구를 깎는다**. 고도가 우선이다.
+  //   앞먹임만 넣으면 제어기가 동체 양력을 믿고 90도를 넘겨 눕는다. 그러면
+  //   추력의 수직성분이 사라져 양력에만 매달리고, 받음각이 조금만 변해도
+  //   떨어진다 — 실제로 383 km/h 로 날면서 고도를 계속 잃었다.
+  const hz = Math.hypot(tx, ty);
+  const lim = Math.max(tz, 1e-6) * Math.tan(TILT_MAX);
+  if (hz > lim && hz > 1e-9){ const s2 = lim/hz; tx *= s2; ty *= s2; }
   const tn = Math.hypot(tx, ty, tz) || 1e-9;
 
   // 원하는 자세. 로켓형은 **동체 x(기수)** 가 추력 방향이다.
@@ -461,7 +511,7 @@ let X = D.x0.slice(), T = 0, running = false, sat = 0;
 // 슬라이더를 확 올려도 명령은 RAMP [m/s^2] 로 따라간다. 실제 비행이 그렇고,
 // 안 그러면 기체가 즉시 드러누워 화면에서 아무것도 안 읽힌다.
 let cmdSpd = 0;
-const HIST = {t:[], V:[], al:[], F:[], cmd:[]};
+const HIST = {t:[], V:[], al:[], F:[], cmd:[], seg:[]};
 function cmdNow(){
   return {spd:cmdSpd, alt:+$("#alt").value, psi:0, target:+$("#spd").value};
 }
@@ -470,8 +520,33 @@ function windNow(){
   return [s*Math.cos(d), s*Math.sin(d), 0];
 }
 function reset(){
-  X = D.x0.slice(); X[2] = +$("#alt").value; T = 0; sat = 0; cmdSpd = 0; altI = 0;
+  // 지상에서 시작한다. 예전엔 목표 고도에 바로 놓고 시작해 이륙 단계가 아예
+  // 없었다 — 미션의 첫 구간이 통째로 빠져 있던 셈이다.
+  X = D.x0.slice(); X[2] = 0; T = 0; sat = 0; cmdSpd = 0; altI = 0;
+  trailN = 0;
+  if (trail) trail.geometry.setDrawRange(0, 0);
   for (const k in HIST) HIST[k].length = 0;
+}
+// 지면. 아래로 뚫고 내려가지 않게 막고, 닿아 있으면 수직속도를 죽인다.
+function ground(){
+  if (X[2] < 0){
+    X[2] = 0;
+    if (X[5] < 0) X[5] = 0;
+  }
+}
+// 지금 어떤 미션 구간인가. 화면 아래 띠에 색으로 깔린다.
+const SEGS = {
+  ground: ["지상",  "#7C8A98"], climb: ["상승",  "#2d94bd"],
+  accel:  ["가속",  "#c17f2a"], cruise:["순항",  "#4fb894"],
+  decel:  ["감속",  "#9085e9"], hover: ["호버",  "#5C6B7A"],
+};
+function segNow(d, cmd, prevCmd){
+  if (X[2] < 1.0 && d.gs < 1.0) return "ground";
+  if (Math.abs(cmd.alt - X[2]) > 5.0) return "climb";
+  if (cmd.spd - prevCmd < -1e-9) return "decel";
+  if (cmd.spd < 1.0) return "hover";
+  if (cmd.spd - d.gs > 2.0) return "accel";
+  return "cruise";
 }
 function diag(){
   // 지금 상태의 공력·받음각. 표시 전용이라 물리와 분리해 다시 센다.
@@ -726,7 +801,9 @@ function tick(ts){
       cmdSpd += Math.abs(dv) < step ? dv : (dv > 0 ? step : -step);
       const cmd = cmdNow();
       const u = control(X, cmd);
+      const prevCmd = cmdSpd - (Math.abs(target - cmdSpd) < RAMP*DT ? 0 : 0);
       X = rk4(X, u, w, P, DT);
+      ground();
       T += DT; budget -= DT;
       if (u.some(v => v >= P.n_max - 1e-6)) sat = Math.min(1, sat + .02);
       else sat = Math.max(0, sat - .01);
@@ -734,6 +811,8 @@ function tick(ts){
     const d = diag();
     HIST.t.push(T); HIST.V.push(d.gs); HIST.al.push(d.alpha);
     HIST.F.push(d.F); HIST.cmd.push(cmdSpd);
+    HIST.seg.push(segNow(d, cmd, HIST.cmd.length > 1
+                  ? HIST.cmd[HIST.cmd.length-2] : 0));
     if (HIST.t.length > 900) for (const k in HIST) HIST[k].shift();
     paint(d);
   }
@@ -743,8 +822,27 @@ function toggleRun(){
   $("#go").textContent = running ? "❚❚ 정지  (Space)" : "▶ 시작  (Space)";
   lastFrame = 0;
 }
+function drawSegs(){
+  const bar = $("#segbar");
+  const n = HIST.seg.length;
+  if (!n){ bar.innerHTML = ""; return; }
+  // 같은 구간이 이어지면 하나로 묶어 그린다.
+  let html = "", run = 1;
+  for (let i = 1; i <= n; i++){
+    if (i < n && HIST.seg[i] === HIST.seg[i-1]){ run++; continue; }
+    const key = HIST.seg[i-1], c = SEGS[key] || SEGS.ground;
+    html += "<i style='flex:" + run + ";background:" + c[1] + "'></i>";
+    run = 1;
+  }
+  const cur = SEGS[HIST.seg[n-1]] || SEGS.ground;
+  bar.innerHTML = html + "<div class='lab'><b>" + cur[0] + "</b>"
+    + Object.values(SEGS).map(c =>
+        "<span style='color:" + c[1] + "'>■</span> " + c[0]).join(" ")
+    + "</div>";
+}
 function paint(d){
   render3D(d);
+  drawSegs();
   plot("#p1", HIST.V, HIST.cmd);
   plot("#p2", HIST.al);
   plot("#p3", HIST.F);
