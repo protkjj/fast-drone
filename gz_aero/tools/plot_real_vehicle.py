@@ -19,6 +19,14 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from check_real_vehicle import load, load_table   # noqa: E402
 
 
+def table_curve(tbl, V, n=181):
+    """표에서 주어진 속도의 (alpha, C_A, C_N) 곡선을 뽑는다."""
+    Vs = sorted({r[0] for r in tbl})
+    Vn = min(Vs, key=lambda v: abs(v - V))
+    sel = sorted((r for r in tbl if r[0] == Vn), key=lambda r: r[1])
+    return Vn, [math.degrees(r[1]) for r in sel], [r[2] for r in sel], [r[3] for r in sel]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("log", nargs="?", default="/tmp/fast_drone_aero/real_vehicle.csv")
@@ -54,9 +62,19 @@ def main():
     # 회색으로 덮어 "공력이 걸려도 안 움직이는 게 정상" 임을 보이게 한다.
     lift = next((tt for tt, z in zip(t, tilt) if z > 1.0), None)
 
-    fig, ax = plt.subplots(4, 1, figsize=(9, 10), sharex=True)
+    C_A = [r[ix["C_A"]] for r in rows]
+    C_N = [r[ix["C_N"]] for r in rows]
+    qb = [r[ix["q_bar"]] for r in rows]
+
+    fig = plt.figure(figsize=(15, 10))
+    gs = fig.add_gridspec(4, 2, width_ratios=[1.25, 1.0])
+    ax = [fig.add_subplot(gs[i, 0]) for i in range(4)]
+    for a_ in ax[:3]:
+        a_.sharex(ax[3])
+    bx = [fig.add_subplot(gs[0:2, 1]), fig.add_subplot(gs[2:4, 1])]
     wind = meta.get("wind", "?")
-    fig.suptitle(f"Aero plugin on PX4 SITL   wind = ({wind}) m/s ENU,  W = {W:.1f} N",
+    fig.suptitle(f"Aero plugin on PX4 SITL   wind = ({wind}) m/s ENU,  W = {W:.1f} N"
+                 f"   |   V max {max(V):.1f} m/s = {max(V) * 3.6:.0f} km/h",
                  fontsize=12)
 
     def ground(a):
@@ -100,6 +118,48 @@ def main():
         ax[0].text(t[0] + 0.3, ax[0].get_ylim()[1] * 0.85, "on ground",
                    fontsize=9, color="0.35")
 
+    # ── 오른쪽: 공력계수 시각화 ────────────────────────────────────────
+    tbl_path = meta.get("table", "")
+    tbl = load_table(tbl_path) if tbl_path and pathlib.Path(tbl_path).is_file() else None
+
+    # (1) 속도-공력.  V^2 로 자라는지가 한눈에 보여야 한다.
+    sc = bx[0].scatter(V, F, c=alpha, s=8, cmap="viridis", vmin=0, vmax=180)
+    plt.colorbar(sc, ax=bx[0], label="alpha [deg]")
+    if tbl:
+        Vgrid = [i * max(max(V), 1.0) / 60.0 for i in range(61)]
+        for adeg, ls, lab in ((0.0, "--", "table, alpha=0"),
+                              (90.0, ":", "table, alpha=90")):
+            cs = []
+            for v in Vgrid:
+                Vn, aa, ca, cn = table_curve(tbl, v)
+                j = min(range(len(aa)), key=lambda k: abs(aa[k] - adeg))
+                cs.append(0.5 * rho * v * v * S * math.hypot(ca[j], cn[j]))
+            bx[0].plot(Vgrid, cs, ls, color="0.35", lw=1.2, label=lab)
+        # alpha=90 이론곡선은 측정점 밑에 정확히 겹쳐 안 보이는 것이 정상이다.
+        # 플러그인이 같은 표에서 계수를 뽑기 때문이다.
+        bx[0].legend(fontsize=8, loc="center left")
+    bx[0].axhline(W, color="tab:red", lw=0.9, alpha=0.6)
+    bx[0].text(0.98, W, "weight ", color="tab:red", fontsize=8, ha="right",
+               va="bottom", transform=bx[0].get_yaxis_transform())
+    bx[0].set_xlabel("V air-relative  [m/s]")
+    bx[0].set_ylabel("|F| aero  [N]")
+    bx[0].set_title("Aero force vs speed: does it grow as V^2", fontsize=10)
+    bx[0].grid(alpha=0.3)
+
+    # (2) 표 위에 비행이 실제로 지나간 자리를 덮어 그린다.
+    #     표 전체가 아니라 **쓰인 구간**이 어디인지가 중요하다.
+    if tbl:
+        Vn, aa, ca, cn = table_curve(tbl, max(V))
+        bx[1].plot(aa, ca, "-", color="tab:blue", lw=1.2, label=f"table C_A @ V={Vn:g}")
+        bx[1].plot(aa, cn, "-", color="tab:orange", lw=1.2, label=f"table C_N @ V={Vn:g}")
+    bx[1].scatter(alpha, C_A, s=10, color="tab:blue", alpha=0.5, label="flight C_A")
+    bx[1].scatter(alpha, C_N, s=10, color="tab:orange", alpha=0.5, label="flight C_N")
+    bx[1].set_xlabel("alpha [deg]")
+    bx[1].set_ylabel("coefficient")
+    bx[1].set_title("Which part of the table the flight actually used", fontsize=10)
+    bx[1].legend(fontsize=8)
+    bx[1].grid(alpha=0.3)
+
     out = pathlib.Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
@@ -110,6 +170,9 @@ def main():
           f"모멘트 최대 {max(M):.2f} N·m")
     print(f"  받음각 {min(alpha):.0f} ~ {max(alpha):.0f} deg, "
           f"요 {min(yaw):.0f} ~ {max(yaw):.0f} deg")
+    print(f"  속도 최대 {max(V):.1f} m/s = {max(V) * 3.6:.0f} km/h")
+    print(f"  C_A {min(C_A):.3f} ~ {max(C_A):.3f}, C_N {min(C_N):.3f} ~ {max(C_N):.3f}")
+    print(f"  동압 최대 {max(qb):.0f} Pa")
     return 0
 
 
