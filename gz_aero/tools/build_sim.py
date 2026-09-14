@@ -167,6 +167,20 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
   font:500 12px/1 "IBM Plex Sans",sans-serif}
 .viewbtns button[aria-pressed=true]{border-color:#F2AA4C; color:#ffffff}
 .viewbtns button:focus-visible{outline:2px solid #F2AA4C; outline-offset:2px}
+.score{position:absolute; left:14px; top:14px; width:320px; z-index:6;
+  background:rgba(16,24,32,.96); border:1px solid var(--rule); border-radius:10px;
+  padding:14px 16px 12px; box-shadow:0 14px 34px rgba(0,0,0,.55)}
+.score .hd{display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:10px; font:600 13px/1 "IBM Plex Sans",sans-serif; color:var(--ink)}
+.score .hd button{border:0; background:none; color:var(--ink-3); cursor:pointer;
+  font-size:14px; padding:2px 4px}
+.score table{width:100%; border-collapse:collapse; font-size:12.5px}
+.score td{padding:4px 0; border-bottom:1px solid rgba(255,255,255,.06)}
+.score td:first-child{color:var(--ink-3)}
+.score td:last-child{text-align:right; font-family:"IBM Plex Mono",monospace;
+  font-variant-numeric:tabular-nums; color:var(--ink)}
+.score .ok{color:var(--ok)} .score .bad{color:var(--bad)} .score .warn{color:var(--warn)}
+.score p{margin:9px 0 0; font-size:11.5px; color:var(--ink-3); line-height:1.55}
 .legend3d{position:absolute; right:12px; bottom:12px; display:flex; gap:14px;
   align-items:center; font:400 11.5px/1 "IBM Plex Mono",monospace; color:#7C8A98}
 .legend3d span{display:inline-flex; align-items:center; gap:5px}
@@ -274,6 +288,7 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
   <div class="stage">
     <div id="view"><div class="hud" id="hud"></div>
       <div class="viewbtns">
+        <button type="button" id="scoreBtn">채점</button>
         <button type="button" data-view="back">뒤에서</button>
         <button type="button" data-view="side">옆에서</button>
         <button type="button" data-view="top">위에서</button>
@@ -285,7 +300,12 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
         <span><i style="background:#2d94bd"></i>속도</span>
         <span>끌기 = 회전 · 휠 = 확대 · Shift+끌기 = 이동 · Space = 정지 · R = 리셋 · F = 따라가기</span>
       </div>
-      <div class="warnbox" id="warn"></div></div>
+      <div class="warnbox" id="warn"></div>
+      <div class="score" id="score" hidden>
+        <div class="hd"><b>미션 채점</b>
+          <button type="button" id="scoreClose" aria-label="닫기">✕</button></div>
+        <div id="scoreBody"></div>
+      </div></div>
     <div class="segbar" id="segbar" title="미션 구간"></div>
     <div class="plots">
       <figure><figcaption>속도 m/s</figcaption><canvas id="p1" height="132"></canvas></figure>
@@ -471,12 +491,75 @@ const CTRLS = {
             note:"동체가 내는 힘을 모르는 상태. 트림을 못 찾아 더 느리다."},
   fast:    {name:"틸트 60° (빠름·위험)", ff:true, tilt:60, indi:false,
             note:"351 km/h 까지 가지만 |ω| 가 10 rad/s 로 텀블한다."},
+  trim:    {name:"트림 기반 (권장)", ff:true, tilt:58, indi:false, trim:true,
+            note:"정상비행 트림을 플랜트에서 직접 풀어 앞먹임한다. 자세 한계 58도. "
+                 + "62도로 풀면 568 km/h 까지 가지만 고도를 잃고 떨어진다 — "
+                 + "그 사이를 찾는 것이 NMPC 의 일이다."},
   indi:    {name:"INDI 내부루프", ff:true, tilt:55, indi:true,
             note:"측정 각가속도를 되먹여 증분으로 모멘트를 낸다. 모델오차에 강하다."},
 };
 let CTRL = "cascade";
 // INDI 상태: 직전 각속도·모멘트와 걸러낸 각가속도
 let omPrev = [0,0,0], omDotF = [0,0,0], Mprev = [0,0,0];
+
+// ── 트림 풀이 ─────────────────────────────────────────────────────────
+// 명령 속도 V 로 수평 정상비행하려면 어떤 자세·추력이어야 하는가를
+// **플랜트에서 직접** 푼다. 따로 수식을 세우면 틀릴 자리가 하나 는다.
+// 미지수 두 개 (기울임 th, 로터 회전수 n), 조건 두 개 (v̇x = 0, v̇z = 0).
+let trimV = -1, trimTh = 0, trimN = 0, trimOK = false;
+function trimResid(V, th, n){
+  const x = new Array(NX).fill(0);
+  // y 축 둘레 회전각 a 로 동체 x 를 (sin th, 0, cos th) 로 향하게 한다.
+  //   a = -pi/2 이면 동체 x 가 월드 +z (호버), 거기서 th 만큼 앞으로 눕힌다.
+  const a = -Math.PI / 2 + th;
+  x[7] = Math.sin(a / 2); x[9] = Math.cos(a / 2);
+  x[3] = V;
+  for (let i = 13; i < 17; i++) x[i] = n;
+  const d = xdot(x, [n, n, n, n], [0, 0, 0], P);
+  return [d[3], d[5]];
+}
+function trimSolve(V, th, n){
+  let ok = false;
+  for (let it = 0; it < 60; it++){
+    const f = trimResid(V, th, n);
+    if (Math.hypot(f[0], f[1]) < 1e-8){ ok = true; break; }
+    const h1 = 1e-6, h2 = 1e-3;                 // 수치 야코비안
+    const fa = trimResid(V, th + h1, n), fb = trimResid(V, th, n + h2);
+    const J = [[(fa[0]-f[0])/h1, (fb[0]-f[0])/h2],
+               [(fa[1]-f[1])/h1, (fb[1]-f[1])/h2]];
+    const det = J[0][0]*J[1][1] - J[0][1]*J[1][0];
+    if (!isFinite(det) || Math.abs(det) < 1e-14) break;
+    let dth = (-f[0]*J[1][1] + f[1]*J[0][1]) / det;
+    let dn  = (-J[0][0]*f[1] + J[1][0]*f[0]) / det;
+    dth = Math.max(-0.15, Math.min(0.15, dth));   // 한 걸음 제한
+    dn  = Math.max(-60, Math.min(60, dn));
+    th += dth; n += dn;
+    th = Math.max(-0.05, Math.min(1.5, th));      // 기울임 0~86도
+    n  = Math.max(1, Math.min(P.n_max, n));
+  }
+  return [th, n, ok];
+}
+// ★ 연속법. 속도를 한 번에 주면 뉴턴이 엉뚱한 가지로 빠진다 (60 m/s 에서
+//   기울임이 음수로 튀며 발산했다). 호버에서 출발해 조금씩 올리며 직전 해를
+//   다음 초기값으로 쓴다. 트림 곡선을 따라가는 표준 방법이다.
+function getTrim(V){
+  if (trimOK && Math.abs(V - trimV) < 0.25) return [trimTh, trimN];
+  let th, n, ok;
+  let v0 = 0;
+  th = 0.0; n = Math.sqrt(P.mass * P.g / (4 * P.k_T));
+  if (trimOK && V > trimV && V - trimV < 30){    // 이어서 올릴 수 있으면
+    v0 = trimV; th = trimTh; n = trimN;
+  }
+  const STEP = 5.0;
+  for (let v = v0; v < V - 1e-9; ){
+    v = Math.min(V, v + STEP);
+    [th, n, ok] = trimSolve(v, th, n);
+    if (!ok) break;
+  }
+  if (Math.abs(v0 - V) < 1e-9) [th, n, ok] = trimSolve(V, th, n);
+  trimV = V; trimTh = th; trimN = n; trimOK = ok;
+  return [th, n];
+}
 let altI = 0;
 // 지금 상태에서 동체 공력을 월드 좌표로. 제어기 앞먹임과 계기 표시가 같은
 // 값을 쓰도록 한 곳에서 계산한다.
@@ -516,18 +599,38 @@ function control(x, cmd){
   //   로켓형은 순항에서 동체가 받음각으로 양력을 내는데, 그걸 모르면 그 트림을
   //   못 찾아 170 km/h 에서 멈춘다. 지금 동체가 실제로 내는 힘을 빼 주면
   //   제어기가 남은 몫만 추력으로 채운다.
-  const Fa = CTRLS[CTRL].ff ? aeroWorld(x) : [0, 0, 0];
-  let tx = m*ax - Fa[0], ty = m*ay - Fa[1];
-  const tz = m*(az + g) - Fa[2];
+  let tx, ty, tz, tiltCap = CTRLS[CTRL].tilt * Math.PI / 180;
+  if (CTRLS[CTRL].trim){
+    // 트림이 이미 중력과 공력을 함께 균형 잡고 있으므로 여기서 g 를 더하지
+    // 않는다. 피드백은 속도 오차만 얹는다.
+    // ★ **현재** 속도의 트림을 쓴다. 명령 속도로 쓰면 아직 느린 상태에서
+    //   80 도짜리 순항 자세를 요구해 고도 권한을 잃고 떨어진다 (실제로
+    //   522 km/h 로 가속하다 지면에 닿았다). 앞먹임은 지금 상태와 맞아야 한다.
+    const vNow = Math.hypot(x[3], x[4]);
+    const [thT, nT] = getTrim(Math.min(vNow, cmd.spd));
+    const T_ff = 4.0 * P.k_T * nT * nT;
+    const st = Math.sin(thT), ct = Math.cos(thT);
+    tx = T_ff*st*Math.cos(psi) + m*ax;
+    ty = T_ff*st*Math.sin(psi) + m*ay;
+    tz = T_ff*ct + m*az;
+    // ★ 자세를 트림에서 크게 벗어나지 못하게 묶는다. 트림 80 도면 추력의
+    //   수직성분이 17% 뿐이라 고도 권한이 거의 없다. 피드백이 거기서 더
+    //   눕히면 속도가 폭주하고 떨어진다 (153 m/s 까지 가서 지면에 닿았다).
+    tiltCap = Math.min(tiltCap, thT + 8.0 * Math.PI / 180);
+  } else {
+    const Fa = CTRLS[CTRL].ff ? aeroWorld(x) : [0, 0, 0];
+    tx = m*ax - Fa[0]; ty = m*ay - Fa[1]; tz = m*(az + g) - Fa[2];
+  }
 
   // ★ 추력축이 수직에서 너무 눕지 않게 **수평 요구를 깎는다**. 고도가 우선이다.
   //   앞먹임만 넣으면 제어기가 동체 양력을 믿고 90도를 넘겨 눕는다. 그러면
   //   추력의 수직성분이 사라져 양력에만 매달리고, 받음각이 조금만 변해도
   //   떨어진다 — 실제로 383 km/h 로 날면서 고도를 계속 잃었다.
   const hz = Math.hypot(tx, ty);
-  const lim = Math.max(tz, 1e-6) * Math.tan(CTRLS[CTRL].tilt * Math.PI / 180);
+  const lim = Math.max(tz, 1e-6) * Math.tan(tiltCap);
   if (hz > lim && hz > 1e-9){ const s2 = lim/hz; tx *= s2; ty *= s2; }
-  const tn = Math.hypot(tx, ty, tz) || 1e-9;
+  const tn0 = Math.hypot(tx, ty, tz);
+  const tn = tn0 || 1e-9;
 
   // 원하는 자세. 로켓형은 **동체 x(기수)** 가 추력 방향이다.
   const xb = [tx/tn, ty/tn, tz/tn];
@@ -646,7 +749,7 @@ function reset(){
   // 지상에서 시작한다. 예전엔 목표 고도에 바로 놓고 시작해 이륙 단계가 아예
   // 없었다 — 미션의 첫 구간이 통째로 빠져 있던 셈이다.
   X = D.x0.slice(); X[2] = 0; T = 0; sat = 0; cmdSpd = 0; altI = 0;
-  omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0];
+  omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;
   trailN = 0;
   if (trail) trail.geometry.setDrawRange(0, 0);
 }
@@ -980,9 +1083,61 @@ function drawSegs(){
     + "<span class='leg'>" + Object.values(SEGS).map(c =>
         "<span style='color:" + c[1] + "'>■</span>" + c[0]).join(" ") + "</span></div>";
 }
+// ── 채점 ─────────────────────────────────────────────────────────────
+// 옛 미션 평가와 같은 기준이다. 속도·고도 추종 RMSE 에 **|ω| 를 반드시 함께**
+// 본다 — RMSE 만으로는 텀블을 못 잡는다 (|ω| 79 인데 z 오차 1.46 인 사례가 있었다).
+function score(){
+  const n = REC.length;
+  if (n < 20) return null;
+  // 순항 구간만 본다. 상승·가속 중의 오차는 추종 성능이 아니다.
+  const cruise = REC.filter(r => r.seg === "cruise");
+  const use = cruise.length > 20 ? cruise : REC.slice(Math.floor(n * 0.5));
+  let sv = 0, sz = 0, maxOm = 0, maxTilt = 0, over25 = 0;
+  const alt = +$("#alt").value;
+  for (const r of use){
+    sv += (r.V - r.cmd) ** 2;
+    sz += (r.x[2] - alt) ** 2;
+  }
+  for (const r of REC){
+    const om = Math.hypot(r.x[10], r.x[11], r.x[12]);
+    maxOm = Math.max(maxOm, om);
+    if (om > 25) over25 += REC_EVERY;
+    const qx=r.x[6], qy=r.x[7], qz=r.x[8], qw=r.x[9];
+    maxTilt = Math.max(maxTilt,
+      Math.acos(Math.max(-1, Math.min(1, 2*(qx*qz - qy*qw)))) * 180/Math.PI);
+  }
+  const rmseV = Math.sqrt(sv / use.length), rmseZ = Math.sqrt(sz / use.length);
+  // 실기 실패 판정 (프로젝트 기준): |ω| > 35 자이로 포화, 또는 |ω| > 25 가 0.2 s 지속
+  const tumble = maxOm > 35 || over25 > 0.2;
+  const crashed = REC.some(r => r.x[2] < 1 && r.t > 20);
+  return {rmseV, rmseZ, maxOm, maxTilt, tumble, crashed,
+          vmax: Math.max(...REC.map(r => r.V)), n: use.length,
+          pass: !tumble && !crashed && rmseZ < 20};
+}
+function drawScore(){
+  const el = $("#score");
+  if (el.hidden) return;
+  const s2 = score();
+  if (!s2){ $("#scoreBody").innerHTML =
+    "<p>기록이 모자랍니다. ▶ 로 좀 더 날려보세요.</p>"; return; }
+  const row = (k, v, cls) => "<tr><td>" + k + "</td><td"
+    + (cls ? " class='" + cls + "'" : "") + ">" + v + "</td></tr>";
+  $("#scoreBody").innerHTML = "<table>"
+    + row("최고 속도", s2.vmax.toFixed(1) + " m/s · " + (s2.vmax*3.6).toFixed(0) + " km/h")
+    + row("속도 RMSE", s2.rmseV.toFixed(2) + " m/s", s2.rmseV < 3 ? "ok" : "warn")
+    + row("고도 RMSE", s2.rmseZ.toFixed(2) + " m", s2.rmseZ < 5 ? "ok" : (s2.rmseZ < 20 ? "warn" : "bad"))
+    + row("최대 |ω|", s2.maxOm.toFixed(2) + " rad/s", s2.tumble ? "bad" : "ok")
+    + row("최대 기울임", s2.maxTilt.toFixed(0) + "°")
+    + row("지면 접촉", s2.crashed ? "있음" : "없음", s2.crashed ? "bad" : "ok")
+    + row("판정", s2.pass ? "통과" : "실패", s2.pass ? "ok" : "bad")
+    + "</table>"
+    + "<p>순항 구간 " + s2.n + " 샘플. <b>RMSE 만 보면 안 됩니다</b> — 텀블은 "
+    + "|ω| 로만 잡힙니다. 실기 실패 기준은 |ω| &gt; 35 rad/s 또는 25 초과가 0.2 s 지속입니다.</p>";
+}
 function paint(d){
   render3D(d);
   drawSegs();
+  drawScore();
   const upto = curIdx() + 1;
   plot("#p1", REC.slice(0, upto).map(r => r.V), REC.slice(0, upto).map(r => r.cmd));
   plot("#p2", REC.slice(0, upto).map(r => r.al));
@@ -1070,7 +1225,7 @@ function initUI(){
   const updCtrl = () => {
     CTRL = sel.value;
     $("#ctrlNote").textContent = CTRLS[CTRL].note;
-    omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0];   // 전환 시 INDI 초기화
+    omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;   // 전환 시 INDI 초기화
   };
   sel.addEventListener("change", updCtrl); updCtrl();
   buildCoefs();
@@ -1096,6 +1251,10 @@ function initUI(){
       $("#follow").click();
     }
   });
+  $("#scoreBtn").addEventListener("click", () => {
+    const el = $("#score"); el.hidden = !el.hidden; drawScore();
+  });
+  $("#scoreClose").addEventListener("click", () => { $("#score").hidden = true; });
   $("#follow").addEventListener("click", e => {
     ORB.follow = !ORB.follow;
     e.target.setAttribute("aria-pressed", String(ORB.follow));
