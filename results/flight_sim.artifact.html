@@ -737,6 +737,18 @@ const RTI_WIDX = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 let rtiU = null, rtiLast = -1e9, rtiOut = null, rtiApplied = null, rtiStat = null;
 let vTrimRef = 0;   // 자세 기준을 뽑을 속도 (controlHybrid 가 넣는다)
 let ROLL_HOLD_OUTSIDE = true;   // A/B 로 재보려고 let
+// INDI 증분 한계 [N·m]. 권한의 일정 비율. 아래에서 기체 값으로 채운다.
+// 스윕으로 고른 값. 통과 구간이 0.15~0.18 이고 0.12·0.22 는 실패한다.
+let INDI_FRAC = 0.16;
+let INDI_LIM = [0.5, 17.5, 17.5];
+// 권한을 기체 값에서 한 번 계산해 둔다. control() 과 controlHybrid() 가 같이 쓴다.
+function setIndiLim(){
+  const Tm = P.k_T * P.n_max * P.n_max;
+  const rollAuth  = 4 * P.k_Q * P.n_max * P.n_max;              // 로터 항력토크
+  const pitchAuth = 2 * Math.abs(P.rotor_positions[0][2]) * Tm * 2;  // 차동추력
+  INDI_LIM = [INDI_FRAC*rollAuth, INDI_FRAC*pitchAuth, INDI_FRAC*pitchAuth];
+}
+setIndiLim();
 
 // 자유변수만 뽑아 촐레스키로 푼다. H 는 대칭 양정. 실패하면 null.
 function cholSolve(H, b, m){
@@ -1321,6 +1333,11 @@ function control(x, cmd){
     }
     // 증분에 한계를 둔다. 모터가 1 차 지연(tau_m)으로 따라오는데 증분을 무한정
     // 쌓으면 감기(windup)로 발산한다. 첫 시도에서 |ω| 가 45 rad/s 까지 갔다.
+    // ★ 여기는 J[i]*25 를 그대로 둔다. 하이브리드 쪽은 권한 비례로 바꿔
+    //   텀블이 사라졌는데(|ω| 47.5 -> 14.4), 같은 값을 이 제어기에 넣으니
+    //   되레 추락했다 (천장 포화 66 %, 599 km/h). 이 제어기는 틸트 한계 55 도
+    //   와 옛 증분 한계에 맞춰 조율돼 있어서, 권한만 늘리면 과구동이 된다.
+    //   바꾸려면 여기 게인까지 같이 다시 잡아야 한다 — 지금 할 일이 아니다.
     const M = [0, 0, 0];
     for (let i = 0; i < 3; i++){
       const lim = J[i] * 25.0;
@@ -1429,9 +1446,17 @@ function controlHybrid(x, cmd){
     const raw = (om[i] - omPrev[i]) / DT;
     omDotF[i] += a * (raw - omDotF[i]);
   }
+  // ★ 증분 한계를 **권한 비례**로. 예전에는 J[i]*25, 즉 모든 축에 똑같이
+  //   25 rad/s^2 였다. 그런데 Ixx 가 Iyy 의 1/35 라 롤에서는 그게 0.5 N·m
+  //   밖에 안 된다. 실측하면 롤 외란이 ω̇ 88 rad/s^2 RMS(최대 191)로 오는데
+  //   INDI 가 낼 수 있는 것이 25 뿐이라 **구조적으로 못 따라잡는다.**
+  //   (피치·요는 명령 8.2 에 실제 10.2 로 잘 따라간다 — 롤만 문제다.)
+  //   한계를 실제 모멘트 권한의 일정 비율로 잡으면 축마다 알맞게 나온다.
+  //     롤    로터 항력토크  4*k_Q*n_max^2      = 64.8 N·m
+  //     피치/요 차동추력    2*arm*k_T*n_max^2   = 68.7 N·m
   const M = [0,0,0];
   for (let i=0;i<3;i++){
-    const lim = J[i]*25.0;
+    const lim = INDI_LIM[i];
     let m2 = Mprev[i] + J[i]*(nu[i] - omDotF[i]);
     M[i] = m2 > lim ? lim : (m2 < -lim ? -lim : m2);
   }
