@@ -99,15 +99,26 @@ def _body_aerodynamics(v_body, omega, p):
 # ════════════════════════════════════════════════════
 
 def _rotor_forces_moments(v_body, n_vec, omega, p):
-    """
-    4로터 추력·모멘트 (RotorPy 방식 + 전진비).
+    """4로터 추력·모멘트 (RotorPy 방식 + 전진비).
 
-    추력 방향: body -z (위로 뜸).
-    V_axial = -w_b (로터 추력축 방향 유입속도).
+    추력축은 p['thrust_axis'] 로 고른다.
+
+      'z' (기본, 역호환) — 추력이 동체 -z. 어뢰형 동체를 수평으로 달고 일반
+          쿼드처럼 숙여서 나는 배치. 로터가 동체 xy 평면에 있다.
+          V_axial = -w_b.
+
+      'x' — 추력이 동체 +x(기수). 로터가 **동체축에 수직인 yz 평면**에 놓여
+          기수축을 둘러싼다. 호버에서 기수가 위를 보고, 순항은 눕혀서 난다.
+          추진까지 축대칭인 로켓형 배치. V_axial = u_b.
+
+    두 배치는 로터 기하와 추력 방향만 다르고 나머지 항(전진비·반토크·자이로)의
+    구조는 같다. 부호를 손으로 옮기다 틀리기 쉬운 자리라 한 함수 안에 나란히
+    두고 축만 갈랐다.
     """
-    # V_axial: 로터 디스크 위에서 아래로 흐르는 공기 속도
-    # (클라이밍 시 양수 → 추력 감소)
-    V_axial = ca.fmax(-v_body[2], 0.0)
+    axis = p.get('thrust_axis', 'z')
+
+    # 로터 추력축 방향 유입속도. 이 축이 바뀌면 전진비도 같이 바뀐다.
+    V_axial = ca.fmax(v_body[0], 0.0) if axis == 'x' else ca.fmax(-v_body[2], 0.0)
 
     pos = p['rotor_positions']     # (4,3)
     dirs = p['rotor_directions']   # (4,)
@@ -121,7 +132,6 @@ def _rotor_forces_moments(v_body, n_vec, omega, p):
         di = float(dirs[i])
         ri = pos[i]
 
-        # 전진비
         n_rps = ni / (2.0 * ca.pi)
         J = V_axial / (n_rps * p['D_prop'] + EPS)
         fac = ca.fmax(1.0 - J / p['J_max'], 0.0)
@@ -129,30 +139,26 @@ def _rotor_forces_moments(v_body, n_vec, omega, p):
         Ti = p['k_T'] * ni**2 * fac
         Qi = p['k_Q'] * ni**2 * fac
 
-        # 추력 [0, 0, -T] (body -z = 위)
-        F_tot += ca.vertcat(0.0, 0.0, -Ti)
-
-        # 추력 모멘트: r × [0, 0, -T]
-        # M_x = r_y·(-T), M_y = -r_x·(-T) = r_x·T, M_z = 0
-        # 아래는 교차곱 직접 전개
-        M_tot += ca.vertcat(
-            ri[1] * (-Ti),      # r_y · (-T)
-           -ri[0] * (-Ti),      # r_x · T  (= -r_x·(-T))
-            0.0)
-
-        # 반토크: CW(dir=+1) → body에 CCW 반작용
-        # z-down에서 CW(+z 방향) = 정방향, 반작용 = -z 방향 = -dir·Q
-        # RotorPy와 동일 부호: M_z_reaction = dir · k_m · n²
-        # (z-up에선 CW→CCW반작용=+z, z-down에선 CW→CCW반작용=-z지만
-        #  'dir'의 부호 규약이 프레임 따라 정의되므로 일관되게 사용)
-        M_tot += ca.vertcat(0.0, 0.0, di * Qi)
+        if axis == 'x':
+            # 추력 [T, 0, 0].  모멘트 r x [T,0,0] = [0, r_z·T, -r_y·T]
+            F_tot += ca.vertcat(Ti, 0.0, 0.0)
+            M_tot += ca.vertcat(0.0, ri[2] * Ti, -ri[1] * Ti)
+            M_tot += ca.vertcat(di * Qi, 0.0, 0.0)      # 반토크는 스핀축(=x) 둘레
+        else:
+            # 추력 [0, 0, -T] (body -z = 위).  모멘트 r x [0,0,-T]
+            F_tot += ca.vertcat(0.0, 0.0, -Ti)
+            M_tot += ca.vertcat(ri[1] * (-Ti), -ri[0] * (-Ti), 0.0)
+            M_tot += ca.vertcat(0.0, 0.0, di * Qi)
 
         h_net += p['I_rotor'] * ni * di
 
-    # 자이로: τ = -ω × h,  h = [0, 0, h_net] (로터 스핀축 = body z)
-    # ω × [0,0,h] = [ω_y·h, -ω_x·h, 0]
-    # τ_gyro = -[ω_y·h, -ω_x·h, 0] = [-ω_y·h, ω_x·h, 0]
-    M_tot += ca.vertcat(-omega[1]*h_net, omega[0]*h_net, 0.0)
+    # 자이로: tau = -omega x h,  h 는 로터 스핀축 방향
+    if axis == 'x':
+        # h = [h,0,0];  omega x h = [0, w_z·h, -w_y·h];  tau = -그것
+        M_tot += ca.vertcat(0.0, -omega[2] * h_net, omega[1] * h_net)
+    else:
+        # h = [0,0,h];  omega x h = [w_y·h, -w_x·h, 0];  tau = -그것
+        M_tot += ca.vertcat(-omega[1] * h_net, omega[0] * h_net, 0.0)
 
     return F_tot, M_tot
 
@@ -206,7 +212,8 @@ def compute_allocation_matrix(params):
 
     추력 방향 [0,0,-1] 기준 교차곱으로 자동 생성.
     """
-    e_thrust = np.array([0, 0, -1])
+    axis = params.get('thrust_axis', 'z')
+    e_thrust = np.array([1, 0, 0]) if axis == 'x' else np.array([0, 0, -1])
     k = params['k_Q'] / params['k_T']
     pos = params['rotor_positions']
     dirs = params['rotor_directions']
@@ -216,9 +223,17 @@ def compute_allocation_matrix(params):
     for i in range(nr):
         A[0, i] = 1.0                                  # T_total
         m = np.cross(pos[i], e_thrust)                  # r × e_thrust
-        A[1, i] = m[0]                                  # Mx
-        A[2, i] = m[1]                                  # My
-        A[3, i] = dirs[i] * k                           # Mz (반토크)
+        # 행 순서는 **축과 무관하게** [T_total, Mx, My, Mz] 로 고정한다.
+        # 축마다 순서가 달라지면 쓰는 쪽이 조용히 어긋난다 — 실제로 그렇게
+        # 제어기가 무너졌다. 반토크는 스핀축(추력축) 둘레에 걸린다.
+        if axis == 'x':
+            A[1, i] = dirs[i] * k                       # Mx (반토크, 스핀축 = x)
+            A[2, i] = m[1]                              # My
+            A[3, i] = m[2]                              # Mz
+        else:
+            A[1, i] = m[0]                              # Mx
+            A[2, i] = m[1]                              # My
+            A[3, i] = dirs[i] * k                       # Mz (반토크, 스핀축 = z)
 
     return A, np.linalg.inv(A)
 

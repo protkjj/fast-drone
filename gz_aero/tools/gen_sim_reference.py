@@ -28,7 +28,8 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from control.vehicle_params import vehicle_params as VP   # noqa: E402
+from control.vehicle_params import vehicle_params as VP_Z   # noqa: E402
+from control.vehicle_params import rocket_params as VP     # noqa: E402
 
 EPS = 1e-8
 NX = 17
@@ -41,6 +42,7 @@ def params():
         "C_Na", "C_dc", "C_A0", "C_Aa2", "x_cp", "C_mq", "C_lp",
         "num_rotors", "D_prop", "k_T", "k_Q", "J_max", "I_rotor",
         "tau_m", "n_min", "n_max")}
+    p["thrust_axis"] = VP.get("thrust_axis", "z")
     p["rotor_positions"] = [[float(v) for v in r] for r in VP["rotor_positions"]]
     p["rotor_directions"] = [float(v) for v in VP["rotor_directions"]]
     p["S_ref"] = float(p["S_ref"])
@@ -92,9 +94,13 @@ def plain_xdot(x, u, w, p):
     Mz += df * p["C_mq"] * om[2]
 
     # ── 로터 ────────────────────────────────────────────────────────
-    V_axial = -wb if -wb > 0.0 else 0.0
+    # thrust_axis 'x' = 로터가 동체축에 수직인 평면에 놓이고 추력이 기수 방향
+    #                   (로켓형, 추진까지 축대칭)
+    # thrust_axis 'z' = 추력이 동체 -z (어뢰 동체를 수평으로 단 일반 쿼드, 역호환)
+    ax_is_x = p["thrust_axis"] == "x"
+    V_axial = (ub if ub > 0.0 else 0.0) if ax_is_x else (-wb if -wb > 0.0 else 0.0)
     h_net = 0.0
-    Frz = 0.0
+    Frx = Frz = 0.0
     for i in range(int(p["num_rotors"])):
         ni = nv[i]
         di = p["rotor_directions"][i]
@@ -106,16 +112,26 @@ def plain_xdot(x, u, w, p):
             fac = 0.0
         Ti = p["k_T"] * ni * ni * fac
         Qi = p["k_Q"] * ni * ni * fac
-        Frz += -Ti
-        Mx += ri[1] * (-Ti)
-        My += -ri[0] * (-Ti)
-        Mz += di * Qi
+        if ax_is_x:
+            Frx += Ti
+            My += ri[2] * Ti
+            Mz += -ri[1] * Ti
+            Mx += di * Qi
+        else:
+            Frz += -Ti
+            Mx += ri[1] * (-Ti)
+            My += -ri[0] * (-Ti)
+            Mz += di * Qi
         h_net += p["I_rotor"] * ni * di
 
-    Mx += -om[1] * h_net
-    My += om[0] * h_net
+    if ax_is_x:
+        My += -om[2] * h_net
+        Mz += om[1] * h_net
+    else:
+        Mx += -om[1] * h_net
+        My += om[0] * h_net
 
-    Fbx, Fby, Fbz = Fx, Fy, Fz + Frz
+    Fbx, Fby, Fbz = Fx + Frx, Fy, Fz + Frz
 
     # ── 조립 ────────────────────────────────────────────────────────
     m = p["mass"]
@@ -172,9 +188,18 @@ def rk4_step(x, u, w, p, dt, sub=4):
 
 
 def hover_state(p):
+    """호버 자세. 추력축이 월드 +z 를 보게 한다.
+
+    'z' 배치: 추력이 동체 -z 이므로 x 축 180도 (q = [1,0,0,0]).
+    'x' 배치: 추력이 동체 +x 이므로 y 축 -90도 -> 기수가 위를 본다.
+    """
     n = math.sqrt(p["mass"] * p["g"] / (4.0 * p["k_T"]))
     x = [0.0] * NX
-    x[6] = 1.0                # qx = 1 → 180° about x (동체 z-down)
+    if p["thrust_axis"] == "x":
+        c = math.cos(-math.pi / 4.0)
+        x[6], x[7], x[8], x[9] = 0.0, math.sin(-math.pi / 4.0), 0.0, c
+    else:
+        x[6] = 1.0
     for i in range(13, 17):
         x[i] = n
     return x

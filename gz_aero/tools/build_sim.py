@@ -156,7 +156,8 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
   font:400 12px/1.65 "IBM Plex Mono",monospace; color:#D3DCE6;
   text-shadow:0 1px 3px rgba(0,0,0,.8)}
 .hud b{color:#ffffff; font-weight:600}
-.viewbtns{position:absolute; right:12px; top:12px; display:flex; gap:6px}
+.viewbtns{position:absolute; right:12px; top:12px; display:flex; gap:5px;
+  flex-wrap:wrap; justify-content:flex-end; max-width:62%}
 .viewbtns button{padding:5px 10px; border:1px solid #2C3A48; border-radius:7px;
   background:rgba(10,15,21,.9); color:#AEBAC6; cursor:pointer;
   font:500 12px/1 "IBM Plex Sans",sans-serif}
@@ -227,6 +228,15 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
     <div class="gauges" id="gauges"></div>
     <details class="more">
       <summary>이 시뮬에 대해</summary>
+      <p class="note"><b>지금 기체는 로켓형입니다.</b> 로터가 동체축에 수직인
+        평면에 놓이고 추력이 기수 방향이라, 호버에서 기수가 위를 봅니다.
+        <code>vehicle_params.py</code> 의 <code>Iyy = Izz</code> 가 바로 이
+        4겹 대칭을 요구합니다.</p>
+      <p class="note"><b>제어기가 한계입니다.</b> 여기 제어기는 추력만으로 뜨는
+        멀티로터식이라, 수평 순항에 필요한 <b>동체 받음각 양력 트림</b>을 못 찾습니다.
+        그래서 170 km/h 근처에서 멈춥니다. 기체가 못 가는 게 아니라 이 제어기가
+        못 태우는 것입니다 — 프로젝트가 NMPC 를 쓰기로 한 이유가 정확히 이
+        천이·트림 문제입니다.</p>
       <p class="note">목표 속도를 올렸다 내리면 기체가 따라갑니다.
         <b>명령과 실측이 벌어지면</b> 거기가 이 기체의 한계입니다.</p>
       <p class="note">기본 설정(83 m/s 목표, 무풍)에서 <b>280 km/h</b> 에 수렴합니다.
@@ -244,8 +254,11 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
   <div class="stage">
     <div id="view"><div class="hud" id="hud"></div>
       <div class="viewbtns">
-        <button type="button" id="follow" aria-pressed="true">기체 따라가기</button>
-        <button type="button" id="reset3d">시점 초기화</button>
+        <button type="button" data-view="back">뒤에서</button>
+        <button type="button" data-view="side">옆에서</button>
+        <button type="button" data-view="top">위에서</button>
+        <button type="button" data-view="nose">기수축</button>
+        <button type="button" id="follow" aria-pressed="true">따라가기</button>
       </div>
       <div class="legend3d">
         <span><i style="background:#f2aa4c"></i>공력</span>
@@ -321,24 +334,39 @@ function xdot(x, u, w, p){
   My += df * p.C_mq * om1;
   Mz += df * p.C_mq * om2;
 
-  const V_axial = (-wb > 0.0) ? -wb : 0.0;
-  let h_net = 0.0, Frz = 0.0;
+  // thrust_axis 'x' = 로터가 동체축에 수직인 평면에 놓이고 추력이 기수 방향
+  //                   (로켓형, 추진까지 축대칭). 'z' 는 역호환용.
+  const axIsX = p.thrust_axis === "x";
+  const V_axial = axIsX ? (ub > 0.0 ? ub : 0.0) : (-wb > 0.0 ? -wb : 0.0);
+  let h_net = 0.0, Frx = 0.0, Frz = 0.0;
   for (let i = 0; i < p.num_rotors; i++){
     const ni = x[13 + i], di = p.rotor_directions[i], ri = p.rotor_positions[i];
     const n_rps = ni / (2.0 * Math.PI);
     const J = V_axial / (n_rps * p.D_prop + EPS);
     let fac = 1.0 - J / p.J_max; if (fac < 0.0) fac = 0.0;
     const Ti = p.k_T * ni * ni * fac, Qi = p.k_Q * ni * ni * fac;
-    Frz += -Ti;
-    Mx += ri[1] * (-Ti);
-    My += -ri[0] * (-Ti);
-    Mz += di * Qi;
+    if (axIsX){
+      Frx += Ti;
+      My += ri[2] * Ti;
+      Mz += -ri[1] * Ti;
+      Mx += di * Qi;
+    } else {
+      Frz += -Ti;
+      Mx += ri[1] * (-Ti);
+      My += -ri[0] * (-Ti);
+      Mz += di * Qi;
+    }
     h_net += p.I_rotor * ni * di;
   }
-  Mx += -om1 * h_net;
-  My += om0 * h_net;
+  if (axIsX){
+    My += -om2 * h_net;
+    Mz += om1 * h_net;
+  } else {
+    Mx += -om1 * h_net;
+    My += om0 * h_net;
+  }
 
-  const Fbx = Fx, Fby = Fy, Fbz = Fz + Frz;
+  const Fbx = Fx + Frx, Fby = Fy, Fbz = Fz + Frz;
   const m = p.mass;
   const ax = (R00*Fbx + R01*Fby + R02*Fbz) / m;
   const ay = (R10*Fbx + R11*Fby + R12*Fbz) / m;
@@ -397,36 +425,63 @@ function selfCheck(){
    PX4 를 옮긴 것이 아니다. 평범한 종속 루프(속도 -> 자세 -> 모멘트)다.
    여기서 보려는 것은 제어 성능이 아니라 **기체가 어디서 한계에 걸리나** 이므로
    제어기는 단순할수록 원인이 분명해진다. 검증도 플랜트만 한다. */
-const KV = 1.2, KZ = 1.0, KR = 9.0, KW = 3.2;
+// 자세 루프를 세게 잡는다. 동체가 정적 안정(x_cp 가 무게중심 뒤)이라 공력이
+// 기수를 바람 쪽으로 미는데, 비례 제어만으로는 그 모멘트를 상쇄하며 정상편차가
+// 남는다. Jy*KW*KR 이 약하면 30~60도까지 벌어져 추력축이 누워 고도를 못 버틴다.
+const KV = 1.2, KZ = 1.0, KR = 8.0, KW = 18.0;
 // 가속도 상한. 실제 PX4 시험은 0 -> 83 m/s 를 30 초에 올렸다 (2.8 m/s^2).
 // 이보다 크게 잡으면 기체가 즉시 70 도씩 누워 아무것도 안 읽힌다.
 const A_MAX = 12.0, RAMP = 3.0;
+// 고도 적분. 기체가 크게 기울면 추력의 수직성분이 줄고 동체가 반양력을 내
+// 고도가 서서히 가라앉는다. P 만으로는 정상편차가 남아 결국 지면에 닿았다.
+const KI = 0.35, I_LIM = 6.0;
+let altI = 0;
 function control(x, cmd){
   const m = P.mass, g = P.g;
   const psi = cmd.psi;
+  const eAlt = cmd.alt - x[2];
+  altI += eAlt * DT;
+  if (altI > I_LIM) altI = I_LIM; else if (altI < -I_LIM) altI = -I_LIM;
   const vdes = [cmd.spd*Math.cos(psi), cmd.spd*Math.sin(psi),
-                Math.max(-8, Math.min(8, KZ*(cmd.alt - x[2])))];
+                Math.max(-8, Math.min(8, KZ*eAlt + KI*altI))];
   let ax = KV*(vdes[0]-x[3]), ay = KV*(vdes[1]-x[4]), az = KV*(vdes[2]-x[5]);
   const an = Math.hypot(ax, ay);
   if (an > A_MAX){ ax *= A_MAX/an; ay *= A_MAX/an; }
-  // 필요한 월드 추력 벡터
   const tx = m*ax, ty = m*ay, tz = m*(az + g);
   const tn = Math.hypot(tx, ty, tz) || 1e-9;
-  // 원하는 자세: 동체 -z 가 추력 방향, 기수는 psi 쪽
-  const zbx = -tx/tn, zby = -ty/tn, zbz = -tz/tn;      // 동체 z (월드)
-  const cx = Math.cos(psi), cy = Math.sin(psi);
-  let ybx = zby*0 - zbz*cy, yby = zbz*cx - zbx*0, ybz = zbx*cy - zby*cx;
-  const yn = Math.hypot(ybx, yby, ybz) || 1e-9;
-  ybx/=yn; yby/=yn; ybz/=yn;
-  const xbx = yby*zbz - ybz*zby, xby = ybz*zbx - ybx*zbz, xbz = ybx*zby - yby*zbx;
 
-  // 현재 자세
-  const qx=x[6], qy=x[7], qz=x[8], qw=x[9];
-  const R = [[1-2*(qy*qy+qz*qz), 2*(qx*qy-qz*qw), 2*(qx*qz+qy*qw)],
-             [2*(qx*qy+qz*qw), 1-2*(qx*qx+qz*qz), 2*(qy*qz-qx*qw)],
-             [2*(qx*qz-qy*qw), 2*(qy*qz+qx*qw), 1-2*(qx*qx+qy*qy)]];
-  const Rd = [[xbx, ybx, zbx], [xby, yby, zby], [xbz, ybz, zbz]];
-  // 오차 회전 Re = R^T Rd, 축각 추출
+  // 원하는 자세. 로켓형은 **동체 x(기수)** 가 추력 방향이다.
+  const xb = [tx/tn, ty/tn, tz/tn];
+
+  const qx0=x[6], qy0=x[7], qz0=x[8], qw0=x[9];
+  const R0 = [[1-2*(qy0*qy0+qz0*qz0), 2*(qx0*qy0-qz0*qw0), 2*(qx0*qz0+qy0*qw0)],
+              [2*(qx0*qy0+qz0*qw0), 1-2*(qx0*qx0+qz0*qz0), 2*(qy0*qz0-qx0*qw0)],
+              [2*(qx0*qz0-qy0*qw0), 2*(qy0*qz0+qx0*qw0), 1-2*(qx0*qx0+qy0*qy0)]];
+
+  // ★ 두 번째 축은 **지금 자세에서 최소로 바뀌도록** 잡는다.
+  //   임의의 기준축(월드 위 / 기수 방위)으로 만들면 목표 프레임이 현재에서
+  //   180도 떨어진 쪽으로 잡히는 일이 생긴다. 그 지점에서 축각 추출이 퇴화해
+  //   오차가 0 으로 읽히고 모멘트 명령이 사라진다 — 실제로 네 로터가 전부
+  //   같은 값으로 나와 기체가 손도 못 쓰고 떨어졌다.
+  //   축대칭 기체라 기수축 둘레 롤은 공력상 의미가 없으므로, 현재 롤을 그대로
+  //   유지하는 것이 옳기도 하다.
+  let yb = [R0[0][1], R0[1][1], R0[2][1]];           // 지금 동체 y
+  const d = yb[0]*xb[0] + yb[1]*xb[1] + yb[2]*xb[2];
+  yb = [yb[0]-d*xb[0], yb[1]-d*xb[1], yb[2]-d*xb[2]];  // xb 에 수직으로 투영
+  let yn = Math.hypot(yb[0], yb[1], yb[2]);
+  if (yn < 1e-6){                                     // 지금 y 가 xb 와 나란하면
+    const alt = [R0[0][2], R0[1][2], R0[2][2]];       // 동체 z 로 대신한다
+    const d2 = alt[0]*xb[0] + alt[1]*xb[1] + alt[2]*xb[2];
+    yb = [alt[0]-d2*xb[0], alt[1]-d2*xb[1], alt[2]-d2*xb[2]];
+    yn = Math.hypot(yb[0], yb[1], yb[2]) || 1e-9;
+  }
+  yb = [yb[0]/yn, yb[1]/yn, yb[2]/yn];
+  const zb = [xb[1]*yb[2] - xb[2]*yb[1],
+              xb[2]*yb[0] - xb[0]*yb[2],
+              xb[0]*yb[1] - xb[1]*yb[0]];
+
+  const R = R0;
+  const Rd = [[xb[0], yb[0], zb[0]], [xb[1], yb[1], zb[1]], [xb[2], yb[2], zb[2]]];
   const E = [[0,0,0],[0,0,0],[0,0,0]];
   for (let i=0;i<3;i++) for (let j=0;j<3;j++){
     let s2 = 0; for (let k=0;k<3;k++) s2 += R[k][i]*Rd[k][j]; E[i][j] = s2;
@@ -437,15 +492,14 @@ function control(x, cmd){
   const es = Math.hypot(ex, ey, ez);
   if (es > 1e-9){ const k2 = ang/es; ex*=k2; ey*=k2; ez*=k2; }
 
-  const wcx = KR*ex, wcy = KR*ey, wcz = KR*ez;
   const Jx=P.Ixx, Jy=P.Iyy, Jz=P.Izz;
   const p_=x[10], q_=x[11], r_=x[12];
-  const Mx = Jx*KW*(wcx-p_) + (q_*(Jz*r_) - r_*(Jy*q_));
-  const My = Jy*KW*(wcy-q_) + (r_*(Jx*p_) - p_*(Jz*r_));
-  const Mz = Jz*KW*(wcz-r_) + (p_*(Jy*q_) - q_*(Jx*p_));
+  const Mx = Jx*KW*(KR*ex-p_) + (q_*(Jz*r_) - r_*(Jy*q_));
+  const My = Jy*KW*(KR*ey-q_) + (r_*(Jx*p_) - p_*(Jz*r_));
+  const Mz = Jz*KW*(KR*ez-r_) + (p_*(Jy*q_) - q_*(Jx*p_));
 
-  // 총추력: 현재 추력축에 투영
-  const axw = -R[0][2], ayw = -R[1][2], azw = -R[2][2];
+  // 총추력은 **현재** 추력축(동체 x 를 월드로)에 투영한다
+  const axw = R[0][0], ayw = R[1][0], azw = R[2][0];
   let T = tx*axw + ty*ayw + tz*azw;
   if (T < 0) T = 0;
 
@@ -453,7 +507,7 @@ function control(x, cmd){
   for (let i=0;i<4;i++){
     let Ti = A[i][0]*T + A[i][1]*Mx + A[i][2]*My + A[i][3]*Mz;
     if (Ti < 0) Ti = 0;
-    let ni = Math.sqrt(Ti / P.k_T);
+    const ni = Math.sqrt(Ti / P.k_T);
     n[i] = ni > P.n_max ? P.n_max : ni;
   }
   return n;
@@ -474,7 +528,7 @@ function windNow(){
   return [s*Math.cos(d), s*Math.sin(d), 0];
 }
 function reset(){
-  X = D.x0.slice(); X[2] = +$("#alt").value; T = 0; sat = 0; cmdSpd = 0;
+  X = D.x0.slice(); X[2] = +$("#alt").value; T = 0; sat = 0; cmdSpd = 0; altI = 0;
   for (const k in HIST) HIST[k].length = 0;
 }
 function diag(){
@@ -495,7 +549,9 @@ function diag(){
   const Fy = -fac*vb, Fz = -fac*wb;
   const C_A = P.C_A0 + P.C_Aa2*(vb*vb+wb*wb)/(V*V+EPS);
   const Fx = -q_bar*P.S_ref*C_A;
-  const tilt = Math.acos(Math.max(-1,Math.min(1, -R[2][2])))*180/Math.PI;
+  // 기울임 = **추력축**(로켓형은 동체 x)이 수직에서 벗어난 각.
+  const tAx = (P.thrust_axis === "x") ? R[2][0] : -R[2][2];
+  const tilt = Math.acos(Math.max(-1,Math.min(1, tAx)))*180/Math.PI;
   // 동체 공력을 월드로 돌린다. 화살표가 **실제 힘 방향**을 가리켜야 한다.
   // 예전엔 기수 방향을 그대로 써서 항력이 앞을 가리켰다.
   const Fw = [R[0][0]*Fx + R[0][1]*Fy + R[0][2]*Fz,
@@ -532,50 +588,47 @@ function init3D(){
   // 로터 추력은 동체축과 수직 — dynamics.py 의 V_axial = -w_b 가 이 배치다.
   // 물리는 처음부터 이랬고, 예전엔 프로펠러를 반투명 통짜 원판으로 그려서
   // 동체를 덮는 덩어리처럼 보였을 뿐이다.
+  // 추진까지 축대칭인 로켓 배치. 기수축(동체 +x)을 따라 내려다보면 동체 단면이
+  // 원으로 보이고 그 둘레에 로터 넷이 90도 간격으로 놓인다. 호버에서는 기수가
+  // 위를 본다 — vehicle_params 의 Iyy = Izz 가 바로 이 4겹 대칭을 요구한다.
   const skin = new THREE.MeshStandardMaterial({color:0x1b2530, roughness:.42, metalness:.4});
   const accent = new THREE.MeshStandardMaterial({color:0xb8802f, roughness:.45, metalness:.25});
-  const dark = new THREE.MeshStandardMaterial({color:0x0c131a, roughness:.6, metalness:.3});
+  const tipM = new THREE.MeshStandardMaterial({color:0xd8402f, roughness:.4});
   const blade = new THREE.MeshStandardMaterial({color:0x18222c, roughness:.65,
                   transparent:true, opacity:.5, side:THREE.DoubleSide});
 
   veh = new THREE.Group();
-  // CapsuleGeometry 는 three r128 에 없다 (r140 대에 들어왔다). 원통 + 구 캡으로
-  // 만든다. 최신 API 를 그냥 쓰면 페이지가 통째로 죽는다 — 실제로 그랬다.
-  const fus = new THREE.Mesh(new THREE.CylinderGeometry(.075, .075, .68, 26), skin);
+  const fus = new THREE.Mesh(new THREE.CylinderGeometry(.075, .075, .70, 28), skin);
   fus.rotation.z = -Math.PI/2; veh.add(fus);
-  for (const sx of [.34, -.34]){
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(.075, 26, 16), skin);
-    cap.position.x = sx; veh.add(cap);
-  }
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(.0775, .0775, .075, 26), accent);
-  band.rotation.z = -Math.PI/2; band.position.x = .17; veh.add(band);
-  const duct = new THREE.Mesh(new THREE.CylinderGeometry(.062, .07, .10, 24), dark);
-  duct.rotation.z = -Math.PI/2; duct.position.x = -.44; veh.add(duct);
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(.075, .26, 28), tipM);
+  cone.rotation.z = -Math.PI/2; cone.position.x = .48; veh.add(cone);
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(.062, .05, .12, 24), skin);
+  tail.rotation.z = -Math.PI/2; tail.position.x = -.41; veh.add(tail);
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(.0785, .0785, .07, 28), accent);
+  ring.rotation.z = -Math.PI/2; veh.add(ring);
 
-  const ARM = 0.25 / Math.SQRT2;              // vehicle_params: arm/√2 = 0.1768
-  const RPROP = 0.30 / 2;                     // D_prop = 0.30 m
+  const ARM = 0.25 / Math.SQRT2;      // 기수축 둘레 반지름 (vehicle_params)
+  const RPROP = 0.30 / 2;
   PROPS.length = 0;
-  for (const ph of [Math.PI/4, 3*Math.PI/4, -3*Math.PI/4, -Math.PI/4]){
-    const cx = Math.cos(ph), cy = Math.sin(ph);
-    const L = ARM * 1.02;
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(L, .030, .018), accent);
-    arm.position.set(L/2*cx, L/2*cy, -.012);
-    arm.rotation.z = ph;
+  // 로터는 yz 평면(동체축에 수직)에 90도 간격. rocket_params 의 위치와 같다.
+  for (const [py, pz] of [[ARM, ARM], [-ARM, ARM], [-ARM, -ARM], [ARM, -ARM]]){
+    const r = Math.hypot(py, pz), ph = Math.atan2(pz, py);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(.020, r, .020), accent);
+    arm.position.set(0, py/2, pz/2);
+    arm.rotation.x = -ph;            // 길이축(y)을 (py,pz) 방향으로 돌린다
     veh.add(arm);
-    const pod = new THREE.Mesh(new THREE.CylinderGeometry(.026,.030,.070,16), accent);
-    pod.rotation.x = Math.PI/2; pod.position.set(ARM*cx, ARM*cy, -.030);
+    const pod = new THREE.Mesh(new THREE.CylinderGeometry(.026,.030,.075,16), accent);
+    pod.rotation.z = -Math.PI/2; pod.position.set(.02, py, pz);
     veh.add(pod);
-    // 프로펠러는 원판이 아니라 날 두 장으로. 원판으로 그리면 서로 겹쳐 보여
-    // 기체가 덩어리가 된다.
     const prop = new THREE.Group();
     for (let k = 0; k < 2; k++){
-      const bl = new THREE.Mesh(new THREE.BoxGeometry(RPROP*.96, .030, .004), blade);
-      bl.position.x = RPROP*.48;
+      const bl = new THREE.Mesh(new THREE.BoxGeometry(.004, RPROP*.96, .030), blade);
+      bl.position.y = RPROP*.48;
       const holder = new THREE.Group();
-      holder.add(bl); holder.rotation.z = k * Math.PI;
+      holder.add(bl); holder.rotation.x = k * Math.PI;
       prop.add(holder);
     }
-    prop.position.set(ARM*cx, ARM*cy, -.068);
+    prop.position.set(.066, py, pz);
     veh.add(prop);
     PROPS.push(prop);
   }
@@ -647,7 +700,7 @@ function render3D(d){
   veh.quaternion.set(X[6], X[7], X[8], X[9]);
   // 로터를 실제 회전수 n [rad/s] 로 돌린다. 방향은 rotor_directions 대로.
   for (let i = 0; i < PROPS.length; i++)
-    PROPS[i].rotation.z += P.rotor_directions[i] * X[13+i] * 0.016;
+    PROPS[i].rotation.x += P.rotor_directions[i] * X[13+i] * 0.016;
   if (trailN < 4000){
     trailPos[trailN*3] = X[0]; trailPos[trailN*3+1] = X[1]; trailPos[trailN*3+2] = X[2];
     trailN++;
@@ -858,11 +911,20 @@ function initUI(){
     e.target.setAttribute("aria-pressed", String(ORB.follow));
     if (!running) paint(diag());
   });
-  $("#reset3d").addEventListener("click", () => {
-    ORB.az = -2.3; ORB.el = 0.32; ORB.dist = 15; ORB.follow = true;
-    $("#follow").setAttribute("aria-pressed", "true");
-    if (!running) paint(diag());
-  });
+  // 시점 프리셋. 마우스로도 되지만 정해진 각도에서 보고 싶을 때가 있다.
+  // '기수축'은 동체축을 따라 내려다보는 시점이라 **단면이 원으로 보이고**
+  // 로터 넷이 그 둘레에 놓인 것을 확인할 수 있다 — 축대칭인지 보는 자리다.
+  const VIEWS = {
+    back: [-2.36, 0.30, 15], side: [-1.57, 0.12, 14],
+    top:  [-2.36, 1.35, 16], nose: [0.0, 0.0, 9],
+  };
+  for (const b of document.querySelectorAll("[data-view]"))
+    b.addEventListener("click", () => {
+      const v = VIEWS[b.dataset.view];
+      ORB.az = v[0]; ORB.el = v[1]; ORB.dist = v[2];
+      ORB.follow = true; $("#follow").setAttribute("aria-pressed", "true");
+      if (!running) paint(diag());
+    });
   $("#rst").addEventListener("click", () => {
     reset(); trailN = 0; trail.geometry.setDrawRange(0,0); paint(diag());
   });
