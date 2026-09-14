@@ -283,9 +283,15 @@ function selfCheck(){
 
 /* ── 캔버스 ──────────────────────────────────────────────────────── */
 function setup(cv){
-  const r = window.devicePixelRatio || 1;
-  const w = cv.clientWidth, h = +cv.getAttribute("height");
+  // ⚠ 의도한 높이를 **한 번만** 기억한다. cv.height 에 배율을 곱해 쓰는 순간
+  //   그 속성 자체가 바뀌므로, 다시 그릴 때 getAttribute 로 읽으면 420 -> 840
+  //   -> 1680 로 매번 두 배가 된다. 슬라이더를 움직일수록 캔버스가 커져
+  //   페이지가 흰 기둥으로 덮이고 느려진다. 실제로 그렇게 터졌다.
+  if (!cv._h) cv._h = +cv.getAttribute("height");
+  const r = Math.min(window.devicePixelRatio || 1, 2);
+  const w = cv.clientWidth, h = cv._h;
   cv.width = w * r; cv.height = h * r;
+  cv.style.height = h + "px";
   const c = cv.getContext("2d");
   c.setTransform(r, 0, 0, r, 0, 0);
   c.clearRect(0, 0, w, h);
