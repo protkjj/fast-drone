@@ -488,8 +488,12 @@ function selfCheck(){
 const NV = 13, NUV = 4;
 const NMPC = {N:20, dt:0.08, rate:0.05, iters:40,
               Qv:[5,5,10], Qz:20, Qw:1, R:[1e-5,1e-3,1e-3,1e-3],
-              Rdu:[1e-4,0.01,0.01,0.01], nuMax:100};
-let nmpcU = null, nmpcLast = -1e9, nmpcOut = null;
+              // Rdu[0] 를 1e-4 에서 1e-3 으로. 700 N 변화에 벌점이 49 뿐이라
+              // 고도항(수만) 앞에서 없는 것과 같았다. 0.05 까지 올려 봤더니
+              // 반대로 T=0 에 갇혔다 — 한 번 0 이 되면 올리는 데 0.05*T^2 이
+              // 들어 스스로 덫이 된다. 실제로 그 설정에서 추락했다.
+              Rdu:[1e-3,0.01,0.01,0.01], nuMax:100};
+let nmpcU = null, nmpcLast = -1e9, nmpcOut = null, nmpcApplied = null;
 
 function vXdot(x, u, p){
   const qx=x[6], qy=x[7], qz=x[8], qw=x[9];
@@ -527,8 +531,11 @@ function vStep(x, u, dt, p){
   if (qn>1e-10) for(let i=6;i<10;i++) y[i]/=qn;
   return y;
 }
-function nmpcCost(x0, U, vref, zref, uref){
-  const C = NMPC; let J = 0, x = x0, uPrev = uref;
+// uLast = 직전에 실제로 낸 입력. 이걸 안 주고 uref(호버)로 두면 풀이 사이에
+// 연속성이 없어서 첫 수가 매번 0 과 상한을 오간다 — 실제로 추력이 0 <-> 767 로
+// 떨었다. MPC 는 "지금 내고 있는 것" 에서 얼마나 움직이는지를 벌해야 한다.
+function nmpcCost(x0, U, vref, zref, uref, uLast){
+  const C = NMPC; let J = 0, x = x0, uPrev = uLast || uref;
   for (let k=0;k<C.N;k++){
     const u = U.slice(k*NUV, k*NUV+NUV);
     x = vStep(x, u, C.dt, P);
@@ -549,7 +556,7 @@ function nmpcCost(x0, U, vref, zref, uref){
   return J;
 }
 function nmpcSolve(x0, vref, zref){
-  const C = NMPC, n = C.N*NUV;
+  const C = NMPC, n = C.N*NUV, uL = nmpcApplied;
   const Tmax = 4*P.k_T*P.n_max*P.n_max, Tref = P.mass*P.g;
   const uref = [Tref, 0, 0, 0];
   const lo = [0, -C.nuMax, -C.nuMax, -C.nuMax];
@@ -566,14 +573,14 @@ function nmpcSolve(x0, vref, zref){
   clamp(nmpcU);
   // 스케일. T 는 수십~수백 N, ν 는 수십 rad/s^2 라 한 걸음 크기가 다르다.
   const sc = []; for (let k=0;k<C.N;k++) sc.push(Tmax, C.nuMax, C.nuMax, C.nuMax);
-  let J0 = nmpcCost(x0, nmpcU, vref, zref, uref);
+  let J0 = nmpcCost(x0, nmpcU, vref, zref, uref, uL);
   let step = 0.08;
   for (let it=0; it<C.iters; it++){
     const g = new Array(n);
     for (let j=0;j<n;j++){
       const h = sc[j]*1e-4, save = nmpcU[j];
       nmpcU[j] = save + h;
-      g[j] = (nmpcCost(x0, nmpcU, vref, zref, uref) - J0) / h;
+      g[j] = (nmpcCost(x0, nmpcU, vref, zref, uref, uL) - J0) / h;
       nmpcU[j] = save;
     }
     let gn = 0; for (let j=0;j<n;j++) gn += (g[j]*sc[j])**2;
@@ -583,13 +590,14 @@ function nmpcSolve(x0, vref, zref){
       const U2 = nmpcU.slice();
       for (let j=0;j<n;j++) U2[j] -= step*sc[j]*sc[j]*g[j]/gn;
       clamp(U2);
-      const J2 = nmpcCost(x0, U2, vref, zref, uref);
+      const J2 = nmpcCost(x0, U2, vref, zref, uref, uL);
       if (J2 < J0){ nmpcU = U2; J0 = J2; step *= 1.3; ok = true; break; }
       step *= 0.4;
     }
     if (!ok) break;
   }
-  return nmpcU.slice(0, NUV);
+  nmpcApplied = nmpcU.slice(0, NUV);
+  return nmpcApplied.slice();
 }
 
 /* ══ 제어기 ═══════════════════════════════════════════════════════════
@@ -609,6 +617,8 @@ const KV = 1.2, KZ = 1.0, KR = 8.0, KW = 18.0;
 // 오차를 +-20 도로 잘라 천천히 되돌리는 안도 재봤는데 되레 나빴다 —
 // 요구 회전율이 0.14 rad/s 로 줄어 trim 이 80 도에서 못 돌아왔다. 안 쓴다.
 let KR_R = 0.4, KW_R = 2.0, W_R_MAX = 25.0;
+// NMPC 에 주는 고도 기준의 상승률 상한 [m/s]. 종속 루프의 clamp 와 같은 뜻.
+const VZ_REF_MAX = 12.0;
 // 가속도 상한. 실제 PX4 시험은 0 -> 83 m/s 를 30 초에 올렸다 (2.8 m/s^2).
 // 이보다 크게 잡으면 기체가 즉시 70 도씩 누워 아무것도 안 읽힌다.
 const A_MAX = 12.0, RAMP = 3.0;
@@ -637,9 +647,11 @@ const CTRLS = {
                  + "그 사이를 찾는 것이 NMPC 의 일이다. "
                  + "롤까지 유지되는 유일한 제어기다 (|p| 0.6, 롤 오차 0도)."},
   hybrid:  {name:"하이브리드 NMPC+INDI (실험)", ff:true, tilt:80, indi:true, nmpc:true,
-            note:"⚠ 아직 안정적으로 못 법니다. 13차 가상모델을 브라우저에서 직접 "
-                 + "풀지만(압축+투영경사), 추력 0·최대 회전율 같은 나쁜 국소해에 "
-                 + "갇혀 고도를 잃습니다. 제대로 된 SQP/내점법이 필요하다는 증거입니다."},
+            note:"⚠ 아직 불안정합니다. 13차 가상모델을 브라우저에서 직접 풉니다"
+                 + "(압축+투영경사). 솔버는 수렴합니다 — 낸 해가 최선의 정속추력보다 "
+                 + "비용이 2배 낮습니다. 남은 문제는 한 번 푸는 데 150 ms 라 "
+                 + "20 Hz 예산 50 ms 를 3배 넘는 것과, 비용함수에 자세 기준이 없어 "
+                 + "롤을 바깥에서 얹어야 하는 것입니다. 실시간은 SQP/acados 가 필요합니다."},
   indi:    {name:"INDI 내부루프", ff:true, tilt:55, indi:true,
             note:"측정 각가속도를 되먹여 증분으로 모멘트를 낸다. 모델오차에 강하다. "
                  + "⚠ 롤 |p| 가 40 rad/s 로 튄다. 포화 인지 할당이 필요하다."},
@@ -935,11 +947,41 @@ function control(x, cmd){
 function controlHybrid(x, cmd){
   const psi = cmd.psi;
   const vref = [cmd.spd*Math.cos(psi), cmd.spd*Math.sin(psi), 0];
+  // ★ 도달 가능한 고도 기준을 준다. 지평선이 N*dt = 1.6 s 뿐인데 200 m 짜리
+  //   고도 오차를 그대로 주면 Qz*200^2 = 800000 이 비용을 통째로 지배해서
+  //   최적해가 "최대 추력" 에 박힌다. 반복을 40 -> 200 -> 1000 으로 늘려도
+  //   778 N(상한) 에서 안 움직였다 — 솔버가 덜 수렴한 게 아니라 비용함수의
+  //   진짜 최적점이 거기였다. 83 m/s 정상비행 트림은 222 N 이면 된다.
+  //   종속 루프가 고도 오차를 상승률로 바꿔 쓰는 것(clamp +-15)과 같은 처리다.
+  const dzCap = VZ_REF_MAX * NMPC.N * NMPC.dt;
+  const dz = cmd.alt - x[2];
+  const zr = x[2] + (dz > dzCap ? dzCap : (dz < -dzCap ? -dzCap : dz));
   if (nmpcOut === null || T - nmpcLast >= NMPC.rate - 1e-9){
-    nmpcOut = nmpcSolve(x.slice(0, 13), vref, cmd.alt);
+    nmpcOut = nmpcSolve(x.slice(0, 13), vref, zr);
     nmpcLast = T;
   }
   const Tc = nmpcOut[0], nu = [nmpcOut[1], nmpcOut[2], nmpcOut[3]];
+  // ★ 롤은 NMPC 가 안 본다. 비용함수에 자세 기준이 없어서 nu_roll 이 어떤
+  //   반복수에서도 0.01 이었다 — 솔버를 아무리 좋게 해도 롤은 안 잡힌다.
+  //   NMPC 가 "얼마나 돌릴지" 만 정하는 인터페이스 분리 원칙 그대로,
+  //   롤 유지는 바깥에서 얹는다.
+  {
+    const qx=x[6], qy=x[7], qz=x[8], qw=x[9];
+    const xb=[1-2*(qy*qy+qz*qz), 2*(qx*qy+qz*qw), 2*(qx*qz-qy*qw)];
+    const yb=[2*(qx*qy-qz*qw), 1-2*(qx*qx+qz*qz), 2*(qy*qz+qx*qw)];
+    const h = Math.hypot(xb[0], xb[1]);
+    if (h > 0.25){
+      const yh=[xb[1]/h, -xb[0]/h, 0];
+      const cr=[yb[1]*yh[2]-yb[2]*yh[1], yb[2]*yh[0]-yb[0]*yh[2], yb[0]*yh[1]-yb[1]*yh[0]];
+      const phi = Math.atan2(cr[0]*xb[0]+cr[1]*xb[1]+cr[2]*xb[2],
+                             yb[0]*yh[0]+yb[1]*yh[1]+yb[2]*yh[2]);
+      const t = Math.min(1, (h - 0.25) / 0.20);
+      const wgt = t*t*(3 - 2*t);
+      let wr = KW_R*(KR_R*phi - x[10]);
+      if (wr > W_R_MAX) wr = W_R_MAX; else if (wr < -W_R_MAX) wr = -W_R_MAX;
+      nu[0] = nu[0] + wgt*(wr - nu[0]);
+    }
+  }
 
   // INDI 내부루프: 측정 각가속도를 되먹여 증분으로 모멘트를 낸다.
   const J = [P.Ixx, P.Iyy, P.Izz], om = [x[10], x[11], x[12]];
@@ -989,7 +1031,7 @@ function reset(){
   // 없었다 — 미션의 첫 구간이 통째로 빠져 있던 셈이다.
   X = D.x0.slice(); X[2] = 0; T = 0; sat = 0; cmdSpd = 0; altI = 0;
   omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;
-  nmpcU = null; nmpcLast = -1e9; nmpcOut = null;
+  nmpcU = null; nmpcLast = -1e9; nmpcOut = null; nmpcApplied = null;
   trailN = 0;
   if (trail) trail.geometry.setDrawRange(0, 0);
 }
@@ -1460,7 +1502,7 @@ function paint(d){
   const settled = Math.abs(cmd.target - cmd.spd) < 0.2;
   const gap = cmd.spd - d.gs;
   let warn = "";
-  if (sat > .5) warn = "⚠ 로터가 최대 회전수에 닿았습니다 — 추력 포화";
+  if (sat > .5) warn = "⚠ 로터가 최대 회전수에 도달했습니다 — 추력 포화";
   else if (settled && gap > 3 && T > 8)
     warn = "⚠ 명령 " + cmd.spd.toFixed(0) + " m/s 에 실측 " + d.gs.toFixed(0)
          + " m/s — 여기가 이 기체의 한계입니다";
@@ -1530,7 +1572,7 @@ function initUI(){
     CTRL = sel.value;
     $("#ctrlNote").textContent = CTRLS[CTRL].note;
     omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;
-  nmpcU = null; nmpcLast = -1e9; nmpcOut = null;   // 전환 시 INDI 초기화
+  nmpcU = null; nmpcLast = -1e9; nmpcOut = null; nmpcApplied = null;   // 전환 시 INDI 초기화
   };
   sel.addEventListener("change", updCtrl); updCtrl();
   buildCoefs();
