@@ -50,7 +50,8 @@ def main():
 
     html = (TEMPLATE
             .replace("%%DATA%%", json.dumps(ref, separators=(",", ":")))
-            .replace("%%LQR%%", json.dumps(lqr, separators=(",", ":"))))
+            .replace("%%LQR%%", json.dumps(lqr, separators=(",", ":")))
+            .replace("%%MOTOR_NMPC%%", (HERE / 'tools' / 'standalone_nmpc.js').read_text(encoding='utf-8')))
     out = pathlib.Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     bare = out.with_suffix(".artifact.html")
@@ -307,6 +308,7 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
   <span id="flightStatus">준비 · LQR</span>
   <span id="modelStatus">기준 계수 · 고정 밀도 1.225 kg/m³</span>
   <span id="perfStatus">목표 ×1 · 실측 —</span>
+  <span id="solverStatus" hidden></span>
 </div>
 
 <div class="body">
@@ -1142,6 +1144,8 @@ function rtiSolve(x0, vref, zref){
   return rtiApplied.slice();
 }
 
+%%MOTOR_NMPC%%
+
 /* ══ 제어기 ═══════════════════════════════════════════════════════════
    PX4 를 옮긴 것이 아니다. 평범한 종속 루프(속도 -> 자세 -> 모멘트)다.
    여기서 보려는 것은 제어 성능이 아니라 **기체가 어디서 한계에 걸리나** 이므로
@@ -1187,6 +1191,8 @@ const CTRLS = {
     note:"기울임 제한을 완화한 비교용 설정입니다. 순간 최고속도와 지속 가능한 수평비행을 구분하세요."},
   indi: {name:"INDI 내부루프 · 실험", group:"실험 제어기", ff:true, tilt:55, indi:true,
     note:"각가속도 피드백으로 모멘트를 보정합니다. 전이 중 롤 불안정과 구동기 포화가 발생할 수 있습니다."},
+  nmpc: {name:"NMPC 단독 · 모터 직접 최적화", group:"실험 제어기", motor:true,
+    note:"17상태와 모터 지연·바람을 예측하고 모터 4개의 회전수를 직접 최적화합니다. INDI/PID 내부루프 없이 SQP 1회를 수행합니다. 평형 기준은 LQR 표에서 읽지만 LQR 제어 출력은 쓰지 않습니다. 계산량·짧은 예측 구간의 한계가 있는 실험 제어기입니다."},
   hybrid: {name:"NMPC + INDI · 계산량 큼", group:"실험 제어기", ff:true, tilt:80, indi:true, nmpc:true,
     note:"가상모델과 투영경사 솔버를 사용합니다. 계산량이 커서 실측 배속이 낮아질 수 있으며 안정 비행은 보장하지 않습니다."},
   sqprti: {name:"SQP-RTI + INDI · 실험", group:"실험 제어기", ff:true, tilt:80, indi:true, nmpc:true, rti:true,
@@ -1303,6 +1309,7 @@ function axialInflow(x){
   return ub > 0 ? ub : 0;
 }
 function control(x, cmd){
+  if (CTRLS[CTRL].motor) return controlMotorNmpc(x, cmd);
   if (CTRLS[CTRL].nmpc) return controlHybrid(x, cmd);
   if (CTRLS[CTRL].lqr)  return controlLQR(x, cmd);
   const m = P.mass, g = P.g;
@@ -1682,6 +1689,7 @@ function windNow(){
 function ctrlSnap(){
   return {
     altI: altI, sat: sat, zS: zSettled,
+    motor: motorSnapshot(),
     om: omPrev.slice(), od: omDotF.slice(), mp: Mprev.slice(),
     tV: trimV, tTh: trimTh, tN: trimN, tOK: trimOK,
     nAge: T - nmpcLast, nOut: nmpcOut ? nmpcOut.slice() : null,
@@ -1695,6 +1703,7 @@ function ctrlSnap(){
 function ctrlLoad(c){
   if (!c) return;
   altI = c.altI; sat = c.sat; zSettled = c.zS;
+  motorRestore(c.motor);
   omPrev = c.om.slice(); omDotF = c.od.slice(); Mprev = c.mp.slice();
   trimV = c.tV; trimTh = c.tTh; trimN = c.tN; trimOK = c.tOK;
   // 경과시간으로 되돌린다. 저장 시점에 한 번도 안 풀었으면 nAge 가 아주 커서
@@ -1723,6 +1732,7 @@ function reset(){
   REC.clear(); viewIdx = null; running = false;
   stepCount = 0; accumulator = 0; lastFrame = null; lastPaint = -Infinity;
   actualRtf = 0; computeMs = 0; physicsFailure = ''; health = freshHealth();
+  resetMotorMpc();
   configRevision = 0; lastConfigKey = ''; activeConfig = null;
   rotorPhase = [0,0,0,0]; lastSatHi = false; lastSatLo = false;
   // 지상에서 시작한다. 예전엔 목표 고도에 바로 놓고 시작해 이륙 단계가 아예
@@ -2109,6 +2119,7 @@ function advanceStep(){
   const target = +$("#spd").value, dv = target - cmdSpd;
   cmdSpd += Math.sign(dv)*Math.min(Math.abs(dv), RAMP*DT);
   const cmd = cmdNow(), u = control(X, cmd);
+  if(physicsFailure){recordState();return false;}
   // 유효하지 않은 값을 기록/WebGL에 넘기지 않고 마지막 유효 상태를 유지한다.
   const next = u.every(Number.isFinite) ? rk4(X,u,windNow(),P,DT) : [];
   if (next.length !== NX || !next.every(Number.isFinite)){
@@ -2230,7 +2241,7 @@ function score(){
   const {maxOm,run25,ms25} = h;
   const tumble = maxOm > 35 || run25 >= 0.2 - 1e-9;
   const crashed = h.crashed, diverged = h.diverged || h.altitudeDeparture;
-  const divWhy = h.diverged ? 'NaN / Inf로 계산 중단' : h.altitudeDeparture ? '목표 도달 후 고도 50 m 이탈' : '';
+  const divWhy = h.diverged ? (last.failure || '계산 중단') : h.altitudeDeparture ? '목표 도달 후 고도 50 m 이탈' : '';
   const satHi = h.elapsed ? h.hi/h.elapsed : 0, satLo = h.elapsed ? h.lo/h.elapsed : 0;
   let maxTilt=0, maxTiltEx=-Infinity;
   const segs = {};
@@ -2681,6 +2692,10 @@ function paint(d, render=true){
   $('#modelStatus').textContent=warnings.length?warnings.join(' · '):'기준 계수 · 고정 밀도 '+P0.rho+' kg/m³';
   $('#perfStatus').textContent='목표 ×'+$('#rtf').value+' · 실측 '+(running?'×'+actualRtf.toFixed(2):'—')
     +' · 계산 '+computeMs.toFixed(1)+' ms/프레임';
+  $('#solverStatus').hidden=!CTRLS[CTRL].motor;
+  $('#solverStatus').textContent=!motorStat?'NMPC 풀이 대기':motorStat.failed
+    ?'NMPC 풀이 실패 · 직전 명령 유지 ('+motorStat.failures+'/3)'
+    :'NMPC SQP 1회 · '+motorStat.ms.toFixed(1)+' ms · '+(motorStat.accepted?'비용 감소':'개선 스텝 없음');
   const values=[['지상속도',d.gs.toFixed(1),'m/s'],['대기속도',d.V.toFixed(1),'m/s'],
     ['총 받음각',angleText(d.alpha),'deg'],['기울임',d.tilt.toFixed(1),'deg'],
     ['α (XZ 평면)',angleText(d.pitchAlpha),'deg'],['β (옆미끄럼)',angleText(d.beta),'deg'],
@@ -2725,6 +2740,7 @@ function refreshControls(){
   updateRunButtons();
 }
 function invalidateController(){
+  resetMotorMpc();
   trimOK=false; trimV=-1;
   nmpcU=null; nmpcOut=null; nmpcApplied=null; nmpcLast=-1e9;
   rtiU=null; rtiOut=null; rtiApplied=null; rtiLast=-1e9; rtiStat=null;
@@ -2800,6 +2816,7 @@ function initUI(){
   sel.value=CTRL;
   const updCtrl = () => {
     CTRL = sel.value;
+    resetMotorMpc();
     $("#ctrlNote").textContent = CTRLS[CTRL].note;
     omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;
   nmpcU = null; nmpcLast = -1e9; nmpcOut = null; nmpcApplied = null;   // 전환 시 INDI 초기화

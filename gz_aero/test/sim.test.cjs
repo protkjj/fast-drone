@@ -186,3 +186,74 @@ test('채점은 미래 기록을 포함하지 않고 관찰이 짧으면 통과�
   assert.ok(result.rewound.maxOm<10);
   assert.equal(result.rewound.windowEnd,1.2);
 });
+
+test('단독 NMPC는 INDI/LQR 제어 없이 모터 명령을 직접 계산한다', () => {
+  const sim=simulator();
+  const result=sim.run(`CTRL='nmpc';$('#spd').value='0';reset();
+    controlHybrid=()=>{throw Error('INDI 호출');};lqrLaw=()=>{throw Error('LQR 호출');};
+    const u=control(X,cmdNow());({u,stat:motorStat});`);
+  assert.equal(result.u.length,4);
+  result.u.forEach(u=>assert.ok(Number.isFinite(u) && u>=0 && u<=1800));
+  assert.ok(result.stat.cost<=result.stat.initialCost+1e-8);
+});
+
+test('단독 NMPC의 예측은 모터 지연·바람을 포함한 실제 플랜트와 일치한다', () => {
+  const sim=simulator();
+  const result=sim.run(`const [xt,ut]=lqrPick(60);const wind=[0,5,0];
+    const predicted=motorPredict(xt,ut,wind,0.05);
+    let reference=xt.slice();for(let i=0;i<25;i++)reference=rk4(reference,ut,wind,P,0.002);
+    ({predicted,reference});`);
+  result.reference.forEach((v,i)=>assert.ok(Math.abs(v-result.predicted[i])<0.002));
+});
+
+test('단독 NMPC의 웜스타트·출력을 되감기와 초기화에서 복원한다', () => {
+  const sim=simulator();
+  const result=sim.run(`CTRL='nmpc';$('#spd').value='0';reset();
+    for(let i=0;i<100;i++)advanceStep();const expected=X.slice();
+    restoreTo(2);REC.truncate(3);for(let i=0;i<60;i++)advanceStep();
+    const actual=X.slice();reset();({expected,actual,cleared:motorU===null && motorOut===null});`);
+  result.expected.forEach((v,i)=>assert.ok(Math.abs(v-result.actual[i])<1e-8));
+  assert.equal(result.cleared,true);
+});
+
+test('단독 NMPC 압축 기울기가 실제 비용의 수치 미분과 일치한다', () => {
+  const sim=simulator();
+  // q·q_ref=0인 정확한 180도 경계는 부호 선택 비용의 미분 불가능점이므로 피한다.
+  const errors=sim.run(`const [x]=lqrPick(30);x[2]=190;x[3]-=1;
+    const ref=motorReference(x,{spd:30,alt:200});
+    const U=Float64Array.from({length:4*MOTOR_MPC.N},(_,j)=>ref.u[j%4]/P.n_max);
+    const previous=x.slice(13), rollout=motorRollout(x,U,ref,previous);
+    const {g}=motorQuadratic(rollout.states,U,ref,previous);
+    [0,1,10,25,47].map(j=>{
+      const a=U.slice(),b=U.slice(),h=1e-6;a[j]+=h;b[j]-=h;
+      const numeric=(motorRollout(x,a,ref,previous).cost-motorRollout(x,b,ref,previous).cost)/(2*h);
+      return Math.abs(numeric-2*g[j])/Math.max(1,Math.abs(numeric));
+    });`);
+  errors.forEach(error=>assert.ok(error<0.001,`상대 오차 ${error}`));
+});
+
+test('단독 NMPC 풀이가 3회 연속 실패하면 숨은 제어기 전환 없이 정지한다', () => {
+  const sim=simulator();
+  const result=sim.run(`CTRL='nmpc';reset();motorSolve=()=>null;running=true;
+    for(let i=0;i<100 && !physicsFailure;i++)advanceStep();
+    ({running,ctrl:CTRL,failures:motorFailures,failure:physicsFailure,score:score()});`);
+  assert.equal(result.running,false);
+  assert.equal(result.ctrl,'nmpc');
+  assert.equal(result.failures,3);
+  assert.match(result.failure,/NMPC 풀이 연속 실패/);
+  assert.equal(result.score.pass,false);
+});
+
+test('단독 NMPC는 호버·60·83 m/s 목표를 120초 후 유지한다', () => {
+  for(const target of [0,60,83]){
+    const sim=simulator();
+    const result=sim.run(`CTRL='nmpc';$('#spd').value='${target}';reset();
+      for(let i=0;i<60000 && !physicsFailure;i++)advanceStep();
+      ({t:T,speed:diag().gs,z:X[2],score:score()});`);
+    assert.equal(result.t,120);
+    assert.ok(Math.abs(result.speed-target)<0.1);
+    assert.ok(Math.abs(result.z-200)<0.1);
+    assert.ok(result.score.maxOm<10);
+    assert.equal(result.score.pass,true);
+  }
+});

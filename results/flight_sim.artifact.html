@@ -237,6 +237,7 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
   <span id="flightStatus">준비 · LQR</span>
   <span id="modelStatus">기준 계수 · 고정 밀도 1.225 kg/m³</span>
   <span id="perfStatus">목표 ×1 · 실측 —</span>
+  <span id="solverStatus" hidden></span>
 </div>
 
 <div class="body">
@@ -1072,6 +1073,185 @@ function rtiSolve(x0, vref, zref){
   return rtiApplied.slice();
 }
 
+/* 단독 NMPC: 17상태 → 모터 회전수 4개를 직접 최적화한다.
+ * INDI/PID/LQR 제어 출력은 사용하지 않는다. LQR 표에서는 평형 자세·회전수만 읽는다.
+ * 동일한 xdot/RK4로 비선형 예측 → 유한차분 선형화 → 압축 SQP → 실제 비용 선탐색.
+ * 매 주기 SQP 1회인 RTI 근사이며, Python CasADi/IPOPT와 같은 해라는 뜻은 아니다.
+ */
+const MOTOR_MPC = {N:12, dt:0.05, rate:0.05, maxStep:0.01,
+  zCap:5, vzMax:6, speedLead:3, terminal:8, trust:0.08,
+  R:0.000002, Rdu:0.00002, regularization:0.001,
+  // 고도, 속도, 쿼터니언, 각속도, 실제 모터 회전수 순서. XY 위치는 추종하지 않는다.
+  indices:[2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+  weights:[20,10,10,15,400,400,400,400,10,20,20,0.00002,0.00002,0.00002,0.00002]};
+let motorU=null, motorOut=null, motorLast=-1e9, motorStat=null, motorFailures=0;
+
+function resetMotorMpc(){
+  motorU=null; motorOut=null; motorLast=-1e9; motorStat=null; motorFailures=0;
+}
+function motorSnapshot(){
+  return {u:motorU?Array.from(motorU):null,out:motorOut?motorOut.slice():null,
+    age:T-motorLast,stat:motorStat?{...motorStat}:null,failures:motorFailures};
+}
+function motorRestore(s){
+  resetMotorMpc(); if(!s)return;
+  motorU=s.u?Float64Array.from(s.u):null; motorOut=s.out?s.out.slice():null;
+  motorLast=T-s.age; motorStat=s.stat?{...s.stat}:null; motorFailures=s.failures;
+}
+function motorPredict(x,u,wind,dt){
+  // 20 ms 모터 시정수를 큰 RK4 보폭으로 건너뛰지 않는다.
+  return rk4(x,u,wind,P,dt,Math.ceil(dt/Math.min(MOTOR_MPC.maxStep,P.tau_m/2)));
+}
+function motorReference(x,cmd){
+  const C=MOTOR_MPC, speed=Math.min(Math.hypot(x[3],x[4])+C.speedLead,cmd.spd,LQ.V_max_table);
+  const [target,u]=lqrPick(Math.max(0,speed));
+  const dz=cmd.alt-x[2];
+  target[2]=x[2]+Math.max(-C.zCap,Math.min(C.zCap,dz));
+  target[5]=Math.max(-C.vzMax,Math.min(C.vzMax,dz));
+  return {target,u,wind:windNow()};
+}
+function motorRollout(x0,U,ref,previous){
+  const C=MOTOR_MPC, scale=P.n_max, states=[x0]; let cost=0;
+  for(let k=0;k<C.N;k++){
+    const u=Array.from(U.slice(4*k,4*k+4),v=>v*scale);
+    const x=motorPredict(states[k],u,ref.wind,C.dt);
+    if(!x.every(Number.isFinite))return {cost:Infinity,states};
+    states.push(x);
+    const sign=x.slice(6,10).reduce((s,v,i)=>s+v*ref.target[6+i],0)<0?-1:1;
+    const terminal=k===C.N-1?C.terminal:1;
+    C.indices.forEach((r,j)=>{
+      const desired=ref.target[r]*(r>=6 && r<=9?sign:1);
+      cost+=terminal*C.weights[j]*(x[r]-desired)**2;
+    });
+    for(let i=0;i<4;i++){
+      const prev=k?U[4*(k-1)+i]*scale:previous[i];
+      cost+=C.R*(u[i]-ref.u[i])**2+C.Rdu*(u[i]-prev)**2;
+    }
+  }
+  return {cost,states};
+}
+function motorQuadratic(states,U,ref,previous){
+  const C=MOTOR_MPC, n=4*C.N, scale=P.n_max;
+  const H=new Float64Array(n*n), g=new Float64Array(n);
+  let sensitivity=new Float64Array(NX*n);
+  for(let k=0;k<C.N;k++){
+    const x=states[k], next=states[k+1], u=Array.from(U.slice(4*k,4*k+4),v=>v*scale);
+    const A=new Float64Array(NX*NX), B=new Float64Array(NX*4);
+    for(let j=0;j<NX;j++){
+      const h=1e-5*(1+Math.abs(x[j])), perturbed=x.slice();perturbed[j]+=h;
+      const y=motorPredict(perturbed,u,ref.wind,C.dt);
+      for(let r=0;r<NX;r++)A[r*NX+j]=(y[r]-next[r])/h;
+    }
+    for(let j=0;j<4;j++){
+      const h=1e-5, perturbed=u.slice();perturbed[j]+=h*scale;
+      const y=motorPredict(x,perturbed,ref.wind,C.dt);
+      for(let r=0;r<NX;r++)B[r*4+j]=(y[r]-next[r])/h;
+    }
+    const propagated=new Float64Array(NX*n), active=4*(k+1);
+    for(let r=0;r<NX;r++){
+      for(let j=0;j<4*k;j++){
+        let sum=0;for(let q=0;q<NX;q++)sum+=A[r*NX+q]*sensitivity[q*n+j];
+        propagated[r*n+j]=sum;
+      }
+      for(let j=0;j<4;j++)propagated[r*n+4*k+j]=B[r*4+j];
+    }
+    sensitivity=propagated;
+    const sign=next.slice(6,10).reduce((s,v,i)=>s+v*ref.target[6+i],0)<0?-1:1;
+    const terminal=k===C.N-1?C.terminal:1;
+    C.indices.forEach((r,index)=>{
+      const weight=C.weights[index]*terminal;
+      const error=next[r]-ref.target[r]*(r>=6 && r<=9?sign:1), off=r*n;
+      for(let a=0;a<active;a++){
+        const wa=weight*sensitivity[off+a];g[a]+=wa*error;
+        for(let b=0;b<=a;b++)H[a*n+b]+=wa*sensitivity[off+b];
+      }
+    });
+  }
+  for(let a=0;a<n;a++)for(let b=0;b<a;b++)H[b*n+a]=H[a*n+b];
+  for(let k=0;k<C.N;k++)for(let i=0;i<4;i++){
+    const j=4*k+i, prev=k?U[j-4]:previous[i]/scale;
+    const R=C.R*scale*scale, Rd=C.Rdu*scale*scale;
+    g[j]+=R*(U[j]-ref.u[i]/scale)+Rd*(U[j]-prev);H[j*n+j]+=R+Rd;
+    if(k){g[j-4]-=Rd*(U[j]-prev);H[(j-4)*n+j-4]+=Rd;
+      H[j*n+j-4]-=Rd;H[(j-4)*n+j]-=Rd;}
+    H[j*n+j]+=C.regularization;
+  }
+  return {H,g};
+}
+function motorBoxStep(H,g,U){
+  const n=U.length, C=MOTOR_MPC, step=new Float64Array(n);
+  const low=Array.from(U,v=>Math.max(P.n_min/P.n_max-v,-C.trust));
+  const high=Array.from(U,v=>Math.min(1-v,C.trust));
+  const objective=d=>{
+    let value=0;
+    for(let i=0;i<n;i++){
+      value+=g[i]*d[i]+0.5*H[i*n+i]*d[i]*d[i];
+      for(let j=0;j<i;j++)value+=H[i*n+j]*d[i]*d[j];
+    }return value;
+  };
+  for(let iteration=0;iteration<4;iteration++){
+    const grad=Float64Array.from(g), free=[];
+    for(let i=0;i<n;i++){
+      for(let j=0;j<n;j++)grad[i]+=H[i*n+j]*step[j];
+      if((step[i]<=low[i]+1e-10 && grad[i]>0)||(step[i]>=high[i]-1e-10 && grad[i]<0))continue;
+      free.push(i);
+    }
+    if(!free.length)break;
+    const m=free.length, subH=new Float64Array(m*m), rhs=new Float64Array(m);
+    for(let i=0;i<m;i++){
+      rhs[i]=-grad[free[i]];
+      for(let j=0;j<m;j++)subH[i*m+j]=H[free[i]*n+free[j]];
+    }
+    const direction=cholSolve(subH,rhs,m);if(!direction)break;
+    const before=objective(step);let accepted=false;
+    for(let alpha=1;alpha>=1/128;alpha/=2){
+      const candidate=Float64Array.from(step);
+      free.forEach((j,i)=>candidate[j]=Math.max(low[j],Math.min(high[j],step[j]+alpha*direction[i])));
+      if(objective(candidate)<before-1e-10){step.set(candidate);accepted=true;break;}
+    }
+    if(!accepted)break;
+  }
+  return step;
+}
+function motorSolve(x,cmd){
+  const start=performance.now(), C=MOTOR_MPC, n=4*C.N, scale=P.n_max;
+  const ref=motorReference(x,cmd), previous=motorOut||x.slice(13,17);
+  const flat=Float64Array.from({length:n},(_,j)=>ref.u[j%4]/scale);
+  let U=motorU?Float64Array.from(motorU):flat;
+  if(motorU)for(let k=0;k<C.N-1;k++)for(let i=0;i<4;i++)U[4*k+i]=motorU[4*(k+1)+i];
+  const clip=v=>Math.max(P.n_min/scale,Math.min(1,v));U=U.map(clip);
+  let rollout=motorRollout(x,U,ref,previous);
+  const flatRollout=motorRollout(x,flat,ref,previous);
+  if(flatRollout.cost<rollout.cost){U=flat;rollout=flatRollout;}
+  if(!Number.isFinite(rollout.cost))return null;
+  const initialCost=rollout.cost, {H,g}=motorQuadratic(rollout.states,U,ref,previous);
+  if(!H.every(Number.isFinite)||!g.every(Number.isFinite))return null;
+  const step=motorBoxStep(H,g,U);let accepted=false;
+  // QP가 좋아졌더라도 실제 비선형 예측의 비용이 나빠지면 적용하지 않는다.
+  for(let alpha=1;alpha>=1/128;alpha/=2){
+    const candidate=U.map((v,i)=>clip(v+alpha*step[i]));
+    const next=motorRollout(x,candidate,ref,previous);
+    if(next.cost<rollout.cost-1e-9){U=candidate;rollout=next;accepted=true;break;}
+  }
+  motorU=U;
+  motorStat={ms:performance.now()-start,initialCost,cost:rollout.cost,accepted,failed:false};
+  return Array.from(U.slice(0,4),v=>v*scale);
+}
+function controlMotorNmpc(x,cmd){
+  if(motorOut && T-motorLast<MOTOR_MPC.rate-1e-9)return motorOut.slice();
+  const result=motorSolve(x,cmd);motorLast=T;
+  if(result && result.every(Number.isFinite)){
+    motorOut=result;motorFailures=0;
+  }else{
+    motorFailures++;motorStat={failed:true,failures:motorFailures};
+    // 숨은 LQR 전환은 없다. 한두 번의 계산 실패는 직전 모터 명령을 유지한다.
+    if(!motorOut)motorOut=x.slice(13,17).map(v=>Math.max(P.n_min,Math.min(P.n_max,v)));
+    if(motorFailures>=3){physicsFailure='단독 NMPC 풀이 연속 실패';running=false;health.diverged=true;}
+  }
+  return motorOut.slice();
+}
+
+
 /* ══ 제어기 ═══════════════════════════════════════════════════════════
    PX4 를 옮긴 것이 아니다. 평범한 종속 루프(속도 -> 자세 -> 모멘트)다.
    여기서 보려는 것은 제어 성능이 아니라 **기체가 어디서 한계에 걸리나** 이므로
@@ -1117,6 +1297,8 @@ const CTRLS = {
     note:"기울임 제한을 완화한 비교용 설정입니다. 순간 최고속도와 지속 가능한 수평비행을 구분하세요."},
   indi: {name:"INDI 내부루프 · 실험", group:"실험 제어기", ff:true, tilt:55, indi:true,
     note:"각가속도 피드백으로 모멘트를 보정합니다. 전이 중 롤 불안정과 구동기 포화가 발생할 수 있습니다."},
+  nmpc: {name:"NMPC 단독 · 모터 직접 최적화", group:"실험 제어기", motor:true,
+    note:"17상태와 모터 지연·바람을 예측하고 모터 4개의 회전수를 직접 최적화합니다. INDI/PID 내부루프 없이 SQP 1회를 수행합니다. 평형 기준은 LQR 표에서 읽지만 LQR 제어 출력은 쓰지 않습니다. 계산량·짧은 예측 구간의 한계가 있는 실험 제어기입니다."},
   hybrid: {name:"NMPC + INDI · 계산량 큼", group:"실험 제어기", ff:true, tilt:80, indi:true, nmpc:true,
     note:"가상모델과 투영경사 솔버를 사용합니다. 계산량이 커서 실측 배속이 낮아질 수 있으며 안정 비행은 보장하지 않습니다."},
   sqprti: {name:"SQP-RTI + INDI · 실험", group:"실험 제어기", ff:true, tilt:80, indi:true, nmpc:true, rti:true,
@@ -1233,6 +1415,7 @@ function axialInflow(x){
   return ub > 0 ? ub : 0;
 }
 function control(x, cmd){
+  if (CTRLS[CTRL].motor) return controlMotorNmpc(x, cmd);
   if (CTRLS[CTRL].nmpc) return controlHybrid(x, cmd);
   if (CTRLS[CTRL].lqr)  return controlLQR(x, cmd);
   const m = P.mass, g = P.g;
@@ -1612,6 +1795,7 @@ function windNow(){
 function ctrlSnap(){
   return {
     altI: altI, sat: sat, zS: zSettled,
+    motor: motorSnapshot(),
     om: omPrev.slice(), od: omDotF.slice(), mp: Mprev.slice(),
     tV: trimV, tTh: trimTh, tN: trimN, tOK: trimOK,
     nAge: T - nmpcLast, nOut: nmpcOut ? nmpcOut.slice() : null,
@@ -1625,6 +1809,7 @@ function ctrlSnap(){
 function ctrlLoad(c){
   if (!c) return;
   altI = c.altI; sat = c.sat; zSettled = c.zS;
+  motorRestore(c.motor);
   omPrev = c.om.slice(); omDotF = c.od.slice(); Mprev = c.mp.slice();
   trimV = c.tV; trimTh = c.tTh; trimN = c.tN; trimOK = c.tOK;
   // 경과시간으로 되돌린다. 저장 시점에 한 번도 안 풀었으면 nAge 가 아주 커서
@@ -1653,6 +1838,7 @@ function reset(){
   REC.clear(); viewIdx = null; running = false;
   stepCount = 0; accumulator = 0; lastFrame = null; lastPaint = -Infinity;
   actualRtf = 0; computeMs = 0; physicsFailure = ''; health = freshHealth();
+  resetMotorMpc();
   configRevision = 0; lastConfigKey = ''; activeConfig = null;
   rotorPhase = [0,0,0,0]; lastSatHi = false; lastSatLo = false;
   // 지상에서 시작한다. 예전엔 목표 고도에 바로 놓고 시작해 이륙 단계가 아예
@@ -2039,6 +2225,7 @@ function advanceStep(){
   const target = +$("#spd").value, dv = target - cmdSpd;
   cmdSpd += Math.sign(dv)*Math.min(Math.abs(dv), RAMP*DT);
   const cmd = cmdNow(), u = control(X, cmd);
+  if(physicsFailure){recordState();return false;}
   // 유효하지 않은 값을 기록/WebGL에 넘기지 않고 마지막 유효 상태를 유지한다.
   const next = u.every(Number.isFinite) ? rk4(X,u,windNow(),P,DT) : [];
   if (next.length !== NX || !next.every(Number.isFinite)){
@@ -2160,7 +2347,7 @@ function score(){
   const {maxOm,run25,ms25} = h;
   const tumble = maxOm > 35 || run25 >= 0.2 - 1e-9;
   const crashed = h.crashed, diverged = h.diverged || h.altitudeDeparture;
-  const divWhy = h.diverged ? 'NaN / Inf로 계산 중단' : h.altitudeDeparture ? '목표 도달 후 고도 50 m 이탈' : '';
+  const divWhy = h.diverged ? (last.failure || '계산 중단') : h.altitudeDeparture ? '목표 도달 후 고도 50 m 이탈' : '';
   const satHi = h.elapsed ? h.hi/h.elapsed : 0, satLo = h.elapsed ? h.lo/h.elapsed : 0;
   let maxTilt=0, maxTiltEx=-Infinity;
   const segs = {};
@@ -2611,6 +2798,10 @@ function paint(d, render=true){
   $('#modelStatus').textContent=warnings.length?warnings.join(' · '):'기준 계수 · 고정 밀도 '+P0.rho+' kg/m³';
   $('#perfStatus').textContent='목표 ×'+$('#rtf').value+' · 실측 '+(running?'×'+actualRtf.toFixed(2):'—')
     +' · 계산 '+computeMs.toFixed(1)+' ms/프레임';
+  $('#solverStatus').hidden=!CTRLS[CTRL].motor;
+  $('#solverStatus').textContent=!motorStat?'NMPC 풀이 대기':motorStat.failed
+    ?'NMPC 풀이 실패 · 직전 명령 유지 ('+motorStat.failures+'/3)'
+    :'NMPC SQP 1회 · '+motorStat.ms.toFixed(1)+' ms · '+(motorStat.accepted?'비용 감소':'개선 스텝 없음');
   const values=[['지상속도',d.gs.toFixed(1),'m/s'],['대기속도',d.V.toFixed(1),'m/s'],
     ['총 받음각',angleText(d.alpha),'deg'],['기울임',d.tilt.toFixed(1),'deg'],
     ['α (XZ 평면)',angleText(d.pitchAlpha),'deg'],['β (옆미끄럼)',angleText(d.beta),'deg'],
@@ -2655,6 +2846,7 @@ function refreshControls(){
   updateRunButtons();
 }
 function invalidateController(){
+  resetMotorMpc();
   trimOK=false; trimV=-1;
   nmpcU=null; nmpcOut=null; nmpcApplied=null; nmpcLast=-1e9;
   rtiU=null; rtiOut=null; rtiApplied=null; rtiLast=-1e9; rtiStat=null;
@@ -2730,6 +2922,7 @@ function initUI(){
   sel.value=CTRL;
   const updCtrl = () => {
     CTRL = sel.value;
+    resetMotorMpc();
     $("#ctrlNote").textContent = CTRLS[CTRL].note;
     omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;
   nmpcU = null; nmpcLast = -1e9; nmpcOut = null; nmpcApplied = null;   // 전환 시 INDI 초기화
