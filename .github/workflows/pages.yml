@@ -1,9 +1,8 @@
 name: Pages
 
 # 공력 페이지(시뮬레이터·대시보드)를 GitHub Pages 로 올린다.
-# 두 페이지가 자립형 HTML 이라 빌드 단계가 필요 없다 — results/ 를 그대로 옮긴다.
-# 생성기를 CI 에서 돌리지 않는 이유: casadi·numpy·matplotlib 가 필요한데, 그 의존성
-# 때문에 배포가 깨지면 페이지까지 같이 죽는다. 갱신은 로컬에서 돌려 커밋한다.
+# 기존 데모는 results/에서 복사하고, 연구 페이지의 공통 CasADi 그래프는
+# 고정 버전으로 생성한다. 모든 계산은 브라우저 Worker에서 실행된다.
 
 on:
   push:
@@ -11,6 +10,8 @@ on:
     paths:
       - 'results/*.html'
       - 'gz_aero/tools/build_site.py'
+      - 'research/**'
+      - 'control/dynamics.py'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -31,8 +32,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: research/package-lock.json
+      - name: 연구 런타임 고정 의존성
+        run: |
+          python -m pip install -r research/requirements.txt
+          npm ci --prefix research --ignore-scripts --no-audit --no-fund
+      - name: 공통 수식 생성 및 연구 회귀 검사
+        run: |
+          python -m research.build_bundle
+          python -m pytest research/test_model.py research/test_estimator.py control/test_research_parity.py -q
+          npm test --prefix research
       - name: site/ 조립
-        run: python3 gz_aero/tools/build_site.py
+        run: python3 gz_aero/tools/build_site.py --research
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

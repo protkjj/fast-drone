@@ -310,9 +310,13 @@ class AxialDronePlant:
 
     @staticmethod
     def hover_state(params):
-        """호버 초기 상태. q=[1,0,0,0] = 180° about x (body z-down)."""
+        """추력축을 관성 +z로 향하게 한 정지 호버 상태 (scalar-last q)."""
         n_hov = np.sqrt(params['mass'] * params['g'] / (4 * params['k_T']))
         x0 = np.zeros(NX)
-        x0[6] = 1.0                         # qx = 1 (180° about x)
+        if params.get('thrust_axis', 'z') == 'x':
+            # Ry(-pi/2) maps body +x to inertial +z.
+            x0[6:10] = [0.0, -np.sqrt(0.5), 0.0, np.sqrt(0.5)]
+        else:
+            x0[6] = 1.0                    # Rx(pi) maps body -z to inertial +z.
         x0[13:17] = n_hov                   # 호버 로터 속도
         return x0

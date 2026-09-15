@@ -1,0 +1,110 @@
+# 선정 기체 제어 연구실 — 실험판
+
+기존 8 kg 실시간 데모와 분리된 연구 페이지다. 현재 목적은 동일한 수식으로
+Python과 브라우저의 물리·제어·추정 경로를 재현하는 것이다. **실물 검증, 제어기
+우열 검증, 실제 20 ms 실시간 동작을 완료한 구현이 아니다.**
+
+## 현재 상태와 알려진 문제
+
+- 실제 CasADi/IPOPT WebAssembly를 사용한다. Python에서 만든 수식과 NLP를
+  직렬화하여 브라우저 Worker에서 계산한다. 서버에서 풀이하지 않는다.
+- 짧은 호버에서 Hybrid와 NMPC 단독의 실행, Python/WASM 수치 일치,
+  다중 주기, GPS 지연 보정, 모터 에너지 수지 및 STL 변환을 검사했다.
+- **2026-09-15 초기 선정 기체 속도 변경 시험:** NMPC 단독은 2초 동안
+  100회 풀이 모두 실패하여 이전 호버 명령을 유지했다. 수렴 개선이 필요하다.
+  이 상태의 추종 오차를 Hybrid 우위의 근거로 사용해서는 안 된다.
+- 로컬 브라우저 호버 검사에서도 실제 풀이 시간이 20 ms를 넘었다.
+  시뮬레이션 시간은 풀이 중 멈춘다. 50 Hz 스케줄 구현은 실시간 성공을 뜻하지 않는다.
+- baseline 중 선정 기체에 연결된 것은 NMPC 단독이다. 기존 페이지의 LQR 등은
+  종전 기체이므로 여기의 선정 기체 Hybrid와 직접 비교하지 않는다.
+
+## 구조와 단위
+
+| 구성 | 정의 |
+| --- | --- |
+| 좌표 | body +x 추력, world +z 위쪽, body→world quaternion `[x,y,z,w]` |
+| 플랜트 | 17개 기계 상태 `[p,v,q,omega,n]` + 배터리 SOC 1개 |
+| Hybrid NMPC | 13상태, 가상 입력 `[T,angular acceleration]` |
+| INDI | 자이로 미분/필터, 동기화된 RPM·추력, 제한된 증분 회전수 할당 |
+| NMPC 단독 | 17상태, 네 로터 회전수 명령을 직접 최적화; INDI 없음 |
+| NMPC 설정 | N=20, 예측 간격 0.05 s, 1 s 범위, 매 0.02 s, 최대 30회 반복 |
+| 빠른 주기 | 플랜트 RK4 / IMU / INDI 0.001 s |
+| 추정 | 15D error-state EKF, 10 Hz GPS, 20 ms 지연 보정 + IMU 재적분 |
+
+회전수 상태·명령의 단위는 **rad/s**다. 추진 계수식 안에서만 rev/s로 변환한다.
+센서 시험 제어기에는 추정 상태·자이로·가정한 RPM 텔레메트리를 전달한다.
+참 상태는 센서 생성과 평가에 사용한다. 두 제어기는 같은 초기값, 난수 seed,
+플랜트 오차, 외란, 상태 추종 가중치를 사용한다. 입력은 의미가 다르므로 각각
+무차원화한 페널티를 적용한다. 체계적인 baseline 튜닝은 아직 완료하지 않았다.
+
+## 기체 자료와 가정
+
+선정 프로필: `profiles/selected.json`, CSV source ID 6931.
+
+- 제공 `selected_design.csv` SHA-256:
+  `326342d0e471bbb424eb558e4034f4e2458a7a2b669b19cfc2af59b96e8528ff`
+- 원본 사이징 코드: [Rocket-Drone-Project 고정 리비전](https://github.com/gocksk/Rocket-Drone-Project/tree/db793a7039c76c9937597a240efc94f68c5a8af0).
+  CSV의 값이 있는 모델 출력 70개를 재현했다. 개념설계 예측이며 측정값이 아니다.
+- 질량 1.711714 kg, 관성 `[0.007651085,0.034966535,0.034966535]` kg·m²,
+  길이 0.670499 m. CT/CP 맵과 모터·배터리 모델을 함께 가져왔다.
+- 배터리 Wh/Ah를 공칭 3.7 V/cell 기준으로 통일했다. 모터 전기 입력,
+  축동력, 동손, 무부하 손실, 로터 가속 에너지 및 전압 강하를 구분한다.
+- 로터 관성 1e-5 kg·m², 속도 루프 20 ms, 모터별 전류 상한 40 A,
+  공력 감쇠, 센서 잡음·바이어스·GPS 지연·RPM 텔레메트리는 **가정**이다.
+- 맵 밖/역유입은 수동적인 연장 모델로 처리하고 비율을 기록한다. 풍차·회생
+  검증 모델이 아니다. 열, 전기 인덕턴스, 나선형 팁 마하 제약은 미구현이다.
+- `simple`은 2 kg의 별도 가정 모델이다. 선정 기체로 오해하지 않도록 STL을 숨긴다.
+
+STL: `assets/drone_v2.stl`, 원본 SHA-256
+`276045699ee8e9ee03fe5d75d4915d88a0688fbcb12a9e8d1e8f5c0702302e35`.
+173,804개 삼각형. CAD 길이 670.499와 CSV 길이 일치를 근거로 mm 단위를
+해석했다. 기수 X=0, CG=기수에서 428.251 mm로 변환한다. X와 Z를 함께
+반전하는 정회전을 사용하여 반사 좌표계를 만들지 않는다. STL은 표시용이며
+질량·관성·공력 계수를 자동 계산하지 않는다. 프로펠러도 정적 메시다.
+
+## 로컬 실행 및 검사
+
+저장소 루트에서 실행한다. Python CasADi 3.7.2와 공식 WASM 3.8.0 간의
+직렬화 호환성은 실제 수치 회귀 검사로 확인한다. Node 22 이상을 권장한다.
+
+```sh
+python3 -m pip install -r research/requirements.txt
+npm ci --prefix research --ignore-scripts --no-audit --no-fund
+python3 -m research.build_bundle
+python3 -m pytest research/test_model.py research/test_estimator.py control/test_research_parity.py -q
+npm test --prefix research
+python3 gz_aero/tools/build_site.py --research
+python3 -m http.server 8765 --directory site
+```
+
+`http://127.0.0.1:8765/research/`에서 먼저 기본 0.2초 호버를 실행한다.
+브라우저 최초 실행은 WASM과 모델을 다운로드한다. STL과 런타임을 합쳐
+수십 MB이며, 저장 공간이나 통신량이 제한된 기기에서는 주의한다.
+풀이 실패와 실제 계산 시간을 반드시 확인한다. 중지는 현재 풀이를 마친 후 처리된다.
+
+```sh
+node research/run.cjs selected hybrid truth 0.2 hover
+node research/run.cjs selected nmpc eskf 0.2 hover
+node research/benchmark.cjs
+```
+
+마지막 명령은 동일 조건의 6개 속도 변경 시험을 순차 실행한다. 현재 NMPC
+수렴 문제로 오래 걸릴 수 있다. `generated/benchmark.json`은 완료된 사례마다
+갱신된다. 생성물·의존성·실험 로그는 Git에 포함하지 않는다.
+
+## 코드 위치와 배포
+
+- `model.py`: 추진·모터·배터리·6DOF 및 공통 수식
+- `nmpc.py`: 두 IPOPT 최적화 문제
+- `eskf.py`: 추정 전파·GPS 갱신·오차 리셋
+- `runtime.js`: 다중 주기, 센서, INDI, 지연 GPS 재적분, 평가
+- `index.html`, `page.js`, `worker.js`, `stl.js`: 웹 UI·Worker·외형
+- `build_bundle.py`, `build_site.py`: 직렬화 및 정적 배포 패키징
+- `../gz_aero/tools/build_sim.py`: **기존** 실시간 데모 원본
+
+GitHub Pages는 `bulnabi`의 `.github/workflows/pages.yml`로 배포한다.
+연구 검사와 빌드가 성공해야 배포한다. 주소는 `/research/`, 기존 `/sim.html`은
+보존한다. 배포는 연구 기능의 공개이지, 미완료 비교 실험의 성공 선언이 아니다.
+
+향후 순서: NMPC 수렴/계산 비용 개선 → 동일 조건의 센서·오차·외란 검증 →
+여러 seed 및 체계적인 baseline 튜닝 → 선정 기체의 강건성 결론 검토.

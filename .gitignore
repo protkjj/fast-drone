@@ -47,3 +47,7 @@ ppts/
 
 # 생성된 Pages 산출물
 site/
+
+# Research browser runtime dependencies (lockfile is versioned).
+node_modules/
+research/generated/

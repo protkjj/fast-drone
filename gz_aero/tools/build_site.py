@@ -11,6 +11,7 @@ Artifact 는 Claude 가 호스팅해서 GitHub Actions 로 못 올린다. 대신
 Pages 에는 로컬용(.html, charset 포함)을 올린다.
 """
 import os
+import argparse
 import pathlib
 import re
 import subprocess
@@ -93,7 +94,7 @@ footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--rule);
 """
 
 
-def main():
+def main(include_research=False):
     site = ROOT / "site"
     # 출력 폴더 전체를 지우지 않고 이 빌드가 관리하는 파일만 갱신한다.
     # 미리보기 서버나 사용자가 추가한 파일도 같은 폴더에 있을 수 있다.
@@ -120,6 +121,12 @@ def main():
         out_names.append(dst)
         cards.append(f'<a class="card" href="{dst}"><h2>{title}</h2>'
                      f'<p>{desc}</p><span class="go">열기 →</span></a>')
+    if include_research:
+        subprocess.run([sys.executable, "-m", "research.build_site", "--output", str(site / "research")],
+                       cwd=ROOT, check=True)
+        cards.append('<a class="card" href="research/index.html"><h2>선정 기체 · 제어 연구실</h2>'
+                     '<p>실제 IPOPT · 50 Hz/1 kHz · 센서/ESKF · 선정 기체 STL. 오프라인 비교 실험.</p>'
+                     '<span class="go">열기 →</span></a>')
     if not cards:
         print("올릴 페이지가 없습니다. 먼저 생성기를 돌리세요.", file=sys.stderr)
         return 1
@@ -155,7 +162,11 @@ def main():
         return 1
     print(f"  JS 문법 검사 통과 ({len(out_names)} 쪽)")
 
-    (site / "index.html").write_text(INDEX.replace("%%CARDS%%", "\n".join(cards)),
+    index = INDEX.replace("%%CARDS%%", "\n".join(cards))
+    if include_research:
+        index = index.replace('페이지는 저장소의 <code>results/</code> 를 그대로 올린 것입니다.',
+                              '기존 데모는 <code>results/</code>, 연구 모드는 <code>research/</code>에서 만듭니다.')
+    (site / "index.html").write_text(index,
                                      encoding="utf-8")
     # Jekyll 이 밑줄로 시작하는 경로를 건너뛰지 않게 한다
     (site / ".nojekyll").write_text("", encoding="utf-8")
@@ -169,4 +180,6 @@ def main():
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--research", action="store_true", help="검증용 IPOPT/WASM 연구 페이지 포함")
+    raise SystemExit(main(include_research=parser.parse_args().research))

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>선정 기체 · 제어 연구실</title>
+<style>
+:root{color-scheme:dark;--bg:#101820;--panel:#18212b;--line:#30404e;--text:#eef2f6;--muted:#aebac6;--accent:#f2aa4c;--hybrid:#59c8f5;--nmpc:#db9bff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 system-ui,-apple-system,sans-serif;word-break:keep-all;overflow-wrap:anywhere}main{max-width:1380px;margin:auto;padding:26px}a{color:var(--hybrid)}header{display:flex;justify-content:space-between;align-items:center;gap:20px}h1{font-size:27px;margin:5px 0}h2{font-size:18px;margin:0 0 14px}.sub{color:var(--muted);margin:0 0 18px}.notice{padding:13px 17px;background:#30281d;border-left:3px solid var(--accent);border-radius:4px;margin:18px 0}.layout{display:grid;grid-template-columns:320px minmax(0,1fr);gap:18px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}.controls label{display:block;margin:13px 0 5px;font-size:13px;color:var(--muted)}input,select,button{font:inherit;min-height:42px;border-radius:6px;border:1px solid #465767;background:#101820;color:var(--text);padding:7px 10px}input,select{width:100%}button{cursor:pointer}button.primary{background:var(--accent);color:#101820;border-color:var(--accent);font-weight:700}button:disabled{opacity:.45;cursor:default}.buttons{display:flex;gap:9px;flex-wrap:wrap;margin-top:18px}.controls .buttons button{flex:1}.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}.small{font-size:12px;color:var(--muted)}.view{position:relative;min-height:330px;overflow:hidden;padding:0}#model{height:330px}#model canvas{display:block;width:100%;height:100%}.model-caption{position:absolute;bottom:14px;left:16px;right:16px;font-size:12px;color:var(--muted);pointer-events:none}#status{min-height:50px;white-space:pre-wrap}progress{width:100%;accent-color:var(--accent)}.results{margin-top:18px}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:right;padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-weight:500}.bad{color:#ff9f90}.good{color:#94dab5}.charts{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}.charts svg{width:100%;height:220px;display:block}.legend{display:flex;gap:20px;color:var(--muted);font-size:12px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}.details{margin-top:18px}summary{cursor:pointer;color:var(--accent)}li{margin:8px 0}code{font-size:12px}#errors{white-space:pre-wrap;color:#ffb5aa}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:3px}@media(max-width:850px){main{padding:16px}.layout{grid-template-columns:1fr}.charts{grid-template-columns:1fr}header{align-items:flex-start}h1{font-size:22px}}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="./stl.js" defer></script><script src="./page.js" defer></script>
+</head><body><main>
+<header><div><a href="../">← 목록</a><h1>선정 기체 · 제어 연구실</h1><p class="sub">NMPC–INDI 인터페이스 분리와 동일 조건 baseline 비교</p></div><a href="../sim.html">기존 실시간 데모</a></header>
+<div class="notice"><strong>실험판 · 검증 진행 중</strong> — 실제 IPOPT를 사용하는 오프라인 계산 모드입니다. 50 Hz / 1 kHz는 시뮬레이션 시간의 주기이며, 실제 20 ms 마감 준수는 별도 지표입니다. 실측 기체 검증이나 Hybrid 우위가 입증된 상태는 아닙니다.<br><strong>알려진 문제:</strong> 선정 기체 NMPC 단독의 속도 변경 시험에서 반복적인 풀이 실패가 확인되어 수렴 개선 중입니다. 실패 시 이전 명령을 유지하므로, 현재 결과를 제어기 우열의 근거로 사용하지 마세요. 먼저 0.2초 호버 시험을 권장합니다.</div>
+<div class="layout">
+<section class="panel controls" aria-label="실험 설정"><h2>공통 시험 조건</h2>
+<label for="profile">기체 모델</label><select id="profile"><option value="selected">선정안 6931 · 1.712 kg</option><option value="simple">단순 검증 기체 · 2 kg</option></select>
+<label for="controller">제어기</label><select id="controller"><option value="both">Hybrid / NMPC 단독 비교</option><option value="hybrid">Hybrid · 13-state NMPC → INDI</option><option value="nmpc">NMPC 단독 · 17-state</option></select>
+<label for="feedback">피드백 경로</label><select id="feedback"><option value="truth">참 상태 · 구조 검증</option><option value="eskf">IMU / GPS → 15D ESKF</option></select>
+<label for="scenario">시험</label><select id="scenario"><option value="hover">호버 유지</option><option value="step">1초 시점 속도 계단 입력</option><option value="gust">속도 계단 + 2–3초 외란</option></select>
+<div class="pair"><div><label for="seconds">기간 (시뮬레이션 초)</label><input id="seconds" type="number" min="0.1" max="120" step="0.1" value="0.2"></div><div><label for="speed">목표 vx (m/s)</label><input id="speed" type="number" min="0" max="100" value="3"></div></div>
+<label for="mismatch">실제 플랜트 오차 · 제어기는 명목 모델 사용</label><select id="mismatch"><option value="nominal">오차 없음</option><option value="mass">질량 +10%</option><option value="inertia">관성 +15%</option><option value="prop">추진 계수 −10%</option><option value="combined">질량 +10% / 관성 +15% / 추진 −10%</option></select>
+<label for="seed">센서 난수 seed</label><input id="seed" type="number" min="0" max="4294967295" value="42">
+<div class="buttons"><button class="primary" id="run">실험 실행</button><button id="stop" disabled>중지 요청</button></div>
+<p class="small">두 제어기는 동일한 기체·초기값·외란·센서 seed를 사용합니다. 계산 속도는 기기에 따라 크게 달라집니다. 첫 풀이가 특히 느릴 수 있습니다.</p></section>
+<div><section class="panel view" aria-label="기체 STL 미리보기"><div id="model"></div><div class="model-caption" id="model-caption">drone_v2.stl 불러오는 중…</div></section>
+<section class="panel results" aria-live="polite"><h2>실행 상태</h2><div id="status">준비됨. 먼저 짧은 호버 시험으로 실행 경로를 확인하세요.</div><progress id="progress" value="0" max="1"></progress><div id="errors"></div></section>
+<section class="panel results"><h2>비교 결과</h2><div class="table-wrap"><table><thead><tr><th>지표</th><th>Hybrid</th><th>NMPC 단독</th></tr></thead><tbody id="metrics"><tr><td colspan="3">아직 실행 결과가 없습니다.</td></tr></tbody></table></div><div class="buttons"><button id="download" disabled>전체 로그 JSON 저장</button></div></section></div>
+</div>
+<div class="charts"><section class="panel"><h2>전진 속도 · m/s</h2><svg id="velocity-chart" viewBox="0 0 620 220" role="img" aria-label="실제 전진 속도와 목표 속도 시간 이력"></svg></section><section class="panel"><h2>고도 · m</h2><svg id="altitude-chart" viewBox="0 0 620 220" role="img" aria-label="고도 시간 이력"></svg></section></div>
+<div class="legend"><span><i class="dot" style="background:#59c8f5"></i>Hybrid</span><span><i class="dot" style="background:#db9bff"></i>NMPC 단독</span><span>점선: 목표값</span></div>
+<details class="panel details"><summary>모델·제어·센서의 정의와 한계</summary><ul>
+<li>선정안은 제공 CSV의 70개 필드를 원본 사이징 코드에서 재현한 개념설계 모델입니다. CT(J)·CP(J), 모터 KV·저항·무부하전류, 질량·관성·형상을 함께 가져왔습니다.</li>
+<li>기계적 플랜트는 17상태이며, 배터리 SOC 1개를 추가로 적분합니다. 전압 강하·전류 제한·모터 동손·로터 가속 에너지를 계산합니다. 목표 속도에서 실제 속도를 잘라 맞추지 않습니다.</li>
+<li>NMPC: IPOPT, N=20, 예측 간격 0.05초, 예측 범위 1초, 최대 30회 반복. 매 20 tick 재계산. INDI·플랜트·IMU: 매 1 ms tick. 화면 렌더링은 별도 스레드입니다.</li>
+<li>Hybrid는 총추력·각가속도만 최적화하고 INDI가 회전수 명령을 생성합니다. NMPC 단독은 4개 회전수 명령을 직접 최적화하며 INDI를 사용하지 않습니다. 풀이 실패 시 마지막 명령을 유지하고 실패 횟수를 공개합니다.</li>
+<li>센서 모드는 가속도·자이로·10 Hz GPS·가정한 RPM 텔레메트리를 사용합니다. GPS 20 ms 지연은 측정 시점으로 돌아가 보정한 후 IMU를 재적분합니다. 초기 위치·속도·자세 표준편차는 0.1 m / 0.05 m/s / 0.01 rad입니다. 가속도계를 무조건 중력 관측으로 재사용하지 않습니다.</li>
+<li>선정 기체의 로터 관성 1e−5 kg·m², 속도 루프 20 ms, 모터 전류 상한 40 A, 공력 감쇠 및 센서 특성은 별도 가정입니다. 모터 열·전기 인덕턴스·회생 제동은 미구현입니다.</li>
+<li>추진 맵 밖·역유입 영역에는 에너지를 생성하지 않는 연장 모델을 쓰고 비율을 기록합니다. 해당 구간이 포함된 결과로 실제 고속 성능을 단정하면 안 됩니다. 원본 사이징의 전진비 정의와 6DOF 축방향 유입 정의도 구분합니다. 현재 회전수 상한은 정지 팁 마하 기준이며, 전진 속도를 포함한 나선형 팁 마하 제약은 미구현입니다.</li>
+<li>STL: mm→m, CAD X=0 기수, CG=기수에서 428.251 mm. STL 외형은 질량 분포나 추진 계수를 자동 산출하지 않습니다. 로터가 합쳐진 정적 메시이므로 STL 프로펠러 회전 애니메이션은 없습니다.</li>
+</ul><p class="small">수식 원본: research/model.py · research/nmpc.py · research/eskf.py. <a href="https://web.casadi.org/get/">CasADi 공식 배포</a> · <a href="https://arxiv.org/html/1711.02508v1">Solà, ESKF 회전·오차 리셋</a></p></details>
+</main></body></html>
