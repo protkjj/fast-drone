@@ -13,7 +13,6 @@ Pages 에는 로컬용(.html, charset 포함)을 올린다.
 import os
 import pathlib
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -96,9 +95,9 @@ footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--rule);
 
 def main():
     site = ROOT / "site"
-    if site.exists():
-        shutil.rmtree(site)
-    site.mkdir()
+    # 출력 폴더 전체를 지우지 않고 이 빌드가 관리하는 파일만 갱신한다.
+    # 미리보기 서버나 사용자가 추가한 파일도 같은 폴더에 있을 수 있다.
+    site.mkdir(exist_ok=True)
     cards, missing, out_names = [], [], []
     for src, dst, title, desc in PAGES:
         f = ROOT / "results" / src
