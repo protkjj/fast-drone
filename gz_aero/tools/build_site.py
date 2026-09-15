@@ -14,6 +14,7 @@ import os
 import argparse
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -108,6 +109,13 @@ def main(include_research=False):
         # 되돌아가기 링크를 끼워 넣는다. </body> 바로 앞이면 본문이 다 만들어진
         # 뒤라 머리글을 찾을 수 있다.
         html = f.read_text(encoding="utf-8")
+        if src == 'flight_sim.html' and 'STL_URL' in html:
+            # The generated HTML lives in results/, while Pages puts it at the
+            # site root. Keep one original STL in source control, copy for hosting.
+            (site / 'assets').mkdir(exist_ok=True)
+            shutil.copy2(ROOT / 'research/assets/drone_v2.stl', site / 'assets/drone_v2.stl')
+            html = html.replace("'../research/assets/drone_v2.stl'", "'./assets/drone_v2.stl'")
+            html = html.replace('href="../research/index.html"', 'href="./research/index.html"')
         if "</body>" in html:
             # ★ **마지막** </body> 앞에 넣는다. 첫 번째로 하면 JS 문자열 안에
             #   들어 있는 "</body>" 를 문서의 끝으로 오해해 그 문자열을 반으로

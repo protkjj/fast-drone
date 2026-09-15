@@ -51,6 +51,7 @@ def main():
     html = (TEMPLATE
             .replace("%%DATA%%", json.dumps(ref, separators=(",", ":")))
             .replace("%%LQR%%", json.dumps(lqr, separators=(",", ":")))
+            .replace("%%STL_PARSER%%", (HERE.parent / 'research' / 'stl.js').read_text(encoding='utf-8'))
             .replace("%%MOTOR_NMPC%%", (HERE / 'tools' / 'standalone_nmpc.js').read_text(encoding='utf-8'))
             .replace("%%HYBRID_INTERFACE%%", (HERE / 'tools' / 'hybrid_interface.js').read_text(encoding='utf-8')))
     out = pathlib.Path(a.out)
@@ -304,7 +305,7 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
 <header>
   <div>
     <h1>축대칭 동체 비행 시뮬레이터</h1>
-    <div class="sub">이륙부터 순항까지, 속도·고도·자세를 함께 살펴보세요.</div>
+    <div class="sub">외형: drone_v2.stl · 계산: 기존 8 kg 시험 모델. <a href="../research/index.html" style="color:var(--accent)">선정 기체 1.712 kg 연구실 →</a></div>
   </div>
   <div class="badges" id="badges"></div>
 </header>
@@ -390,7 +391,7 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
         <span><i style="background:#f2aa4c"></i>공력</span>
         <span><i style="background:#2d94bd"></i>속도</span>
         <span><i style="background:#59c8f5"></i>궤적</span>
-        <span>기체 표시 ×5</span>
+        <span id="stlStatus" role="status">STL 불러오는 중 · 표시 ×5</span>
         <span class="help">끌기 = 회전 · 휠 = 확대 · Shift+끌기 = 이동</span>
       </div>
       <div class="warnbox" id="warn"></div>
@@ -434,6 +435,7 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
 </div>
 
 <script>
+%%STL_PARSER%%
 const D = %%DATA%%;
 const P0 = D.params;
 const P = JSON.parse(JSON.stringify(P0));
@@ -1746,7 +1748,34 @@ const TRAIL_MAX = 6000;
 const TRAIL_DOT_EVERY = 3;   // 0.12 s 마다
 let ren, scene, cam, veh, arrow, velArrow, trail, trailDots,
     trailPos, trailDotPos, trailN = 0;
-const PROPS = [];   // 프로펠러를 실제 회전수만큼 돌린다
+const STL_URL = '../research/assets/drone_v2.stl';
+function syncVehiclePose(vehicle, state){
+  // Mesh coordinates are metres relative to the selected CAD CG. Only the
+  // display follows the plant; this function never writes a physical state.
+  vehicle.position.set(state[0], state[1], state[2]);
+  vehicle.quaternion.set(state[6], state[7], state[8], state[9]);
+}
+async function loadVehicleSTL(){
+  try {
+    const response = await fetch(STL_URL);
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const mesh = ResearchSTL.parse(await response.arrayBuffer());
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
+    geometry.computeVertexNormals();
+    const skin = new THREE.MeshStandardMaterial({color:0xb5c8d5,
+      roughness:.55, metalness:.22, side:THREE.DoubleSide});
+    const model = new THREE.Mesh(geometry, skin);
+    model.name = 'drone_v2.stl'; veh.add(model);
+    $('#stlStatus').textContent = 'drone_v2.stl · 표시 ×5 · 프로펠러 정적 메시';
+    if (!running) paint(diag());
+  } catch(error) {
+    $('#stlStatus').textContent = 'STL 표시 실패 · 비행 계산은 별도 동작';
+    $('#stlStatus').title = String(error.message || error) +
+      ' · 로컬 파일은 HTTP 미리보기로 여세요. STL 외형은 물리 계수를 바꾸지 않습니다.';
+    console.warn('STL display failed:', error);
+  }
+}
 // RViz 처럼 마우스로 궤도·이동·확대. OrbitControls 는 three 핵심 번들에 없어서
 // 직접 쓴다 (CDN 에서 따로 받으면 막힐 수 있다).
 const ORB = {az: -2.3, el: 0.32, dist: 15, follow: true,
@@ -1768,62 +1797,13 @@ function init3D(){
   const g1 = new THREE.GridHelper(3000, 120, 0x35495d, 0x1c2733);
   g1.rotation.x = Math.PI/2; scene.add(g1);
 
-  // 레드불 레이싱 드론 배치. 어뢰형 동체가 수평이고 주황 X암이 동체를 감싼다.
-  // 로터 추력은 동체축과 수직 — dynamics.py 의 V_axial = -w_b 가 이 배치다.
-  // 물리는 처음부터 이랬고, 예전엔 프로펠러를 반투명 통짜 원판으로 그려서
-  // 동체를 덮는 덩어리처럼 보였을 뿐이다.
-  // 추진까지 축대칭인 로켓 배치. 기수축(동체 +x)을 따라 내려다보면 동체 단면이
-  // 원으로 보이고 그 둘레에 로터 넷이 90도 간격으로 놓인다. 호버에서는 기수가
-  // 위를 본다 — vehicle_params 의 Iyy = Izz 가 바로 이 4겹 대칭을 요구한다.
-  const skin = new THREE.MeshStandardMaterial({color:0x50687b, roughness:.5, metalness:.3});
-  const accent = new THREE.MeshStandardMaterial({color:0xb8802f, roughness:.45, metalness:.25});
-  const tipM = new THREE.MeshStandardMaterial({color:0xd8402f, roughness:.4});
-  const blade = new THREE.MeshStandardMaterial({color:0x18222c, roughness:.65,
-                  transparent:true, opacity:.5, side:THREE.DoubleSide});
-
+  // Use the supplied CAD, not an unrelated cylinder/cone approximation. It is
+  // one static mesh, so the baked-in propellers must not be rotated as a body.
+  // The legacy 8 kg plant stays explicit; appearance does not infer its inertia.
   veh = new THREE.Group();
-  const bodyRadius = P.d_ref/2;
-  const fus = new THREE.Mesh(new THREE.CylinderGeometry(bodyRadius, bodyRadius, .70, 28), skin);
-  fus.rotation.z = -Math.PI/2; veh.add(fus);
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(bodyRadius, .26, 28), tipM);
-  cone.rotation.z = -Math.PI/2; cone.position.x = .48; veh.add(cone);
-  const tail = new THREE.Mesh(new THREE.CylinderGeometry(bodyRadius*.83, bodyRadius*.67, .12, 24), skin);
-  tail.rotation.z = -Math.PI/2; tail.position.x = -.41; veh.add(tail);
-  const ring = new THREE.Mesh(new THREE.CylinderGeometry(bodyRadius+.0035, bodyRadius+.0035, .07, 28), accent);
-  ring.rotation.z = -Math.PI/2; veh.add(ring);
-  // 롤 기준선. 매끈한 축대칭 동체는 기수축 둘레로 돌아도 화면에서 안 보인다.
-  // 그래서 로터 팔만 도는 것처럼 읽혔다 — 실제로는 강체로 같이 돌고 있었다.
-  // 동체 +z 쪽에 줄을 하나 그어 롤이 눈에 보이게 한다.
-  const stripe = new THREE.Mesh(new THREE.BoxGeometry(.62, .010, .004), accent);
-  stripe.position.set(-.02, 0, bodyRadius+.0005); veh.add(stripe);
-
-  const ARM = 0.25 / Math.SQRT2;      // 기수축 둘레 반지름 (vehicle_params)
-  const RPROP = 0.30 / 2;
-  PROPS.length = 0;
-  // 로터는 yz 평면(동체축에 수직)에 90도 간격. rocket_params 의 위치와 같다.
-  for (const [py, pz] of [[ARM, ARM], [-ARM, ARM], [-ARM, -ARM], [ARM, -ARM]]){
-    const r = Math.hypot(py, pz), ph = Math.atan2(pz, py);
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(.020, r, .020), accent);
-    arm.position.set(0, py/2, pz/2);
-    arm.rotation.x = ph;             // y축을 +X 둘레로 돌리면 +Z 방향이다
-    veh.add(arm);
-    const pod = new THREE.Mesh(new THREE.CylinderGeometry(.026,.030,.075,16), accent);
-    pod.rotation.z = -Math.PI/2; pod.position.set(.02, py, pz);
-    veh.add(pod);
-    const prop = new THREE.Group();
-    for (let k = 0; k < 2; k++){
-      const bl = new THREE.Mesh(new THREE.BoxGeometry(.004, RPROP*.96, .030), blade);
-      bl.position.y = RPROP*.48;
-      const holder = new THREE.Group();
-      holder.add(bl); holder.rotation.x = k * Math.PI;
-      prop.add(holder);
-    }
-    prop.position.set(.066, py, pz);
-    veh.add(prop);
-    PROPS.push(prop);
-  }
   veh.scale.setScalar(5);
   scene.add(veh);
+  loadVehicleSTL();
 
   arrow = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(),
                                 1, 0xf2aa4c, .8, .35);
@@ -1952,11 +1932,7 @@ function syncTrail(){
 function render3D(d){
   if(!ren) return;
   const p = new THREE.Vector3(X[0], X[1], X[2]);
-  veh.position.copy(p);
-  veh.quaternion.set(X[6], X[7], X[8], X[9]);
-  // 로터를 실제 회전수 n [rad/s] 로 돌린다. 방향은 rotor_directions 대로.
-  for (let i = 0; i < PROPS.length; i++)
-    PROPS[i].rotation.x = rotorPhase[i];
+  syncVehiclePose(veh, X);
   syncTrail();
   const W = P.mass * P.g;
   const fv = new THREE.Vector3(d.Fw[0], d.Fw[1], d.Fw[2]);

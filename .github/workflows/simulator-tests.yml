@@ -2,9 +2,9 @@ name: Simulator tests
 
 on:
   pull_request:
-    paths: ['gz_aero/tools/build_sim.py', 'gz_aero/tools/*.js', 'gz_aero/tools/build_site.py', 'gz_aero/data/*.json', 'gz_aero/test/*.cjs', 'results/flight_sim*.html', '.github/workflows/simulator-tests.yml']
+    paths: ['gz_aero/tools/build_sim.py', 'gz_aero/tools/*.js', 'gz_aero/tools/build_site.py', 'gz_aero/data/*.json', 'gz_aero/test/*.cjs', 'research/stl.js', 'research/assets/**', 'results/flight_sim*.html', '.github/workflows/simulator-tests.yml']
   push:
-    paths: ['gz_aero/tools/build_sim.py', 'gz_aero/tools/*.js', 'gz_aero/tools/build_site.py', 'gz_aero/data/*.json', 'gz_aero/test/*.cjs', 'results/flight_sim*.html', '.github/workflows/simulator-tests.yml']
+    paths: ['gz_aero/tools/build_sim.py', 'gz_aero/tools/*.js', 'gz_aero/tools/build_site.py', 'gz_aero/data/*.json', 'gz_aero/test/*.cjs', 'research/stl.js', 'research/assets/**', 'results/flight_sim*.html', '.github/workflows/simulator-tests.yml']
 
 permissions:
   contents: read

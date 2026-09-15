@@ -2,6 +2,20 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {simulator} = require('./sim_harness.cjs');
 
+test('STL 외형은 상태의 위치·자세만 따르며 기존 물리 상태를 바꾸지 않는다', () => {
+  const sim=simulator();
+  const result=sim.run(`const before=Array.from(X), calls={};
+    const display={position:{set:(...v)=>calls.p=v},quaternion:{set:(...v)=>calls.q=v}};
+    syncVehiclePose(display,X);
+    ({before,after:Array.from(X),position:calls.p,q:calls.q,mass:P.mass,
+      parser:typeof ResearchSTL.parse,url:STL_URL});`);
+  assert.deepEqual(Array.from(result.before),Array.from(result.after));
+  assert.deepEqual(Array.from(result.position),Array.from(result.before).slice(0,3));
+  assert.deepEqual(Array.from(result.q),Array.from(result.before).slice(6,10));
+  assert.equal(result.mass,8);assert.equal(result.parser,'function');
+  assert.equal(result.url,'../research/assets/drone_v2.stl');
+});
+
 test('Python 기준 궤적 및 LQR 보간과 일치한다', () => {
   const sim = simulator();
   assert.ok(sim.run('selfCheck()') < 1e-9);
