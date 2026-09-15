@@ -2,9 +2,9 @@ name: Simulator tests
 
 on:
   pull_request:
-    paths: ['gz_aero/tools/build_sim.py', 'gz_aero/tools/standalone_nmpc.js', 'gz_aero/tools/build_site.py', 'gz_aero/data/*.json', 'gz_aero/test/*.cjs', 'results/flight_sim*.html', '.github/workflows/simulator-tests.yml']
+    paths: ['gz_aero/tools/build_sim.py', 'gz_aero/tools/*.js', 'gz_aero/tools/build_site.py', 'gz_aero/data/*.json', 'gz_aero/test/*.cjs', 'results/flight_sim*.html', '.github/workflows/simulator-tests.yml']
   push:
-    paths: ['gz_aero/tools/build_sim.py', 'gz_aero/tools/standalone_nmpc.js', 'gz_aero/tools/build_site.py', 'gz_aero/data/*.json', 'gz_aero/test/*.cjs', 'results/flight_sim*.html', '.github/workflows/simulator-tests.yml']
+    paths: ['gz_aero/tools/build_sim.py', 'gz_aero/tools/*.js', 'gz_aero/tools/build_site.py', 'gz_aero/data/*.json', 'gz_aero/test/*.cjs', 'results/flight_sim*.html', '.github/workflows/simulator-tests.yml']
 
 permissions:
   contents: read
@@ -23,7 +23,7 @@ jobs:
       - name: 원본으로 HTML 재생성
         run: python3 gz_aero/tools/build_sim.py
       - name: 물리·시간·기록·채점 회귀 검사
-        run: node --test gz_aero/test/sim.test.cjs
+        run: node --test gz_aero/test/sim.test.cjs gz_aero/test/hybrid_interface.test.cjs
       - name: 배포 페이지 조립 및 스크립트 문법 검사
         run: python3 gz_aero/tools/build_site.py
       - name: 생성물이 원본과 일치하는지 검사

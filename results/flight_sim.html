@@ -261,7 +261,8 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
       <p class="note">예제는 정지한 뒤 적용합니다. 기존 기록은 ‘초기화’로 비웁니다.</p></div>
     <div class="fld"><label for="ctrl">제어기</label>
       <select id="ctrl"></select>
-      <p class="note" id="ctrlNote" style="margin-top:6px"></p></div>
+      <p class="note" id="ctrlNote" style="margin-top:6px"></p>
+      <p class="note" id="interfaceStatus" hidden aria-live="off"></p></div>
     <div class="fld"><div class="row"><label for="spd">목표 속도</label>
       <output id="o_spd"></output></div>
       <input type="range" id="spd" min="0" max="120" step="1" value="60"></div>
@@ -622,7 +623,7 @@ function controlLQR(x, cmd){
    **상자제약만 남는 문제**가 되어 브라우저에서도 풀 수 있다.
 
    IPOPT 를 옮기지 않았다. 압축 + 투영경사 + 되추적 선탐색으로 푼다. 지평선을
-   8 로 줄였고(파이썬은 20) 20 Hz 로만 다시 푼다. 같은 해를 준다고 주장하지
+   20 단계에서 20 Hz 로 다시 푼다. 같은 해를 준다고 주장하지
    않는다 — 구조가 같고 같은 비용을 줄일 뿐이다.                              */
 const NV = 13, NUV = 4;
 const NMPC = {N:20, dt:0.08, rate:0.05, iters:40,
@@ -639,9 +640,11 @@ function vXdot(x, u, p){
   const R00=1-2*(qy*qy+qz*qz), R01=2*(qx*qy-qz*qw), R02=2*(qx*qz+qy*qw);
   const R10=2*(qx*qy+qz*qw), R11=1-2*(qx*qx+qz*qz), R12=2*(qy*qz-qx*qw);
   const R20=2*(qx*qz-qy*qw), R21=2*(qy*qz+qx*qw), R22=1-2*(qx*qx+qy*qy);
-  const ub=R00*x[3]+R10*x[4]+R20*x[5];
-  const vb=R01*x[3]+R11*x[4]+R21*x[5];
-  const wb=R02*x[3]+R12*x[4]+R22*x[5];
+  // Ground speed is the tracking target; aerodynamic force uses air-relative speed.
+  const wind=windNow(), vx=x[3]-wind[0], vy=x[4]-wind[1], vz=x[5]-wind[2];
+  const ub=R00*vx+R10*vy+R20*vz;
+  const vb=R01*vx+R11*vy+R21*vz;
+  const wb=R02*vx+R12*vy+R22*vz;
   const V_sq = ub*ub+vb*vb+wb*wb+EPS, V_cf = Math.sqrt(vb*vb+wb*wb+EPS);
   const fac = 0.5*p.rho*p.S_ref*(p.C_Na*ub + p.C_dc*V_cf);
   let Fx = -0.5*p.rho*V_sq*p.S_ref*(p.C_A0 + p.C_Aa2*(vb*vb+wb*wb)/V_sq);
@@ -776,27 +779,11 @@ function nmpcSolve(x0, vref, zref){
      5) 투영 뉴턴으로 상자 QP 를 푼다. 경계에 붙은 변수를 빼고 자유변수만
         촐레스키로 푼 뒤, 투영 선탐색으로 받는다.
    ------------------------------------------------------------------ */
-/* 비용함수를 다시 짰다. 솔버를 25 배 빠르게 만들고 나니 진짜 병목이
-   드러났기 때문이다 — 제대로 풀린 해가 각가속도 한계에 계속 붙었고,
-   가중치 12 조합 중 고도를 지킨 것이 하나뿐이었다. 원인이 셋이었다.
-
-   (1) **자세 기준이 없었다.** 비용에 Qv(속도)·Qz(고도)·Qw(각속도)뿐이라
-       자세를 붙잡는 것이 아무것도 없었다. nu_roll 이 어떤 반복수에서도
-       0.01 이었던 이유다 — 솔버를 아무리 좋게 해도 롤은 안 잡힌다.
-       고치는 법이 마침 싸다: **LQR 게인표에 속도별 트림 자세가 이미 들어
-       있다.** 쿼터니언은 상태(6~9)라 지금의 대각 가중치 기계에 그대로
-       들어간다. |q - q_ref|^2 은 작은 오차에서 (Δφ/2)^2 이라 자세 오차의
-       제곱과 같다. 이 한 항이 자세와 롤을 같이 잡는다.
-
-   (2) **지평선이 짧았다.** N*dt = 1.6 s 인데 가속은 30 s 짜리다. 균일
-       격자로 늘리면 앞쪽이 거칠어져 적용할 첫 수가 나빠진다. 그래서
-       **등급 격자** — 앞은 30 ms 로 촘촘하고 뒤로 갈수록 벌어져(1.18 배,
-       상한 0.30 s) 같은 20 스텝으로 약 4 s 를 본다.
-
-   (3) **nu 상한이 내부루프가 낼 수 있는 값보다 컸다.** INDI 증분 한계가
-       J*25 이므로 25 rad/s^2 인데 상자는 100(뒤에 40)이었다. NMPC 가 지키지
-       못할 약속을 하고 있었던 셈이다. 메모리의 "FC/CC 분리" 가 정한 인터페이스
-       계약이 곧 이 값이다. 25 로 맞춘다.                                   */
+/* Browser RTI configuration retained to isolate the interface repair.
+   The 13-state predictor optimizes all three angular accelerations. A trim
+   quaternion reference is part of the objective, never an outside roll override.
+   Box limits alone do not describe the coupled thrust/moment feasible set;
+   INDI reports any allocation residual explicitly. This is not an IPOPT port. */
 const RTI = {N:20, dt0:0.03, dtGrow:1.18, dtMax:0.30, rate:0.05,
              Qv:[5,5,10], Qz:20, Qw:20, Qq:400, R:[1e-5,0.01,0.01,0.01],
              Rdu:[1e-3,0.01,0.01,0.01], nuMax:25,
@@ -813,12 +800,11 @@ RTI.horizon = RTI.dts.reduce((x, y) => x + y, 0);
 const RTI_WIDX = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 let rtiU = null, rtiLast = -1e9, rtiOut = null, rtiApplied = null, rtiStat = null;
 let vTrimRef = 0;   // 자세 기준을 뽑을 속도 (controlHybrid 가 넣는다)
-let ROLL_HOLD_OUTSIDE = true;   // A/B 로 재보려고 let
 // INDI 증분 한계 [N·m]. 권한의 일정 비율. 아래에서 기체 값으로 채운다.
 // 스윕으로 고른 값. 통과 구간이 0.15~0.18 이고 0.12·0.22 는 실패한다.
 let INDI_FRAC = 0.16;
 let INDI_LIM = [0.5, 17.5, 17.5];
-// 권한을 기체 값에서 한 번 계산해 둔다. control() 과 controlHybrid() 가 같이 쓴다.
+// 기존 INDI baseline 전용 한계. 제안 Hybrid는 실제 로터 상태·추력 제약을 쓴다.
 function setIndiLim(){
   const Tm = P.k_T * P.n_max * P.n_max;
   const rollAuth  = 4 * P.k_Q * P.n_max * P.n_max;              // 로터 항력토크
@@ -1259,6 +1245,117 @@ function controlMotorNmpc(x,cmd){
 }
 
 
+/* Interface-separated INDI, for the body +x thrust plant.
+ * NMPC owns [total thrust, angular acceleration]; only this module owns motors.
+ * We solve the increment in rotor-force coordinates: Δf = (∂f/∂n) Δn.
+ * Unlike clipping G^-1 Δν afterwards, bounded allocation preserves total thrust.
+ * Aerodynamic, rigid-body and rotor-gyro moments enter via measured acceleration,
+ * not an accumulated requested moment. This is a local incremental approximation.
+ */
+const HYBRID_INDI = {filterHz:50};
+let hybridState=null, hybridStat=null;
+function resetHybridInterface(){ hybridState=null; hybridStat=null; }
+function hybridSnapshot(){
+  return {state:hybridState?JSON.parse(JSON.stringify(hybridState)):null,
+          stat:hybridStat?JSON.parse(JSON.stringify(hybridStat)):null};
+}
+function hybridRestore(saved){
+  const copy=saved?JSON.parse(JSON.stringify(saved)):{};
+  hybridState=copy.state||null; hybridStat=copy.stat||null;
+}
+function hybridRotorForce(n, vax){
+  return P.k_T*n*n*Math.max(0,1-vax/((n/(2*Math.PI))*P.D_prop+EPS)/P.J_max);
+}
+function hybridForceMatrix(){
+  if(P.thrust_axis!=='x') throw Error('Hybrid INDI requires body +x thrust geometry');
+  return [P.rotor_directions.map(d=>d*P.k_Q/P.k_T/P.Ixx),
+          P.rotor_positions.map(r=>r[2]/P.Iyy),
+          P.rotor_positions.map(r=>-r[1]/P.Izz)];
+}
+// Small dense system with pivoting. KKT matrices are indefinite, so not Cholesky.
+function hybridLinearSolve(A,b){
+  const n=b.length, rows=A.map((row,i)=>[...row,b[i]]);
+  for(let k=0;k<n;k++){
+    let p=k;for(let i=k+1;i<n;i++)if(Math.abs(rows[i][k])>Math.abs(rows[p][k]))p=i;
+    if(Math.abs(rows[p][k])<1e-12)return null;
+    [rows[k],rows[p]]=[rows[p],rows[k]];
+    for(let i=k+1;i<n;i++){
+      const scale=rows[i][k]/rows[k][k];
+      for(let j=k;j<=n;j++)rows[i][j]-=scale*rows[k][j];
+    }
+  }
+  const x=Array(n).fill(0);
+  for(let i=n-1;i>=0;i--){
+    let sum=rows[i][n];for(let j=i+1;j<n;j++)sum-=rows[i][j]*x[j];
+    x[i]=sum/rows[i][i];
+  }
+  return x;
+}
+// min ||B f - angularTarget||², subject to sum(f)=T and 0<=f_i<=cap_i.
+// Four rotors => only 3^4 active faces. The feasible unconstrained solution exits
+// immediately; otherwise enumerate faces, giving a global minimum of this QP.
+function hybridAllocate(total,angularTarget,B,caps){
+  const maxTotal=caps.reduce((a,b)=>a+b,0), Tc=Math.max(0,Math.min(maxTotal,total));
+  if(Tc<=1e-12)return [0,0,0,0];
+  if(maxTotal-Tc<=1e-12)return caps.slice();
+  const H=Array.from({length:4},(_,i)=>Array.from({length:4},(_,j)=>
+    B.reduce((sum,row)=>sum+row[i]*row[j],0)));
+  const g=Array.from({length:4},(_,i)=>B.reduce((sum,row,k)=>sum+row[i]*angularTarget[k],0));
+  let best=null,bestCost=Infinity;
+  for(let face=0;face<81;face++){
+    let code=face,remain=Tc;const free=[],f=[0,0,0,0];
+    for(let i=0;i<4;i++){
+      const status=code%3;code=Math.floor(code/3);
+      if(status===0)free.push(i);else if(status===2){f[i]=caps[i];remain-=f[i];}
+    }
+    if(remain < -1e-9 || remain>free.reduce((sum,i)=>sum+caps[i],0)+1e-9)continue;
+    const m=free.length;
+    if(m){
+      const A=free.map(i=>[...free.map(j=>H[i][j]),1]);
+      A.push([...free.map(()=>1),0]);
+      const rhs=free.map(i=>g[i]-f.reduce((sum,v,j)=>sum+H[i][j]*v,0));rhs.push(remain);
+      const solved=hybridLinearSolve(A,rhs);if(!solved)continue;
+      free.forEach((i,k)=>{f[i]=solved[k];});
+    }else if(Math.abs(remain)>1e-9)continue;
+    if(f.some((v,i)=>v < -1e-8 || v>caps[i]+1e-8))continue;
+    const cost=B.reduce((sum,row,k)=>sum+(row.reduce((a,b,i)=>a+b*f[i],0)-angularTarget[k])**2,0);
+    if(cost<bestCost){bestCost=cost;best=f;}
+    if(face===0)break;
+  }
+  if(!best)throw Error('Hybrid allocation: no feasible total-thrust solution');
+  return best.map((f,i)=>Math.max(0,Math.min(caps[i],f)));
+}
+function hybridIndi(x,requested,dt){
+  const omega=x.slice(10,13),vax=axialInflow(x),B=hybridForceMatrix();
+  const forces=x.slice(13,17).map(n=>hybridRotorForce(n,vax));
+  if(!hybridState){
+    // No previous IMU sample exists at reset: start with zero angular acceleration.
+    // Never read xdot's true acceleration as a substitute for measurement.
+    hybridState={omega:omega.slice(),forces:forces.slice(),filtered:forces.slice(),alpha:[0,0,0]};
+  }else{
+    const a=1-Math.exp(-2*Math.PI*HYBRID_INDI.filterHz*dt);
+    for(let k=0;k<3;k++)hybridState.alpha[k]+=a*((omega[k]-hybridState.omega[k])/dt-hybridState.alpha[k]);
+    // Δω/dt covers the previous interval; use its midpoint actuator force and
+    // the same LPF to avoid treating motor/filter delay as an external moment.
+    for(let i=0;i<4;i++)hybridState.filtered[i]+=a*((forces[i]+hybridState.forces[i])/2-hybridState.filtered[i]);
+  }
+  const s=hybridState, measuredT=forces.reduce((a,b)=>a+b,0);
+  const delta=[requested[0]-measuredT,...requested.slice(1).map((v,k)=>v-s.alpha[k])];
+  const rotorAlpha=B.map(row=>row.reduce((sum,b,i)=>sum+b*s.filtered[i],0));
+  const target=rotorAlpha.map((v,k)=>v+delta[k+1]);
+  const caps=forces.map(()=>hybridRotorForce(P.n_max,vax));
+  const allocated=hybridAllocate(measuredT+delta[0],target,B,caps);
+  const motors=allocated.map(f=>nFromThrust(f,vax));
+  const applied=[allocated.reduce((a,b)=>a+b,0),...B.map((row,k)=>
+    s.alpha[k]+row.reduce((sum,b,i)=>sum+b*(allocated[i]-s.filtered[i]),0))];
+  hybridStat={t:T,requested:requested.slice(),applied,measured:[measuredT,...s.alpha],delta,
+    residual:requested.map((v,k)=>v-applied[k]),forces:allocated,
+    limited:Math.hypot(...requested.map((v,k)=>v-applied[k]))>1e-5};
+  s.omega=omega.slice();s.forces=forces.slice();
+  return motors;
+}
+
+
 /* ══ 제어기 ═══════════════════════════════════════════════════════════
    PX4 를 옮긴 것이 아니다. 평범한 종속 루프(속도 -> 자세 -> 모멘트)다.
    여기서 보려는 것은 제어 성능이 아니라 **기체가 어디서 한계에 걸리나** 이므로
@@ -1306,10 +1403,10 @@ const CTRLS = {
     note:"각가속도 피드백으로 모멘트를 보정합니다. 전이 중 롤 불안정과 구동기 포화가 발생할 수 있습니다."},
   nmpc: {name:"NMPC 단독 · 모터 직접 최적화", group:"실험 제어기", motor:true,
     note:"17상태와 모터 지연·바람을 예측하고 모터 4개의 회전수를 직접 최적화합니다. INDI/PID 내부루프 없이 SQP 1회를 수행합니다. 평형 기준은 LQR 표에서 읽지만 LQR 제어 출력은 쓰지 않습니다. 계산량·짧은 예측 구간의 한계가 있는 실험 제어기입니다."},
-  hybrid: {name:"NMPC + INDI · 계산량 큼", group:"실험 제어기", ff:true, tilt:80, indi:true, nmpc:true,
-    note:"가상모델과 투영경사 솔버를 사용합니다. 계산량이 커서 실측 배속이 낮아질 수 있으며 안정 비행은 보장하지 않습니다."},
-  sqprti: {name:"SQP-RTI + INDI · 실험", group:"실험 제어기", ff:true, tilt:80, indi:true, nmpc:true, rti:true,
-    note:"매 제어 주기 한 번의 SQP 반복을 수행합니다. 속도 추종과 구동기 여유 사이의 타협을 채점에서 확인하세요."},
+  hybrid: {name:"Hybrid · NMPC(PG) → INDI", group:"제안 Hybrid", ff:true, tilt:80, indi:true, nmpc:true,
+    note:"제안 구조의 브라우저 근사: 13상태 NMPC는 총추력·각가속도만 결정하고, INDI는 실제 로터·각가속도 피드백으로 모터를 할당합니다. PG 20 Hz / INDI 500 Hz. 연구용 IPOPT·50 Hz/1 kHz와 다릅니다. 계산량이 크고 상승 중 큰 자세 반전이 관찰되어 최종 추종 성공만으로 안정성을 판단하면 안 됩니다."},
+  sqprti: {name:"Hybrid · NMPC(SQP-RTI) → INDI", group:"제안 Hybrid", ff:true, tilt:80, indi:true, nmpc:true, rti:true,
+    note:"제안 구조의 브라우저 근사: 13상태 가상 명령 최적화 → 증분 INDI → 17상태 플랜트. 총추력을 보존하는 포화 할당을 사용합니다. SQP 20 Hz / INDI 500 Hz, 참 상태 피드백이며 연구용 IPOPT·센서/ESKF 구현은 아닙니다."},
 };
 let CTRL = "lqr";
 // INDI 상태: 직전 각속도·모멘트와 걸러낸 각가속도
@@ -1612,14 +1709,9 @@ function control(x, cmd){
 function controlHybrid(x, cmd){
   const psi = cmd.psi;
   const vref = [cmd.spd*Math.cos(psi), cmd.spd*Math.sin(psi), 0];
-  // ★ 도달 가능한 고도 기준을 준다. 지평선이 N*dt = 1.6 s 뿐인데 200 m 짜리
-  //   고도 오차를 그대로 주면 Qz*200^2 = 800000 이 비용을 통째로 지배해서
-  //   최적해가 "최대 추력" 에 박힌다. 반복을 40 -> 200 -> 1000 으로 늘려도
-  //   778 N(상한) 에서 안 움직였다 — 솔버가 덜 수렴한 게 아니라 비용함수의
-  //   진짜 최적점이 거기였다. 83 m/s 정상비행 트림은 222 N 이면 된다.
-  //   종속 루프가 고도 오차를 상승률로 바꿔 쓰는 것(clamp +-15)과 같은 처리다.
+  // A moving altitude reference limits the requested climb over this horizon.
+  // Retained from the prior controller; not changed to improve the comparison.
   const useRti = !!CTRLS[CTRL].rti;
-  const SOL = useRti ? RTI : NMPC;
   // ★ **현재** 속도의 트림을 기준으로 삼는다. 명령 속도로 잡으면 아직 느린
   //   상태에서 순항 자세(64도)를 요구해 고도 권한을 잃는다 — 종속 루프가
   //   같은 함정에 빠졌던 자리이고, 여기서도 |ω| 67 로 추락했다.
@@ -1643,70 +1735,13 @@ function controlHybrid(x, cmd){
     }
     out = nmpcOut;
   }
-  const Tc = out[0], nu = [out[1], out[2], out[3]];
-  // ★ 롤은 인터페이스 층에서 잡는다. 두 솔버 모두.
-  //
-  //   투영경사(hybrid)는 비용에 자세 항이 아예 없어 nu_roll 이 어떤 반복수
-  //   에서도 0.01 이었다 — 솔버를 아무리 좋게 해도 롤은 안 잡힌다.
-  //   RTI 는 q_ref(트림 자세)에 롤이 들어 있는데도 여기서 덮어쓴다. 재보고
-  //   내린 결정이다: 끄면 |ω| 가 47.5 -> 64.7 로 나빠지고 NMPC 가 낸
-  //   |ν_roll| 이 한계 25 에 붙는다.
-  //
-  //   이유가 있다. 비용이 |q - q_ref|^2 라 세 축을 **같은 무게**로 잰다.
-  //   그런데 Ixx 가 Iyy 의 1/35 라 같은 자세 오차를 롤로 지우는 비용이
-  //   훨씬 싸다 — 최적해가 롤을 과하게 쓴다. 축별로 다르게 재려면 쿼터니언
-  //   차가 아니라 동체 프레임 오차로 써야 하는데, 그러면 지금의 대각 가중치
-  //   기계(상태에 바로 가중)를 못 쓴다. 그건 다음 일이다.
-  //
-  //   축대칭 동체라 기수축 둘레 롤은 공력상 결합이 없다. NMPC 가 추력축
-  //   기동을 정하고 롤은 인터페이스 층이 맡는 분리가 물리적으로도 맞다.
-  if (ROLL_HOLD_OUTSIDE){
-    const qx=x[6], qy=x[7], qz=x[8], qw=x[9];
-    const xb=[1-2*(qy*qy+qz*qz), 2*(qx*qy+qz*qw), 2*(qx*qz-qy*qw)];
-    const yb=[2*(qx*qy-qz*qw), 1-2*(qx*qx+qz*qz), 2*(qy*qz+qx*qw)];
-    const h = Math.hypot(xb[0], xb[1]);
-    if (h > 0.25){
-      const yh=[xb[1]/h, -xb[0]/h, 0];
-      const cr=[yb[1]*yh[2]-yb[2]*yh[1], yb[2]*yh[0]-yb[0]*yh[2], yb[0]*yh[1]-yb[1]*yh[0]];
-      const phi = Math.atan2(cr[0]*xb[0]+cr[1]*xb[1]+cr[2]*xb[2],
-                             yb[0]*yh[0]+yb[1]*yh[1]+yb[2]*yh[2]);
-      const t = Math.min(1, (h - 0.25) / 0.20);
-      const wgt = t*t*(3 - 2*t);
-      let wr = KW_R*(KR_R*phi - x[10]);
-      if (wr > W_R_MAX) wr = W_R_MAX; else if (wr < -W_R_MAX) wr = -W_R_MAX;
-      nu[0] = nu[0] + wgt*(wr - nu[0]);
-    }
-  }
-
-  // INDI 내부루프: 측정 각가속도를 되먹여 증분으로 모멘트를 낸다.
-  const J = [P.Ixx, P.Iyy, P.Izz], om = [x[10], x[11], x[12]];
-  const a = 0.06;
-  for (let i=0;i<3;i++){
-    const raw = (om[i] - omPrev[i]) / DT;
-    omDotF[i] += a * (raw - omDotF[i]);
-  }
-  // ★ 증분 한계를 **권한 비례**로. 예전에는 J[i]*25, 즉 모든 축에 똑같이
-  //   25 rad/s^2 였다. 그런데 Ixx 가 Iyy 의 1/35 라 롤에서는 그게 0.5 N·m
-  //   밖에 안 된다. 실측하면 롤 외란이 ω̇ 88 rad/s^2 RMS(최대 191)로 오는데
-  //   INDI 가 낼 수 있는 것이 25 뿐이라 **구조적으로 못 따라잡는다.**
-  //   (피치·요는 명령 8.2 에 실제 10.2 로 잘 따라간다 — 롤만 문제다.)
-  //   한계를 실제 모멘트 권한의 일정 비율로 잡으면 축마다 알맞게 나온다.
-  //     롤    로터 항력토크  4*k_Q*n_max^2      = 64.8 N·m
-  //     피치/요 차동추력    2*arm*k_T*n_max^2   = 68.7 N·m
-  const M = [0,0,0];
-  for (let i=0;i<3;i++){
-    const lim = INDI_LIM[i];
-    let m2 = Mprev[i] + J[i]*(nu[i] - omDotF[i]);
-    M[i] = m2 > lim ? lim : (m2 < -lim ? -lim : m2);
-  }
-  omPrev = om.slice(); Mprev = M.slice();
-
-  const A = D.alloc_inv, nOut = [0,0,0,0], Vax = axialInflow(x);
-  for (let i=0;i<4;i++){
-    const Ti = A[i][0]*Tc + A[i][1]*M[0] + A[i][2]*M[1] + A[i][3]*M[2];
-    nOut[i] = nFromThrust(Ti, Vax);
-  }
-  return nOut;
+  if(!out || out.length!==4 || !out.every(Number.isFinite)) return [NaN,NaN,NaN,NaN];
+  const motors = hybridIndi(x, out, DT);
+  // Applied means the allocator's achievable virtual command, not its request.
+  // Actual response (including motor lag) is recorded separately in measured.
+  if(useRti) rtiApplied=hybridStat.applied.slice();
+  else nmpcApplied=hybridStat.applied.slice();
+  return motors;
 }
 
 /* ══ 상태 ═════════════════════════════════════════════════════════════ */
@@ -1803,6 +1838,7 @@ function ctrlSnap(){
   return {
     altI: altI, sat: sat, zS: zSettled,
     motor: motorSnapshot(),
+    hybrid: hybridSnapshot(),
     om: omPrev.slice(), od: omDotF.slice(), mp: Mprev.slice(),
     tV: trimV, tTh: trimTh, tN: trimN, tOK: trimOK,
     nAge: T - nmpcLast, nOut: nmpcOut ? nmpcOut.slice() : null,
@@ -1817,6 +1853,7 @@ function ctrlLoad(c){
   if (!c) return;
   altI = c.altI; sat = c.sat; zSettled = c.zS;
   motorRestore(c.motor);
+  hybridRestore(c.hybrid);
   omPrev = c.om.slice(); omDotF = c.od.slice(); Mprev = c.mp.slice();
   trimV = c.tV; trimTh = c.tTh; trimN = c.tN; trimOK = c.tOK;
   // 경과시간으로 되돌린다. 저장 시점에 한 번도 안 풀었으면 nAge 가 아주 커서
@@ -1842,6 +1879,7 @@ function restoreTo(i){
   if (typeof refreshControls === 'function') refreshControls();
 }
 function reset(){
+  resetHybridInterface();
   REC.clear(); viewIdx = null; running = false;
   stepCount = 0; accumulator = 0; lastFrame = null; lastPaint = -Infinity;
   actualRtf = 0; computeMs = 0; physicsFailure = ''; health = freshHealth();
@@ -2441,15 +2479,21 @@ function drawScoreCv(){
 function scoreCsv(){
   const columns=['t_s','seg','cmd_mps','groundspeed_mps','alt_m','z_ref_m','total_alpha_deg',
     'F_N','omega_rad_s','tilt_deg','sat_hi','sat_lo','airspeed_mps','pitch_alpha_deg','beta_deg',
-    'controller','target_mps','wind_mps','wind_to_deg','config_id',...COEFS.map(([k])=>k)];
+    'controller','target_mps','wind_mps','wind_to_deg','config_id',...COEFS.map(([k])=>k),
+    'hybrid_sample_t_s',...['request','allocated','measured','residual'].flatMap(prefix=>
+      ['T_N','alpha_x_rad_s2','alpha_y_rad_s2','alpha_z_rad_s2'].map(unit=>'hybrid_'+prefix+'_'+unit))];
   const header=['# fast_drone · 고정 밀도 '+P0.rho+' kg/m3',
     '# 바람은 향하는 방향: 0 deg=+X, 90 deg=+Y',
     '# 최근 최대 240초. 각 행의 설정은 해당 시점의 값. 수치 일치는 실기 검증 아님.',
+    '# Hybrid allocated=할당 예측, measured=실제 로터 추력·LPF 각가속도. 모터 지연 때문에 서로 다름.',
     columns.join(',')];
   const rows=REC.slice(0,curIdx()+1).map(r=>[r.t,r.seg,r.cmd,r.V,r.x[2],r.zr,r.al,
     r.F,Math.hypot(...r.x.slice(10,13)),tiltOf(r),+r.satHi,+r.satLo,r.airspeed,
     r.pitchAlpha,r.beta,r.config.ctrl,r.config.spd,r.config.wsp,r.config.wdir,r.config.revision,
-    ...COEFS.map(([k])=>r.config.params[k])].map(v=>v===null?'':typeof v==='number'?+v.toFixed(6):v).join(','));
+    ...COEFS.map(([k])=>r.config.params[k]),
+    r.cs.hybrid?.stat?.t??null,
+    ...['requested','applied','measured','residual'].flatMap(key=>r.cs.hybrid?.stat?.[key]??[null,null,null,null])
+    ].map(v=>v===null?'':typeof v==='number'?+v.toFixed(6):v).join(','));
   return header.concat(rows).join('\n')+'\n';
 }
 
@@ -2809,6 +2853,12 @@ function paint(d, render=true){
   $('#solverStatus').textContent=!motorStat?'NMPC 풀이 대기':motorStat.failed
     ?'NMPC 풀이 실패 · 직전 명령 유지 ('+motorStat.failures+'/3)'
     :'NMPC SQP 1회 · '+motorStat.ms.toFixed(1)+' ms · '+(motorStat.accepted?'비용 감소':'개선 스텝 없음');
+  $('#interfaceStatus').hidden=!CTRLS[CTRL].nmpc;
+  $('#interfaceStatus').textContent=!hybridStat?'인터페이스 측정 대기':
+    '총추력 요청 / 할당 / 측정: '+[hybridStat.requested[0],hybridStat.applied[0],hybridStat.measured[0]]
+      .map(v=>v.toFixed(2)).join(' / ')+' N · 각가속도 할당 잔차 '+Math.hypot(...hybridStat.residual.slice(1)).toFixed(3)
+      +' rad/s²'+(hybridStat.limited?' · 구동기 제약으로 명령 제한':'')
+      +' · 할당은 예측값, 측정은 모터 지연·필터 포함. 축별 값은 CSV에 기록합니다.';
   const values=[['지상속도',d.gs.toFixed(1),'m/s'],['대기속도',d.V.toFixed(1),'m/s'],
     ['총 받음각',angleText(d.alpha),'deg'],['기울임',d.tilt.toFixed(1),'deg'],
     ['α (XZ 평면)',angleText(d.pitchAlpha),'deg'],['β (옆미끄럼)',angleText(d.beta),'deg'],
@@ -2853,6 +2903,7 @@ function refreshControls(){
   updateRunButtons();
 }
 function invalidateController(){
+  resetHybridInterface();
   resetMotorMpc();
   trimOK=false; trimV=-1;
   nmpcU=null; nmpcOut=null; nmpcApplied=null; nmpcLast=-1e9;
@@ -2923,11 +2974,12 @@ function initUI(){
     }); upd(); addNumberInput(id);
   }
   const sel = $("#ctrl");
-  sel.innerHTML = ['기준 비행','비교 실험','실험 제어기'].map(group=>
+  sel.innerHTML = ['기준 비행','비교 실험','실험 제어기','제안 Hybrid'].map(group=>
     "<optgroup label='"+group+"'>"+Object.entries(CTRLS).filter(([,c])=>c.group===group)
       .map(([k,c])=>"<option value='"+k+"'>"+c.name+"</option>").join('')+'</optgroup>').join('');
   sel.value=CTRL;
   const updCtrl = () => {
+    resetHybridInterface();
     CTRL = sel.value;
     resetMotorMpc();
     $("#ctrlNote").textContent = CTRLS[CTRL].note;
