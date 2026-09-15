@@ -50,16 +50,19 @@ def main():
 
     html = (TEMPLATE
             .replace("%%DATA%%", json.dumps(ref, separators=(",", ":")))
-            .replace("%%LQR%%", json.dumps(lqr, separators=(",", ":"))))
+            .replace("%%LQR%%", json.dumps(lqr, separators=(",", ":")))
+            .replace("%%MOTOR_NMPC%%", (HERE / 'tools' / 'standalone_nmpc.js').read_text(encoding='utf-8'))
+            .replace("%%HYBRID_INTERFACE%%", (HERE / 'tools' / 'hybrid_interface.js').read_text(encoding='utf-8')))
     out = pathlib.Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     bare = out.with_suffix(".artifact.html")
     bare.write_text(html, encoding="utf-8")
+    head, body = html.split('<div class="app">', 1)
     out.write_text('<!doctype html>\n<html lang="ko">\n<head>\n'
                    '<meta charset="utf-8">\n'
                    '<meta name="viewport" content="width=device-width,'
-                   'initial-scale=1">\n</head>\n<body style="margin:0">\n'
-                   + html + "\n</body>\n</html>\n", encoding="utf-8")
+                   'initial-scale=1">\n' + head + '</head>\n<body>\n'
+                   + '<div class="app">' + body + "\n</body>\n</html>\n", encoding="utf-8")
     print(f"저장 {out}  ({out.stat().st_size / 1024:.0f} KB)  — 로컬에서 열기용")
     print(f"     {bare}  — Artifact 발행용")
     print(f"  기준 궤적 {ref['steps']} 스텝 (dt {ref['dt']} s)")
@@ -97,7 +100,7 @@ body{word-break:keep-all; overflow-wrap:break-word;margin:0; background:var(--gr
 /* ⚠ 열을 안 정하면 암묵 열이 auto(=내용 크기) 라 격자가 뷰포트를 넘어 자란다.
    안쪽 칸을 아무리 minmax(0,1fr) 로 해도 바깥이 늘어나면 소용이 없다 —
    오른쪽 칸을 넓히면 화면 밖으로 밀려났다. */
-.app{display:grid; grid-template-rows:auto 1fr; grid-template-columns:minmax(0,1fr);
+.app{display:grid; grid-template-rows:auto auto 1fr; grid-template-columns:minmax(0,1fr);
   width:100%; max-width:100vw; overflow-x:hidden;
   height:100vh; min-height:640px; max-height:1100px}
 @media(max-width:900px){.app{height:auto; max-height:none}}
@@ -133,7 +136,7 @@ details.vchk .vbody p{margin:8px 0 0; font-size:11.5px; color:var(--ink-3);
    넓힐 때 가운데가 줄지 못하고 **격자가 창 밖으로 넘친다** — 실제로 오른쪽
    칸이 창 밖으로 342 px 까지 밀려났다. minmax(0,1fr) + min-width:0 로 푼다. */
 .body{display:grid; min-height:0; overflow:hidden;
-  grid-template-columns:var(--colL,268px) 5px minmax(0,1fr) 5px var(--colR,262px)}
+  grid-template-columns:minmax(190px,min(var(--colL,268px),30vw)) 5px minmax(0,1fr) 5px minmax(190px,min(var(--colR,262px),30vw))}
 .grip{cursor:col-resize; background:var(--rule); position:relative}
 .grip::after{content:""; position:absolute; inset:0 -4px}
 .grip:hover, .grip.on{background:var(--accent)}
@@ -190,7 +193,8 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
   font:500 12px/1 "IBM Plex Sans",sans-serif}
 .viewbtns button[aria-pressed=true]{border-color:#F2AA4C; color:#ffffff}
 .viewbtns button:focus-visible{outline:2px solid #F2AA4C; outline-offset:2px}
-.score{position:absolute; left:14px; top:14px; width:320px; z-index:6;
+.score{position:absolute; left:14px; top:14px; width:min(360px,calc(100% - 28px)); z-index:6;
+  max-height:calc(100% - 28px); overflow-y:auto;
   background:rgba(16,24,32,.96); border:1px solid var(--rule); border-radius:10px;
   padding:14px 16px 12px; box-shadow:0 14px 34px rgba(0,0,0,.55)}
 .score .hd{display:flex; justify-content:space-between; align-items:center;
@@ -214,7 +218,7 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
   font-variant-numeric:tabular-nums; color:var(--ink); padding:3px 0}
 .score table.segtab td:first-child{text-align:left; color:var(--ink-3);
   font-family:inherit}
-.legend3d{position:absolute; right:12px; bottom:12px; display:flex; gap:14px;
+.legend3d{position:absolute; left:14px; bottom:12px; display:flex; gap:14px; flex-wrap:wrap;
   align-items:center; font:400 11.5px/1 "IBM Plex Mono",monospace; color:#7C8A98}
 .legend3d span{display:inline-flex; align-items:center; gap:5px}
 .legend3d i{width:12px; height:3px; border-radius:2px; display:inline-block}
@@ -247,6 +251,45 @@ input[type=range]:focus-visible{outline:2px solid var(--accent); outline-offset:
 .note{font-size:12px; color:var(--ink-3); line-height:1.6; margin:10px 0 0;
   overflow-wrap:anywhere}
 .note b{color:var(--ink-2)}
+.statusbar{display:flex; flex-wrap:wrap; gap:6px 18px; padding:8px 20px;
+  background:var(--stage-2); border-bottom:1px solid var(--rule); font-size:12px;
+  color:var(--ink-2)}
+.statusbar strong{color:var(--accent)}
+.statusbar span{white-space:normal}
+.experiment{padding:8px 10px; border-left:3px solid var(--warn); background:var(--stage-2)}
+.precise{width:78px; padding:4px 6px; border:1px solid var(--rule); border-radius:5px;
+  color:var(--ink); background:var(--stage); font:12px "IBM Plex Mono",monospace}
+.fld .row{flex-wrap:wrap}
+.right .fld .row{display:grid;grid-template-columns:minmax(0,1fr) 78px;align-items:center}
+.right .fld output{display:none}
+.grip:focus-visible,.segbar:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.segbar,#view canvas{touch-action:none}
+.exp{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px}
+.exp button{padding:8px; border:1px solid var(--rule); border-radius:6px;
+  background:var(--panel-2); color:var(--ink); cursor:pointer}
+.viewbtns{top:auto;bottom:38px;max-width:calc(100% - 24px)}
+#quickGo{background:var(--accent);color:var(--ground);border-color:var(--accent);font-weight:600}
+.warnbox{bottom:78px;background:rgba(10,15,21,.85);border-radius:6px}
+.renderer-error{position:absolute;top:48%;left:14px;right:14px;color:var(--warn);text-align:center;font-size:13px}
+.legend3d .help{display:none}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.gauge-extra{margin-top:12px}
+@media(max-width:900px){
+  header{padding:12px;gap:8px} header .sub{max-width:55ch}
+  .statusbar{padding:8px 12px}
+  .body{display:flex;flex-direction:column;overflow:visible}
+  .stage{order:0;grid-template-rows:400px 32px auto;flex:none}
+  .left{order:1;overflow:visible}.right{order:2;overflow:visible}
+  .plots{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:540px){
+  .plots{grid-template-columns:1fr}
+  .stage{grid-template-rows:380px 32px auto}
+  .badges{margin-left:0}.hud{font-size:11px}
+  .viewbtns{left:12px;justify-content:flex-start;gap:4px}
+  .viewbtns button{min-height:36px;padding:6px 8px}
+  .segbar .leg{display:none}.statusbar{font-size:11px}
+}
 details.more{margin-top:16px; border-top:1px solid var(--rule); padding-top:10px}
 details.more summary{cursor:pointer; font:600 11px/1 "IBM Plex Mono",monospace;
   letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3);
@@ -261,10 +304,16 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
 <header>
   <div>
     <h1>축대칭 동체 비행 시뮬레이터</h1>
-    <div class="sub">브라우저가 6자유도를 직접 풉니다. Gazebo도 PX4도 없습니다.</div>
+    <div class="sub">이륙부터 순항까지, 속도·고도·자세를 함께 살펴보세요.</div>
   </div>
   <div class="badges" id="badges"></div>
 </header>
+<div class="statusbar" aria-label="시뮬레이션 상태">
+  <span id="flightStatus">준비 · LQR</span>
+  <span id="modelStatus">기준 계수 · 고정 밀도 1.225 kg/m³</span>
+  <span id="perfStatus">목표 ×1 · 실측 —</span>
+  <span id="solverStatus" hidden></span>
+</div>
 
 <div class="body">
   <div class="col left" id="colL">
@@ -273,21 +322,29 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
       <button type="button" id="go" class="go">▶ 시작  (Space)</button>
       <button type="button" id="rst">↺ 초기화</button>
     </div>
+    <div class="fld"><label for="preset">비행 예제</label>
+      <select id="preset"><option value="standard">기본 · LQR 60 m/s</option>
+        <option value="hover">호버 · LQR 0 m/s</option>
+        <option value="cruise">고속 순항 · LQR 83 m/s</option></select>
+      <p class="note">예제는 정지한 뒤 적용합니다. 기존 기록은 ‘초기화’로 비웁니다.</p></div>
     <div class="fld"><label for="ctrl">제어기</label>
       <select id="ctrl"></select>
-      <p class="note" id="ctrlNote" style="margin-top:6px"></p></div>
+      <p class="note" id="ctrlNote" style="margin-top:6px"></p>
+      <p class="note" id="interfaceStatus" hidden aria-live="off"></p></div>
     <div class="fld"><div class="row"><label for="spd">목표 속도</label>
       <output id="o_spd"></output></div>
-      <input type="range" id="spd" min="0" max="120" step="1" value="83"></div>
+      <input type="range" id="spd" min="0" max="120" step="1" value="60"></div>
     <div class="fld"><div class="row"><label for="alt">목표 고도</label>
       <output id="o_alt"></output></div>
       <input type="range" id="alt" min="10" max="400" step="10" value="200"></div>
-    <div class="fld"><div class="row"><label for="wsp">측풍</label>
+    <div class="fld"><div class="row"><label for="wsp">수평 풍속</label>
       <output id="o_wsp"></output></div>
       <input type="range" id="wsp" min="0" max="40" step="1" value="0"></div>
-    <div class="fld"><div class="row"><label for="wdir">바람 방위</label>
+    <div class="fld"><div class="row"><label for="wdir">바람이 향하는 방향</label>
       <output id="o_wdir"></output></div>
       <input type="range" id="wdir" min="0" max="350" step="10" value="90"></div>
+    <p class="note">0° = +X (진행 방향의 순풍), 90° = +Y (횡풍), 180° = 맞바람.
+      기상 풍향의 ‘불어오는 방향’과 반대입니다.</p>
     <div class="fld"><div class="row"><label for="rtf">시간 배속</label>
       <output id="o_rtf"></output></div>
       <input type="range" id="rtf" min="0.25" max="4" step="0.25" value="1"></div>
@@ -296,33 +353,33 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
     <div class="gauges" id="gauges"></div>
     <details class="more">
       <summary>이 시뮬에 대해</summary>
-      <p class="note"><b>지금 기체는 로켓형입니다.</b> 로터가 동체축에 수직인
-        평면에 놓이고 추력이 기수 방향이라, 호버에서 기수가 위를 봅니다.
-        <code>vehicle_params.py</code> 의 <code>Iyy = Izz</code> 가 바로 이
-        4겹 대칭을 요구합니다.</p>
-      <p class="note"><b>제어기가 한계입니다.</b> 여기 제어기는 추력만으로 뜨는
-        멀티로터식이라, 수평 순항에 필요한 <b>동체 받음각 양력 트림</b>을 못 찾습니다.
-        그래서 170 km/h 근처에서 멈춥니다. 기체가 못 가는 게 아니라 이 제어기가
-        못 태우는 것입니다 — 프로젝트가 NMPC 를 쓰기로 한 이유가 정확히 이
-        천이·트림 문제입니다.</p>
-      <p class="note">목표 속도를 올렸다 내리면 기체가 따라갑니다.
-        <b>명령과 실측이 벌어지면</b> 거기가 이 기체의 한계입니다.</p>
-      <p class="note">기본 설정(83 m/s 목표, 무풍)에서 <b>280 km/h</b> 에 수렴합니다.
-        같은 기체를 PX4 + Gazebo 로 날렸을 때는 <b>281 km/h</b> 였습니다.
-        제어기도 적분기도 공력 경로도 다른 두 스택이 <b>0.4% 안에서 일치</b>합니다 —
-        이 한계는 설정이 아니라 물리입니다.</p>
-      <p class="note">고도가 조금 가라앉는 것은 제어기 탓입니다. 여기 제어기는
-        PX4 가 아니라 단순한 종속 루프라, 크게 기울인 동안 고도 권한을 일부
-        잃습니다. 검증한 것은 <b>플랜트이지 제어기가 아닙니다.</b></p>
+      <p class="note"><b>지름 90 mm, 질량 8 kg의 로켓형 모델</b>입니다. 추력은
+        동체 +X축 방향이고 호버에서 기수가 위를 봅니다. 기체는 보기 쉽게
+        실제 길이의 5배로 표시합니다.</p>
+      <p class="note"><b>모델 가정:</b> 해수면 고정 밀도 1.225 kg/m³, 일정한 수평 바람,
+        단순 전진비 추력 모델입니다. 고도는 지상 기준입니다. 고도에 따른 밀도 변화,
+        돌풍, 센서 오차, 배터리·열 제한, 로터 후류와 지상효과는 포함하지 않습니다.</p>
+      <p class="note"><b>지면은 실패 판정 경계</b>입니다. 이륙 후 지면에 닿으면 정지하며,
+        충돌 변형이나 파손을 계산하지 않습니다.</p>
+      <p class="note">숫자 일치는 구현 검사입니다. 실기체 성능은 별도 실험이 필요합니다.
+        명령과 실측 차이는 제어기·모델·구동기 제한을 함께 확인해야 해석할 수 있습니다.</p>
+      <p class="note">‘총 받음각’은 기수축과 공기 상대속도 사이의 각도(0~180°)입니다.
+        α는 동체 XZ 평면, β는 옆미끄럼각입니다. 대기속도 0.5 m/s 미만에서는
+        방향각을 정의하지 않습니다. 역류(총 받음각 &gt;90°)는 미검증 영역입니다.</p>
+      <p class="note">마우스 끌기 = 회전 · 휠 = 확대 · Shift+끌기 = 이동.<br>
+        Space = 시작/정지 · R = 초기화 · F = 따라가기.<br>
+        타임라인은 방향키·Home·End로 이동합니다.</p>
     </details>
   </div>
 
-  <div class="grip" id="gripL" role="separator" aria-label="왼쪽 폭 조절"></div>
+  <div class="grip" id="gripL" role="separator" tabindex="0" aria-orientation="vertical" aria-label="왼쪽 폭 조절"></div>
 
   <div class="stage">
     <div id="view"><div class="hud" id="hud"></div>
+      <div id="rendererError" class="renderer-error" role="status" hidden></div>
       <div class="viewbtns">
-        <button type="button" id="scoreBtn">채점</button>
+        <button type="button" id="quickGo">▶ 시작</button>
+        <button type="button" id="scoreBtn" aria-expanded="false" aria-controls="score">채점</button>
         <button type="button" data-view="back">뒤에서</button>
         <button type="button" data-view="side">옆에서</button>
         <button type="button" data-view="top">위에서</button>
@@ -333,10 +390,11 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
         <span><i style="background:#f2aa4c"></i>공력</span>
         <span><i style="background:#2d94bd"></i>속도</span>
         <span><i style="background:#59c8f5"></i>궤적</span>
-        <span>끌기 = 회전 · 휠 = 확대 · Shift+끌기 = 이동 · Space = 정지 · R = 리셋 · F = 따라가기</span>
+        <span>기체 표시 ×5</span>
+        <span class="help">끌기 = 회전 · 휠 = 확대 · Shift+끌기 = 이동</span>
       </div>
       <div class="warnbox" id="warn"></div>
-      <div class="score" id="score" hidden>
+      <div class="score" id="score" role="region" aria-label="미션 채점" hidden>
         <div class="hd"><b>미션 채점</b>
           <button type="button" id="scoreClose" aria-label="닫기">✕</button></div>
         <canvas id="scoreCv" height="96"></canvas>
@@ -347,18 +405,19 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
           <button type="button" id="expCopy">값 복사</button>
         </div>
       </div></div>
-    <div class="segbar" id="segbar" title="미션 구간"></div>
+    <div class="segbar" id="segbar" role="slider" tabindex="0" aria-label="기록 시간" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" title="끌거나 방향키로 기록 이동"></div>
     <div class="plots">
-      <figure><figcaption>속도 m/s</figcaption><canvas id="p1" height="132"></canvas></figure>
-      <figure><figcaption>받음각 deg</figcaption><canvas id="p2" height="132"></canvas></figure>
-      <figure><figcaption>공력 N</figcaption><canvas id="p3" height="132"></canvas></figure>
+      <figure><figcaption>지상속도 · m/s (회색 = 명령)</figcaption><canvas id="p1" height="132" role="img" aria-label="지상속도와 명령의 시간 그래프"></canvas></figure>
+      <figure><figcaption>총 받음각 · deg</figcaption><canvas id="p2" height="132" role="img" aria-label="총 받음각 시간 그래프"></canvas></figure>
+      <figure><figcaption>고도 · m (회색 = 명령)</figcaption><canvas id="p3" height="132" role="img" aria-label="고도와 명령의 시간 그래프"></canvas></figure>
     </div>
   </div>
 
-  <div class="grip" id="gripR" role="separator" aria-label="오른쪽 폭 조절"></div>
+  <div class="grip" id="gripR" role="separator" tabindex="0" aria-orientation="vertical" aria-label="오른쪽 폭 조절"></div>
 
   <div class="col right" id="colR">
     <h2>동체 공력 계수</h2>
+    <p class="note" id="coefficientNote">기준 계수 · LQR 표는 이 값에서 설계되었습니다.</p>
     <div id="coefs"></div>
     <div class="btns"><button type="button" id="def">기본값으로</button></div>
     <details class="more">
@@ -521,17 +580,15 @@ function selfCheck(){
    그런데 LQR 은 게인이 **설계 시점에 한 번** 정해지는 제어기라, 속도별로
    미리 풀어 표로 넘기면 런타임에는 보간과 행렬곱만 남는다. 그래서 이 저장소의
    최적제어 자산 중 브라우저로 옮길 수 있는 유일한 것이다.
-   표는 gz_aero/tools/gen_lqr_table.py 가 굽는다 (2.5 m/s 간격, 21 점).
+   표는 gz_aero/tools/gen_lqr_table.py 가 생성한다. 범위와 점 수는 LQ에서 읽는다.
 
    오차상태 14D:  [δz, δv(3), δφ(3), δω(3), δn(4)]
    제어법:        u = u_trim − K_r·δx,  그리고 [n_min, n_max] 로 자른다
    controller.py 의 LQRController 와 같다. 고도만 트림의 z 가 아니라
    **명령 고도**를 기준으로 삼는다 (트림은 위치를 정하지 않는다).
 
-   ★ 표는 0~50 m/s (180 km/h) 까지다. 로켓 배치는 52 m/s 위에 정상비행
-     트림이 아예 없다 — 후방 로터가 음추력을 요구한다. 그 위에서는 마지막
-     게인을 유지하는데, 이건 '빠르게 못 난다' 를 숨기는 게 아니라 기체에
-     그 속도의 평형점이 없다는 사실을 그대로 드러내는 것이다.              */
+   표 밖에서는 마지막 게인을 유지한다. 표의 끝은 계산한 범위이며,
+   그 자체로 기체의 물리적 최고속도나 다른 평형점의 부재를 입증하지 않는다. */
 const LQ = %%LQR%%;
 
 function lqrPick(V){
@@ -634,7 +691,7 @@ function controlLQR(x, cmd){
    **상자제약만 남는 문제**가 되어 브라우저에서도 풀 수 있다.
 
    IPOPT 를 옮기지 않았다. 압축 + 투영경사 + 되추적 선탐색으로 푼다. 지평선을
-   8 로 줄였고(파이썬은 20) 20 Hz 로만 다시 푼다. 같은 해를 준다고 주장하지
+   20 단계에서 20 Hz 로 다시 푼다. 같은 해를 준다고 주장하지
    않는다 — 구조가 같고 같은 비용을 줄일 뿐이다.                              */
 const NV = 13, NUV = 4;
 const NMPC = {N:20, dt:0.08, rate:0.05, iters:40,
@@ -651,9 +708,11 @@ function vXdot(x, u, p){
   const R00=1-2*(qy*qy+qz*qz), R01=2*(qx*qy-qz*qw), R02=2*(qx*qz+qy*qw);
   const R10=2*(qx*qy+qz*qw), R11=1-2*(qx*qx+qz*qz), R12=2*(qy*qz-qx*qw);
   const R20=2*(qx*qz-qy*qw), R21=2*(qy*qz+qx*qw), R22=1-2*(qx*qx+qy*qy);
-  const ub=R00*x[3]+R10*x[4]+R20*x[5];
-  const vb=R01*x[3]+R11*x[4]+R21*x[5];
-  const wb=R02*x[3]+R12*x[4]+R22*x[5];
+  // Ground speed is the tracking target; aerodynamic force uses air-relative speed.
+  const wind=windNow(), vx=x[3]-wind[0], vy=x[4]-wind[1], vz=x[5]-wind[2];
+  const ub=R00*vx+R10*vy+R20*vz;
+  const vb=R01*vx+R11*vy+R21*vz;
+  const wb=R02*vx+R12*vy+R22*vz;
   const V_sq = ub*ub+vb*vb+wb*wb+EPS, V_cf = Math.sqrt(vb*vb+wb*wb+EPS);
   const fac = 0.5*p.rho*p.S_ref*(p.C_Na*ub + p.C_dc*V_cf);
   let Fx = -0.5*p.rho*V_sq*p.S_ref*(p.C_A0 + p.C_Aa2*(vb*vb+wb*wb)/V_sq);
@@ -788,27 +847,11 @@ function nmpcSolve(x0, vref, zref){
      5) 투영 뉴턴으로 상자 QP 를 푼다. 경계에 붙은 변수를 빼고 자유변수만
         촐레스키로 푼 뒤, 투영 선탐색으로 받는다.
    ------------------------------------------------------------------ */
-/* 비용함수를 다시 짰다. 솔버를 25 배 빠르게 만들고 나니 진짜 병목이
-   드러났기 때문이다 — 제대로 풀린 해가 각가속도 한계에 계속 붙었고,
-   가중치 12 조합 중 고도를 지킨 것이 하나뿐이었다. 원인이 셋이었다.
-
-   (1) **자세 기준이 없었다.** 비용에 Qv(속도)·Qz(고도)·Qw(각속도)뿐이라
-       자세를 붙잡는 것이 아무것도 없었다. nu_roll 이 어떤 반복수에서도
-       0.01 이었던 이유다 — 솔버를 아무리 좋게 해도 롤은 안 잡힌다.
-       고치는 법이 마침 싸다: **LQR 게인표에 속도별 트림 자세가 이미 들어
-       있다.** 쿼터니언은 상태(6~9)라 지금의 대각 가중치 기계에 그대로
-       들어간다. |q - q_ref|^2 은 작은 오차에서 (Δφ/2)^2 이라 자세 오차의
-       제곱과 같다. 이 한 항이 자세와 롤을 같이 잡는다.
-
-   (2) **지평선이 짧았다.** N*dt = 1.6 s 인데 가속은 30 s 짜리다. 균일
-       격자로 늘리면 앞쪽이 거칠어져 적용할 첫 수가 나빠진다. 그래서
-       **등급 격자** — 앞은 30 ms 로 촘촘하고 뒤로 갈수록 벌어져(1.18 배,
-       상한 0.30 s) 같은 20 스텝으로 약 4 s 를 본다.
-
-   (3) **nu 상한이 내부루프가 낼 수 있는 값보다 컸다.** INDI 증분 한계가
-       J*25 이므로 25 rad/s^2 인데 상자는 100(뒤에 40)이었다. NMPC 가 지키지
-       못할 약속을 하고 있었던 셈이다. 메모리의 "FC/CC 분리" 가 정한 인터페이스
-       계약이 곧 이 값이다. 25 로 맞춘다.                                   */
+/* Browser RTI configuration retained to isolate the interface repair.
+   The 13-state predictor optimizes all three angular accelerations. A trim
+   quaternion reference is part of the objective, never an outside roll override.
+   Box limits alone do not describe the coupled thrust/moment feasible set;
+   INDI reports any allocation residual explicitly. This is not an IPOPT port. */
 const RTI = {N:20, dt0:0.03, dtGrow:1.18, dtMax:0.30, rate:0.05,
              Qv:[5,5,10], Qz:20, Qw:20, Qq:400, R:[1e-5,0.01,0.01,0.01],
              Rdu:[1e-3,0.01,0.01,0.01], nuMax:25,
@@ -825,12 +868,11 @@ RTI.horizon = RTI.dts.reduce((x, y) => x + y, 0);
 const RTI_WIDX = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 let rtiU = null, rtiLast = -1e9, rtiOut = null, rtiApplied = null, rtiStat = null;
 let vTrimRef = 0;   // 자세 기준을 뽑을 속도 (controlHybrid 가 넣는다)
-let ROLL_HOLD_OUTSIDE = true;   // A/B 로 재보려고 let
 // INDI 증분 한계 [N·m]. 권한의 일정 비율. 아래에서 기체 값으로 채운다.
 // 스윕으로 고른 값. 통과 구간이 0.15~0.18 이고 0.12·0.22 는 실패한다.
 let INDI_FRAC = 0.16;
 let INDI_LIM = [0.5, 17.5, 17.5];
-// 권한을 기체 값에서 한 번 계산해 둔다. control() 과 controlHybrid() 가 같이 쓴다.
+// 기존 INDI baseline 전용 한계. 제안 Hybrid는 실제 로터 상태·추력 제약을 쓴다.
 function setIndiLim(){
   const Tm = P.k_T * P.n_max * P.n_max;
   const rollAuth  = 4 * P.k_Q * P.n_max * P.n_max;              // 로터 항력토크
@@ -1092,6 +1134,10 @@ function rtiSolve(x0, vref, zref){
   return rtiApplied.slice();
 }
 
+%%MOTOR_NMPC%%
+
+%%HYBRID_INTERFACE%%
+
 /* ══ 제어기 ═══════════════════════════════════════════════════════════
    PX4 를 옮긴 것이 아니다. 평범한 종속 루프(속도 -> 자세 -> 모멘트)다.
    여기서 보려는 것은 제어 성능이 아니라 **기체가 어디서 한계에 걸리나** 이므로
@@ -1119,66 +1165,32 @@ const A_MAX = 12.0, RAMP = 3.0;
 const KI = 0.35, I_LIM = 6.0;
 // 추력축이 수직에서 눕는 한계. 스윕 결과 60도면 351 km/h 까지 가지만 |w| 가
 // 10 rad/s 로 텀블한다 (메모리의 "RMSE 만으론 텀블 못 잡음" 그대로다).
-// 55도가 안전선이고 거기선 170 km/h 다. 이 트레이드오프가 곧 NMPC 가 필요한 이유다.
+// 기울임 상한만으로 안정성이 보장되지는 않는다. 각속도와 포화를 함께 검사한다.
 const TILT_MAX = 55.0 * Math.PI / 180.0;
 
 // ── 제어기 선택 ───────────────────────────────────────────────────────
-// NMPC 계열은 solver 가 필요해 브라우저에 넣지 않았다. 흉내만 낸 것을 NMPC 라
-// 부르면 거짓이 된다. 대신 프로젝트의 내부루프인 INDI 는 그대로 이식했다.
+// 기준 비행과 실험 제어기를 구분한다. 실험 솔버의 처리시간은 실행 환경에 의존한다.
 const CTRLS = {
-  cascade: {name:"종속 PID (기본)", ff:true, tilt:55, indi:false,
-            note:"속도→자세→모멘트 종속 루프. 공력 앞먹임 켬. "
-                 + "⚠ 전이 구간에서 롤 |p| 가 29~41 rad/s 로 튄다 (trim 은 0.6)."},
-  noff:    {name:"앞먹임 없음", ff:false, tilt:55, indi:false,
-            note:"동체가 내는 힘을 모르는 상태. 트림을 못 찾아 더 느리다."},
-  fast:    {name:"틸트 60° (빠름·위험)", ff:true, tilt:60, indi:false,
-            note:"351 km/h 까지 가지만 |ω| 가 10 rad/s 로 텀블한다."},
-  trim:    {name:"트림 기반 (권장)", ff:true, tilt:58, indi:false, trim:true,
-            note:"정상비행 트림을 플랜트에서 직접 풀어 앞먹임한다. 자세 한계 58도. "
-                 + "62도로 풀면 568 km/h 까지 가지만 고도를 잃고 떨어진다 — "
-                 + "그 사이를 찾는 것이 NMPC 의 일이다. "
-                 + "롤까지 유지되는 유일한 제어기다 (|p| 0.6, 롤 오차 0도)."},
-  hybrid:  {name:"하이브리드 NMPC+INDI (실험)", ff:true, tilt:80, indi:true, nmpc:true,
-            note:"⚠ 아직 불안정합니다. 13차 가상모델을 브라우저에서 직접 풉니다"
-                 + "(압축+투영경사). 솔버는 수렴합니다 — 낸 해가 최선의 정속추력보다 "
-                 + "비용이 2배 낮습니다. 남은 문제는 한 번 푸는 데 150 ms 라 "
-                 + "20 Hz 예산 50 ms 를 3배 넘는 것과, 비용함수에 자세 기준이 없어 "
-                 + "롤을 바깥에서 얹어야 하는 것입니다. 실시간은 SQP/acados 가 필요합니다."},
-  sqprti:  {name:"하이브리드 SQP-RTI (실험)", ff:true, tilt:80, indi:true, nmpc:true, rti:true,
-            note:"같은 13차 가상모델을 실시간 반복(RTI)으로 푼다. 매 주기 SQP 한 번 — "
-                 + "직전 해에서 선형화하고, 압축으로 상태를 소거해 상자제약만 남긴 QP 를 "
-                 + "투영 뉴턴으로 푼다. 솔버는 성공했다: 평균 7.4 ms (투영경사 184.7 ms, "
-                 + "25배), 같은 비용 수준, 20 Hz 예산 50 ms 에 6.8배 여유. "
-                 + "비용함수도 다시 짰다: 자세 기준(LQR 표의 트림 자세)·등급 시간격자"
-                 + "(30 ms~0.30 s, 지평선 3.3 s)·ν 상한을 INDI 한계 25 로 맞춤·"
-                 + "예측 적분 보폭 0.05 s 제한. 그래도 |ω| 47.5 로 텀블했는데, "
-                 + "축별로 재보니 롤만 문제였다 — 명령 ν 23.7 에 실제 ω̇ 88 RMS(최대 191), "
-                 + "피치·요는 8.2 에 10.2 로 잘 따라간다. 원인은 INDI 증분 한계가 J*25, "
-                 + "즉 모든 축에 똑같이 25 rad/s² 인 것. Ixx 가 Iyy 의 1/35 라 롤에서는 "
-                 + "0.5 N·m 뿐이라 구조적으로 못 따라잡는다. 한계를 **권한 비례**(0.16)로 "
-                 + "바꾸니 |ω| 47.5 → 14.4 로 떨어지고 텀블이 사라졌다. "
-                 + "측풍 12 m/s + 교란에서도 텀블 없이 난다. "
-                 + "⚠ 그런데 **속도를 못 지킨다**. 명령 83 m/s 에 90.6 으로 정착한다 "
-                 + "(+27 km/h, 9 % 초과). 게다가 이 기체의 트림 상한이 85 m/s 라 "
-                 + "평형점 밖에서 나는 것이다. Qv 를 올리면 속도는 잡히는데 추력을 깎느라 "
-                 + "로터가 0 으로 내려간다 — Qv ×2 에서 바닥 포화 25 %, ×4 에서 67 %. "
-                 + "속도와 구동기 여유를 맞바꾸는 구조이고 둘 다 만족하는 지점이 없다. "
-                 + "LQR 은 같은 조건에서 83.0 m/s 정확, 순항 |ω| 평균 0.0, 포화 0 % 다 — "
-                 + "선형화가 트림에서 나와 추력과 자세를 함께 잡기 때문이다."},
-  lqr:     {name:"오차상태 LQR (게인표)", ff:true, tilt:55, indi:false, lqr:true,
-            note:"속도별로 파이썬에서 ARE 를 미리 풀어 게인표로 구워 왔다 "
-                 + "(2.5 m/s 간격 21 점, 폐루프 최대 실수부 -0.18 ~ -0.61 로 전부 안정). "
-                 + "런타임에는 보간과 4x14 행렬곱뿐이라 solver 가 필요 없다. "
-                 + "표를 제대로 읽었는지는 파이썬이 계산한 기준 샘플 16 개와 "
-                 + "페이지에서 대조한다 — 절반은 격자 사이라 보간까지 검사한다. "
-                 + "⚠ 표가 180 km/h 에서 끝난다. 로켓 배치는 52 m/s 위에 정상비행 "
-                 + "트림이 아예 없다 (후방 로터가 음추력을 요구). 제어기 한계가 "
-                 + "아니라 기체에 그 평형점이 없는 것이다."},
-  indi:    {name:"INDI 내부루프", ff:true, tilt:55, indi:true,
-            note:"측정 각가속도를 되먹여 증분으로 모멘트를 낸다. 모델오차에 강하다. "
-                 + "⚠ 롤 |p| 가 40 rad/s 로 튄다. 포화 인지 할당이 필요하다."},
+  lqr: {name:"LQR · 기준 비행 (기본)", group:"기준 비행", ff:true, tilt:55, indi:false, lqr:true,
+    note:"속도별 정상비행 자세와 추력을 사용하는 게인표 제어기입니다. 기준 계수·무풍 조건에서 비교하세요. 표 범위를 넘으면 마지막 게인을 유지합니다."},
+  trim: {name:"트림 앞먹임 PID", group:"비교 실험", ff:true, tilt:58, indi:false, trim:true,
+    note:"병진 힘 평형으로 앞먹임을 계산합니다. 회전 평형은 내부 자세 루프가 담당하며, 목표 속도를 항상 달성하지는 않습니다."},
+  cascade: {name:"종속 PID · 전이 불안정 가능", group:"비교 실험", ff:true, tilt:55, indi:false,
+    note:"속도 → 자세 → 모멘트 루프입니다. 전이 중 롤 불안정이 발생할 수 있어 각속도와 포화를 함께 확인하세요."},
+  noff: {name:"앞먹임 없는 PID", group:"비교 실험", ff:false, tilt:55, indi:false,
+    note:"공력을 보상하지 않는 비교용 제어기입니다. 고도·속도 정상편차를 관찰하세요."},
+  fast: {name:"틸트 60° PID · 불안정 가능", group:"비교 실험", ff:true, tilt:60, indi:false,
+    note:"기울임 제한을 완화한 비교용 설정입니다. 순간 최고속도와 지속 가능한 수평비행을 구분하세요."},
+  indi: {name:"INDI 내부루프 · 실험", group:"실험 제어기", ff:true, tilt:55, indi:true,
+    note:"각가속도 피드백으로 모멘트를 보정합니다. 전이 중 롤 불안정과 구동기 포화가 발생할 수 있습니다."},
+  nmpc: {name:"NMPC 단독 · 모터 직접 최적화", group:"실험 제어기", motor:true,
+    note:"17상태와 모터 지연·바람을 예측하고 모터 4개의 회전수를 직접 최적화합니다. INDI/PID 내부루프 없이 SQP 1회를 수행합니다. 평형 기준은 LQR 표에서 읽지만 LQR 제어 출력은 쓰지 않습니다. 계산량·짧은 예측 구간의 한계가 있는 실험 제어기입니다."},
+  hybrid: {name:"Hybrid · NMPC(PG) → INDI", group:"제안 Hybrid", ff:true, tilt:80, indi:true, nmpc:true,
+    note:"제안 구조의 브라우저 근사: 13상태 NMPC는 총추력·각가속도만 결정하고, INDI는 실제 로터·각가속도 피드백으로 모터를 할당합니다. PG 20 Hz / INDI 500 Hz. 연구용 IPOPT·50 Hz/1 kHz와 다릅니다. 계산량이 크고 상승 중 큰 자세 반전이 관찰되어 최종 추종 성공만으로 안정성을 판단하면 안 됩니다."},
+  sqprti: {name:"Hybrid · NMPC(SQP-RTI) → INDI", group:"제안 Hybrid", ff:true, tilt:80, indi:true, nmpc:true, rti:true,
+    note:"제안 구조의 브라우저 근사: 13상태 가상 명령 최적화 → 증분 INDI → 17상태 플랜트. 총추력을 보존하는 포화 할당을 사용합니다. SQP 20 Hz / INDI 500 Hz, 참 상태 피드백이며 연구용 IPOPT·센서/ESKF 구현은 아닙니다."},
 };
-let CTRL = "cascade";
+let CTRL = "lqr";
 // INDI 상태: 직전 각속도·모멘트와 걸러낸 각가속도
 let omPrev = [0,0,0], omDotF = [0,0,0], Mprev = [0,0,0];
 
@@ -1289,6 +1301,7 @@ function axialInflow(x){
   return ub > 0 ? ub : 0;
 }
 function control(x, cmd){
+  if (CTRLS[CTRL].motor) return controlMotorNmpc(x, cmd);
   if (CTRLS[CTRL].nmpc) return controlHybrid(x, cmd);
   if (CTRLS[CTRL].lqr)  return controlLQR(x, cmd);
   const m = P.mass, g = P.g;
@@ -1314,7 +1327,10 @@ function control(x, cmd){
     //   522 km/h 로 가속하다 지면에 닿았다). 앞먹임은 지금 상태와 맞아야 한다.
     const vNow = Math.hypot(x[3], x[4]);
     const [thT, nT] = getTrim(Math.min(vNow, cmd.spd));
-    const T_ff = 4.0 * P.k_T * nT * nT;   // 트림은 플랜트로 직접 풀었으므로 fac 가 이미 들어 있다
+    // nT는 전진비 손실을 보상한 회전수다. 힘으로 바꿀 때도 fac를 적용해야 한다.
+    const VaxT = Math.max(0, Math.min(vNow, cmd.spd) * Math.sin(thT));
+    const facT = Math.max(0, 1 - 2*Math.PI*VaxT/(nT*P.D_prop*P.J_max + EPS));
+    const T_ff = 4.0 * P.k_T * nT * nT * facT;
     const st = Math.sin(thT), ct = Math.cos(thT);
     tx = T_ff*st*Math.cos(psi) + m*ax;
     ty = T_ff*st*Math.sin(psi) + m*ay;
@@ -1475,14 +1491,9 @@ function control(x, cmd){
 function controlHybrid(x, cmd){
   const psi = cmd.psi;
   const vref = [cmd.spd*Math.cos(psi), cmd.spd*Math.sin(psi), 0];
-  // ★ 도달 가능한 고도 기준을 준다. 지평선이 N*dt = 1.6 s 뿐인데 200 m 짜리
-  //   고도 오차를 그대로 주면 Qz*200^2 = 800000 이 비용을 통째로 지배해서
-  //   최적해가 "최대 추력" 에 박힌다. 반복을 40 -> 200 -> 1000 으로 늘려도
-  //   778 N(상한) 에서 안 움직였다 — 솔버가 덜 수렴한 게 아니라 비용함수의
-  //   진짜 최적점이 거기였다. 83 m/s 정상비행 트림은 222 N 이면 된다.
-  //   종속 루프가 고도 오차를 상승률로 바꿔 쓰는 것(clamp +-15)과 같은 처리다.
+  // A moving altitude reference limits the requested climb over this horizon.
+  // Retained from the prior controller; not changed to improve the comparison.
   const useRti = !!CTRLS[CTRL].rti;
-  const SOL = useRti ? RTI : NMPC;
   // ★ **현재** 속도의 트림을 기준으로 삼는다. 명령 속도로 잡으면 아직 느린
   //   상태에서 순항 자세(64도)를 요구해 고도 권한을 잃는다 — 종속 루프가
   //   같은 함정에 빠졌던 자리이고, 여기서도 |ω| 67 로 추락했다.
@@ -1506,70 +1517,13 @@ function controlHybrid(x, cmd){
     }
     out = nmpcOut;
   }
-  const Tc = out[0], nu = [out[1], out[2], out[3]];
-  // ★ 롤은 인터페이스 층에서 잡는다. 두 솔버 모두.
-  //
-  //   투영경사(hybrid)는 비용에 자세 항이 아예 없어 nu_roll 이 어떤 반복수
-  //   에서도 0.01 이었다 — 솔버를 아무리 좋게 해도 롤은 안 잡힌다.
-  //   RTI 는 q_ref(트림 자세)에 롤이 들어 있는데도 여기서 덮어쓴다. 재보고
-  //   내린 결정이다: 끄면 |ω| 가 47.5 -> 64.7 로 나빠지고 NMPC 가 낸
-  //   |ν_roll| 이 한계 25 에 붙는다.
-  //
-  //   이유가 있다. 비용이 |q - q_ref|^2 라 세 축을 **같은 무게**로 잰다.
-  //   그런데 Ixx 가 Iyy 의 1/35 라 같은 자세 오차를 롤로 지우는 비용이
-  //   훨씬 싸다 — 최적해가 롤을 과하게 쓴다. 축별로 다르게 재려면 쿼터니언
-  //   차가 아니라 동체 프레임 오차로 써야 하는데, 그러면 지금의 대각 가중치
-  //   기계(상태에 바로 가중)를 못 쓴다. 그건 다음 일이다.
-  //
-  //   축대칭 동체라 기수축 둘레 롤은 공력상 결합이 없다. NMPC 가 추력축
-  //   기동을 정하고 롤은 인터페이스 층이 맡는 분리가 물리적으로도 맞다.
-  if (ROLL_HOLD_OUTSIDE){
-    const qx=x[6], qy=x[7], qz=x[8], qw=x[9];
-    const xb=[1-2*(qy*qy+qz*qz), 2*(qx*qy+qz*qw), 2*(qx*qz-qy*qw)];
-    const yb=[2*(qx*qy-qz*qw), 1-2*(qx*qx+qz*qz), 2*(qy*qz+qx*qw)];
-    const h = Math.hypot(xb[0], xb[1]);
-    if (h > 0.25){
-      const yh=[xb[1]/h, -xb[0]/h, 0];
-      const cr=[yb[1]*yh[2]-yb[2]*yh[1], yb[2]*yh[0]-yb[0]*yh[2], yb[0]*yh[1]-yb[1]*yh[0]];
-      const phi = Math.atan2(cr[0]*xb[0]+cr[1]*xb[1]+cr[2]*xb[2],
-                             yb[0]*yh[0]+yb[1]*yh[1]+yb[2]*yh[2]);
-      const t = Math.min(1, (h - 0.25) / 0.20);
-      const wgt = t*t*(3 - 2*t);
-      let wr = KW_R*(KR_R*phi - x[10]);
-      if (wr > W_R_MAX) wr = W_R_MAX; else if (wr < -W_R_MAX) wr = -W_R_MAX;
-      nu[0] = nu[0] + wgt*(wr - nu[0]);
-    }
-  }
-
-  // INDI 내부루프: 측정 각가속도를 되먹여 증분으로 모멘트를 낸다.
-  const J = [P.Ixx, P.Iyy, P.Izz], om = [x[10], x[11], x[12]];
-  const a = 0.06;
-  for (let i=0;i<3;i++){
-    const raw = (om[i] - omPrev[i]) / DT;
-    omDotF[i] += a * (raw - omDotF[i]);
-  }
-  // ★ 증분 한계를 **권한 비례**로. 예전에는 J[i]*25, 즉 모든 축에 똑같이
-  //   25 rad/s^2 였다. 그런데 Ixx 가 Iyy 의 1/35 라 롤에서는 그게 0.5 N·m
-  //   밖에 안 된다. 실측하면 롤 외란이 ω̇ 88 rad/s^2 RMS(최대 191)로 오는데
-  //   INDI 가 낼 수 있는 것이 25 뿐이라 **구조적으로 못 따라잡는다.**
-  //   (피치·요는 명령 8.2 에 실제 10.2 로 잘 따라간다 — 롤만 문제다.)
-  //   한계를 실제 모멘트 권한의 일정 비율로 잡으면 축마다 알맞게 나온다.
-  //     롤    로터 항력토크  4*k_Q*n_max^2      = 64.8 N·m
-  //     피치/요 차동추력    2*arm*k_T*n_max^2   = 68.7 N·m
-  const M = [0,0,0];
-  for (let i=0;i<3;i++){
-    const lim = INDI_LIM[i];
-    let m2 = Mprev[i] + J[i]*(nu[i] - omDotF[i]);
-    M[i] = m2 > lim ? lim : (m2 < -lim ? -lim : m2);
-  }
-  omPrev = om.slice(); Mprev = M.slice();
-
-  const A = D.alloc_inv, nOut = [0,0,0,0], Vax = axialInflow(x);
-  for (let i=0;i<4;i++){
-    const Ti = A[i][0]*Tc + A[i][1]*M[0] + A[i][2]*M[1] + A[i][3]*M[2];
-    nOut[i] = nFromThrust(Ti, Vax);
-  }
-  return nOut;
+  if(!out || out.length!==4 || !out.every(Number.isFinite)) return [NaN,NaN,NaN,NaN];
+  const motors = hybridIndi(x, out, DT);
+  // Applied means the allocator's achievable virtual command, not its request.
+  // Actual response (including motor lag) is recorded separately in measured.
+  if(useRti) rtiApplied=hybridStat.applied.slice();
+  else nmpcApplied=hybridStat.applied.slice();
+  return motors;
 }
 
 /* ══ 상태 ═════════════════════════════════════════════════════════════ */
@@ -1592,10 +1546,54 @@ let zSettled = false;
 let cmdSpd = 0;
 // 기록. 상태까지 담아 **시간을 앞뒤로 오갈 수 있게** 한다.
 // 되감아서 재생을 누르면 그 지점부터 다시 난다 (뒤 기록은 버린다).
-const REC = [];
+// 원형 버퍼: 가득 차도 나머지 기록 6,000개를 매번 앞으로 복사하지 않는다.
+class FlightHistory {
+  constructor(capacity){ this.capacity = capacity; this.clear(); }
+  clear(){ this.items = new Array(this.capacity); this.start = 0; this.length = 0; this.version = 0; }
+  at(i){ if (i < 0) i += this.length; return i >= 0 && i < this.length ? this.items[(this.start+i)%this.capacity] : undefined; }
+  push(record){
+    if (this.length < this.capacity) this.items[(this.start+this.length++)%this.capacity] = record;
+    else { this.items[this.start] = record; this.start = (this.start+1)%this.capacity; }
+    this.version++;
+  }
+  truncate(length){
+    while (this.length > length){ this.items[(this.start+--this.length)%this.capacity] = undefined; }
+    this.version++;
+  }
+  *[Symbol.iterator](){ for (let i=0;i<this.length;i++) yield this.at(i); }
+  slice(start=0,end=this.length){ return Array.from(this).slice(start,end); }
+  map(fn){ return Array.from(this).map(fn); }
+  filter(fn){ return Array.from(this).filter(fn); }
+  some(fn){ return Array.from(this).some(fn); }
+}
+const REC = new FlightHistory(6000);
 let viewIdx = null;        // null = 실시간, 숫자 = 그 프레임을 보는 중
 const REC_EVERY = 0.04;    // [s] 기록 간격
-let recAcc = 0;
+let stepCount = 0, accumulator = 0, lastPaint = -Infinity;
+let rotorPhase = [0,0,0,0];
+let actualRtf = 0, computeMs = 0, physicsFailure = "";
+let configRevision = 0, lastConfigKey = "", activeConfig = null;
+let health;
+function freshHealth(){
+  return {elapsed:0, maxOm:0, run:0, run25:0, ms25:0, hi:0, lo:0,
+    airborne:false, crashed:false, diverged:false, altitudeDeparture:false};
+}
+function captureConfig(){
+  const config = {ctrl:CTRL, spd:+$('#spd').value, alt:+$('#alt').value,
+    wsp:+$('#wsp').value, wdir:+$('#wdir').value, params:{...P}};
+  const key = JSON.stringify(config);
+  if (key !== lastConfigKey){
+    lastConfigKey = key; activeConfig = {...config, revision:++configRevision};
+  }
+  return activeConfig;
+}
+function loadConfig(config){
+  if (!config) return;
+  CTRL = config.ctrl; Object.assign(P, config.params);
+  for (const id of ['ctrl','spd','alt','wsp','wdir']) $('#'+id).value = config[id];
+  activeConfig = config; configRevision = config.revision;
+  const {revision,...values}=config; lastConfigKey=JSON.stringify(values);
+}
 function cmdNow(){
   return {spd:cmdSpd, alt:+$("#alt").value, psi:0, target:+$("#spd").value};
 }
@@ -1621,6 +1619,8 @@ function windNow(){
 function ctrlSnap(){
   return {
     altI: altI, sat: sat, zS: zSettled,
+    motor: motorSnapshot(),
+    hybrid: hybridSnapshot(),
     om: omPrev.slice(), od: omDotF.slice(), mp: Mprev.slice(),
     tV: trimV, tTh: trimTh, tN: trimN, tOK: trimOK,
     nAge: T - nmpcLast, nOut: nmpcOut ? nmpcOut.slice() : null,
@@ -1634,6 +1634,8 @@ function ctrlSnap(){
 function ctrlLoad(c){
   if (!c) return;
   altI = c.altI; sat = c.sat; zSettled = c.zS;
+  motorRestore(c.motor);
+  hybridRestore(c.hybrid);
   omPrev = c.om.slice(); omDotF = c.od.slice(); Mprev = c.mp.slice();
   trimV = c.tV; trimTh = c.tTh; trimN = c.tN; trimOK = c.tOK;
   // 경과시간으로 되돌린다. 저장 시점에 한 번도 안 풀었으면 nAge 가 아주 커서
@@ -1648,13 +1650,24 @@ function ctrlLoad(c){
 // 되감기 복원은 여기 한 곳에서만 한다. 예전엔 toggleRun 과 타임라인이
 // 각자 X·T 만 되돌려 놓고 cmdSpd 는 한쪽만 되돌렸다.
 function restoreTo(i){
-  const r = REC[i];
+  const r = REC.at(i);
   X = r.x.slice(); T = r.t; cmdSpd = r.cmd;
+  loadConfig(r.config);
   ctrlLoad(r.cs);
-  recAcc = 0;
+  health = {...r.health}; stepCount = Math.round(T/DT);
+  lastSatHi = r.satHi; lastSatLo = r.satLo;
+  rotorPhase = r.rotorPhase.slice();
+  accumulator = 0; physicsFailure = r.failure || '';
+  if (typeof refreshControls === 'function') refreshControls();
 }
 function reset(){
-  REC.length = 0; viewIdx = null; recAcc = 0;
+  resetHybridInterface();
+  REC.clear(); viewIdx = null; running = false;
+  stepCount = 0; accumulator = 0; lastFrame = null; lastPaint = -Infinity;
+  actualRtf = 0; computeMs = 0; physicsFailure = ''; health = freshHealth();
+  resetMotorMpc();
+  configRevision = 0; lastConfigKey = ''; activeConfig = null;
+  rotorPhase = [0,0,0,0]; lastSatHi = false; lastSatLo = false;
   // 지상에서 시작한다. 예전엔 목표 고도에 바로 놓고 시작해 이륙 단계가 아예
   // 없었다 — 미션의 첫 구간이 통째로 빠져 있던 셈이다.
   X = D.x0.slice(); X[2] = 0; T = 0; sat = 0; cmdSpd = 0; altI = 0; zSettled = false;
@@ -1664,10 +1677,15 @@ function reset(){
   trailN = 0; trailDrawn = 0;
   if (trail) trail.geometry.setDrawRange(0, 0);
   if (trailDots) trailDots.geometry.setDrawRange(0, 0);
+  recordState();
+  updateRunButtons();
 }
 // 지면. 아래로 뚫고 내려가지 않게 막고, 닿아 있으면 수직속도를 죽인다.
 function ground(){
-  if (X[2] < 0){
+  if (X[2] <= 0){
+    if (health && health.airborne){
+      health.crashed = true; physicsFailure = '이륙 후 지면 접촉'; running = false;
+    }
     X[2] = 0;
     if (X[5] < 0) X[5] = 0;
   }
@@ -1698,7 +1716,10 @@ function diag(){
   const vb = R[0][1]*d0+R[1][1]*d1+R[2][1]*d2;
   const wb = R[0][2]*d0+R[1][2]*d1+R[2][2]*d2;
   const Vcf = Math.hypot(vb, wb), V = Math.hypot(ub, vb, wb);
-  const alpha = Math.atan2(Vcf, ub) * 180/Math.PI;
+  const anglesValid = V >= 0.5;
+  const alpha = anglesValid ? Math.atan2(Vcf, ub) * 180/Math.PI : null;
+  const pitchAlpha = anglesValid ? Math.atan2(wb, ub)*180/Math.PI : null;
+  const beta = anglesValid ? Math.atan2(vb, Math.hypot(ub,wb))*180/Math.PI : null;
   const q_bar = 0.5*P.rho*(V*V);
   const fac = 0.5*P.rho*P.S_ref*(P.C_Na*ub + P.C_dc*Vcf);
   const Fy = -fac*vb, Fz = -fac*wb;
@@ -1712,7 +1733,7 @@ function diag(){
   const Fw = [R[0][0]*Fx + R[0][1]*Fy + R[0][2]*Fz,
               R[1][0]*Fx + R[1][1]*Fy + R[1][2]*Fz,
               R[2][0]*Fx + R[2][1]*Fy + R[2][2]*Fz];
-  return {V, alpha, q_bar, F:Math.hypot(Fx,Fy,Fz), tilt, Fw,
+  return {V, alpha, pitchAlpha, beta, q_bar, F:Math.hypot(Fx,Fy,Fz), tilt, Fw,
           gs:Math.hypot(X[3],X[4]), alt:X[2]};
 }
 
@@ -1729,13 +1750,14 @@ const PROPS = [];   // 프로펠러를 실제 회전수만큼 돌린다
 // RViz 처럼 마우스로 궤도·이동·확대. OrbitControls 는 three 핵심 번들에 없어서
 // 직접 쓴다 (CDN 에서 따로 받으면 막힐 수 있다).
 const ORB = {az: -2.3, el: 0.32, dist: 15, follow: true,
-             tgt: new THREE.Vector3()};
+             tgt: typeof THREE==='undefined'?null:new THREE.Vector3()};
 function init3D(){
   const host = $("#view");
   ren = new THREE.WebGLRenderer({antialias:true});
   ren.setPixelRatio(Math.min(devicePixelRatio, 2));
   host.appendChild(ren.domElement);
   scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0f15);
   scene.fog = new THREE.Fog(0x0a0f15, 140, 1000);
   cam = new THREE.PerspectiveCamera(52, 1, .5, 5000);
   cam.up.set(0, 0, 1);      // 월드는 z-up. 쿼터니언을 변환하지 않는다.
@@ -1753,26 +1775,27 @@ function init3D(){
   // 추진까지 축대칭인 로켓 배치. 기수축(동체 +x)을 따라 내려다보면 동체 단면이
   // 원으로 보이고 그 둘레에 로터 넷이 90도 간격으로 놓인다. 호버에서는 기수가
   // 위를 본다 — vehicle_params 의 Iyy = Izz 가 바로 이 4겹 대칭을 요구한다.
-  const skin = new THREE.MeshStandardMaterial({color:0x1b2530, roughness:.42, metalness:.4});
+  const skin = new THREE.MeshStandardMaterial({color:0x50687b, roughness:.5, metalness:.3});
   const accent = new THREE.MeshStandardMaterial({color:0xb8802f, roughness:.45, metalness:.25});
   const tipM = new THREE.MeshStandardMaterial({color:0xd8402f, roughness:.4});
   const blade = new THREE.MeshStandardMaterial({color:0x18222c, roughness:.65,
                   transparent:true, opacity:.5, side:THREE.DoubleSide});
 
   veh = new THREE.Group();
-  const fus = new THREE.Mesh(new THREE.CylinderGeometry(.075, .075, .70, 28), skin);
+  const bodyRadius = P.d_ref/2;
+  const fus = new THREE.Mesh(new THREE.CylinderGeometry(bodyRadius, bodyRadius, .70, 28), skin);
   fus.rotation.z = -Math.PI/2; veh.add(fus);
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(.075, .26, 28), tipM);
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(bodyRadius, .26, 28), tipM);
   cone.rotation.z = -Math.PI/2; cone.position.x = .48; veh.add(cone);
-  const tail = new THREE.Mesh(new THREE.CylinderGeometry(.062, .05, .12, 24), skin);
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(bodyRadius*.83, bodyRadius*.67, .12, 24), skin);
   tail.rotation.z = -Math.PI/2; tail.position.x = -.41; veh.add(tail);
-  const ring = new THREE.Mesh(new THREE.CylinderGeometry(.0785, .0785, .07, 28), accent);
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(bodyRadius+.0035, bodyRadius+.0035, .07, 28), accent);
   ring.rotation.z = -Math.PI/2; veh.add(ring);
   // 롤 기준선. 매끈한 축대칭 동체는 기수축 둘레로 돌아도 화면에서 안 보인다.
   // 그래서 로터 팔만 도는 것처럼 읽혔다 — 실제로는 강체로 같이 돌고 있었다.
   // 동체 +z 쪽에 줄을 하나 그어 롤이 눈에 보이게 한다.
   const stripe = new THREE.Mesh(new THREE.BoxGeometry(.62, .010, .004), accent);
-  stripe.position.set(-.02, 0, .0755); veh.add(stripe);
+  stripe.position.set(-.02, 0, bodyRadius+.0005); veh.add(stripe);
 
   const ARM = 0.25 / Math.SQRT2;      // 기수축 둘레 반지름 (vehicle_params)
   const RPROP = 0.30 / 2;
@@ -1782,7 +1805,7 @@ function init3D(){
     const r = Math.hypot(py, pz), ph = Math.atan2(pz, py);
     const arm = new THREE.Mesh(new THREE.BoxGeometry(.020, r, .020), accent);
     arm.position.set(0, py/2, pz/2);
-    arm.rotation.x = -ph;            // 길이축(y)을 (py,pz) 방향으로 돌린다
+    arm.rotation.x = ph;             // y축을 +X 둘레로 돌리면 +Z 방향이다
     veh.add(arm);
     const pod = new THREE.Mesh(new THREE.CylinderGeometry(.026,.030,.075,16), accent);
     pod.rotation.z = -Math.PI/2; pod.position.set(.02, py, pz);
@@ -1854,11 +1877,13 @@ function bindMouse(el){
   el.addEventListener("pointerup", e => {
     drag = null; el.releasePointerCapture(e.pointerId); el.style.cursor = "grab";
   });
+  el.addEventListener('pointercancel',()=>{drag=null;el.style.cursor='grab';});
   el.addEventListener("pointermove", e => {
     if (!drag) return;
     const dx = e.clientX - px, dy = e.clientY - py;
     px = e.clientX; py = e.clientY;
     if (drag === "orbit"){
+      ORB.nose = false;
       ORB.az -= dx * 0.006;
       ORB.el = Math.max(-1.45, Math.min(1.45, ORB.el + dy * 0.006));
     } else {
@@ -1879,6 +1904,7 @@ function bindMouse(el){
   }, {passive:false});
 }
 function resize3D(){
+  if(!ren) return;
   const host = $("#view");
   const w = host.clientWidth, h = host.clientHeight;
   if (!w || !h) return;
@@ -1894,15 +1920,18 @@ function resize3D(){
 // 정확히 같아진다**. 되감으면 REC 가 잘리고 선도 같이 잘린다.
 // 전부 다시 채우는 건 비싸니 길이만 보고 늘어난 만큼만 이어 붙인다.
 let trailDrawn = 0;
+let trailStartTime = null;
 function syncTrail(){
   if (!trail) return;
   const n = Math.min(REC.length, TRAIL_MAX);
   const upTo = (viewIdx === null) ? n : Math.min(viewIdx + 1, n);
-  if (upTo < trailDrawn || REC.length < trailDrawn){   // 되감겨 잘렸다 -> 다시
+  const firstTime = n ? REC.at(0).t : null;
+  if (firstTime !== trailStartTime || upTo < trailDrawn || REC.length < trailDrawn){
     trailDrawn = 0;
   }
+  trailStartTime = firstTime;
   for (let i = trailDrawn; i < upTo; i++){
-    const q = REC[i].x;
+    const q = REC.at(i).x;
     trailPos[i*3] = q[0]; trailPos[i*3+1] = q[1]; trailPos[i*3+2] = q[2];
   }
   if (upTo !== trailDrawn){
@@ -1912,7 +1941,7 @@ function syncTrail(){
     // 점은 성기게. 선이 1 px 라 멀리서 흐린데, 점이 굵기를 만들어 준다.
     let m = 0;
     for (let i = 0; i < upTo; i += TRAIL_DOT_EVERY){
-      const q = REC[i].x;
+      const q = REC.at(i).x;
       trailDotPos[m*3] = q[0]; trailDotPos[m*3+1] = q[1]; trailDotPos[m*3+2] = q[2];
       m++;
     }
@@ -1921,12 +1950,13 @@ function syncTrail(){
   }
 }
 function render3D(d){
+  if(!ren) return;
   const p = new THREE.Vector3(X[0], X[1], X[2]);
   veh.position.copy(p);
   veh.quaternion.set(X[6], X[7], X[8], X[9]);
   // 로터를 실제 회전수 n [rad/s] 로 돌린다. 방향은 rotor_directions 대로.
   for (let i = 0; i < PROPS.length; i++)
-    PROPS[i].rotation.x += P.rotor_directions[i] * X[13+i] * 0.016;
+    PROPS[i].rotation.x = rotorPhase[i];
   syncTrail();
   const W = P.mass * P.g;
   const fv = new THREE.Vector3(d.Fw[0], d.Fw[1], d.Fw[2]);
@@ -1950,6 +1980,12 @@ function render3D(d){
   cam.position.set(ORB.tgt.x + ORB.dist*ce*Math.cos(ORB.az),
                    ORB.tgt.y + ORB.dist*ce*Math.sin(ORB.az),
                    ORB.tgt.z + ORB.dist*se);
+  if(ORB.nose){
+    // 기수축 프리셋은 월드 +X가 아니라 현재 동체 +X를 따라 바라본다.
+    const axis=new THREE.Vector3(1,0,0).applyQuaternion(veh.quaternion);
+    cam.position.copy(p).addScaledVector(axis,ORB.dist);
+    cam.up.copy(new THREE.Vector3(0,0,1).applyQuaternion(veh.quaternion));
+  } else cam.up.set(0,0,1);
   cam.lookAt(ORB.tgt);
   ren.render(scene, cam);
 }
@@ -1959,12 +1995,15 @@ function plot(id, ys, ys2, color2){
   const cv = $(id);
   if (!cv._h) cv._h = +cv.getAttribute("height");
   const r = Math.min(devicePixelRatio, 2), w = cv.clientWidth, h = cv._h;
-  cv.width = w*r; cv.height = h*r; cv.style.height = h + "px";
+  if (cv.width !== Math.round(w*r) || cv.height !== Math.round(h*r)){
+    cv.width = Math.round(w*r); cv.height = Math.round(h*r); cv.style.height = h + "px";
+  }
   const c = cv.getContext("2d"); c.setTransform(r,0,0,r,0,0);
   c.clearRect(0,0,w,h);
   if (ys.length < 2) return;
   let lo = Infinity, hi = -Infinity;
-  for (const v of ys){ if (v<lo) lo=v; if (v>hi) hi=v; }
+  for (const v of ys){ if (v === null || !Number.isFinite(v)) continue; if (v<lo) lo=v; if (v>hi) hi=v; }
+  if (!Number.isFinite(lo)) return;
   if (ys2) for (const v of ys2){ if (v<lo) lo=v; if (v>hi) hi=v; }
   if (hi - lo < 1e-6){ hi = lo + 1; }
   const pad = (hi-lo)*.12; lo -= pad; hi += pad;
@@ -1977,10 +2016,18 @@ function plot(id, ys, ys2, color2){
   c.textAlign = "right"; c.textBaseline = "middle";
   c.fillText(hi.toFixed(0), X0-4, Y0+4);
   c.fillText(lo.toFixed(0), X0-4, Y1-2);
+  c.textBaseline='bottom';c.textAlign='left';
+  c.fillText(REC.at(0).t.toFixed(0)+' s',X0,h);
+  c.textAlign='right';c.fillText(REC.at(curIdx()).t.toFixed(0)+' s',w-6,h);
   const draw = (arr, col) => {
     c.strokeStyle = col; c.lineWidth = 1.8; c.beginPath();
-    for (let i=0;i<arr.length;i++){ const x=fx(i), y=fy(arr[i]);
-      i ? c.lineTo(x,y) : c.moveTo(x,y); }
+    let started=false;
+    for (let i=0;i<arr.length;i++){
+      if(arr[i]===null || !Number.isFinite(arr[i])){started=false;continue;}
+      const x=fx(i), y=fy(arr[i]);
+      if(started) c.lineTo(x,y); else c.moveTo(x,y);
+      started=true;
+    }
     c.stroke();
   };
   if (ys2) draw(ys2, color2 || "#7C8A98");
@@ -1988,64 +2035,88 @@ function plot(id, ys, ys2, color2){
 }
 
 /* ══ 루프 ═════════════════════════════════════════════════════════════ */
-let lastFrame = 0;
+let lastFrame = null;
+function updateRunButtons(){
+  $("#go").textContent = running ? "❚❚ 정지  (Space)" : "▶ 시작  (Space)";
+  $("#quickGo").textContent = running ? "❚❚ 정지" : "▶ 시작";
+}
+function recordState(){
+  const d = diag(), cmd = cmdNow(), prev = REC.length ? REC.at(-1).cmd : 0;
+  REC.push({t:T, x:X.slice(), cmd:cmdSpd, V:d.gs, airspeed:d.V,
+    al:d.alpha, pitchAlpha:d.pitchAlpha, beta:d.beta, F:d.F,
+    zr:cmd.alt, st:zSettled, satHi:lastSatHi, satLo:lastSatLo,
+    seg:segNow(d,cmd,prev), cs:ctrlSnap(), config:captureConfig(),
+    health:{...health}, failure:physicsFailure, rotorPhase:rotorPhase.slice()});
+}
+function advanceStep(){
+  const target = +$("#spd").value, dv = target - cmdSpd;
+  cmdSpd += Math.sign(dv)*Math.min(Math.abs(dv), RAMP*DT);
+  const cmd = cmdNow(), u = control(X, cmd);
+  if(physicsFailure){recordState();return false;}
+  // 유효하지 않은 값을 기록/WebGL에 넘기지 않고 마지막 유효 상태를 유지한다.
+  const next = u.every(Number.isFinite) ? rk4(X,u,windNow(),P,DT) : [];
+  if (next.length !== NX || !next.every(Number.isFinite)){
+    physicsFailure = '계산 중단: NaN / Inf';
+    health.diverged = true; running = false; recordState(); return false;
+  }
+  X = next; T = ++stepCount * DT;
+  for (let i=0;i<4;i++) rotorPhase[i] = (rotorPhase[i] - P.rotor_directions[i]*X[13+i]*DT) % (2*Math.PI);
+  health.elapsed += DT;
+  if (X[2] > 1) health.airborne = true;
+  const om = Math.hypot(X[10],X[11],X[12]);
+  health.maxOm = Math.max(health.maxOm,om);
+  if (om > 25){ health.run += DT; health.ms25 += DT; }
+  else health.run = 0;
+  health.run25 = Math.max(health.run25,health.run);
+  lastSatHi = u.some(v => v >= P.n_max - 1e-6);
+  // 회전수가 양수여도 전진비 때문에 추력이 0일 수 있어 추력 하한을 검사한다.
+  const axial = axialInflow(X);
+  lastSatLo = u.some(v => P.k_T*v*v*Math.max(0,1-2*Math.PI*axial/(v*P.D_prop*P.J_max+EPS)) <= 1e-6);
+  if (lastSatHi) health.hi += DT;
+  if (lastSatLo) health.lo += DT;
+  sat = Math.max(0,Math.min(1,sat + (lastSatHi || lastSatLo ? .02 : -.01)));
+  if (!zSettled && Math.abs(X[2] - cmd.alt) < 5) zSettled = true;
+  if (zSettled && Math.abs(X[2]-cmd.alt)>50) health.altitudeDeparture=true;
+  ground();
+  if (stepCount % Math.round(REC_EVERY/DT) === 0 || physicsFailure) recordState();
+  return true;
+}
 function tick(ts){
   requestAnimationFrame(tick);
-  if (!lastFrame) lastFrame = ts;
-  const dtReal = Math.min(0.05, (ts - lastFrame)/1000);
-  lastFrame = ts;
-  if (running){
-    const rtf = +$("#rtf").value;
-    let budget = dtReal * rtf;
-    const w = windNow();
-    const target = +$("#spd").value;
-    let guard = 0;
-    // cmd 를 루프 밖에 둔다. 안에서 const 로 잡으면 아래 기록 단계에서
-    // 스코프를 벗어나 매 프레임 예외가 나고 시간이 아예 안 간다 — 실제로 그랬다.
-    let cmd = cmdNow();
-    while (budget > 0 && guard++ < 600){
-      const dv = target - cmdSpd, step = RAMP * DT;
-      cmdSpd += Math.abs(dv) < step ? dv : (dv > 0 ? step : -step);
-      cmd = cmdNow();
-      const u = control(X, cmd);
-      X = rk4(X, u, w, P, DT);
-      ground();
-      T += DT; budget -= DT;
-      // 포화는 천장만 보면 안 된다. 할당이 Ti<0 을 0 으로 눕히면 로터가
-      // 완전히 멈추는데(n_min=0) 그건 권한을 잃은 것이지 여유가 아니다.
-      lastSatHi = u.some(v => v >= P.n_max - 1e-6);
-      lastSatLo = u.some(v => v <= P.n_min + 1e-6);
-      if (!zSettled && Math.abs(X[2] - cmd.alt) < 5.0) zSettled = true;
-      if (lastSatHi || lastSatLo) sat = Math.min(1, sat + .02);
-      else sat = Math.max(0, sat - .01);
-    }
-    const d = diag();
-    recAcc += dtReal * rtf;
-    if (recAcc >= REC_EVERY || !REC.length){
-      recAcc = 0;
-      const prev = REC.length ? REC[REC.length-1].cmd : 0;
-      // zr(그때의 목표 고도)를 같이 담는다. 예전엔 채점이 슬라이더의 **지금**
-      // 값을 읽어서, 같은 기록 한 판에 고도 슬라이더만 움직이면 RMSEz 가
-      // 1.23(통과) 에서 198.80(실패) 으로 뒤집혔다. 소급 채점이었다.
-      // satHi/satLo 도 담는다. 바닥 포화(Ti<0 -> n=0)는 지금 화면에 안 뜬다.
-      REC.push({t:T, x:X.slice(), cmd:cmdSpd, V:d.gs, al:d.alpha, F:d.F,
-                zr:cmd.alt, st:zSettled, satHi:lastSatHi, satLo:lastSatLo,
-                seg:segNow(d, cmd, prev), cs:ctrlSnap()});
-      if (REC.length > 6000) REC.shift();
-    }
-    paint(d);
+  if (lastFrame === null){ lastFrame = ts; return; }
+  const wall = Math.max(0,(ts-lastFrame)/1000); lastFrame = ts;
+  if (!running || document.hidden){ accumulator = 0; return; }
+  const before = T, begin = performance.now(), rtf = +$("#rtf").value;
+  accumulator += Math.min(wall,0.25)*rtf;
+  // 프레임마다 계산 예산을 두되 적분 보폭은 부하나 FPS에 따라 바꾸지 않는다.
+  while (accumulator + 1e-10 >= DT){
+    if (performance.now()-begin > 12) break;
+    if (!advanceStep()) break;
+    accumulator -= DT;
+    if (!running) break;
+  }
+  // 과부하 때 계산 대기를 무한히 쌓지 않고 실제 진행 배속을 표시한다.
+  accumulator = Math.max(0,Math.min(accumulator,0.25*rtf));
+  computeMs = 0.9*computeMs + 0.1*(performance.now()-begin);
+  if (wall > 0) actualRtf = 0.9*actualRtf + 0.1*(T-before)/wall;
+  const d = diag(); render3D(d);
+  if (ts-lastPaint >= 100 || !running){
+    paint(d,false); lastPaint=ts; updateRunButtons();
   }
 }
 function toggleRun(){
+  if (physicsFailure) return;
   // 되감아 둔 상태에서 재생하면 그 지점부터 이어 난다. 뒤 기록은 버린다.
   if (!running && viewIdx !== null){
-    REC.length = viewIdx + 1;
+    REC.truncate(viewIdx + 1);
     restoreTo(viewIdx);
     viewIdx = null;
   }
   running = !running;
-  $("#go").textContent = running ? "❚❚ 정지  (Space)" : "▶ 시작  (Space)";
-  lastFrame = 0;
+  updateRunButtons();
+  lastFrame = null;
+  // 정지하면 tick이 계기를 갱신하지 않으므로 상태 표시도 여기서 즉시 바꾼다.
+  paint(diag());
 }
 function curIdx(){ return viewIdx === null ? REC.length - 1 : viewIdx; }
 function drawSegs(){
@@ -2054,17 +2125,21 @@ function drawSegs(){
   if (!n){ bar.innerHTML = "<div class='lab'>기록 없음 — ▶ 를 누르세요</div>"; return; }
   let html = "", run = 1;
   for (let i = 1; i <= n; i++){
-    if (i < n && REC[i].seg === REC[i-1].seg){ run++; continue; }
-    const c = SEGS[REC[i-1].seg] || SEGS.ground;
+    if (i < n && REC.at(i).seg === REC.at(i-1).seg){ run++; continue; }
+    const c = SEGS[REC.at(i-1).seg] || SEGS.ground;
     html += "<i style='flex:" + run + ";background:" + c[1] + "'></i>";
     run = 1;
   }
-  const i = curIdx(), cur = SEGS[REC[i].seg] || SEGS.ground;
+  const i = curIdx(), cur = SEGS[REC.at(i).seg] || SEGS.ground;
+  bar.setAttribute('aria-valuemin',REC.at(0).t.toFixed(2));
+  bar.setAttribute('aria-valuemax',REC.at(-1).t.toFixed(2));
+  bar.setAttribute('aria-valuenow',REC.at(i).t.toFixed(2));
+  bar.setAttribute('aria-valuetext',REC.at(i).t.toFixed(1)+'초 · '+cur[0]);
   const pct = n > 1 ? (i / (n - 1)) * 100 : 0;
   bar.innerHTML = html
     + "<div class='head' style='left:" + pct + "%'></div>"
     + "<div class='lab'><b>" + cur[0] + "</b> "
-    + REC[i].t.toFixed(1) + " s"
+    + REC.at(i).t.toFixed(1) + " s"
     + (viewIdx !== null ? " · 되감기" : "")
     + "<span class='leg'>" + Object.values(SEGS).map(c =>
         "<span style='color:" + c[1] + "'>■</span>" + c[0]).join(" ") + "</span></div>";
@@ -2076,8 +2151,14 @@ function drawSegs(){
 // V=50 에서 63.9도, V=85 에서 80.7도라 상수 70도면 정상 순항이 전부 실패로
 // 찍힌다. 트림 대비 **초과분**으로 재야 뜻이 있다.
 function trimTiltDeg(V){
-  const [xt] = lqrPick(Math.min(V, LQ.V_max_table));
-  const qx=xt[6], qy=xt[7], qz=xt[8], qw=xt[9];
+  // 채점에는 자세만 필요하다. 표본마다 4×14 게인 행렬까지 생성하지 않는다.
+  const rows=LQ.rows, speed=Math.max(rows[0].V,Math.min(V,rows.at(-1).V));
+  let i=0;while(i+1<rows.length && rows[i+1].V<speed)i++;
+  const a=rows[i],b=rows[Math.min(i+1,rows.length-1)];
+  const f=b.V===a.V?0:(speed-a.V)/(b.V-a.V);
+  const q=[6,7,8,9].map(k=>a.x[k]+f*(b.x[k]-a.x[k]));
+  const norm=Math.hypot(...q);
+  const [qx,qy,qz,qw]=q.map(v=>v/norm);
   return Math.acos(Math.max(-1, Math.min(1, 2*(qx*qz - qy*qw)))) * 180/Math.PI;
 }
 function tiltOf(r){
@@ -2085,129 +2166,70 @@ function tiltOf(r){
   return Math.acos(Math.max(-1, Math.min(1, 2*(qx*qz - qy*qw)))) * 180/Math.PI;
 }
 function score(){
-  const n = REC.length;
-  if (n < 20) return null;
-
-  // ★ 발산 판정을 **제일 먼저**. 상태가 NaN 이면 아래 비교가 전부 false 라
-  //   텀블도 추락도 안 잡히고, 엉뚱하게 rmseZ 때문에 실패로 찍힌다.
-  //   파이썬 기준과 같게 |z - z_ref| > 50 도 발산으로 본다
-  //   (control/mission_sim.py:201).
-  let diverged = false, divWhy = "";
-  for (const r of REC){
-    for (let i = 0; i < NX; i++)
-      if (!isFinite(r.x[i])) { diverged = true; divWhy = "상태가 NaN/Inf"; break; }
-    if (diverged) break;
-    // ★ 목표 고도에 한 번 닿은 **뒤**에만 본다. 닿기 전은 이륙이다.
-    if (r.st && Math.abs(r.x[2] - r.zr) > 50){
-      diverged = true; divWhy = "고도에 닿은 뒤 50 m 이탈";
-    }
-    if (diverged) break;
-  }
-  const settled = REC.filter(r => r.st);
-
-  // ★ |ω| 판정은 **최장 연속** 구간으로. 파이썬이 그렇게 센다
-  //   (control/acados_fallback_mc.py:76-90 의 run25). 예전엔 총합이었고,
-  //   게다가 `> 0.2` 가 5 샘플에서 IEEE754 상 거짓이라 실효 기준이 240 ms
-  //   였다. 총합과 최장연속은 서로 다른 방향으로 둘 다 틀린다.
-  let maxOm = 0, run = 0, run25 = 0, ms25 = 0;
-  let maxTiltEx = -1e9, maxTilt = 0, satHiN = 0, satLoN = 0;
-  for (const r of REC){
-    const om = Math.hypot(r.x[10], r.x[11], r.x[12]);
-    maxOm = Math.max(maxOm, om);
-    if (om > 25){ run += REC_EVERY; ms25 += REC_EVERY; run25 = Math.max(run25, run); }
-    else run = 0;
-    const tl = tiltOf(r);
-    maxTilt = Math.max(maxTilt, tl);
-    maxTiltEx = Math.max(maxTiltEx, tl - trimTiltDeg(r.V));
-    if (r.satHi) satHiN++;
-    if (r.satLo) satLoN++;
-  }
-
-  // ★ 구간별로 잰다. 예전엔 순항만 집계했는데, segNow 가 |alt-z|>5 를
-  //   'climb' 으로 걸러낸 **뒤** 순항만 보므로 RMSEz <= 5 가 구조적으로
-  //   보장됐다. 제일 어려운 구간(감속·호버 복귀)이 통째로 빠져 있었다.
+  const rows = REC.slice(0,curIdx()+1), n = rows.length;
+  if (!n || (n<20 && !rows[n-1].failure)) return null;
+  const last = rows[n-1], h = last.health;
+  const settled = rows.filter(r => r.st);
+  // 비행 이상은 2 ms마다 누적해 40 ms 기록 사이의 짧은 피크도 놓치지 않는다.
+  const {maxOm,run25,ms25} = h;
+  const tumble = maxOm > 35 || run25 >= 0.2 - 1e-9;
+  const crashed = h.crashed, diverged = h.diverged || h.altitudeDeparture;
+  const divWhy = h.diverged ? (last.failure || '계산 중단') : h.altitudeDeparture ? '목표 도달 후 고도 50 m 이탈' : '';
+  const satHi = h.elapsed ? h.hi/h.elapsed : 0, satLo = h.elapsed ? h.lo/h.elapsed : 0;
+  let maxTilt=0, maxTiltEx=-Infinity;
   const segs = {};
-  for (const r of REC){
-    const g = segs[r.seg] || (segs[r.seg] = {n:0, sv:0, sz:0, mz:0, mo:0});
-    g.n++;
-    g.sv += (r.V - r.cmd) ** 2;
-    g.sz += (r.x[2] - r.zr) ** 2;
-    g.mz = Math.max(g.mz, Math.abs(r.x[2] - r.zr));
-    g.mo = Math.max(g.mo, Math.hypot(r.x[10], r.x[11], r.x[12]));
+  for (const r of rows){
+    const tilt = tiltOf(r); maxTilt=Math.max(maxTilt,tilt);
+    maxTiltEx=Math.max(maxTiltEx,tilt-trimTiltDeg(r.airspeed));
+    const g=segs[r.seg] || (segs[r.seg]={n:0,sv:0,sz:0,mz:0,mo:0});
+    g.n++; g.sv+=(r.V-r.cmd)**2; g.sz+=(r.x[2]-r.zr)**2;
+    g.mz=Math.max(g.mz,Math.abs(r.x[2]-r.zr));
+    g.mo=Math.max(g.mo,Math.hypot(...r.x.slice(10,13)));
   }
-  const bySeg = [];
-  for (const k of ["ground","climb","accel","cruise","decel","hover"]){
-    const g = segs[k];
-    if (!g) continue;
-    bySeg.push({seg:k, name:SEGS[k][0], n:g.n,
-                rmseV:Math.sqrt(g.sv/g.n), rmseZ:Math.sqrt(g.sz/g.n),
-                maxZ:g.mz, maxOm:g.mo});
-  }
-  // 대표값은 **정착 이후** 표본으로 낸다. 이륙 구간을 섞으면 RMSE 가
-  // 이륙에 통째로 먹혀 제어기 차이가 안 보인다. 구간별 표에는 이륙도 있다.
-  const use = settled.length > 20 ? settled : REC;
-  let SV = 0, SZ = 0;
-  for (const r of use){ SV += (r.V - r.cmd)**2; SZ += (r.x[2] - r.zr)**2; }
-  const rmseV = Math.sqrt(SV/use.length), rmseZ = Math.sqrt(SZ/use.length);
-  const cruise = segs.cruise;
-  const rmseVc = cruise ? Math.sqrt(cruise.sv/cruise.n) : null;
-  const rmseZc = cruise ? Math.sqrt(cruise.sz/cruise.n) : null;
-
-  const tumble = maxOm > 35 || run25 >= 0.2;
-  const crashed = REC.some(r => r.x[2] < 1 && r.t > 20);
-  // ★ 속도 추종을 판정에 넣는다. 예전엔 없어서, '권장' 제어기가 명령
-  //   83 m/s 에 실측 48.2 m/s(35 m/s 미달) 인데도 통과로 찍혔다.
-  //   ★★ 그리고 **초과도 본다**. 처음엔 부족만 봤는데, 그러면 명령 83 m/s 에
-  //   94 m/s 로 나는(= 40 km/h 초과) 하이브리드가 통과로 찍힌다. 추종 실패는
-  //   양쪽 다 실패다. 게다가 이 기체는 트림 상한이 85 m/s 라, 초과한다는 것은
-  //   **정상비행 평형점 밖에서 날고 있다**는 뜻이기도 하다.
-  const last = REC[n-1];
-  const vErr = last.V - last.cmd;                    // +초과 / -부족
-  // 허용치 10 % 는 너무 헐렁했다. 명령 83 m/s 에 90.6 으로 나는(9 % 초과)
-  // 하이브리드가 통과로 찍혔다. 순항 속도 규격으로 ±5 % 가 보통이다.
-  const vTol = Math.max(2.0, 0.05 * Math.max(last.cmd, 1e-9));
-  const vMiss = Math.abs(vErr) > vTol;
-  const vShort = -vErr;
-
-  // 판정을 둘로 나눈다.
-  //   비행 건전성 — 기체가 제어 아래 있었나 (제어기 비교의 축)
-  //   미션 달성   — 시킨 일을 해냈나 (300 km/h 목표의 축)
-  // 하나로 묶으면 "로켓이 83 m/s 를 못 낸다" 는 사실이 모든 제어기를 똑같이
-  // 실패로 만들어 제어기 사이의 차이를 덮어 버린다. 둘 다 봐야 한다.
-  const sound = [], miss = [];
-  if (diverged) sound.push("발산 — " + divWhy);
-  if (tumble) sound.push("텀블 — |ω|max " + maxOm.toFixed(1)
-                       + ", 25 초과 최장연속 " + (run25*1000).toFixed(0) + " ms");
-  if (crashed) sound.push("추락 — 고도 1 m 아래");
-  if (satHiN/n > 0.2) sound.push("모터 천장 포화 " + (100*satHiN/n).toFixed(0) + "%");
-  if (satLoN/n > 0.2) sound.push("모터 바닥 포화 " + (100*satLoN/n).toFixed(0) + "%");
-  if (vMiss) miss.push("속도 추종 실패 — 명령 " + last.cmd.toFixed(1)
-                      + " m/s 대비 " + Math.abs(vErr).toFixed(1) + " m/s "
-                      + (vErr > 0 ? "초과" : "부족")
-                      + " (" + (Math.abs(vErr)*3.6).toFixed(0) + " km/h)");
-  if (rmseZ >= 20) miss.push("고도 RMSE " + rmseZ.toFixed(1) + " m");
-
-  return {rmseV, rmseZ, rmseVc, rmseZc, bySeg,
-          maxOm, run25, ms25, maxTilt, maxTiltEx,
-          satHi: satHiN/n, satLo: satLoN/n,
-          tumble, crashed, diverged, divWhy, vMiss, vShort, vErr, vTol,
-          vmax: Math.max(...REC.map(r => r.V)), n,
-          nCruise: cruise ? cruise.n : 0,
-          nSettled: settled.length, tSettle: settled.length ? settled[0].t : null,
-          sound, miss, why: sound.concat(miss),
-          soundOk: sound.length === 0, pass: sound.length === 0 && miss.length === 0};
+  const bySeg = Object.keys(SEGS).filter(k=>segs[k]).map(k=>{
+    const g=segs[k]; return {seg:k,name:SEGS[k][0],n:g.n,rmseV:Math.sqrt(g.sv/g.n),
+      rmseZ:Math.sqrt(g.sz/g.n),maxZ:g.mz,maxOm:g.mo};
+  });
+  const use = settled.length > 20 ? settled : rows;
+  const rms = (list,fn) => Math.sqrt(list.reduce((sum,r)=>sum+fn(r)**2,0)/list.length);
+  const rmseV=rms(use,r=>r.V-r.cmd), rmseZ=rms(use,r=>r.x[2]-r.zr);
+  const cruise=bySeg.find(g=>g.seg==='cruise');
+  const vErr=last.V-last.cmd, vTol=Math.max(2,0.05*last.config.spd);
+  // 순간적으로 목표를 통과한 것과 5초 동안 유지한 것을 구분한다.
+  const tail=rows.filter(r=>r.t>=last.t-5-1e-9);
+  const missionReady=tail.length>1 && last.t-tail[0].t>=5-1e-9
+    && tail.every(r=>r.config.revision===last.config.revision
+      && Math.abs(r.cmd-r.config.spd)<0.2 && r.st);
+  const vMiss=missionReady && tail.some(r=>Math.abs(r.V-r.config.spd)>vTol);
+  const zMiss=missionReady && tail.some(r=>Math.abs(r.x[2]-r.zr)>5);
+  const sound=[],miss=[];
+  if(diverged) sound.push(divWhy);
+  if(tumble) sound.push('각속도 기준 초과: 최대 '+maxOm.toFixed(1)+' rad/s');
+  if(crashed) sound.push('이륙 후 지면 접촉');
+  if(satHi>0.2) sound.push('회전수 상한 포화 '+(100*satHi).toFixed(0)+'%');
+  if(satLo>0.2) sound.push('추력 하한 포화 '+(100*satLo).toFixed(0)+'%');
+  if(!missionReady) miss.push('목표 도달 후 동일 설정으로 5초 이상 관찰하세요.');
+  if(vMiss) miss.push('최근 5초 속도 오차가 허용 범위(±'+vTol.toFixed(1)+' m/s)를 벗어났습니다.');
+  if(zMiss) miss.push('최근 5초 고도 오차가 ±5 m를 벗어났습니다.');
+  return {rmseV,rmseZ,rmseVc:cruise?cruise.rmseV:null,rmseZc:cruise?cruise.rmseZ:null,
+    bySeg,maxOm,run25,ms25,maxTilt,maxTiltEx,satHi,satLo,tumble,crashed,diverged,divWhy,
+    vMiss,vShort:-vErr,vErr,vTol,vmax:Math.max(...rows.map(r=>r.V)),n,
+    nCruise:cruise?cruise.n:0,nSettled:settled.length,tSettle:settled.length?settled[0].t:null,
+    windowStart:rows[0].t,windowEnd:last.t,missionReady,
+    sound,miss,why:sound.concat(miss),soundOk:!sound.length,
+    pass:!sound.length && missionReady && !vMiss && !zMiss};
 }
 // RMSE 를 시간에 따라. 한 숫자로만 보면 어느 구간이 나빴는지 안 보인다.
 function rmseSeries(win){
   win = win || 25;
   const out = {t:[], v:[], z:[]};
-  for (let i = win; i < REC.length; i++){
+  for (let i = win; i <= curIdx(); i++){
     let sv = 0, sz = 0;
     for (let k = i - win; k < i; k++){
-      sv += (REC[k].V - REC[k].cmd) ** 2;
-      sz += (REC[k].x[2] - REC[k].zr) ** 2;   // 그때의 기준값. 슬라이더 지금 값이 아니다
+      sv += (REC.at(k).V - REC.at(k).cmd) ** 2;
+      sz += (REC.at(k).x[2] - REC.at(k).zr) ** 2;   // 그때의 기준값. 슬라이더 지금 값이 아니다
     }
-    out.t.push(REC[i].t);
+    out.t.push(REC.at(i).t);
     out.v.push(Math.sqrt(sv / win));
     out.z.push(Math.sqrt(sz / win));
   }
@@ -2237,25 +2259,24 @@ function drawScoreCv(){
   c.fillStyle = "#2d94bd"; c.fillText("RMSE z", 88, 9);
 }
 function scoreCsv(){
-  const S = rmseSeries();
-  const alt = +$("#alt").value;
-  const head = "# fast_drone 비행 시뮬 채점\n"
-    + "# 제어기: " + CTRLS[CTRL].name + "\n"
-    + "# 목표속도: " + $("#spd").value + " m/s, 목표고도: " + alt + " m\n"
-    + "# 측풍: " + $("#wsp").value + " m/s, 방위 " + $("#wdir").value + " deg\n"
-    + "# 계수: " + COEFS.map(([k]) => k + "=" + P[k]).join(", ") + "\n"
-    + "t_s,seg,cmd_mps,V_mps,alt_m,z_ref_m,alpha_deg,F_N,omega_rad_s,"
-    + "tilt_deg,sat_hi,sat_lo,rmse_v,rmse_z\n";
-  const off = REC.length - S.t.length;
-  return head + REC.map((r, i) => {
-    const om = Math.hypot(r.x[10], r.x[11], r.x[12]);
-    const j = i - off;
-    return [r.t.toFixed(3), r.seg, r.cmd.toFixed(3), r.V.toFixed(4),
-            r.x[2].toFixed(3), r.zr.toFixed(2), r.al.toFixed(3), r.F.toFixed(4),
-            om.toFixed(5), tiltOf(r).toFixed(2),
-            r.satHi ? 1 : 0, r.satLo ? 1 : 0,
-            j >= 0 ? S.v[j].toFixed(4) : "", j >= 0 ? S.z[j].toFixed(4) : ""].join(",");
-  }).join("\n") + "\n";
+  const columns=['t_s','seg','cmd_mps','groundspeed_mps','alt_m','z_ref_m','total_alpha_deg',
+    'F_N','omega_rad_s','tilt_deg','sat_hi','sat_lo','airspeed_mps','pitch_alpha_deg','beta_deg',
+    'controller','target_mps','wind_mps','wind_to_deg','config_id',...COEFS.map(([k])=>k),
+    'hybrid_sample_t_s',...['request','allocated','measured','residual'].flatMap(prefix=>
+      ['T_N','alpha_x_rad_s2','alpha_y_rad_s2','alpha_z_rad_s2'].map(unit=>'hybrid_'+prefix+'_'+unit))];
+  const header=['# fast_drone · 고정 밀도 '+P0.rho+' kg/m3',
+    '# 바람은 향하는 방향: 0 deg=+X, 90 deg=+Y',
+    '# 최근 최대 240초. 각 행의 설정은 해당 시점의 값. 수치 일치는 실기 검증 아님.',
+    '# Hybrid allocated=할당 예측, measured=실제 로터 추력·LPF 각가속도. 모터 지연 때문에 서로 다름.',
+    columns.join(',')];
+  const rows=REC.slice(0,curIdx()+1).map(r=>[r.t,r.seg,r.cmd,r.V,r.x[2],r.zr,r.al,
+    r.F,Math.hypot(...r.x.slice(10,13)),tiltOf(r),+r.satHi,+r.satLo,r.airspeed,
+    r.pitchAlpha,r.beta,r.config.ctrl,r.config.spd,r.config.wsp,r.config.wdir,r.config.revision,
+    ...COEFS.map(([k])=>r.config.params[k]),
+    r.cs.hybrid?.stat?.t??null,
+    ...['requested','applied','measured','residual'].flatMap(key=>r.cs.hybrid?.stat?.[key]??[null,null,null,null])
+    ].map(v=>v===null?'':typeof v==='number'?+v.toFixed(6):v).join(','));
+  return header.concat(rows).join('\n')+'\n';
 }
 
 /* ══ 채점 별창 ════════════════════════════════════════════════════════
@@ -2273,14 +2294,14 @@ const MET = [
   {k:"dz",    name:"고도 편차 z−z_ref", unit:"m",    col:"#2d94bd"},
   {k:"om",    name:"각속도 |ω|",       unit:"rad/s", col:"#e0664f"},
   {k:"tiltEx",name:"기울임 (트림 대비)", unit:"°",   col:"#9085e9"},
-  {k:"alpha", name:"받음각 α",          unit:"°",    col:"#c9a227"},
+  {k:"alpha", name:"총 받음각",         unit:"°",    col:"#c9a227"},
 ];
 function metricSeries(){
   const S = rmseSeries();
-  const off = REC.length - S.t.length;
+  const off = curIdx()+1 - S.t.length;
   const out = {t:[], rv:[], rz:[], om:[], tiltEx:[], alpha:[], dz:[], satHi:[], satLo:[]};
-  for (let i = 0; i < REC.length; i++){
-    const r = REC[i], j = i - off;
+  for (let i = 0; i <= curIdx(); i++){
+    const r = REC.at(i), j = i - off;
     out.t.push(r.t);
     out.rv.push(j >= 0 ? S.v[j] : null);
     out.rz.push(j >= 0 ? S.z[j] : null);
@@ -2345,7 +2366,7 @@ function scoreWinScript(){
 let DATA = null, MET = [], on = {}, t0 = null, t1 = null, full = null;
 const $ = s => document.querySelector(s);
 addEventListener("message", e => {
-  if (!e.data || e.data.kind !== "score") return;
+  if (e.source !== window.opener || !e.data || e.data.kind !== "score") return;
   const first = DATA === null;
   DATA = e.data;
   MET = DATA.met;
@@ -2375,10 +2396,16 @@ addEventListener("message", e => {
 function render(){
   const d = DATA, v = d.v;
   $("#sub").textContent = d.meta;
+  if (!v){
+    $("#chips").textContent = "관찰 중 · 기록이 모자랍니다.";
+    $("#why").textContent = "▶ 로 좀 더 날려보세요.";
+    $("#segtab").textContent = "";
+    t0 = full[0]; t1 = full[1]; draw(); return;
+  }
   const chip = (t, c) => "<span class='chip " + c + "'>" + t + "</span>";
   $("#chips").innerHTML =
       chip("비행 건전성 " + (v.soundOk ? "통과" : "실패"), v.soundOk ? "ok" : "bad")
-    + chip("미션 " + (v.pass ? "통과" : "실패"), v.pass ? "ok" : "warn")
+    + chip("미션 " + (v.pass ? "통과" : v.missionReady ? "미달" : "관찰 중"), v.pass ? "ok" : "warn")
     + chip("최고 " + v.vmax.toFixed(1) + " m/s · " + (v.vmax*3.6).toFixed(0) + " km/h", "")
     + chip("RMSE z " + v.rmseZ.toFixed(2) + " m", "")
     + chip("RMSE v " + v.rmseV.toFixed(2) + " m/s", "")
@@ -2388,7 +2415,7 @@ function render(){
            (v.satHi+v.satLo) > 0.2 ? "bad" : "ok");
   let w = "";
   if (v.sound.length) w += "<p class='why'><b>건전성 실패</b> \\u00B7 " + v.sound.join(" \\u00B7 ") + "</p>";
-  if (v.miss.length)  w += "<p class='why warn'><b>미션 미달</b> \\u00B7 " + v.miss.join(" \\u00B7 ") + "</p>";
+  if (v.miss.length)  w += "<p class='why warn'><b>" + (v.missionReady ? "미션 미달" : "관찰 안내") + "</b> \\u00B7 " + v.miss.join(" \\u00B7 ") + "</p>";
   $("#why").innerHTML = w;
   let st = "<table><tr><th>구간</th><th>표본</th><th>RMSE v</th><th>RMSE z</th>"
          + "<th>최대 \\u0394z</th><th>|\\u03C9|max</th></tr>";
@@ -2502,10 +2529,9 @@ addEventListener("resize", () => { if (DATA) draw(); });
 function pushScore(){
   if (!scoreWin || scoreWin.closed) return;
   const v = score();
-  if (!v) return;
   scoreWin.postMessage({kind:"score", v: v, s: metricSeries(), met: MET,
     meta: CTRLS[CTRL].name + " · 목표 " + $("#spd").value + " m/s · 고도 "
-          + $("#alt").value + " m · 측풍 " + $("#wsp").value + " m/s "
+          + $("#alt").value + " m · 수평 풍속 " + $("#wsp").value + " m/s · 향하는 방향 "
           + $("#wdir").value + "°"}, "*");
 }
 function openScoreWin(){
@@ -2521,37 +2547,35 @@ function openScoreWin(){
 }
 function drawScore(){
   const el = $("#score");
-  if (el.hidden) return;
+  if (el.hidden){ pushScore(); return; }
   drawScoreCv();
   const s2 = score();
   if (!s2){ $("#scoreBody").innerHTML =
-    "<p>기록이 모자랍니다. ▶ 로 좀 더 날려보세요.</p>"; return; }
+    "<p>기록이 모자랍니다. ▶ 로 좀 더 날려보세요.</p>"; pushScore(); return; }
   const row = (k, v, cls) => "<tr><td>" + k + "</td><td"
     + (cls ? " class='" + cls + "'" : "") + ">" + v + "</td></tr>";
   const pct = v => (100*v).toFixed(0) + "%";
   let html = "<table>"
     + row("최고 속도", s2.vmax.toFixed(1) + " m/s · " + (s2.vmax*3.6).toFixed(0) + " km/h")
-    + row("속도 RMSE (전 구간)", s2.rmseV.toFixed(2) + " m/s", s2.rmseV < 3 ? "ok" : "warn")
-    + row("고도 RMSE (전 구간)", s2.rmseZ.toFixed(2) + " m",
+    + row("속도 RMSE (선택 표본)", s2.rmseV.toFixed(2) + " m/s", s2.rmseV < 3 ? "ok" : "warn")
+    + row("고도 RMSE (선택 표본)", s2.rmseZ.toFixed(2) + " m",
           s2.rmseZ < 5 ? "ok" : (s2.rmseZ < 20 ? "warn" : "bad"))
     + row("최대 |ω|", s2.maxOm.toFixed(2) + " rad/s", s2.maxOm > 35 ? "bad" : "ok")
     + row("|ω|&gt;25 최장연속", (s2.run25*1000).toFixed(0) + " ms"
           + (s2.ms25 > s2.run25 + 1e-9 ? " (총합 " + (s2.ms25*1000).toFixed(0) + ")" : ""),
           s2.run25 >= 0.2 ? "bad" : "ok")
-    + row("기울임 (트림 대비)", s2.maxTilt.toFixed(0) + "° · 초과 "
-          + (s2.maxTiltEx >= 0 ? "+" : "") + s2.maxTiltEx.toFixed(0) + "°",
-          s2.maxTiltEx > 15 ? "bad" : (s2.maxTiltEx > 8 ? "warn" : "ok"))
+    + row("최대 기울임 (표시 기록)", s2.maxTilt.toFixed(0) + "°")
     + row("모터 포화 (천장/바닥)", pct(s2.satHi) + " / " + pct(s2.satLo),
           (s2.satHi + s2.satLo) > 0.2 ? "bad" : ((s2.satHi + s2.satLo) > 0.02 ? "warn" : "ok"))
     + row("지면 접촉", s2.crashed ? "있음" : "없음", s2.crashed ? "bad" : "ok")
     + row("발산", s2.diverged ? s2.divWhy : "없음", s2.diverged ? "bad" : "ok")
     + row("비행 건전성", s2.soundOk ? "통과" : "실패", s2.soundOk ? "ok" : "bad")
-    + row("미션 달성", s2.pass ? "통과" : "실패", s2.pass ? "ok" : "warn")
+    + row("미션 달성", s2.pass ? "통과" : s2.missionReady ? "미달" : "관찰 중", s2.pass ? "ok" : "warn")
     + "</table>";
   if (s2.sound.length)
     html += "<p class='bad'><b>건전성 실패</b><br>· " + s2.sound.join("<br>· ") + "</p>";
   if (s2.miss.length)
-    html += "<p class='warn'><b>미션 미달</b><br>· " + s2.miss.join("<br>· ") + "</p>";
+    html += "<p class='warn'><b>"+(s2.missionReady?'미션 미달':'관찰 안내')+"</b><br>· " + s2.miss.join("<br>· ") + "</p>";
   if (s2.bySeg.length > 1){
     html += "<table class='segtab'><tr><th>구간</th><th>표본</th>"
           + "<th>RMSE v</th><th>RMSE z</th><th>최대 Δz</th><th>|ω|max</th></tr>";
@@ -2561,54 +2585,74 @@ function drawScore(){
             + g.maxZ.toFixed(1) + "</td><td>" + g.maxOm.toFixed(1) + "</td></tr>";
     html += "</table>";
   }
-  html += "<p>전 구간 " + s2.n + " 샘플 · 대표값은 <b>목표 고도 도달 이후</b> "
-    + s2.nSettled + " 샘플로 냅니다"
-    + (s2.tSettle !== null ? " (도달 t=" + s2.tSettle.toFixed(0) + " s)" : " — 아직 도달 못함")
-    + ".</p>"
-    + "<p><b>왜 구간별로 보나.</b> 예전에는 순항 구간만 집계했는데, 구간 판정이 "
-    + "고도 오차 5 m 초과를 '상승' 으로 걸러낸 <b>뒤</b> 순항만 보므로 "
-    + "고도 RMSE 가 5 이하로 <b>구조적으로 보장</b>됐습니다. 제일 어려운 "
-    + "구간(감속·호버 복귀)이 통째로 빠져 있었습니다.</p>"
-    + "<p><b>RMSE 만 보면 안 됩니다</b> — 텀블은 |ω| 로만 잡힙니다. 실기 실패 "
-    + "기준은 |ω| &gt; 35 rad/s 또는 25 초과가 <b>연속</b> 200 ms 이상입니다 "
-    + "(총합이 아니라 최장연속 — 파이썬 판정과 같은 정의).</p>";
+  html += "<p>표시 기록 " + s2.windowStart.toFixed(1) + "–" + s2.windowEnd.toFixed(1)
+    + " s · " + s2.n + " 샘플. 최대 240초를 보관합니다."
+    + " 각속도·접촉·포화는 <b>이륙 전부터 현재 선택 시점까지 누적</b>합니다.</p>"
+    + "<p>RMSE 표본: " + (s2.nSettled>20?'목표 고도 도달 후 '+s2.nSettled+'개':
+      '표시 기록 전체 '+s2.n+'개 · 고도 도달 후 표본 부족') + ".</p>"
+    + "<p>미션 통과: 동일 설정의 최근 5초 동안 목표 속도 ±max(2 m/s, 5%),"
+    + " 고도 ±5 m 유지 및 건전성 기준 충족.</p>"
+    + "<p>각속도 기준: 최대 35 rad/s 초과 또는 25 rad/s 초과가 연속 200 ms 이상."
+    + " 이는 이 시뮬레이터의 비교 기준입니다.</p>";
   $("#scoreBody").innerHTML = html;
   pushScore();
 }
-function paint(d){
-  render3D(d);
-  drawSegs();
-  drawScore();
-  const upto = curIdx() + 1;
-  plot("#p1", REC.slice(0, upto).map(r => r.V), REC.slice(0, upto).map(r => r.cmd));
-  plot("#p2", REC.slice(0, upto).map(r => r.al));
-  plot("#p3", REC.slice(0, upto).map(r => r.F));
-  const W = P.mass * P.g;
-  const cmd = cmdNow();
-  $("#hud").innerHTML =
-    "t <b>" + T.toFixed(1) + "</b> s<br>" +
-    "속도 <b>" + d.gs.toFixed(1) + "</b> m/s = <b>" + (d.gs*3.6).toFixed(0) + "</b> km/h<br>" +
-    "대기속도 " + d.V.toFixed(1) + " m/s · α " + d.alpha.toFixed(1) + "°<br>" +
-    "명령 " + cmd.spd.toFixed(1) + " m/s (목표 " + cmd.target.toFixed(0) + ")<br>" +
-    "고도 " + d.alt.toFixed(1) + " m · 기울임 " + d.tilt.toFixed(1) + "°<br>" +
-    "공력 " + d.F.toFixed(1) + " N (" + (100*d.F/W).toFixed(0) + "% 무게)";
-  // 램프가 끝난 뒤에도 실측이 못 따라오면 그게 한계다. 램프 중의 차이는
-  // 그냥 가속 중이라는 뜻이므로 경고하면 안 된다.
-  const settled = Math.abs(cmd.target - cmd.spd) < 0.2;
-  const gap = cmd.spd - d.gs;
-  let warn = "";
-  if (sat > .5) warn = "⚠ 로터가 최대 회전수에 도달했습니다 — 추력 포화";
-  else if (settled && gap > 3 && T > 8)
-    warn = "⚠ 명령 " + cmd.spd.toFixed(0) + " m/s 에 실측 " + d.gs.toFixed(0)
-         + " m/s — 여기가 이 기체의 한계입니다";
-  $("#warn").textContent = warn;
-  $("#gauges").innerHTML = [
-    ["속도", d.gs.toFixed(1), "m/s"], ["", (d.gs*3.6).toFixed(0), "km/h"],
-    ["받음각", d.alpha.toFixed(1), "deg"], ["기울임", d.tilt.toFixed(1), "deg"],
-    ["공력", d.F.toFixed(1), "N"], ["무게대비", (100*d.F/W).toFixed(0), "%"],
-    ["동압", d.q_bar.toFixed(0), "Pa"], ["고도", d.alt.toFixed(0), "m"],
-  ].map(([k,v,u]) => "<div><div class='k'>" + k + "</div><div class='v'>"
-    + v + " <small>" + u + "</small></div></div>").join("");
+const angleText = value => value === null ? '—' : value.toFixed(1);
+function modelWarnings(d){
+  const notes=[];
+  if(COEFS.some(([k])=>P[k]!==P0[k])) notes.push('계수 수정 · LQR 표 재설계 안 됨');
+  if(d.alpha!==null && d.alpha>90) notes.push('역류 · 공력 미검증');
+  if(d.V>LQ.V_max_table || +$('#spd').value>LQ.V_max_table) notes.push('LQR 표 범위 밖');
+  if(+$('#wsp').value>0 && CTRLS[CTRL].lqr) notes.push('바람 조건 · 무풍 설계 게인 사용');
+  return notes;
+}
+function paint(d, render=true){
+  if(render) render3D(d);
+  drawSegs(); drawScore();
+  const rows=REC.slice(0,curIdx()+1);
+  plot('#p1',rows.map(r=>r.V),rows.map(r=>r.cmd));
+  plot('#p2',rows.map(r=>r.al));
+  plot('#p3',rows.map(r=>r.x[2]),rows.map(r=>r.zr));
+  const cmd=cmdNow(), warnings=modelWarnings(d);
+  $('#hud').innerHTML='t <b>'+T.toFixed(1)+'</b> s<br>'
+    +'지상 <b>'+d.gs.toFixed(1)+'</b> m/s · '+(d.gs*3.6).toFixed(0)+' km/h<br>'
+    +'대기 '+d.V.toFixed(1)+' m/s · 총 받음각 '+angleText(d.alpha)+'°<br>'
+    +'고도 <b>'+d.alt.toFixed(1)+'</b> / '+cmd.alt+' m<br>'
+    +'속도 명령 '+cmd.spd.toFixed(1)+' / 목표 '+cmd.target+' m/s';
+  let warn=physicsFailure;
+  if(!warn && health.maxOm>35) warn='각속도 기준 초과 기록 있음 · 채점 확인';
+  else if(!warn && lastSatHi) warn='회전수 상한 포화';
+  else if(!warn && lastSatLo) warn='추력 하한 포화';
+  else if(!warn && Math.abs(cmd.target-cmd.spd)<0.2 && Math.abs(cmd.spd-d.gs)>3 && T>8)
+    warn='속도 추종 오차 · 가속 시간, 자세와 구동기 여유를 확인하세요';
+  $('#warn').textContent=warn;
+  $('#flightStatus').textContent=(physicsFailure?'중단':running?'비행 중':viewIdx!==null?'기록 탐색':'정지')
+    +' · '+CTRLS[CTRL].name;
+  $('#modelStatus').textContent=warnings.length?warnings.join(' · '):'기준 계수 · 고정 밀도 '+P0.rho+' kg/m³';
+  $('#perfStatus').textContent='목표 ×'+$('#rtf').value+' · 실측 '+(running?'×'+actualRtf.toFixed(2):'—')
+    +' · 계산 '+computeMs.toFixed(1)+' ms/프레임';
+  $('#solverStatus').hidden=!CTRLS[CTRL].motor;
+  $('#solverStatus').textContent=!motorStat?'NMPC 풀이 대기':motorStat.failed
+    ?'NMPC 풀이 실패 · 직전 명령 유지 ('+motorStat.failures+'/3)'
+    :'NMPC SQP 1회 · '+motorStat.ms.toFixed(1)+' ms · '+(motorStat.accepted?'비용 감소':'개선 스텝 없음');
+  $('#interfaceStatus').hidden=!CTRLS[CTRL].nmpc;
+  $('#interfaceStatus').textContent=!hybridStat?'인터페이스 측정 대기':
+    '총추력 요청 / 할당 / 측정: '+[hybridStat.requested[0],hybridStat.applied[0],hybridStat.measured[0]]
+      .map(v=>v.toFixed(2)).join(' / ')+' N · 각가속도 할당 잔차 '+Math.hypot(...hybridStat.residual.slice(1)).toFixed(3)
+      +' rad/s²'+(hybridStat.limited?' · 구동기 제약으로 명령 제한':'')
+      +' · 할당은 예측값, 측정은 모터 지연·필터 포함. 축별 값은 CSV에 기록합니다.';
+  const values=[['지상속도',d.gs.toFixed(1),'m/s'],['대기속도',d.V.toFixed(1),'m/s'],
+    ['총 받음각',angleText(d.alpha),'deg'],['기울임',d.tilt.toFixed(1),'deg'],
+    ['α (XZ 평면)',angleText(d.pitchAlpha),'deg'],['β (옆미끄럼)',angleText(d.beta),'deg'],
+    ['고도',d.alt.toFixed(1),'m'],['상승률',X[5].toFixed(1),'m/s'],
+    ['각속도 |ω|',Math.hypot(...X.slice(10,13)).toFixed(2),'rad/s'],['공력',d.F.toFixed(1),'N'],
+    ['동압',d.q_bar.toFixed(0),'Pa'],['기록 구간',rows[0].t.toFixed(0)+'–'+rows.at(-1).t.toFixed(0),'s']];
+  if(!$('#gauges').children.length) $('#gauges').innerHTML=values.map(([name,,unit],i)=>
+    '<div><div class="k">'+name+'</div><div class="v"><span id="g'+i+'"></span> <small>'+unit+'</small></div></div>').join('');
+  values.forEach(([,value],i)=>$('#g'+i).textContent=value);
+  $('#p1').setAttribute('aria-label','지상속도 '+d.gs.toFixed(1)+' m/s, 명령 '+cmd.spd.toFixed(1)+' m/s. CSV로 기록 저장 가능');
+  $('#p2').setAttribute('aria-label','총 받음각 '+angleText(d.alpha)+'도. 저속에서는 정의하지 않음');
+  $('#p3').setAttribute('aria-label','고도 '+d.alt.toFixed(1)+' m, 목표 '+cmd.alt+' m. CSV로 기록 저장 가능');
 }
 
 /* ══ UI ═══════════════════════════════════════════════════════════════ */
@@ -2621,6 +2665,49 @@ const COEFS = [
   ["C_mq", "피치 감쇠", -40, 0, 0.5],
   ["C_lp", "롤 감쇠", -20, 0, 0.5],
 ];
+function refreshControls(){
+  for (const id of ['spd','alt','wsp','wdir','rtf']){
+    const value=+$('#'+id).value;
+    const unit={spd:'m/s',alt:'m',wsp:'m/s',wdir:'°',rtf:'배'}[id];
+    $('#o_'+id).textContent=value+' '+unit+(id==='spd'?' · '+(value*3.6).toFixed(0)+' km/h':'');
+    const number=$('#n_'+id); if(number) number.value=value;
+  }
+  $('#ctrl').value=CTRL;
+  $('#ctrlNote').textContent=CTRLS[CTRL].note+(CTRLS[CTRL].lqr
+    ?' 현재 표: 0–'+LQ.V_max_table+' m/s, '+LQ.rows.length+'점.':'');
+  $('#ctrlNote').className='note'+(CTRLS[CTRL].group!=='기준 비행'?' experiment':'');
+  for(const [k] of COEFS){
+    $('#c_'+k).value=P[k]; $('#o_'+k).textContent=P[k].toFixed(2);
+    const number=$('#n_c_'+k); if(number) number.value=P[k];
+  }
+  const changed=COEFS.some(([k])=>P[k]!==P0[k]);
+  $('#coefficientNote').textContent=changed?'사용자 수정 계수 · LQR 표는 기준 계수로 설계됨':'기준 계수 · LQR 표는 이 값에서 설계되었습니다.';
+  updateRunButtons();
+}
+function invalidateController(){
+  resetHybridInterface();
+  resetMotorMpc();
+  trimOK=false; trimV=-1;
+  nmpcU=null; nmpcOut=null; nmpcApplied=null; nmpcLast=-1e9;
+  rtiU=null; rtiOut=null; rtiApplied=null; rtiLast=-1e9; rtiStat=null;
+}
+function changedControls(){
+  // 되감은 시점의 설정 변경은 다음 재생의 분기에 적용한다.
+  if(viewIdx!==null){ REC.truncate(viewIdx+1); viewIdx=null; }
+  captureConfig(); refreshControls(); if(!running) paint(diag());
+}
+function addNumberInput(id){
+  const slider=$('#'+id), number=document.createElement('input');
+  number.type='number'; number.id='n_'+id; number.className='precise';
+  number.min=slider.min; number.max=slider.max; number.step=slider.step; number.value=slider.value;
+  number.setAttribute('aria-label',slider.labels[0].textContent+' 숫자 입력');
+  slider.previousElementSibling.appendChild(number);
+  number.addEventListener('change',()=>{
+    if(!number.validity.valid || number.value===''){ number.value=slider.value; return; }
+    slider.value=number.value; slider.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+  slider.addEventListener('input',()=>{number.value=slider.value;});
+}
 function buildCoefs(){
   $("#coefs").innerHTML = COEFS.map(([k, lbl, lo, hi, st]) =>
     "<div class='fld'><div class='row'><label for='c_" + k + "'>" + k
@@ -2630,32 +2717,31 @@ function buildCoefs(){
     + "' step='" + st + "' value='" + P[k] + "'></div>").join("");
   for (const [k] of COEFS){
     const el = $("#c_" + k);
-    const upd = () => { P[k] = +el.value; $("#o_" + k).textContent = (+el.value).toFixed(2); };
-    el.addEventListener("input", upd); upd();
+    el.addEventListener("input", () => { P[k]=+el.value; invalidateController(); changedControls(); });
+    $('#o_'+k).textContent=P[k].toFixed(2);
+    addNumberInput('c_'+k);
   }
 }
 function initUI(){
   const err = selfCheck();
-  const good = err < 1e-9;
+  const lqrErr=lqrCheck();
+  const good = [err,lqrErr,D.casadi_max_diff].every(v=>Number.isFinite(v) && v<1e-9);
   // 배지는 이 페이지의 숫자를 믿어도 되는지에 대한 답이라 없앨 수 없다.
   // 다만 늘 두 줄을 차지할 이유는 없어서 하나로 접고 자세한 값은 펼쳐서 본다.
   $("#badges").innerHTML =
     "<details class='vchk'><summary class='badge " + (good ? "" : "bad") + "'>"
-    + "<span class='dot'></span>검증 <b>"
+    + "<span class='dot'></span>수치 구현 일치 <b>"
     + (good ? "통과" : "실패") + "</b></summary>"
     + "<div class='vbody'>"
     + "<div><span>JS ↔ 파이썬</span><b>" + err.toExponential(1) + "</b></div>"
     + "<div><span>파이썬 ↔ CasADi</span><b>"
     + D.casadi_max_diff.toExponential(1) + "</b></div>"
     + "<div><span>LQR 표 ↔ 파이썬</span><b>"
-    + lqrCheck().toExponential(1) + "</b></div>"
+    + lqrErr.toExponential(1) + "</b></div>"
     + "<p>같은 물리를 세 번 구현했습니다. 이 값은 구현끼리의 최대 차이이고,"
     + " 기계정밀도 수준이면 셋이 같은 답을 낸다는 뜻입니다.</p>"
-    + "<p><b>무엇을 보증하나.</b> 검증 구간 " + D.segs.length + " 개가"
-    + " 대기속도 0~76 m/s, 받음각 0~160°, |ω| 0~178 rad/s, 전진비 계수"
-    + " fac 0.000~1.000 을 훑습니다. 예전에는 구간이 하나뿐이라 fac 가"
-    + " 0.999~1.000 이었고, 그래서 할당이 전진비를 무시하던 버그가 이 배지를"
-    + " 그대로 통과했습니다.</p>"
+    + "<p>기준 계수의 " + D.segs.length + "개 궤적과 LQR 보간을 비교합니다."
+    + " 풍동·실기체 검증이나 계수 변경 후 제어기 성능을 보증하지 않습니다.</p>"
     + "</div></details>";
   for (const [id, fn] of [["spd", v => v + " m/s · " + (v*3.6).toFixed(0) + " km/h"],
                           ["alt", v => v + " m"],
@@ -2664,26 +2750,44 @@ function initUI(){
                           ["rtf", v => "×" + v]]){
     const el = $("#" + id), out = $("#o_" + id);
     const upd = () => out.textContent = fn(+el.value);
-    el.addEventListener("input", upd); upd();
+    el.addEventListener("input", () => {
+      upd(); if(id==='alt') zSettled=false;
+      changedControls();
+    }); upd(); addNumberInput(id);
   }
-  $("#alt").addEventListener("input", () => { if (!running) { X[2] = +$("#alt").value; paint(diag()); } });
   const sel = $("#ctrl");
-  sel.innerHTML = Object.entries(CTRLS).map(([k, c]) =>
-    "<option value='" + k + "'>" + c.name + "</option>").join("");
+  sel.innerHTML = ['기준 비행','비교 실험','실험 제어기','제안 Hybrid'].map(group=>
+    "<optgroup label='"+group+"'>"+Object.entries(CTRLS).filter(([,c])=>c.group===group)
+      .map(([k,c])=>"<option value='"+k+"'>"+c.name+"</option>").join('')+'</optgroup>').join('');
+  sel.value=CTRL;
   const updCtrl = () => {
+    resetHybridInterface();
     CTRL = sel.value;
+    resetMotorMpc();
     $("#ctrlNote").textContent = CTRLS[CTRL].note;
     omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;
   nmpcU = null; nmpcLast = -1e9; nmpcOut = null; nmpcApplied = null;   // 전환 시 INDI 초기화
   rtiU = null; rtiLast = -1e9; rtiOut = null; rtiApplied = null; rtiStat = null;
   };
-  sel.addEventListener("change", updCtrl); updCtrl();
+  sel.addEventListener("change", () => {updCtrl(); changedControls();}); updCtrl();
   buildCoefs();
   $("#def").addEventListener("click", () => {
     for (const [k] of COEFS){ P[k] = P0[k]; $("#c_"+k).value = P0[k];
       $("#o_"+k).textContent = P0[k].toFixed(2); }
+    invalidateController(); changedControls();
   });
   $("#go").addEventListener("click", toggleRun);
+  $('#quickGo').addEventListener('click',toggleRun);
+  $('#preset').addEventListener('change',()=>{
+    running=false; lastFrame=null;
+    $('#spd').value=({standard:60,hover:0,cruise:83})[$('#preset').value];
+    $('#alt').value=200; $('#wsp').value=0; $('#wdir').value=90;
+    sel.value='lqr'; updCtrl(); zSettled=false;
+    for(const [k] of COEFS) P[k]=P0[k];
+    changedControls();
+  });
+  document.addEventListener('visibilitychange',()=>{ lastFrame=null; accumulator=0; });
+  refreshControls();
 
   // 스페이스로 정지·재생. 슬라이더를 만지는 중에는 가로채지 않고, 버튼에
   // 포커스가 있을 때도 비워 둔다 — 버튼은 브라우저가 이미 스페이스로 누른다.
@@ -2691,6 +2795,7 @@ function initUI(){
   addEventListener("keydown", e => {
     const t = e.target;
     const tag = t && t.tagName;
+    if(e.ctrlKey || e.metaKey || e.altKey || e.repeat || (t && t.isContentEditable)) return;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
     if (e.code === "Space"){
       if (tag === "BUTTON" || tag === "SUMMARY") return;
@@ -2703,8 +2808,13 @@ function initUI(){
   });
   $("#scoreBtn").addEventListener("click", () => {
     const el = $("#score"); el.hidden = !el.hidden; drawScore();
+    $('#scoreBtn').setAttribute('aria-expanded',String(!el.hidden));
+    if(!el.hidden) $('#scoreClose').focus();
   });
-  $("#scoreClose").addEventListener("click", () => { $("#score").hidden = true; });
+  $("#scoreClose").addEventListener("click", () => {
+    $("#score").hidden=true; $('#scoreBtn').setAttribute('aria-expanded','false'); $('#scoreBtn').focus();
+  });
+  $('#score').addEventListener('keydown',e=>{if(e.key==='Escape') $('#scoreClose').click();});
   // 내려받기는 두 곳에서 다르게 동작한다.
   //   GitHub Pages — 평범한 페이지라 <a download> 가 그냥 된다.
   //   Artifact 뷰어 — 샌드박스가 <a download> 와 blob 저장을 막는다.
@@ -2766,13 +2876,15 @@ function initUI(){
   for (const b of document.querySelectorAll("[data-view]"))
     b.addEventListener("click", () => {
       const v = VIEWS[b.dataset.view];
+      ORB.nose = b.dataset.view === 'nose';
       ORB.az = v[0]; ORB.el = v[1]; ORB.dist = v[2];
       ORB.follow = true; $("#follow").setAttribute("aria-pressed", "true");
       if (!running) paint(diag());
     });
   $("#rst").addEventListener("click", () => {
     reset(); trailN = 0; trailDrawn = 0;
-    trail.geometry.setDrawRange(0,0); trailDots.geometry.setDrawRange(0,0);
+    if(trail) trail.geometry.setDrawRange(0,0);
+    if(trailDots) trailDots.geometry.setDrawRange(0,0);
     paint(diag());
   });
   addEventListener("resize", () => { resize3D(); paint(diag()); });
@@ -2799,6 +2911,15 @@ function bindTimeline(){
   bar.addEventListener("pointerup", e => {
     on = false; bar.releasePointerCapture(e.pointerId);
   });
+  bar.addEventListener('pointercancel',()=>{on=false;});
+  bar.addEventListener('keydown',e=>{
+    const moves={ArrowLeft:-1,ArrowRight:1,PageUp:-25,PageDown:25};
+    if(!(e.key in moves) && e.key!=='Home' && e.key!=='End') return;
+    e.preventDefault(); running=false;
+    viewIdx=e.key==='Home'?0:e.key==='End'?REC.length-1:
+      Math.max(0,Math.min(REC.length-1,curIdx()+moves[e.key]));
+    restoreTo(viewIdx); updateRunButtons(); paint(diag());
+  });
 }
 
 function bindGrips(){
@@ -2806,20 +2927,34 @@ function bindGrips(){
     const el = $(id);
     let on = false, x0 = 0, w0 = 0;
     const col = side > 0 ? $("#colL") : $("#colR");
+    const setWidth = value => {
+      // 양쪽 패널을 넓혀도 가운데 화면이 완전히 사라지지 않게 제한한다.
+      const other=(side>0?$('#colR'):$('#colL')).getBoundingClientRect().width;
+      const upper=Math.max(190,Math.min(560,innerWidth*0.3,innerWidth-other-330));
+      const width=Math.max(190,Math.min(upper,value));
+      document.documentElement.style.setProperty(varName,width+'px');
+      el.setAttribute('aria-valuemin','190'); el.setAttribute('aria-valuemax',String(upper));
+      el.setAttribute('aria-valuenow',String(Math.round(width)));
+      try{localStorage.setItem('fd'+varName,String(width));}catch(_){}
+      resize3D(); if(!running) paint(diag());
+    };
+    el.addEventListener('keydown',e=>{
+      if(e.key==='ArrowLeft'||e.key==='ArrowRight'){
+        e.preventDefault(); setWidth(col.getBoundingClientRect().width+(e.key==='ArrowRight'?20:-20)*side);
+      }
+    });
     el.addEventListener("pointerdown", e => {
       on = true; x0 = e.clientX; w0 = col.getBoundingClientRect().width;
       el.classList.add("on"); el.setPointerCapture(e.pointerId);
     });
     el.addEventListener("pointermove", e => {
       if (!on) return;
-      const w = Math.max(190, Math.min(560, w0 + side * (e.clientX - x0)));
-      document.documentElement.style.setProperty(varName, w + "px");
-      try { localStorage.setItem("fd" + varName, String(w)); } catch (_) {}
-      resize3D(); if (!running) paint(diag());
+      setWidth(w0 + side*(e.clientX-x0));
     });
     el.addEventListener("pointerup", e => {
       on = false; el.classList.remove("on"); el.releasePointerCapture(e.pointerId);
     });
+    el.addEventListener('pointercancel',()=>{on=false;el.classList.remove('on');});
     el.addEventListener("dblclick", () => {
       document.documentElement.style.removeProperty(varName);
       try { localStorage.removeItem("fd" + varName); } catch (_) {}
@@ -2833,7 +2968,13 @@ function bindGrips(){
   }
 }
 
-init3D();
+// 브라우저 초기화
+try { init3D(); }
+catch(error){
+  ren=null;
+  $('#rendererError').hidden=false;
+  $('#rendererError').textContent='3D 화면을 사용할 수 없습니다. WebGL 또는 연결을 확인하세요. 계기·그래프·물리 계산은 계속 사용할 수 있습니다.';
+}
 bindGrips();
 bindTimeline();
 reset();
