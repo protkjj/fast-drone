@@ -23,7 +23,10 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-body{margin:0; background:var(--ground); color:var(--ink);
+/* 한글 줄바꿈. 기본값은 글자 단위라 '돌렸습 / 니다.' 처럼 **낱말 중간에서**
+   끊긴다. keep-all 은 어절(띄어쓰기) 단위로만 끊는다. 아주 좁은 칸에서
+   넘칠 수 있어 overflow-wrap 으로 받쳐 둔다 (긴 URL·식별자용). */
+body{word-break:keep-all; overflow-wrap:break-word;margin:0; background:var(--ground); color:var(--ink);
   font:400 14px/1.55 "IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
   -webkit-font-smoothing:antialiased}
 .num,code{font-family:"IBM Plex Mono",ui-monospace,monospace;

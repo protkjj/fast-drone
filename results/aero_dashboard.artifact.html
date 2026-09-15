@@ -14,18 +14,25 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-body{
+/* 한글 줄바꿈. 기본값은 글자 단위라 '돌렸습 / 니다.' 처럼 **낱말 중간에서**
+   끊긴다. keep-all 은 어절(띄어쓰기) 단위로만 끊는다. 아주 좁은 칸에서
+   넘칠 수 있어 overflow-wrap 으로 받쳐 둔다 (긴 URL·식별자용). */
+body{word-break:keep-all; overflow-wrap:break-word;
   margin:0; background:var(--ground); color:var(--ink);
   font:400 15px/1.6 "IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
   -webkit-font-smoothing:antialiased;
 }
-.wrap{max-width:1120px; margin:0 auto; padding:0 24px 96px}
+/* 1120 -> 1280. 차트가 2 칸으로 바뀌어 폭이 더 필요하다.
+   본문 문단은 아래에서 66ch 로 따로 묶으므로 글줄은 안 길어진다. */
+.wrap{max-width:1280px; margin:0 auto; padding:0 24px 96px}
 h1,h2,h3{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;
   font-weight:700; text-wrap:balance; margin:0}
 h1{font-size:clamp(30px,4.4vw,46px); letter-spacing:-.015em; line-height:1.08}
 h2{font-size:26px; letter-spacing:-.01em}
 h3{font-size:15px; font-weight:600}
-p{margin:0 0 14px; max-width:66ch; color:var(--ink-2)}
+/* text-wrap:pretty — 마지막 줄에 '다.' 한 글자만 남는 것을 막는다.
+   실제로 결론 문단이 그렇게 끊겨 있었다. */
+p{margin:0 0 14px; max-width:66ch; color:var(--ink-2); text-wrap:pretty}
 p.lead{color:var(--ink); font-size:17px}
 code,.num{font-family:"IBM Plex Mono",ui-monospace,monospace;
   font-variant-numeric:tabular-nums}
@@ -89,7 +96,10 @@ td.n{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums}
 td.c1{color:var(--s1)} td.c2{color:var(--s2)}
 .scroll{overflow-x:auto}
 
-.charts{display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr));
+/* 계수 차트는 2 x 2. 예전에는 auto-fit minmax(330px) 라 1120 px 폭에서
+   3 칸이 되고 넷째가 혼자 한 줄을 써서 오른쪽 3 분의 2 가 비었다.
+   2 칸이면 각 그림이 두 배 넓어져 곡선이 훨씬 잘 읽힌다. */
+.charts{display:grid; grid-template-columns:repeat(auto-fit,minmax(440px,1fr));
   gap:18px; margin-top:24px}
 figure{margin:0; background:var(--panel); border:1px solid var(--rule);
   border-radius:10px; padding:16px 16px 10px}
@@ -103,7 +113,7 @@ canvas{width:100%; display:block}
 ul.notes{margin:14px 0 0; padding:0; list-style:none;
   display:grid; gap:11px; max-width:78ch}
 ul.notes li{padding-left:18px; position:relative; color:var(--ink-2);
-  font-size:14.5px}
+  font-size:14.5px; text-wrap:pretty}
 ul.notes li::before{content:""; position:absolute; left:0; top:9px;
   width:6px; height:6px; border-radius:50%; background:var(--warn)}
 ul.notes li b{color:var(--ink); font-weight:600}
@@ -284,7 +294,9 @@ function setup(cv){
   return [c, w, h];
 }
 function axes(c, w, h, xd, yd, xl, yl, title){
-  const P = {l: 56, r: 14, t: 26, b: 38};
+  // 여백. y 이름을 세로로 쓰지 않게 되어 왼쪽을 56 -> 46 으로 줄였다.
+  // 그만큼 그림이 넓어진다. 위쪽은 제목 + 단위 줄을 넣느라 26 -> 34.
+  const P = {l: 46, r: 14, t: 34, b: 40};
   const X = v => P.l + (v - xd[0]) / (xd[1] - xd[0] || 1) * (w - P.l - P.r);
   const Y = v => h - P.b - (v - yd[0]) / (yd[1] - yd[0] || 1) * (h - P.t - P.b);
   c.font = '400 11px "IBM Plex Mono", monospace';
@@ -305,12 +317,19 @@ function axes(c, w, h, xd, yd, xl, yl, title){
   c.beginPath(); c.moveTo(P.l, h - P.b + .5); c.lineTo(w - P.r, h - P.b + .5); c.stroke();
   c.fillStyle = css("--ink-2"); c.textAlign = "center"; c.textBaseline = "bottom";
   c.fillText(xl, (P.l + w - P.r) / 2, h - 4);
-  c.save(); c.translate(13, (P.t + h - P.b) / 2); c.rotate(-Math.PI / 2);
-  c.fillText(yl, 0, 0); c.restore();
+  // ★ y 이름을 **가로로** 그림 위 오른쪽에 둔다. 예전에는 -90도로 돌려
+  //   왼쪽 끝(x=13)에 그렸는데, 눈금 숫자(오른쪽 정렬로 x=48 에서 왼쪽으로
+  //   뻗는다)와 겹치고 캔버스 밖으로 잘렸다. 한글은 세로로 읽기도 어렵다.
+  if (yl){
+    c.textAlign = "right"; c.textBaseline = "top";
+    c.fillStyle = css("--ink-3");
+    c.font = '400 11px "IBM Plex Mono", monospace';
+    c.fillText(yl, w - P.r, 6);
+  }
   if (title){
     c.fillStyle = css("--ink"); c.textAlign = "left"; c.textBaseline = "top";
     c.font = '600 13px "IBM Plex Sans", sans-serif';
-    c.fillText(title, P.l - 42, 4);
+    c.fillText(title, P.l - 34, 4);
   }
   return [X, Y];
 }
