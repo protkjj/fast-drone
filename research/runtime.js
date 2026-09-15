@@ -71,15 +71,32 @@
     return {functions,estimator,solvers,call,array,dispose};
   }
 
+  // Warm-start grid nodes are 50 ms apart, but the controller advances 20 ms.
+  // Shifting a whole node predicts 30 ms too far ahead on every control update.
+  function shiftPrediction(values, width, fraction) {
+    const blocks=values.length/width;
+    return values.map((v,i)=>{
+      const block=Math.floor(i/width),next=Math.min(block+1,blocks-1)*width+i%width;
+      return (1-fraction)*v+fraction*values[next];
+    });
+  }
+
   class Optimizer {
     constructor(ca, binding, data, kind) {
       this.ca=ca; this.binding=binding; this.meta=data.solvers[kind]; this.solver=binding.solvers[kind];
       this.previous=this.meta.hover.slice(); this.guess=null; this.stats=[];
+      this.stateScale=this.meta.state_scaling||Array(this.meta.nx).fill(1);
+      this.commandScale=this.meta.command_scaling||[1,1,1,1];
+      this.constraintScale=this.meta.constraint_scaling||Array.from({length:this.meta.lbg.length},(_,i)=>this.stateScale[i%this.meta.nx]);
       this.lamX=null; this.lamG=null;
     }
     solve(state, refs, voltage, wind) {
       const m=this.meta, x=state.slice(0,m.nx);
-      if(!this.guess) this.guess=[...Array.from({length:m.N+1},()=>x).flat(),...Array.from({length:m.N},()=>m.hover).flat()];
+      if(!this.guess) {
+        const scaledX=x.map((v,i)=>v/this.stateScale[i]);
+        const scaledU=m.hover.map((v,i)=>v/this.commandScale[i]);
+        this.guess=[...Array.from({length:m.N+1},()=>scaledX).flat(),...Array.from({length:m.N},()=>scaledU).flat()];
+      }
       const parameters=[...x,...refs.flat(),...this.previous,...wind,voltage];
       const begin=performance.now();
       let result, status, values, residual=Infinity, success=false;
@@ -89,20 +106,33 @@
         const packed=Object.fromEntries(Object.entries(input).map(([k,v])=>[k,this.ca.DM(v)]));
         result=this.solver.call(packed);
         values=this.binding.array(result.x);
-        residual=Math.max(...this.binding.array(result.g).map(Math.abs));
+        // Keep the pre-normalization acceptance gate in physical units. Scaling
+        // must not disguise a large motor-state defect as a small dimensionless one.
+        residual=Math.max(0,...this.binding.array(result.g).map((v,i)=>
+          Math.max(m.lbg[i]-v,v-m.ubg[i])*this.constraintScale[i]));
         status=this.solver.stats();
         success=status.success && residual<1e-3 && values.every(Number.isFinite);
       } catch(error) {status={return_status:String(error.message||error),iter_count:0};}
       const elapsed=performance.now()-begin;
       this.stats.push({ms:elapsed,success,status:status.return_status,iterations:status.iter_count,residual});
       if(success) {
-        this.lamX=this.binding.array(result.lam_x); this.lamG=this.binding.array(result.lam_g);
+        const shift=m.control_dt_s/m.prediction_dt_s;
+        const lamX=this.binding.array(result.lam_x),lamG=this.binding.array(result.lam_g);
+        this.lamX=[...shiftPrediction(lamX.slice(0,m.state_count),m.nx,shift),
+          ...shiftPrediction(lamX.slice(m.state_count),4,shift)];
+        this.lamG=[...shiftPrediction(lamG.slice(0,m.state_count),m.nx,shift),
+          ...shiftPrediction(lamG.slice(m.state_count),160,shift)];
         const controls=values.slice(m.state_count);
-        this.previous=controls.slice(0,4).map((v,i)=>clamp(v,m.lower[i],m.upper[i]));
+        this.previous=controls.slice(0,4).map((v,i)=>clamp(v*this.commandScale[i],m.lower[i],m.upper[i]));
         // Shift primal warm start. Previous-input cost uses the ACTUAL last request,
         // never a reset-to-hover placeholder on every solve.
         const states=values.slice(0,m.state_count);
-        this.guess=[...states.slice(m.nx),...states.slice(-m.nx),...controls.slice(4),...controls.slice(-4)];
+        const shifted=shiftPrediction(states,m.nx,shift);
+        for(let k=0;k<=m.N;k++){
+          const offset=k*m.nx+6,q=shifted.slice(offset,offset+4),length=norm(q);
+          if(length>1e-8)q.forEach((v,i)=>shifted[offset+i]=v/length);
+        }
+        this.guess=[...shifted,...shiftPrediction(controls,4,shift)];
       }
       // Declared fallback: hold the last bounded command; no hidden PD/INDI for NMPC.
       return this.previous.slice();
@@ -259,14 +289,14 @@
       }
       if(x[17]<p.battery.minimum_soc) {failure='Battery minimum SOC reached';break;}
       if(nextTick%100===0) {
-        progress({t:nextTick*DT,total:cfg.seconds,v:x.slice(3,6),z:x[2],q:x.slice(6,10),solves:optimizer.stats.length});
+        progress({t:nextTick*DT,total:cfg.seconds,v:x.slice(3,6),z:x[2],q:x.slice(6,10),rpm:x.slice(13,17),solves:optimizer.stats.length});
         // Yield the worker event loop so Stop messages are serviced between solves.
         await new Promise(resolve=>setTimeout(resolve,0));
         if(shouldStop()) {failure='User stopped';break;}
       }
     }
     const timing=optimizer.stats.map(v=>v.ms);
-    return {configuration:cfg,profile_id:p.id,solver:'CasADi/IPOPT WebAssembly 3.8.0',
+    return {configuration:cfg,profile_id:p.id,implementation:data.provenance||null,solver:'CasADi/IPOPT WebAssembly 3.8.0',
       simulated_seconds:samples*DT,wall_seconds:(performance.now()-begin)/1000,failure,
       counts:{plant:samples,imu:imuSamples,nmpc:optimizer.stats.length,indi:indi?.samples||0,gps_captured:gpsSamples,
               gps_fused:estimator.updates,gps_replayed_imu:estimator.replayed},
@@ -284,7 +314,7 @@
                     'Outside-map samples use an explicit passive continuation; these are NOT validated propulsion performance results.']};
     } finally {b.dispose();}
   }
-  const api={run,makeBindings,boundedIncrement,Estimator,Optimizer,INDI,rotate,random,reference,environment};
+  const api={run,makeBindings,boundedIncrement,Estimator,Optimizer,INDI,rotate,random,reference,environment,shiftPrediction};
   if(typeof module!=='undefined'&&module.exports) module.exports=api;
   else root.ResearchRuntime=api;
 })(globalThis);

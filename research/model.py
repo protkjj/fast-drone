@@ -196,6 +196,20 @@ def build(p):
     full_rhs = mechanical(xm, dnm, tm, qm, environment[:3], ca.DM.zeros(3), p, ca.DM.ones(5))[0]
     full = ca.Function("full_prediction", [xm, cmd, environment[:3], bus_v], [full_rhs])
 
+    # A constraint-form motor predictor avoids differentiating a nested current
+    # clamp inside IPOPT. It is identical to the plant when requested current
+    # and winding voltage satisfy the actuator constraints checked by the NLP.
+    # The actual plant above ALWAYS retains its physical saturation model.
+    motor = p["motor"]
+    kt = 60/(2*np.pi*motor["kv_rpm_V"])
+    friction_m = kt*motor["i0_A"]*xm[13:17]/ca.sqrt(xm[13:17]**2+1)
+    free_dn = (cmd-xm[13:17])/motor["speed_loop_tau_s"]
+    requested_current = (qm+friction_m+motor["rotor_inertia_kg_m2"]*free_dn)/kt
+    required_voltage = kt*xm[13:17]+motor["resistance_ohm"]*requested_current
+    free_rhs = mechanical(xm,free_dn,tm,qm,environment[:3],ca.DM.zeros(3),p,ca.DM.ones(5))[0]
+    constrained = ca.Function("constraint_form_prediction", [xm,cmd,environment[:3],bus_v],
+                              [free_rhs,requested_current,required_voltage])
+
     xv, virtual = ca.SX.sym("virtual_state", 13), ca.SX.sym("virtual_command", 4)
     rv = rotation(xv[6:10])
     fv, _ = aero(rv.T @ (xv[3:6]-environment[:3]), xv[10:13], p)
@@ -211,7 +225,8 @@ def build(p):
     wrench = ca.vertcat(ca.sum1(ti), mi/ca.DM(p["inertia_kg_m2"]))
     effect = ca.Function("effectiveness", [pn, pa], [wrench, ca.jacobian(wrench, pn)])
     af = ca.Function("aerodynamics", [xv, environment[:3]], [fv])
-    return {"rhs": rhs, "step": step, "diag": diag, "full": full, "virtual": vf, "effect": effect, "aero": af}
+    return {"rhs": rhs, "step": step, "diag": diag, "full": full, "constrained": constrained,
+            "virtual": vf, "effect": effect, "aero": af}
 
 
 def initial_state(p, altitude=20):

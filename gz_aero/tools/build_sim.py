@@ -1749,6 +1749,7 @@ const TRAIL_DOT_EVERY = 3;   // 0.12 s 마다
 let ren, scene, cam, veh, arrow, velArrow, trail, trailDots,
     trailPos, trailDotPos, trailN = 0;
 const STL_URL = '../research/assets/drone_v2.stl';
+let lastRotorVisualTime = null;
 function syncVehiclePose(vehicle, state){
   // Mesh coordinates are metres relative to the selected CAD CG. Only the
   // display follows the plant; this function never writes a physical state.
@@ -1760,14 +1761,9 @@ async function loadVehicleSTL(){
     const response = await fetch(STL_URL);
     if (!response.ok) throw new Error('HTTP ' + response.status);
     const mesh = ResearchSTL.parse(await response.arrayBuffer());
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
-    geometry.computeVertexNormals();
-    const skin = new THREE.MeshStandardMaterial({color:0xb5c8d5,
-      roughness:.55, metalness:.22, side:THREE.DoubleSide});
-    const model = new THREE.Mesh(geometry, skin);
-    model.name = 'drone_v2.stl'; veh.add(model);
-    $('#stlStatus').textContent = 'drone_v2.stl · 표시 ×5 · 프로펠러 정적 메시';
+    const model = ResearchSTL.createVehicle(mesh, THREE);
+    veh.add(model); veh.userData.rotors = model.userData.rotors;
+    $('#stlStatus').textContent = 'STL ×5 · 로터 시각 감속·잔상 (물리 RPM 유지)';
     if (!running) paint(diag());
   } catch(error) {
     $('#stlStatus').textContent = 'STL 표시 실패 · 비행 계산은 별도 동작';
@@ -1797,8 +1793,8 @@ function init3D(){
   const g1 = new THREE.GridHelper(3000, 120, 0x35495d, 0x1c2733);
   g1.rotation.x = Math.PI/2; scene.add(g1);
 
-  // Use the supplied CAD, not an unrelated cylinder/cone approximation. It is
-  // one static mesh, so the baked-in propellers must not be rotated as a body.
+  // The supplied CAD's disconnected blades/hubs are grouped around their
+  // own four shaft axes; the body and motor housings remain stationary.
   // The legacy 8 kg plant stays explicit; appearance does not infer its inertia.
   veh = new THREE.Group();
   veh.scale.setScalar(5);
@@ -1933,6 +1929,10 @@ function render3D(d){
   if(!ren) return;
   const p = new THREE.Vector3(X[0], X[1], X[2]);
   syncVehiclePose(veh, X);
+  const visualNow=performance.now();
+  const visualDt=lastRotorVisualTime===null?0:(visualNow-lastRotorVisualTime)/1000;
+  lastRotorVisualTime=visualNow;
+  ResearchSTL.animateRotors(veh,X.slice(13,17),visualDt,running&&viewIdx===null,P.rotor_directions);
   syncTrail();
   const W = P.mass * P.g;
   const fv = new THREE.Vector3(d.Fw[0], d.Fw[1], d.Fw[2]);

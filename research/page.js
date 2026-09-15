@@ -2,10 +2,22 @@
 const $=id=>document.getElementById(id);
 const results={};
 let worker=null, vehicle=null, running=false, drawModel=()=>{};
+let rotorRates=[0,0,0,0],rotorFrame=null,lastRotorFrame=0;
+function animateModel(now){
+  rotorFrame=null;
+  if(!running)return;
+  if(vehicle&&vehicle.visible&&now-lastRotorFrame>=1000/30){
+    ResearchSTL.animateRotors(vehicle,rotorRates,(now-lastRotorFrame)/1000,true);
+    lastRotorFrame=now;drawModel();
+  }
+  rotorFrame=requestAnimationFrame(animateModel);
+}
 const colors={hybrid:'#59c8f5',nmpc:'#db9bff'};
 function setBusy(value) {
   running=value; $('run').disabled=value; $('stop').disabled=!value;
   document.querySelectorAll('.controls input,.controls select').forEach(el=>el.disabled=value);
+  if(value&&rotorFrame===null){lastRotorFrame=performance.now();rotorFrame=requestAnimationFrame(animateModel);}
+  if(!value&&vehicle){ResearchSTL.animateRotors(vehicle,rotorRates,0,false);drawModel();}
 }
 const number=value=>!Number.isFinite(value)?'—':value!==0&&Math.abs(value)<.001?value.toExponential(2):value.toLocaleString('ko-KR',{maximumFractionDigits:3});
 function showResults() {
@@ -64,11 +76,16 @@ $('run').addEventListener('click',()=>{
       const m=event.data;
       if(m.type==='status') $('status').textContent=m.text;
       if(m.type==='progress') {
+        if(m.rpm)rotorRates=m.rpm.slice();
         $('status').textContent=`${m.controller==='hybrid'?'Hybrid':'NMPC 단독'} · ${number(m.t)} / ${number(m.total)} s\n실제 vx ${number(m.v[0])} m/s · 고도 ${number(m.z)} m · NMPC ${m.solves}회`;
         $('progress').value=m.t/m.total;
         if(vehicle&&m.q) {vehicle.quaternion.set(...m.q);drawModel();}
       }
-      if(m.type==='result') {results[m.result.configuration.controller]=m.result;showResults();}
+      if(m.type==='result') {
+        results[m.result.configuration.controller]=m.result;showResults();
+        rotorRates=m.result.final.slice(13,17);
+        if(vehicle){vehicle.quaternion.set(...m.result.final.slice(6,10));drawModel();}
+      }
       if(m.type==='done') {
         setBusy(false);$('status').textContent=m.stopped?'중지됨. 완료된 계산 결과를 보존했습니다.':'계산 완료. 실패·포화·맵 적용 범위·실제 계산 시간을 함께 확인하세요.';
       }
@@ -87,7 +104,7 @@ $('download').addEventListener('click',()=>{
 $('profile').addEventListener('change',()=>{
   if(vehicle) vehicle.visible=$('profile').value==='selected';
   drawModel();
-  $('model-caption').textContent=$('profile').value==='selected'?'drone_v2.stl · 선정안 외형 · 무게중심 기준 · 마우스로 드래그':'단순 시험 모델 선택됨. 선정안 STL은 이 모델의 형상이 아니므로 숨겼습니다.';
+  $('model-caption').textContent=$('profile').value==='selected'?'drone_v2.stl · 로터 시각 감속·잔상 · 물리 RPM 유지':'단순 시험 모델 선택됨. 선정안 STL은 이 모델의 형상이 아니므로 숨겼습니다.';
 });
 async function previewSTL() {
   if(typeof THREE==='undefined') throw new Error('Three.js를 불러오지 못했습니다. 계산 기능은 계속 사용할 수 있습니다.');
@@ -98,8 +115,7 @@ async function previewSTL() {
   const lamp=new THREE.DirectionalLight(0xffffff,1.4);lamp.position.set(1,1,2);scene.add(lamp);
   const response=await fetch('./assets/drone_v2.stl');if(!response.ok)throw new Error('STL HTTP '+response.status);
   const mesh=ResearchSTL.parse(await response.arrayBuffer());
-  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(mesh.positions,3));geometry.computeVertexNormals();
-  vehicle=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0xb5c8d5,metalness:.22,roughness:.55,side:THREE.DoubleSide}));scene.add(vehicle);
+  vehicle=ResearchSTL.createVehicle(mesh,THREE);scene.add(vehicle);
   const axes=new THREE.AxesHelper(.16);scene.add(axes);
   let azimuth=-.9,elevation=.35,drag=null;
   host.addEventListener('pointerdown',event=>{drag=[event.clientX,event.clientY];host.setPointerCapture(event.pointerId);});
@@ -111,6 +127,6 @@ async function previewSTL() {
     renderer.render(scene,camera);
   };
   new ResizeObserver(drawModel).observe(host);
-  drawModel();$('model-caption').textContent=`drone_v2.stl · ${mesh.triangles.toLocaleString()} triangles · CG 기준 · 마우스로 드래그`;
+  drawModel();$('model-caption').textContent='drone_v2.stl · 4개 로터 · 시각 감속·잔상 (물리 RPM 유지)';
 }
 previewSTL().catch(error=>$('model-caption').textContent=error.message);

@@ -13,6 +13,12 @@ before(async()=>{
   b=runtime.makeBindings(ca,data);
 });
 after(()=>b?.dispose());
+test('20 ms warm-start shift interpolates the 50 ms grid without mutating the source',()=>{
+  const values=[0,10,50,60,100,110];
+  assert.deepEqual(runtime.shiftPrediction(values,2,.4),[20,30,70,80,100,110]);
+  assert.deepEqual(values,[0,10,50,60,100,110]);
+  assert.deepEqual(runtime.shiftPrediction([],160,.4),[]);
+});
 test('Python and WASM evaluate identical plant RHS and RK4 step',()=>{
   const p=data.parity;
   for(const key of ['rhs','step']) {
@@ -73,6 +79,13 @@ test('selected-aircraft WASM parity and both controllers survive a sequential ho
     assert.equal(result.failure,null);assert.equal(result.metrics.solver_failures,0);
     assert.equal(result.counts.nmpc,1);assert.ok(result.metrics.velocity_rmse_mps<1e-4);
   }
+});
+test('selected standalone NMPC solves the first speed-preview problem within 30 iterations',async()=>{
+  const selected=JSON.parse(fs.readFileSync(path.join(__dirname,'../generated/selected.json'),'utf8'));
+  const result=await runtime.run(ca,selected,{seconds:.02,scenario:'step',controller:'nmpc',feedback:'truth'});
+  assert.equal(result.metrics.solver_failures,0,JSON.stringify(result.solves));
+  assert.ok(result.solves[0].iterations<=30);assert.ok(result.solves[0].residual<1e-3);
+  assert.equal(result.counts.indi,0);
 });
 test('STL uses metres and the selected CG, with body +x pointing at the nose',()=>{
   const bytes=fs.readFileSync(path.join(__dirname,'../assets/drone_v2.stl'));

@@ -9,7 +9,7 @@
 <script src="./stl.js" defer></script><script src="./page.js" defer></script>
 </head><body><main>
 <header><div><a href="../">← 목록</a><h1>선정 기체 · 제어 연구실</h1><p class="sub">NMPC–INDI 인터페이스 분리와 동일 조건 baseline 비교</p></div><a href="../sim.html">기존 실시간 데모</a></header>
-<div class="notice"><strong>실험판 · 검증 진행 중</strong> — 실제 IPOPT를 사용하는 오프라인 계산 모드입니다. 50 Hz / 1 kHz는 시뮬레이션 시간의 주기이며, 실제 20 ms 마감 준수는 별도 지표입니다. 실측 기체 검증이나 Hybrid 우위가 입증된 상태는 아닙니다.<br><strong>알려진 문제:</strong> 선정 기체 NMPC 단독의 속도 변경 시험에서 반복적인 풀이 실패가 확인되어 수렴 개선 중입니다. 실패 시 이전 명령을 유지하므로, 현재 결과를 제어기 우열의 근거로 사용하지 마세요. 먼저 0.2초 호버 시험을 권장합니다.</div>
+<div class="notice"><strong>실험판 · 검증 진행 중</strong> — 실제 IPOPT를 사용하는 오프라인 계산 모드입니다. 50 Hz / 1 kHz는 시뮬레이션 시간의 주기이며, 실제 20 ms 마감 준수는 별도 지표입니다. 실측 기체 검증이나 Hybrid 우위가 입증된 상태는 아닙니다.<br><strong>현재 검증:</strong> 2초 명목 속도 변경 시험에서 NMPC 단독의 풀이 실패는 0/100회입니다. 다른 조건에는 일부 풀이 실패·추진 맵 밖 표본이 남아 있으며, 두 제어기 모두 실제 20 ms 마감을 넘었습니다. 실패·계산 시간·모델 적용 범위를 함께 확인하세요. <a href="https://github.com/protkjj/fast-drone/blob/bulnabi/research/VALIDATION.md">6개 시험 결과와 한계</a>. 먼저 짧은 호버 시험을 권장합니다.</div>
 <div class="layout">
 <section class="panel controls" aria-label="실험 설정"><h2>공통 시험 조건</h2>
 <label for="profile">기체 모델</label><select id="profile"><option value="selected">선정안 6931 · 1.712 kg</option><option value="simple">단순 검증 기체 · 2 kg</option></select>
@@ -32,9 +32,10 @@
 <li>기계적 플랜트는 17상태이며, 배터리 SOC 1개를 추가로 적분합니다. 전압 강하·전류 제한·모터 동손·로터 가속 에너지를 계산합니다. 목표 속도에서 실제 속도를 잘라 맞추지 않습니다.</li>
 <li>NMPC: IPOPT, N=20, 예측 간격 0.05초, 예측 범위 1초, 최대 30회 반복. 매 20 tick 재계산. INDI·플랜트·IMU: 매 1 ms tick. 화면 렌더링은 별도 스레드입니다.</li>
 <li>Hybrid는 총추력·각가속도만 최적화하고 INDI가 회전수 명령을 생성합니다. NMPC 단독은 4개 회전수 명령을 직접 최적화하며 INDI를 사용하지 않습니다. 풀이 실패 시 마지막 명령을 유지하고 실패 횟수를 공개합니다.</li>
+<li>NMPC 단독의 예측기는 전류·전압 한계를 RK4 내부 단계마다 명시적 부등식으로 검사합니다. 실제 플랜트의 전류·전압 포화는 그대로 유지합니다. 두 제어기의 웜스타트는 50 ms 예측 격자를 20 ms만큼 보간 이동합니다. 계단 입력의 미래 일정은 예측 구간에 제공하므로 1초 이전에도 선제 반응할 수 있습니다.</li>
 <li>센서 모드는 가속도·자이로·10 Hz GPS·가정한 RPM 텔레메트리를 사용합니다. GPS 20 ms 지연은 측정 시점으로 돌아가 보정한 후 IMU를 재적분합니다. 초기 위치·속도·자세 표준편차는 0.1 m / 0.05 m/s / 0.01 rad입니다. 가속도계를 무조건 중력 관측으로 재사용하지 않습니다.</li>
 <li>선정 기체의 로터 관성 1e−5 kg·m², 속도 루프 20 ms, 모터 전류 상한 40 A, 공력 감쇠 및 센서 특성은 별도 가정입니다. 모터 열·전기 인덕턴스·회생 제동은 미구현입니다.</li>
 <li>추진 맵 밖·역유입 영역에는 에너지를 생성하지 않는 연장 모델을 쓰고 비율을 기록합니다. 해당 구간이 포함된 결과로 실제 고속 성능을 단정하면 안 됩니다. 원본 사이징의 전진비 정의와 6DOF 축방향 유입 정의도 구분합니다. 현재 회전수 상한은 정지 팁 마하 기준이며, 전진 속도를 포함한 나선형 팁 마하 제약은 미구현입니다.</li>
-<li>STL: mm→m, CAD X=0 기수, CG=기수에서 428.251 mm. STL 외형은 질량 분포나 추진 계수를 자동 산출하지 않습니다. 로터가 합쳐진 정적 메시이므로 STL 프로펠러 회전 애니메이션은 없습니다.</li>
+<li>STL: mm→m, CAD X=0 기수, CG=기수에서 428.251 mm. 원본의 블레이드 8개·허브 4개를 네 축으로 분리해 표시합니다. 회전은 실행 중에만 보이며 화면 깜빡임을 피하기 위한 시각적 감속·잔상입니다. 실제 RPM·추력·토크·적분 상태는 바꾸지 않습니다. STL 외형은 질량 분포나 추진 계수를 자동 산출하지 않습니다.</li>
 </ul><p class="small">수식 원본: research/model.py · research/nmpc.py · research/eskf.py. <a href="https://web.casadi.org/get/">CasADi 공식 배포</a> · <a href="https://arxiv.org/html/1711.02508v1">Solà, ESKF 회전·오차 리셋</a></p></details>
 </main></body></html>

@@ -21,6 +21,12 @@ def bundle(name, include_solvers=True):
                "profile": p, "sensors": eskf.SENSORS, "initial": x0.tolist(),
                "functions": {k: v.serialize() for k,v in functions.items()},
                "estimator": {k: v.serialize() for k,v in estimators.items()}, "solvers": {}}
+    # Both profiles read selected.json; model.profile() applies the explicit
+    # simple-model overrides. Hash those two sources, not a nonexistent file.
+    sources={file:hashlib.sha256((Path(__file__).parent/file).read_bytes()).hexdigest()
+             for file in ("model.py","nmpc.py","eskf.py","runtime.js","profiles/selected.json")}
+    payload["provenance"]={"source_sha256":sources,
+        "input_sha256":hashlib.sha256(json.dumps(sources,sort_keys=True).encode()).hexdigest()}
     if include_solvers:
         for kind in ("hybrid", "nmpc"):
             begin = time.perf_counter()
