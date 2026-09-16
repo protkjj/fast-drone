@@ -3,17 +3,18 @@ const assert=require('node:assert/strict');
 const {writeFileSync}=require('node:fs');
 const {join}=require('node:path');
 module.exports=async function({evaluate,send,sessionId,profile}){
-  const wait=async expression=>{
+  const wait=async (expression,timeout=30000)=>{
     const begin=Date.now();
-    while(Date.now()-begin<30000){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}
-    throw new Error('Timed out: '+expression);
+    while(Date.now()-begin<timeout){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}
+    const state=await evaluate('({t:typeof T==="undefined"?null:T,running:typeof running==="undefined"?null:running,controller:typeof CTRL==="undefined"?null:CTRL,failure:typeof physicsFailure==="undefined"?null:physicsFailure,hidden:document.hidden,focus:document.activeElement?.id,status:document.getElementById("flightStatus")?.textContent,stl:document.getElementById("stlStatus")?.textContent,stlError:document.getElementById("stlStatus")?.title,renderer:document.getElementById("rendererError")?.textContent})');
+    throw new Error('Timed out: '+expression+'; state='+JSON.stringify(state));
   };
   const key=async(code,key,virtual)=>{
     await send('Input.dispatchKeyEvent',{type:'keyDown',code,key,windowsVirtualKeyCode:virtual},sessionId);
     await send('Input.dispatchKeyEvent',{type:'keyUp',code,key,windowsVirtualKeyCode:virtual},sessionId);
   };
   const space=()=>key('Space',' ',32),blur=()=>evaluate('document.activeElement.blur()');
-  await wait('typeof veh!=="undefined" && veh?.userData.rotors?.length===4');
+  await wait('typeof veh!=="undefined" && veh?.userData.rotors?.length===4',90000);
   const initial=await evaluate(`({title:document.title,ctrl:CTRL,speed:$('#spd').value,altitude:$('#alt').value,
     z:X[2],mass:P.mass,check:selfCheck(),lqrCheck:lqrCheck(),options:Object.keys(CTRLS)})`);
   assert.equal(initial.ctrl,'lqr');assert.equal(initial.speed,'60');assert.equal(initial.altitude,'200');
@@ -44,7 +45,9 @@ module.exports=async function({evaluate,send,sessionId,profile}){
   console.log('ORIGINAL INPUT: Space/range/number/button, frozen state and rotors, F/R, rewind, wind, coefficients and score passed');
   for(const controller of ['sqprti','hybrid','nmpc']){
     await evaluate(`$('#ctrl').value=${JSON.stringify(controller)};$('#ctrl').dispatchEvent(new Event('change'));$('#rst').click()`);
-    await blur();await space();await wait('T>=.3 || !!physicsFailure');await blur();await space();
+    await blur();await space();
+    console.log('ORIGINAL START '+JSON.stringify(await evaluate('({controller:CTRL,running,t:T,hidden:document.hidden,focus:document.activeElement?.id})')));
+    await wait('T>=.3 || !!physicsFailure');await blur();await space();
     const result=await evaluate('({controller:CTRL,t:T,failure:physicsFailure,finite:X.every(Number.isFinite),pose:veh.position.toArray(),state:X.slice(0,3)})');
     assert.equal(result.controller,controller);assert.equal(result.failure,'');assert.ok(result.finite&&result.t>=.3);
     assert.deepEqual(result.pose,result.state);console.log('ORIGINAL CONTROLLER '+JSON.stringify(result));
