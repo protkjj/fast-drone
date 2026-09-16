@@ -137,7 +137,7 @@ $('run').addEventListener('click',()=>{
   const mismatch=mismatches[$('mismatch').value]||customScales;
   let options;
   const altitude=Number($('altitude').value),scenario=mode==='observe'?'schedule':$('scenario').value;
-  const commands=mode==='observe'&&$('scenario').value!=='schedule'?[{t:0,speed,altitude}]:recordedCommands;
+  const commands=mode==='observe'&&$('scenario').value!=='schedule'?[{t:0,speed,altitude}]:recordedCommands?.filter(command=>command.t<=seconds);
   try{options=ResearchRuntime.validateOptions({seconds,speed,seed,controller:mode==='observe'?'pd':'hybrid',feedback:$('feedback').value,scenario,commands,
     scales:mismatch,altitude,preview:mode==='observe'?false:$('preview').value==='true',log_hz:Number($('log-hz').value)});}
   catch(error){$('errors').textContent=error.message;$('settings').open=true;return;}
@@ -288,9 +288,12 @@ function scenarioNote(adjust=true){
   $('scenario-note').textContent={hover:'호버: 짧은 실행 경로 확인용. 긴 과도응답 검증과는 다릅니다.',
     step:'1초에 목표 속도 변경 · 최소 1.1초. 정착 성능 평가는 더 긴 기록이 필요합니다.',
     gust:'2–3초 측풍·모멘트 외란 · 최소 3.1초. 외란 이후 복귀까지 보려면 기간을 늘리세요.',
-    schedule:`관찰에서 기록한 목표 ${recordedCommands?.length||0}개를 같은 시뮬레이션 시각에 적용합니다.`}[scenario];
+    schedule:`선택한 앞 ${number(Number($('seconds').value))}초 구간의 목표 ${recordedCommands?.filter(c=>c.t<=Number($('seconds').value)).length||0}개를 원래 시각에 적용합니다. 원본 기록은 보존됩니다.`}[scenario];
+  const solves=Math.ceil(Number($('seconds').value)/.02);
+  $('scenario-note').textContent+=` 제어기마다 IPOPT 약 ${number(solves)}회. 긴 관찰 기록은 먼저 0.2–2초 구간으로 계산하세요(속도 계단 시험은 1.1초 이상).`;
 }
 $('scenario').addEventListener('change',()=>scenarioNote());
+$('seconds').addEventListener('input',()=>scenarioNote(false));
 $('profile').addEventListener('change',()=>{
   updateAircraftLabel();
   if(replayResult())return; // Editing future settings must not relabel a past log.

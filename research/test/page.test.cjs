@@ -67,4 +67,8 @@ test('observed command schedule transfers to precise comparison without overwrit
   e.get('run').click();const options=messages.at(-1).options;
   assert.equal(messages.at(-1).mode,'compare');assert.deepEqual(options.commands,cfg.commands);
   assert.equal(JSON.stringify(context.report),before);
+  // Choosing a shorter prefix trims only the NEW experiment, never the log.
+  evaluate('setBusy(false)');e.get('seconds').value='0.02';e.get('run').click();
+  assert.equal(messages.at(-1).options.commands.length,1);
+  assert.equal(JSON.stringify(context.report),before);
 });
