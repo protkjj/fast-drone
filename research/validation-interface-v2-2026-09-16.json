@@ -1,0 +1,1739 @@
+{
+  "schema_version": 2,
+  "source_commit": "23163bd59fd9ebc1a4791c317d88a39dc25a680b",
+  "started_at": "2026-09-15T13:41:55.610Z",
+  "finished_at": "2026-09-16T00:26:56.079Z",
+  "raw_log_sha256": "b8f656af7b4e32471b7dbb10d9540928f01ff4ed990261a2d58b953780007ec3",
+  "reports": [
+    {
+      "case_id": "nominal-truth",
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "truth",
+        "scenario": "step",
+        "seconds": 2,
+        "speed": 3,
+        "altitude": 20,
+        "seed": 42,
+        "preview": true,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "implementation": {
+        "source_sha256": {
+          "model.py": "33650a0f70dd3cf4753a0a6a51df07fe0471569c5c87ec85974395f532f83f07",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "630fe8632d75a5acfb79d02ced9e2d069808855ed2e03033eb890ffe078caa1a",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+          "../control/dynamics.py": "af37d3e0e0e0e07e1a88fdf5ae6c8648446a4ab0b7509b7c215f9e6ba0ae5944"
+        },
+        "input_sha256": "0a9efc5dc2bfb6a49723e0ce81023d4489bc9b045346be5c4530265637254efa"
+      },
+      "status": "completed",
+      "failure": null,
+      "simulated_seconds": 2,
+      "wall_seconds": 34.49635279100001,
+      "counts": {
+        "plant": 2000,
+        "imu": 2000,
+        "nmpc": 100,
+        "indi": 2000,
+        "gps_captured": 20,
+        "gps_fused": 19,
+        "gps_replayed_imu": 380
+      },
+      "event_coverage": {
+        "speed_step": true,
+        "gust_started": false,
+        "gust_completed": false
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.42997096991245876,
+        "altitude_rmse_m": 0.02140104340059932,
+        "position_estimation_rmse_m": 0.07453070070593355,
+        "electrical_energy_J": 996.5491685177672,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0,
+        "max_body_rate_rad_s": 1.8864957312495778,
+        "current_limited_fraction": 0.041,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.1845,
+        "coasting_fraction": 0.1435,
+        "allocation_limited_fraction": 0,
+        "allocation_thrust_residual_max_N": 2.2504208629925415e-7,
+        "allocation_alpha_residual_max_rad_s2": 8.590755058435207e-7,
+        "motor_energy_residual_W": 6.821210263296962e-13,
+        "bus_residual_V": 5.995204332975845e-15,
+        "solver_failures": 1,
+        "solve_ms_p50": 220.11766599999828,
+        "solve_ms_p95": 268.6684170000008,
+        "solve_ms_max": 1439.1210829999982,
+        "deadline_misses_20ms": 100
+      },
+      "final": [
+        3.0272816566131,
+        0,
+        19.999380671035752,
+        3.036575366315689,
+        0,
+        0.0014799612376085749,
+        0,
+        -0.7067418344919429,
+        0,
+        0.7074715396247139,
+        0,
+        0.03566309806207251,
+        0,
+        1505.2928609869039,
+        1505.2928609869039,
+        1522.515800301696,
+        1522.515800301696,
+        0.997336881874475
+      ],
+      "failed_solves": [
+        {
+          "ms": 1439.1210829999982,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 5.113861021926666e-12,
+          "t_s": 1.24
+        }
+      ],
+      "timing_outliers_over_60s": [],
+      "trace_checks": {
+        "first_t_s": 0,
+        "last_t_s": 2,
+        "rows": 101,
+        "finite_states": true,
+        "max_quaternion_norm_error": 2.220446049250313e-16,
+        "synchronized_sensor_times": true
+      }
+    },
+    {
+      "case_id": "nominal-truth",
+      "configuration": {
+        "controller": "nmpc",
+        "feedback": "truth",
+        "scenario": "step",
+        "seconds": 2,
+        "speed": 3,
+        "altitude": 20,
+        "seed": 42,
+        "preview": true,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "implementation": {
+        "source_sha256": {
+          "model.py": "33650a0f70dd3cf4753a0a6a51df07fe0471569c5c87ec85974395f532f83f07",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "630fe8632d75a5acfb79d02ced9e2d069808855ed2e03033eb890ffe078caa1a",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+          "../control/dynamics.py": "af37d3e0e0e0e07e1a88fdf5ae6c8648446a4ab0b7509b7c215f9e6ba0ae5944"
+        },
+        "input_sha256": "0a9efc5dc2bfb6a49723e0ce81023d4489bc9b045346be5c4530265637254efa"
+      },
+      "status": "completed",
+      "failure": null,
+      "simulated_seconds": 2,
+      "wall_seconds": 330.184902,
+      "counts": {
+        "plant": 2000,
+        "imu": 2000,
+        "nmpc": 100,
+        "indi": 0,
+        "gps_captured": 20,
+        "gps_fused": 19,
+        "gps_replayed_imu": 380
+      },
+      "event_coverage": {
+        "speed_step": true,
+        "gust_started": false,
+        "gust_completed": false
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.4541400360254728,
+        "altitude_rmse_m": 0.012171256423349803,
+        "position_estimation_rmse_m": 0.07430002296474807,
+        "electrical_energy_J": 946.008523442722,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0,
+        "max_body_rate_rad_s": 1.221922181721878,
+        "current_limited_fraction": 0.0005,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.0045,
+        "coasting_fraction": 0.004,
+        "allocation_limited_fraction": null,
+        "allocation_thrust_residual_max_N": null,
+        "allocation_alpha_residual_max_rad_s2": null,
+        "motor_energy_residual_W": 3.410605131648481e-13,
+        "bus_residual_V": 5.800915303666443e-15,
+        "solver_failures": 0,
+        "solve_ms_p50": 3069.243625000003,
+        "solve_ms_p95": 5385.821915999986,
+        "solve_ms_max": 9022.603041999988,
+        "deadline_misses_20ms": 100
+      },
+      "final": [
+        2.999265364259746,
+        -1.3791496006293472e-17,
+        20.000625272971945,
+        3.052450080458663,
+        -5.795569954739838e-18,
+        -0.0013900669120055689,
+        1.234809389600092e-17,
+        -0.7084067425717213,
+        1.739490727298183e-17,
+        0.7058044255166745,
+        -3.4053398085903014e-16,
+        0.028967567701346952,
+        -6.0710663461358245e-18,
+        1505.5686890808165,
+        1505.5686890808165,
+        1518.8230144616223,
+        1518.8230144616225,
+        0.9974879500512571
+      ],
+      "failed_solves": [],
+      "timing_outliers_over_60s": [],
+      "trace_checks": {
+        "first_t_s": 0,
+        "last_t_s": 2,
+        "rows": 101,
+        "finite_states": true,
+        "max_quaternion_norm_error": 2.220446049250313e-16,
+        "synchronized_sensor_times": true
+      }
+    },
+    {
+      "case_id": "nominal-eskf",
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "eskf",
+        "scenario": "step",
+        "seconds": 2,
+        "speed": 3,
+        "altitude": 20,
+        "seed": 42,
+        "preview": true,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "implementation": {
+        "source_sha256": {
+          "model.py": "33650a0f70dd3cf4753a0a6a51df07fe0471569c5c87ec85974395f532f83f07",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "630fe8632d75a5acfb79d02ced9e2d069808855ed2e03033eb890ffe078caa1a",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+          "../control/dynamics.py": "af37d3e0e0e0e07e1a88fdf5ae6c8648446a4ab0b7509b7c215f9e6ba0ae5944"
+        },
+        "input_sha256": "0a9efc5dc2bfb6a49723e0ce81023d4489bc9b045346be5c4530265637254efa"
+      },
+      "status": "completed",
+      "failure": null,
+      "simulated_seconds": 2,
+      "wall_seconds": 35.21773558400001,
+      "counts": {
+        "plant": 2000,
+        "imu": 2000,
+        "nmpc": 100,
+        "indi": 2000,
+        "gps_captured": 20,
+        "gps_fused": 19,
+        "gps_replayed_imu": 380
+      },
+      "event_coverage": {
+        "speed_step": true,
+        "gust_started": false,
+        "gust_completed": false
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.4326679160868279,
+        "altitude_rmse_m": 0.04013300716862317,
+        "position_estimation_rmse_m": 0.07483912229778147,
+        "electrical_energy_J": 1115.6069117909888,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0,
+        "max_body_rate_rad_s": 1.8029986194322674,
+        "current_limited_fraction": 0.096,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.957,
+        "coasting_fraction": 0.901,
+        "allocation_limited_fraction": 0,
+        "allocation_thrust_residual_max_N": 2.0116409871206997e-7,
+        "allocation_alpha_residual_max_rad_s2": 0.000009991945912160514,
+        "motor_energy_residual_W": 6.821210263296962e-13,
+        "bus_residual_V": 5.995204332975845e-15,
+        "solver_failures": 0,
+        "solve_ms_p50": 224.4718340000254,
+        "solve_ms_p95": 345.4426660000463,
+        "solve_ms_max": 479.2430830000085,
+        "deadline_misses_20ms": 100
+      },
+      "final": [
+        3.0507341691924488,
+        -0.018661385648208073,
+        20.08533995257675,
+        3.0616864561809485,
+        -0.013334111098324546,
+        0.06987060423509205,
+        0.004453187299908276,
+        -0.7123859661974123,
+        0.006787156925898608,
+        0.701740934240489,
+        -0.0017486837585791414,
+        -0.06369754533374071,
+        0.05788548313233936,
+        1466.2297154456771,
+        1484.7503111664073,
+        1512.1890486440109,
+        1503.85480352621,
+        0.9970358161794091
+      ],
+      "failed_solves": [],
+      "timing_outliers_over_60s": [],
+      "trace_checks": {
+        "first_t_s": 0,
+        "last_t_s": 2,
+        "rows": 101,
+        "finite_states": true,
+        "max_quaternion_norm_error": 2.220446049250313e-16,
+        "synchronized_sensor_times": true
+      }
+    },
+    {
+      "case_id": "nominal-eskf",
+      "configuration": {
+        "controller": "nmpc",
+        "feedback": "eskf",
+        "scenario": "step",
+        "seconds": 2,
+        "speed": 3,
+        "altitude": 20,
+        "seed": 42,
+        "preview": true,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "implementation": {
+        "source_sha256": {
+          "model.py": "33650a0f70dd3cf4753a0a6a51df07fe0471569c5c87ec85974395f532f83f07",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "630fe8632d75a5acfb79d02ced9e2d069808855ed2e03033eb890ffe078caa1a",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+          "../control/dynamics.py": "af37d3e0e0e0e07e1a88fdf5ae6c8648446a4ab0b7509b7c215f9e6ba0ae5944"
+        },
+        "input_sha256": "0a9efc5dc2bfb6a49723e0ce81023d4489bc9b045346be5c4530265637254efa"
+      },
+      "status": "completed",
+      "failure": null,
+      "simulated_seconds": 2,
+      "wall_seconds": 3146.5813679589996,
+      "counts": {
+        "plant": 2000,
+        "imu": 2000,
+        "nmpc": 100,
+        "indi": 0,
+        "gps_captured": 20,
+        "gps_fused": 19,
+        "gps_replayed_imu": 380
+      },
+      "event_coverage": {
+        "speed_step": true,
+        "gust_started": false,
+        "gust_completed": false
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.4544575587060785,
+        "altitude_rmse_m": 0.03730900580511447,
+        "position_estimation_rmse_m": 0.07449343280103014,
+        "electrical_energy_J": 954.1018100059886,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0,
+        "max_body_rate_rad_s": 1.3132210502505879,
+        "current_limited_fraction": 0.0005,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.006,
+        "coasting_fraction": 0.0055,
+        "allocation_limited_fraction": null,
+        "allocation_thrust_residual_max_N": null,
+        "allocation_alpha_residual_max_rad_s2": null,
+        "motor_energy_residual_W": 2.8421709430404007e-13,
+        "bus_residual_V": 6.217248937900877e-15,
+        "solver_failures": 3,
+        "solve_ms_p50": 3483.6069579999894,
+        "solve_ms_p95": 9837.714625000022,
+        "solve_ms_max": 1003748.1931249999,
+        "deadline_misses_20ms": 100
+      },
+      "final": [
+        3.0320239208377386,
+        -0.013073358998801023,
+        20.080934211231558,
+        3.078890610956418,
+        -0.011300089707333595,
+        0.06550473363325991,
+        -0.005321631653218762,
+        -0.7138159975812255,
+        -0.00109838871632865,
+        0.7003122127850515,
+        -0.0030433644240788816,
+        -0.10513694481820948,
+        0.02665371684904943,
+        1491.5476496823364,
+        1495.8367354909658,
+        1503.6292834052424,
+        1500.5104441349454,
+        0.997465689571927
+      ],
+      "failed_solves": [
+        {
+          "ms": 9727.548625000054,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 3.989075066044583e-7,
+          "t_s": 0.74
+        },
+        {
+          "ms": 9882.991249999963,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 1.0038432897973573e-7,
+          "t_s": 1.32
+        },
+        {
+          "ms": 9837.714625000022,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 1.031953342917058e-8,
+          "t_s": 1.72
+        }
+      ],
+      "timing_outliers_over_60s": [
+        {
+          "ms": 1003748.1931249999,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 9,
+          "residual": 1.327749412412954e-8,
+          "t_s": 1.82
+        },
+        {
+          "ms": 981629.9610419997,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 8,
+          "residual": 3.908620014634283e-8,
+          "t_s": 1.86
+        },
+        {
+          "ms": 777847.4795840001,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 8,
+          "residual": 4.033386836460861e-8,
+          "t_s": 1.9000000000000001
+        }
+      ],
+      "trace_checks": {
+        "first_t_s": 0,
+        "last_t_s": 2,
+        "rows": 101,
+        "finite_states": true,
+        "max_quaternion_norm_error": 2.220446049250313e-16,
+        "synchronized_sensor_times": true
+      }
+    },
+    {
+      "case_id": "combined-truth",
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "truth",
+        "scenario": "step",
+        "seconds": 2,
+        "speed": 3,
+        "altitude": 20,
+        "seed": 42,
+        "preview": true,
+        "log_hz": 50,
+        "scales": [
+          1.1,
+          1.15,
+          1.15,
+          1.15,
+          0.9
+        ]
+      },
+      "implementation": {
+        "source_sha256": {
+          "model.py": "33650a0f70dd3cf4753a0a6a51df07fe0471569c5c87ec85974395f532f83f07",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "630fe8632d75a5acfb79d02ced9e2d069808855ed2e03033eb890ffe078caa1a",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+          "../control/dynamics.py": "af37d3e0e0e0e07e1a88fdf5ae6c8648446a4ab0b7509b7c215f9e6ba0ae5944"
+        },
+        "input_sha256": "0a9efc5dc2bfb6a49723e0ce81023d4489bc9b045346be5c4530265637254efa"
+      },
+      "status": "completed",
+      "failure": null,
+      "simulated_seconds": 2,
+      "wall_seconds": 1920.0896802500001,
+      "counts": {
+        "plant": 2000,
+        "imu": 2000,
+        "nmpc": 100,
+        "indi": 2000,
+        "gps_captured": 20,
+        "gps_fused": 19,
+        "gps_replayed_imu": 380
+      },
+      "event_coverage": {
+        "speed_step": true,
+        "gust_started": false,
+        "gust_completed": false
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.43927961116017794,
+        "altitude_rmse_m": 0.06858292125929369,
+        "position_estimation_rmse_m": 0.07426363385164561,
+        "electrical_energy_J": 1186.2619989203788,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0.042,
+        "max_body_rate_rad_s": 1.8941136801884881,
+        "current_limited_fraction": 0.04,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.1525,
+        "coasting_fraction": 0.1125,
+        "allocation_limited_fraction": 0,
+        "allocation_thrust_residual_max_N": 2.5064016284659374e-7,
+        "allocation_alpha_residual_max_rad_s2": 8.310224650642795e-7,
+        "motor_energy_residual_W": 6.821210263296962e-13,
+        "bus_residual_V": 5.9396931817445875e-15,
+        "solver_failures": 1,
+        "solve_ms_p50": 226.02716600010172,
+        "solve_ms_p95": 375.0917499996722,
+        "solve_ms_max": 944281.0660000001,
+        "deadline_misses_20ms": 100
+      },
+      "final": [
+        3.004320046873562,
+        0,
+        19.930196212465784,
+        3.0474603059866454,
+        0,
+        0.009830165355173465,
+        0,
+        -0.7071867405882992,
+        0,
+        0.7070268127419905,
+        0,
+        0.03006188493014992,
+        0,
+        1663.506180032799,
+        1663.506180032799,
+        1679.915916134211,
+        1679.915916134211,
+        0.9968251654062933
+      ],
+      "failed_solves": [
+        {
+          "ms": 1464.2821249999106,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 7.105427357601002e-15,
+          "t_s": 0.6
+        }
+      ],
+      "timing_outliers_over_60s": [
+        {
+          "ms": 944281.0660000001,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 5,
+          "residual": 7.105427357601002e-15,
+          "t_s": 1.68
+        },
+        {
+          "ms": 939177.0133750001,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 5,
+          "residual": 7.105427357601002e-15,
+          "t_s": 1.94
+        }
+      ],
+      "trace_checks": {
+        "first_t_s": 0,
+        "last_t_s": 2,
+        "rows": 101,
+        "finite_states": true,
+        "max_quaternion_norm_error": 2.220446049250313e-16,
+        "synchronized_sensor_times": true
+      }
+    },
+    {
+      "case_id": "combined-truth",
+      "configuration": {
+        "controller": "nmpc",
+        "feedback": "truth",
+        "scenario": "step",
+        "seconds": 2,
+        "speed": 3,
+        "altitude": 20,
+        "seed": 42,
+        "preview": true,
+        "log_hz": 50,
+        "scales": [
+          1.1,
+          1.15,
+          1.15,
+          1.15,
+          0.9
+        ]
+      },
+      "implementation": {
+        "source_sha256": {
+          "model.py": "33650a0f70dd3cf4753a0a6a51df07fe0471569c5c87ec85974395f532f83f07",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "630fe8632d75a5acfb79d02ced9e2d069808855ed2e03033eb890ffe078caa1a",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+          "../control/dynamics.py": "af37d3e0e0e0e07e1a88fdf5ae6c8648446a4ab0b7509b7c215f9e6ba0ae5944"
+        },
+        "input_sha256": "0a9efc5dc2bfb6a49723e0ce81023d4489bc9b045346be5c4530265637254efa"
+      },
+      "status": "completed",
+      "failure": null,
+      "simulated_seconds": 2,
+      "wall_seconds": 24038.505383166,
+      "counts": {
+        "plant": 2000,
+        "imu": 2000,
+        "nmpc": 100,
+        "indi": 0,
+        "gps_captured": 20,
+        "gps_fused": 19,
+        "gps_replayed_imu": 380
+      },
+      "event_coverage": {
+        "speed_step": true,
+        "gust_started": false,
+        "gust_completed": false
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.4637339100243309,
+        "altitude_rmse_m": 0.09262628247143863,
+        "position_estimation_rmse_m": 0.07372016941444726,
+        "electrical_energy_J": 1138.6349849723945,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0.1235,
+        "max_body_rate_rad_s": 1.1943180569574525,
+        "current_limited_fraction": 0,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.0065,
+        "coasting_fraction": 0.0065,
+        "allocation_limited_fraction": null,
+        "allocation_thrust_residual_max_N": null,
+        "allocation_alpha_residual_max_rad_s2": null,
+        "motor_energy_residual_W": 4.547473508864641e-13,
+        "bus_residual_V": 6.050715484207103e-15,
+        "solver_failures": 0,
+        "solve_ms_p50": 3386.9172920025885,
+        "solve_ms_p95": 1024757.9955839999,
+        "solve_ms_max": 2007804.0557080004,
+        "deadline_misses_20ms": 100
+      },
+      "final": [
+        2.983234126373986,
+        -1.3288317970007557e-17,
+        19.90369207304513,
+        3.034980530616208,
+        5.20834134048742e-17,
+        0.03034178114930876,
+        -7.43501380791853e-18,
+        -0.7086724779950229,
+        6.2602710937489326e-18,
+        0.7055376098638498,
+        -3.4841256670271975e-17,
+        0.06963869565033487,
+        -2.0180496652284878e-16,
+        1661.148899931031,
+        1661.1488999310313,
+        1677.622718167613,
+        1677.6227181676131,
+        0.9969716048212401
+      ],
+      "failed_solves": [],
+      "timing_outliers_over_60s": [
+        {
+          "ms": 1061772.0505,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 17,
+          "residual": 3.989982123136297e-7,
+          "t_s": 0
+        },
+        {
+          "ms": 951203.4045000002,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 12,
+          "residual": 3.9936841118447114e-7,
+          "t_s": 0.02
+        },
+        {
+          "ms": 536277.0306249997,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 10,
+          "residual": 3.9932538068841394e-7,
+          "t_s": 0.04
+        },
+        {
+          "ms": 984958.3517919993,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 11,
+          "residual": 3.7127934174675745e-7,
+          "t_s": 0.24
+        },
+        {
+          "ms": 1028260.4383339994,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 10,
+          "residual": 3.8128085609624805e-7,
+          "t_s": 0.28
+        },
+        {
+          "ms": 1024757.9955839999,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 8,
+          "residual": 3.68398194141117e-7,
+          "t_s": 0.3
+        },
+        {
+          "ms": 572987.449000001,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 6,
+          "residual": 3.9220496548371287e-7,
+          "t_s": 0.34
+        },
+        {
+          "ms": 904160.2192499992,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 12,
+          "residual": 3.9884204744886283e-7,
+          "t_s": 0.64
+        },
+        {
+          "ms": 1041623.6723329984,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 11,
+          "residual": 3.9439041873702683e-7,
+          "t_s": 0.66
+        },
+        {
+          "ms": 1010307.1950000003,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 7,
+          "residual": 0.000004679332278101356,
+          "t_s": 0.7000000000000001
+        },
+        {
+          "ms": 654311.1153330002,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 7,
+          "residual": 3.8021888599794836e-7,
+          "t_s": 0.74
+        },
+        {
+          "ms": 911578.34375,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 13,
+          "residual": 3.988514748807146e-7,
+          "t_s": 1.04
+        },
+        {
+          "ms": 2007804.0557080004,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 18,
+          "residual": 3.985325840053171e-7,
+          "t_s": 1.08
+        },
+        {
+          "ms": 998042.3238749988,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 15,
+          "residual": 3.9829736194764974e-7,
+          "t_s": 1.1
+        },
+        {
+          "ms": 909527.3156250007,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 14,
+          "residual": 3.9795462165711844e-7,
+          "t_s": 1.12
+        },
+        {
+          "ms": 1073142.109166,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 15,
+          "residual": 3.9754158319922535e-7,
+          "t_s": 1.1400000000000001
+        },
+        {
+          "ms": 611557.1659590006,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 14,
+          "residual": 3.962335493526106e-7,
+          "t_s": 1.18
+        },
+        {
+          "ms": 946025.5582089983,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 5,
+          "residual": 2.814317339103879e-7,
+          "t_s": 1.48
+        },
+        {
+          "ms": 904905.6782920025,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 9,
+          "residual": 3.864117121185845e-7,
+          "t_s": 1.56
+        },
+        {
+          "ms": 993232.8752079979,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 10,
+          "residual": 1.2163156496513827e-7,
+          "t_s": 1.6
+        },
+        {
+          "ms": 929238.698125001,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 10,
+          "residual": 1.2248065887081986e-7,
+          "t_s": 1.62
+        },
+        {
+          "ms": 979264.0090829991,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 10,
+          "residual": 1.303390440377665e-7,
+          "t_s": 1.6600000000000001
+        },
+        {
+          "ms": 945282.895583,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 10,
+          "residual": 1.50757337716126e-7,
+          "t_s": 1.68
+        },
+        {
+          "ms": 767562.623790998,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 9,
+          "residual": 3.8728319941532373e-7,
+          "t_s": 1.7
+        }
+      ],
+      "trace_checks": {
+        "first_t_s": 0,
+        "last_t_s": 2,
+        "rows": 101,
+        "finite_states": true,
+        "max_quaternion_norm_error": 2.220446049250313e-16,
+        "synchronized_sensor_times": true
+      }
+    },
+    {
+      "case_id": "gust-eskf-7",
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "eskf",
+        "scenario": "gust",
+        "seconds": 3.2,
+        "speed": 3,
+        "altitude": 20,
+        "seed": 7,
+        "preview": true,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "implementation": {
+        "source_sha256": {
+          "model.py": "33650a0f70dd3cf4753a0a6a51df07fe0471569c5c87ec85974395f532f83f07",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "630fe8632d75a5acfb79d02ced9e2d069808855ed2e03033eb890ffe078caa1a",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+          "../control/dynamics.py": "af37d3e0e0e0e07e1a88fdf5ae6c8648446a4ab0b7509b7c215f9e6ba0ae5944"
+        },
+        "input_sha256": "0a9efc5dc2bfb6a49723e0ce81023d4489bc9b045346be5c4530265637254efa"
+      },
+      "status": "completed",
+      "failure": null,
+      "simulated_seconds": 3.2,
+      "wall_seconds": 6338.849060167004,
+      "counts": {
+        "plant": 3200,
+        "imu": 3200,
+        "nmpc": 160,
+        "indi": 3200,
+        "gps_captured": 32,
+        "gps_fused": 31,
+        "gps_replayed_imu": 620
+      },
+      "event_coverage": {
+        "speed_step": true,
+        "gust_started": true,
+        "gust_completed": true
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.3761532240450387,
+        "altitude_rmse_m": 0.06042513193441435,
+        "position_estimation_rmse_m": 0.13978203982104168,
+        "electrical_energy_J": 1769.9209534256472,
+        "saturation_fraction": 0.015,
+        "outside_prop_map_fraction": 0.1171875,
+        "max_body_rate_rad_s": 2.0075187510427983,
+        "current_limited_fraction": 0.075625,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.895,
+        "coasting_fraction": 0.8496875,
+        "allocation_limited_fraction": 0.015,
+        "allocation_thrust_residual_max_N": 2.1609346134709995e-7,
+        "allocation_alpha_residual_max_rad_s2": 2.9933043009204603,
+        "motor_energy_residual_W": 6.821210263296962e-13,
+        "bus_residual_V": 5.995204332975845e-15,
+        "solver_failures": 0,
+        "solve_ms_p50": 226.6340840011835,
+        "solve_ms_p95": 289.3147909939289,
+        "solve_ms_max": 983408.6211670004,
+        "deadline_misses_20ms": 160
+      },
+      "final": [
+        6.607145317401976,
+        0.1966502913753602,
+        19.93743190400181,
+        2.866427657713973,
+        0.0829229376602779,
+        0.37220284090872663,
+        0.012737131862964352,
+        -0.7048357692241376,
+        -0.008275759890421149,
+        0.7092078790399611,
+        -0.00811736907394502,
+        -0.12359510624607667,
+        -0.027724124700923013,
+        1611.365554098373,
+        1624.0710704407977,
+        1621.5747250521172,
+        1671.4134514459108,
+        0.995303520623731
+      ],
+      "failed_solves": [],
+      "timing_outliers_over_60s": [
+        {
+          "ms": 983408.6211670004,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 4,
+          "residual": 1.192768106506037e-11,
+          "t_s": 0.2
+        },
+        {
+          "ms": 949152.3442919999,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 5,
+          "residual": 3.9968028886505635e-15,
+          "t_s": 1.6400000000000001
+        },
+        {
+          "ms": 449448.28041700274,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 4,
+          "residual": 7.105427357601002e-15,
+          "t_s": 1.9000000000000001
+        }
+      ],
+      "trace_checks": {
+        "first_t_s": 0,
+        "last_t_s": 3.2,
+        "rows": 161,
+        "finite_states": true,
+        "max_quaternion_norm_error": 2.220446049250313e-16,
+        "synchronized_sensor_times": true
+      }
+    },
+    {
+      "case_id": "gust-eskf-7",
+      "configuration": {
+        "controller": "nmpc",
+        "feedback": "eskf",
+        "scenario": "gust",
+        "seconds": 3.2,
+        "speed": 3,
+        "altitude": 20,
+        "seed": 7,
+        "preview": true,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "implementation": {
+        "source_sha256": {
+          "model.py": "33650a0f70dd3cf4753a0a6a51df07fe0471569c5c87ec85974395f532f83f07",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "630fe8632d75a5acfb79d02ced9e2d069808855ed2e03033eb890ffe078caa1a",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+          "../control/dynamics.py": "af37d3e0e0e0e07e1a88fdf5ae6c8648446a4ab0b7509b7c215f9e6ba0ae5944"
+        },
+        "input_sha256": "0a9efc5dc2bfb6a49723e0ce81023d4489bc9b045346be5c4530265637254efa"
+      },
+      "status": "completed",
+      "failure": null,
+      "simulated_seconds": 3.2,
+      "wall_seconds": 1605.0290394169986,
+      "counts": {
+        "plant": 3200,
+        "imu": 3200,
+        "nmpc": 160,
+        "indi": 0,
+        "gps_captured": 32,
+        "gps_fused": 31,
+        "gps_replayed_imu": 620
+      },
+      "event_coverage": {
+        "speed_step": true,
+        "gust_started": true,
+        "gust_completed": true
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.3865177858042016,
+        "altitude_rmse_m": 0.06172582353585133,
+        "position_estimation_rmse_m": 0.14078254484407718,
+        "electrical_energy_J": 1532.2901030000014,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0.1259375,
+        "max_body_rate_rad_s": 1.2413515249829374,
+        "current_limited_fraction": 0.0009375,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.0053125,
+        "coasting_fraction": 0.004375,
+        "allocation_limited_fraction": null,
+        "allocation_thrust_residual_max_N": null,
+        "allocation_alpha_residual_max_rad_s2": null,
+        "motor_energy_residual_W": 4.547473508864641e-13,
+        "bus_residual_V": 5.9396931817445875e-15,
+        "solver_failures": 1,
+        "solve_ms_p50": 3086.24849999696,
+        "solve_ms_p95": 9723.049332998693,
+        "solve_ms_max": 310221.4768330008,
+        "deadline_misses_20ms": 160
+      },
+      "final": [
+        6.599374677189749,
+        0.18869443899785596,
+        19.92721893590539,
+        2.8848533460920374,
+        0.06561874062850516,
+        0.3354743783221437,
+        0.04675126364675068,
+        -0.704913009518417,
+        0.02896900888375253,
+        0.7071582318572085,
+        0.02279553419661568,
+        -0.1339654633905496,
+        0.04939318455284576,
+        1605.4017513121041,
+        1622.4632478009498,
+        1605.5842003817256,
+        1663.598734282902,
+        0.9959282639138961
+      ],
+      "failed_solves": [
+        {
+          "ms": 9757.680749997497,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 1.0927633797841452e-10,
+          "t_s": 1.3
+        }
+      ],
+      "timing_outliers_over_60s": [
+        {
+          "ms": 310221.4768330008,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 18,
+          "residual": 4.069812874226043e-7,
+          "t_s": 0.1
+        },
+        {
+          "ms": 186748.28829200566,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 8,
+          "residual": 3.986568861200633e-7,
+          "t_s": 0.62
+        },
+        {
+          "ms": 153462.911040999,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 10,
+          "residual": 5.160786806235329e-8,
+          "t_s": 1.24
+        },
+        {
+          "ms": 228184.3499589935,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 8,
+          "residual": 7.713872578890557e-10,
+          "t_s": 1.48
+        },
+        {
+          "ms": 184887.0451669991,
+          "success": true,
+          "status": "Solve_Succeeded",
+          "iterations": 9,
+          "residual": 3.0776405729460166e-11,
+          "t_s": 2.4
+        }
+      ],
+      "trace_checks": {
+        "first_t_s": 0,
+        "last_t_s": 3.2,
+        "rows": 161,
+        "finite_states": true,
+        "max_quaternion_norm_error": 2.220446049250313e-16,
+        "synchronized_sensor_times": true
+      }
+    },
+    {
+      "case_id": "gust-eskf-42",
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "eskf",
+        "scenario": "gust",
+        "seconds": 3.2,
+        "speed": 3,
+        "altitude": 20,
+        "seed": 42,
+        "preview": true,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "implementation": {
+        "source_sha256": {
+          "model.py": "33650a0f70dd3cf4753a0a6a51df07fe0471569c5c87ec85974395f532f83f07",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "630fe8632d75a5acfb79d02ced9e2d069808855ed2e03033eb890ffe078caa1a",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+          "../control/dynamics.py": "af37d3e0e0e0e07e1a88fdf5ae6c8648446a4ab0b7509b7c215f9e6ba0ae5944"
+        },
+        "input_sha256": "0a9efc5dc2bfb6a49723e0ce81023d4489bc9b045346be5c4530265637254efa"
+      },
+      "status": "completed",
+      "failure": null,
+      "simulated_seconds": 3.2,
+      "wall_seconds": 63.05972974999994,
+      "counts": {
+        "plant": 3200,
+        "imu": 3200,
+        "nmpc": 160,
+        "indi": 3200,
+        "gps_captured": 32,
+        "gps_fused": 31,
+        "gps_replayed_imu": 620
+      },
+      "event_coverage": {
+        "speed_step": true,
+        "gust_started": true,
+        "gust_completed": true
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.36449827335251533,
+        "altitude_rmse_m": 0.07095008551254271,
+        "position_estimation_rmse_m": 0.1394327804437809,
+        "electrical_energy_J": 1758.8838183229298,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0.0465625,
+        "max_body_rate_rad_s": 1.8029986194322674,
+        "current_limited_fraction": 0.070625,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.9665625,
+        "coasting_fraction": 0.9265625,
+        "allocation_limited_fraction": 0,
+        "allocation_thrust_residual_max_N": 2.0116409871206997e-7,
+        "allocation_alpha_residual_max_rad_s2": 0.000009991945912160514,
+        "motor_energy_residual_W": 6.821210263296962e-13,
+        "bus_residual_V": 5.995204332975845e-15,
+        "solver_failures": 3,
+        "solve_ms_p50": 225.6550000011921,
+        "solve_ms_p95": 415.39233399927616,
+        "solve_ms_max": 1488.4761660024524,
+        "deadline_misses_20ms": 160
+      },
+      "final": [
+        6.690265109532591,
+        0.1674700172029897,
+        20.147268989684324,
+        3.068858881121355,
+        0.14713105827314737,
+        0.15290511185673272,
+        0.022735548218683448,
+        -0.6990835853459464,
+        0.009257998248870034,
+        0.7146184471558769,
+        -0.006765929654524754,
+        0.1162095242608665,
+        0.16607137344234082,
+        1587.0432198013423,
+        1619.7756746939547,
+        1618.3874283454497,
+        1660.8564883047147,
+        0.995342966836232
+      ],
+      "failed_solves": [
+        {
+          "ms": 1488.4761660024524,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 7.105427357601002e-15,
+          "t_s": 2.2800000000000002
+        },
+        {
+          "ms": 1484.7618329972029,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 1.3322676295501878e-14,
+          "t_s": 3.02
+        },
+        {
+          "ms": 1466.5442920029163,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 3.647474322576727e-9,
+          "t_s": 3.08
+        }
+      ],
+      "timing_outliers_over_60s": [],
+      "trace_checks": {
+        "first_t_s": 0,
+        "last_t_s": 3.2,
+        "rows": 161,
+        "finite_states": true,
+        "max_quaternion_norm_error": 2.220446049250313e-16,
+        "synchronized_sensor_times": true
+      }
+    },
+    {
+      "case_id": "gust-eskf-42",
+      "configuration": {
+        "controller": "nmpc",
+        "feedback": "eskf",
+        "scenario": "gust",
+        "seconds": 3.2,
+        "speed": 3,
+        "altitude": 20,
+        "seed": 42,
+        "preview": true,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "implementation": {
+        "source_sha256": {
+          "model.py": "33650a0f70dd3cf4753a0a6a51df07fe0471569c5c87ec85974395f532f83f07",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "630fe8632d75a5acfb79d02ced9e2d069808855ed2e03033eb890ffe078caa1a",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+          "../control/dynamics.py": "af37d3e0e0e0e07e1a88fdf5ae6c8648446a4ab0b7509b7c215f9e6ba0ae5944"
+        },
+        "input_sha256": "0a9efc5dc2bfb6a49723e0ce81023d4489bc9b045346be5c4530265637254efa"
+      },
+      "status": "completed",
+      "failure": null,
+      "simulated_seconds": 3.2,
+      "wall_seconds": 579.2458303340003,
+      "counts": {
+        "plant": 3200,
+        "imu": 3200,
+        "nmpc": 160,
+        "indi": 0,
+        "gps_captured": 32,
+        "gps_fused": 31,
+        "gps_replayed_imu": 620
+      },
+      "event_coverage": {
+        "speed_step": true,
+        "gust_started": true,
+        "gust_completed": true
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.37933438687216037,
+        "altitude_rmse_m": 0.0681384580711528,
+        "position_estimation_rmse_m": 0.1396273248932674,
+        "electrical_energy_J": 1507.2088455908622,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0.0334375,
+        "max_body_rate_rad_s": 1.3132210502505879,
+        "current_limited_fraction": 0.0003125,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.004375,
+        "coasting_fraction": 0.0040625,
+        "allocation_limited_fraction": null,
+        "allocation_thrust_residual_max_N": null,
+        "allocation_alpha_residual_max_rad_s2": null,
+        "motor_energy_residual_W": 2.8421709430404007e-13,
+        "bus_residual_V": 6.217248937900877e-15,
+        "solver_failures": 5,
+        "solve_ms_p50": 3102.948792003095,
+        "solve_ms_p95": 6167.933958999813,
+        "solve_ms_max": 10188.849957995117,
+        "deadline_misses_20ms": 160
+      },
+      "final": [
+        6.692564852938355,
+        0.15818334012110108,
+        20.144710376344694,
+        3.095528945133261,
+        0.1349113778547661,
+        0.15227419603202683,
+        0.035121558866069075,
+        -0.6999437730289727,
+        0.022829812855463146,
+        0.7129684357289374,
+        0.015090716133895966,
+        0.03545023278019442,
+        0.15969452662548336,
+        1569.6494474028516,
+        1610.5554172893899,
+        1589.657554245676,
+        1631.0665218357274,
+        0.9959984073280598
+      ],
+      "failed_solves": [
+        {
+          "ms": 9759.395499996841,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 3.989075066044583e-7,
+          "t_s": 0.74
+        },
+        {
+          "ms": 9711.706958003342,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 1.0038432897973573e-7,
+          "t_s": 1.32
+        },
+        {
+          "ms": 9668.965250000358,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 1.031953342917058e-8,
+          "t_s": 1.72
+        },
+        {
+          "ms": 10188.849957995117,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 6.773031832607579e-8,
+          "t_s": 2.36
+        },
+        {
+          "ms": 9754.475749999285,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 0.00003768044420997957,
+          "t_s": 2.82
+        }
+      ],
+      "timing_outliers_over_60s": [],
+      "trace_checks": {
+        "first_t_s": 0,
+        "last_t_s": 3.2,
+        "rows": 161,
+        "finite_states": true,
+        "max_quaternion_norm_error": 2.220446049250313e-16,
+        "synchronized_sensor_times": true
+      }
+    },
+    {
+      "case_id": "gust-eskf-2026",
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "eskf",
+        "scenario": "gust",
+        "seconds": 3.2,
+        "speed": 3,
+        "altitude": 20,
+        "seed": 2026,
+        "preview": true,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "implementation": {
+        "source_sha256": {
+          "model.py": "33650a0f70dd3cf4753a0a6a51df07fe0471569c5c87ec85974395f532f83f07",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "630fe8632d75a5acfb79d02ced9e2d069808855ed2e03033eb890ffe078caa1a",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+          "../control/dynamics.py": "af37d3e0e0e0e07e1a88fdf5ae6c8648446a4ab0b7509b7c215f9e6ba0ae5944"
+        },
+        "input_sha256": "0a9efc5dc2bfb6a49723e0ce81023d4489bc9b045346be5c4530265637254efa"
+      },
+      "status": "completed",
+      "failure": null,
+      "simulated_seconds": 3.2,
+      "wall_seconds": 58.22300325000286,
+      "counts": {
+        "plant": 3200,
+        "imu": 3200,
+        "nmpc": 160,
+        "indi": 3200,
+        "gps_captured": 32,
+        "gps_fused": 31,
+        "gps_replayed_imu": 620
+      },
+      "event_coverage": {
+        "speed_step": true,
+        "gust_started": true,
+        "gust_completed": true
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.3683339840753127,
+        "altitude_rmse_m": 0.08705596053028361,
+        "position_estimation_rmse_m": 0.1277501732573241,
+        "electrical_energy_J": 1749.038845299361,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0,
+        "max_body_rate_rad_s": 1.738789251524698,
+        "current_limited_fraction": 0.073125,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.9575,
+        "coasting_fraction": 0.9171875,
+        "allocation_limited_fraction": 0,
+        "allocation_thrust_residual_max_N": 1.6972830607642209e-7,
+        "allocation_alpha_residual_max_rad_s2": 0.0000099960622017033,
+        "motor_energy_residual_W": 5.684341886080801e-13,
+        "bus_residual_V": 5.995204332975845e-15,
+        "solver_failures": 0,
+        "solve_ms_p50": 226.5357090011239,
+        "solve_ms_p95": 374.8801659941673,
+        "solve_ms_max": 704.2232920005918,
+        "deadline_misses_20ms": 160
+      },
+      "final": [
+        6.501701510696152,
+        0.15033599406135023,
+        20.20880061613438,
+        2.8263607682819423,
+        0.07585984621289148,
+        0.2635159272916876,
+        -0.0024704327357494495,
+        -0.6987040375189704,
+        -0.009909718638890066,
+        0.7153379357990776,
+        -0.0006868780241715694,
+        0.08414592084219816,
+        0.1335897512081259,
+        1425.3669757733007,
+        1487.5890456157274,
+        1470.4266341638715,
+        1457.4166345690564,
+        0.9953682977909569
+      ],
+      "failed_solves": [],
+      "timing_outliers_over_60s": [],
+      "trace_checks": {
+        "first_t_s": 0,
+        "last_t_s": 3.2,
+        "rows": 161,
+        "finite_states": true,
+        "max_quaternion_norm_error": 2.220446049250313e-16,
+        "synchronized_sensor_times": true
+      }
+    },
+    {
+      "case_id": "gust-eskf-2026",
+      "configuration": {
+        "controller": "nmpc",
+        "feedback": "eskf",
+        "scenario": "gust",
+        "seconds": 3.2,
+        "speed": 3,
+        "altitude": 20,
+        "seed": 2026,
+        "preview": true,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "implementation": {
+        "source_sha256": {
+          "model.py": "33650a0f70dd3cf4753a0a6a51df07fe0471569c5c87ec85974395f532f83f07",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "630fe8632d75a5acfb79d02ced9e2d069808855ed2e03033eb890ffe078caa1a",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+          "../control/dynamics.py": "af37d3e0e0e0e07e1a88fdf5ae6c8648446a4ab0b7509b7c215f9e6ba0ae5944"
+        },
+        "input_sha256": "0a9efc5dc2bfb6a49723e0ce81023d4489bc9b045346be5c4530265637254efa"
+      },
+      "status": "completed",
+      "failure": null,
+      "simulated_seconds": 3.2,
+      "wall_seconds": 538.5446214589998,
+      "counts": {
+        "plant": 3200,
+        "imu": 3200,
+        "nmpc": 160,
+        "indi": 0,
+        "gps_captured": 32,
+        "gps_fused": 31,
+        "gps_replayed_imu": 620
+      },
+      "event_coverage": {
+        "speed_step": true,
+        "gust_started": true,
+        "gust_completed": true
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.3824027716733927,
+        "altitude_rmse_m": 0.08451233462429202,
+        "position_estimation_rmse_m": 0.1271449203160615,
+        "electrical_energy_J": 1504.1274990841991,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0,
+        "max_body_rate_rad_s": 1.2313371993192013,
+        "current_limited_fraction": 0.0003125,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.004375,
+        "coasting_fraction": 0.0040625,
+        "allocation_limited_fraction": null,
+        "allocation_thrust_residual_max_N": null,
+        "allocation_alpha_residual_max_rad_s2": null,
+        "motor_energy_residual_W": 3.410605131648481e-13,
+        "bus_residual_V": 6.106226635438361e-15,
+        "solver_failures": 2,
+        "solve_ms_p50": 3169.320624999702,
+        "solve_ms_p95": 4944.518291994929,
+        "solve_ms_max": 9713.358833000064,
+        "deadline_misses_20ms": 160
+      },
+      "final": [
+        6.503688075886189,
+        0.13961205285111117,
+        20.20331508238805,
+        2.840461058176323,
+        0.05186044949285171,
+        0.2601356339673866,
+        0.038667535153536305,
+        -0.6986115893583213,
+        0.032813836621786135,
+        0.7137015630258554,
+        0.014750969691315521,
+        0.06177646701532435,
+        0.17052652492857112,
+        1433.4146886966118,
+        1483.8797247310874,
+        1461.032673956689,
+        1491.1293415340072,
+        0.9960059095486745
+      ],
+      "failed_solves": [
+        {
+          "ms": 9689.43495799601,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 5.310335504660202e-13,
+          "t_s": 1.86
+        },
+        {
+          "ms": 9713.358833000064,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 4.5474735088646407e-13,
+          "t_s": 2.48
+        }
+      ],
+      "timing_outliers_over_60s": [],
+      "trace_checks": {
+        "first_t_s": 0,
+        "last_t_s": 3.2,
+        "rows": 161,
+        "finite_states": true,
+        "max_quaternion_norm_error": 2.220446049250313e-16,
+        "synchronized_sensor_times": true
+      }
+    }
+  ],
+  "gust_three_seed_summary": {
+    "hybrid": {
+      "velocity_rmse_mps": {
+        "n": 3,
+        "mean": 0.3696618271576222,
+        "sample_sd": 0.005939852216151149
+      },
+      "altitude_rmse_m": {
+        "n": 3,
+        "mean": 0.07281039265908022,
+        "sample_sd": 0.01341252455487914
+      },
+      "electrical_energy_J": {
+        "n": 3,
+        "mean": 1759.281205682646,
+        "sample_sd": 10.446724246610747
+      },
+      "outside_prop_map_fraction": {
+        "n": 3,
+        "mean": 0.05458333333333334,
+        "sample_sd": 0.05900404956088466
+      },
+      "solver_failures": 3,
+      "solves": 480
+    },
+    "nmpc": {
+      "velocity_rmse_mps": {
+        "n": 3,
+        "mean": 0.3827516481165849,
+        "sample_sd": 0.003604384986883836
+      },
+      "altitude_rmse_m": {
+        "n": 3,
+        "mean": 0.07145887207709872,
+        "sample_sd": 0.011750537595108954
+      },
+      "electrical_energy_J": {
+        "n": 3,
+        "mean": 1514.542149225021,
+        "sample_sd": 15.447202707049076
+      },
+      "outside_prop_map_fraction": {
+        "n": 3,
+        "mean": 0.053125000000000006,
+        "sample_sd": 0.06523619945053513
+      },
+      "solver_failures": 8,
+      "solves": 480
+    }
+  },
+  "timing_caveat": "Host sleep/wake and concurrent development affected wall-clock measurements. Do not use this batch for speed rankings, maximum solve latency or hard-real-time claims. Raw timings and >60 s outliers are retained.",
+  "limitations": [
+    "Three seeds and 3.2 seconds are exploratory, not statistical robustness evidence.",
+    "The gust ends at 3 s; only 0.2 s recovery is observed, not a settling-time validation.",
+    "Off-map passive continuation samples are included; no measured high-speed propulsion validation.",
+    "Some solver failures remain; no cases or failed samples were excluded.",
+    "Version 2 changes sensor noise stream ordering. Old and new ESKF seed traces are not identical."
+  ]
+}

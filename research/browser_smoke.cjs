@@ -125,6 +125,12 @@ async function main(){
         })()`);
         console.log('REPLAY '+JSON.stringify(playback));
         if(!playback.imported||!playback.pose||!playback.reused||!playback.ended||!playback.immutable||playback.error)throw new Error('Replay/import/reuse failed');
+        const partialWarning=await evaluate(`(()=>{
+          const report=Object.values(results)[0],status=report.status;
+          try {report.status='stopped';showResults();return $('result-context').textContent.includes('직접 순위 비교하지 마세요');}
+          finally {report.status=status;showResults();}
+        })()`);
+        if(!partialWarning)throw new Error('Partial-result comparison warning missing');
         if(!uiOnly){const stopped=await evaluate(`(async()=>{
           $('controller').value='nmpc';$('seconds').value='2';$('scenario').value='hover';$('run').click();
           let begin=Date.now();while(running&&!/NMPC [1-9][0-9]*회/.test($('status').textContent)&&Date.now()-begin<45000)

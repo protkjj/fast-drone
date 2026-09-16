@@ -72,6 +72,8 @@ function showResults() {
   $('download').disabled=Object.keys(results).length===0;
   const result=Object.values(results)[0];
   $('result-context').textContent=result?`${imported?'가져온 기록 · ':'현재 실행 · '}${result.profile_id} · ${result.configuration.scenario} · seed ${result.configuration.seed} · ${result.configuration.preview?'미래 목표 예고':'비예고'} · 구현 ${result.implementation?.input_sha256?.slice(0,12)||'알 수 없음'}\n제한 비율은 각 tick에 4개 모터 중 하나라도 해당 제한이 작동한 비율입니다. 모터 추종 제한은 전류·전압·회생 제동 불가를 포함하며 속도 오차 자체와는 다릅니다.`:'';
+  if(Object.values(results).some(r=>r.status!=='completed'))
+    $('result-context').textContent+='\n부분·실패 결과가 포함되어 있습니다. 관측 시간이 다른 RMSE와 에너지를 직접 순위 비교하지 마세요.';
 }
 function drawChart(id,value,reference) {
   const svg=$(id), ns='http://www.w3.org/2000/svg';svg.replaceChildren();
