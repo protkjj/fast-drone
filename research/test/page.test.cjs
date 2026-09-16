@@ -3,9 +3,9 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const R=require('../runtime.js'),Results=require('../results.js');
 function fixture(){
-  const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8'),elements=new Map(),messages=[];
+  const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8'),elements=new Map(),messages=[],documentEvents={};
   class Element{
-    constructor(){this.value='';this.disabled=false;this.options=[];this.events={};this.textContent='';this.classList={toggle(){}};}
+    constructor(){this.value='';this.disabled=false;this.options=[];this.events={};this.textContent='';this.classList={toggle(){}};this.style={setProperty(){}};}
     addEventListener(type,fn){this.events[type]=fn;}
     click(){if(!this.disabled)this.events.click?.({target:this});}
     append(...nodes){for(const node of nodes){if(node.id)elements.set(node.id,node);this.options.push(node);node.parentElement=this;}}
@@ -15,6 +15,7 @@ function fixture(){
   }
   for(const match of html.matchAll(/<(\w+)\b([^>]*\bid="([^"]+)"[^>]*)>/g)){
     const element=new Element();element.id=match[3];element.value=match[2].match(/\bvalue="([^"]*)"/)?.[1]||'';
+    element.tagName=match[1].toUpperCase();element.type=match[2].match(/\btype="([^"]*)"/)?.[1];
     element.disabled=/\bdisabled\b/.test(match[2]);element.parentElement=new Element();
     if(match[1]==='select'){
       const content=html.slice(match.index+match[0].length).split('</select>')[0];
@@ -30,6 +31,7 @@ function fixture(){
     location:{href:'http://localhost/sim.html'},history:{replaceState(){}},matchMedia:()=>({matches:false}),
     requestAnimationFrame:()=>1,
     document:{getElementById:id=>elements.get(id),createElement:()=>new Element(),createElementNS:()=>new Element(),
+      addEventListener:(type,fn)=>documentEvents[type]=fn,
       querySelector:()=>aircraft,querySelectorAll:selector=>{
         if(selector.includes('.controls'))return [...elements.values()].filter(e=>['profile','controller','feedback','scenario','seconds','speed','altitude','preview','mismatch','seed','log-hz'].includes(e.id));
         if(!classes.has(selector))classes.set(selector,[new Element()]);return classes.get(selector);
@@ -37,8 +39,44 @@ function fixture(){
     Worker:class{constructor(url){this.url=url;context.activeWorker=this;}postMessage(message){messages.push(message);}}
   };
   vm.createContext(context);vm.runInContext(fs.readFileSync(path.join(__dirname,'../page.js'),'utf8'),context);
-  return {context,elements,messages,evaluate:code=>vm.runInContext(code,context)};
+  const key=(code,target={tagName:'DIV'},extra={})=>{
+    let prevented=false;documentEvents.keydown({code,key:code==='Space'?' ':code.replace('Key','').toLowerCase(),
+      target,preventDefault(){prevented=true;},...extra});return prevented;
+  };
+  return {context,elements,messages,key,evaluate:code=>vm.runInContext(code,context)};
 }
+test('Space starts, pauses and resumes, including after range input; typing and native buttons retain their keys',()=>{
+  const {context,elements:e,messages,key,evaluate}=fixture();
+  for(const target of [e.get('live-target-speed'),e.get('observe-controller'),e.get('go'),{tagName:'DIV',isContentEditable:true}]){
+    assert.equal(key('Space',target),false);assert.equal(messages.length,0);
+  }
+  for(const extra of [{repeat:true},{ctrlKey:true},{metaKey:true},{altKey:true},{isComposing:true}])assert.equal(key('Space',undefined,extra),false);
+  assert.equal(key('Space'),true);assert.equal(messages.at(-1).type,'run');assert.equal(evaluate('running'),true);
+  assert.equal(key('Space',e.get('speed-slider')),true);assert.equal(messages.at(-1).type,'pause');assert.equal(messages.at(-1).paused,true);
+  const count=messages.length;key('Space');assert.equal(messages.length,count); // Await acknowledgement, not double-toggle.
+  context.activeWorker.onmessage({data:{type:'paused',paused:true,t:.1}});
+  assert.match(e.get('go').textContent,/계속/);key('Space');assert.equal(messages.at(-1).paused,false);
+  context.activeWorker.onmessage({data:{type:'paused',paused:false,t:.1}});assert.match(e.get('go').textContent,/일시정지/);
+});
+test('R waits for orderly stop, resets the view and preserves the recorded result; F toggles the camera button',()=>{
+  const {context,elements:e,messages,key,evaluate}=fixture();
+  let followed=0;e.get('follow').events.click=()=>followed++;key('KeyF');assert.equal(followed,1);
+  key('KeyF',e.get('live-target-speed'));assert.equal(followed,1);
+  key('Space');key('KeyR');assert.equal(messages.at(-1).type,'stop');assert.equal(evaluate('resetRequested'),true);
+  context.activeWorker.onmessage({data:{type:'done',stopped:true,count:0}});
+  assert.equal(evaluate('running'),false);assert.equal(evaluate('resetRequested'),false);assert.match(e.get('status').textContent,/초기 상태/);
+  evaluate('results.hybrid={saved:true};');key('KeyR');assert.equal(evaluate('results.hybrid.saved'),true);
+  assert.equal(e.get('timeline').value,'0');assert.match(e.get('go').textContent,/시작/);
+});
+test('live angle is a display-only air-relative body-axis angle, and chart labels use actual pixel dimensions',()=>{
+  const {elements:e,evaluate}=fixture();
+  assert.equal(evaluate('airAngle({q:[0,0,0,1],v:[1,0,0]})'),0);
+  assert.equal(evaluate('airAngle({q:[0,0,0,1],v:[0,1,0]})'),90);
+  assert.equal(evaluate('airAngle({q:[0,0,0,1],v:[-1,0,0]})'),180);
+  assert.equal(evaluate('airAngle({q:[0,0,0,1],v:[1,0,0],environment:[1,0,0,0,0,0]})'),null);
+  e.get('velocity-chart').clientWidth=220;e.get('velocity-chart').clientHeight=135;
+  evaluate('drawCharts()');assert.equal(e.get('velocity-chart').viewBox,'0 0 220 135');
+});
 test('unified page defaults to selected observation, preserves comparison settings and sends honest mode/controller options',()=>{
   const {context,elements:e,messages,evaluate}=fixture();
   assert.equal(evaluate('mode'),'observe');assert.equal(e.get('profile').value,'selected');

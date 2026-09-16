@@ -3,6 +3,8 @@ const $=id=>document.getElementById(id);
 const results={};
 let worker=null,vehicle=null,running=false,drawModel=()=>{},updatePath=()=>{},appendLivePath=()=>{};
 let playing=false,replayTime=0,imported=false,customScales=null,mode='compare',paused=false,recordedCommands=null;
+let replayActive=false,resetRequested=false,lastPlotWall=0;
+const liveTraces={};
 const controllerNames={pd:'PD–INDI · 조작용 baseline',hybrid:'Hybrid',nmpc:'NMPC 단독'};
 const settingIds=['profile','controller','feedback','scenario','seconds','speed','altitude','preview','mismatch','seed','log-hz','wind-speed','wind-angle'];
 const modeSettings={compare:null,observe:{profile:'selected',controller:'both',feedback:'truth',scenario:'hover',seconds:'30',speed:'0',altitude:'20',preview:'false',mismatch:'nominal',seed:'42','log-hz':'50'}};
@@ -18,12 +20,13 @@ function setMode(next,restore=true){
     $('mode-'+kind).setAttribute('aria-pressed',String(kind===mode));
     document.querySelectorAll('.'+kind+'-only').forEach(el=>el.hidden=kind!==mode);
   }
-  $('run').textContent=mode==='observe'?'비행 시작':'정밀 계산 시작';$('pause').hidden=mode!=='observe';
-  $('settings').open=mode==='compare'&&!matchMedia('(max-width:850px)').matches;
+  $('run').textContent=mode==='observe'?'새 비행':'정밀 계산 시작';$('pause').hidden=mode!=='observe';
+  $('settings').open=!matchMedia('(max-width:900px)').matches;
   updateModeNote();
   $('status').textContent=mode==='observe'?'비행 시작 → 슬라이더로 속도·고도·바람 조작':'정밀 비교 준비됨. 짧은 호버로 확인 후 속도·외란 시험을 선택하세요.';
   $('record-panel').open=mode==='compare';
   $('progress').value=0;scenarioNote(false);updateAircraftLabel();
+  updateFlightActions();
   const url=new URL(location.href);url.searchParams.set('mode',mode);history.replaceState(null,'',url);
 }
 function updateModeNote(){
@@ -58,6 +61,7 @@ function animateModel(now){
 function startFrames(){if(rotorFrame===null){lastRotorFrame=performance.now();rotorFrame=requestAnimationFrame(animateModel);}}
 function setPlaying(value){
   playing=value;$('play').textContent=value?'일시정지':'재생';
+  updateFlightActions();
   if(value)startFrames();else if(vehicle){ResearchSTL.animateRotors(vehicle,rotorRates,0,false);drawModel();}
 }
 const colors={pd:'#f2aa4c',hybrid:'#59c8f5',nmpc:'#db9bff'};
@@ -72,6 +76,65 @@ function setBusy(value) {
   $('replay-controller').disabled=value||!replayResult();
   if(value){paused=false;$('pause').textContent='일시정지';setPlaying(false);if(vehicle)vehicle.visible=$('profile').value==='selected';startFrames();}
   if(!value&&vehicle){ResearchSTL.animateRotors(vehicle,rotorRates,0,false);drawModel();}
+  updateFlightActions();
+}
+function updateFlightActions(){
+  const busy=running&&($('pause').disabled||mode!=='observe');
+  const label=running?(paused?'▶ 계속':busy?'처리 중…':'❚❚ 일시정지'):
+    playing?'❚❚ 재생 정지':replayActive&&replayResult()?'▶ 기록 재생':'▶ 시작';
+  $('go').textContent=label+' (Space)';$('quick-go').textContent=label;
+  $('go').disabled=busy;$('quick-go').disabled=busy;
+}
+function toggleFlight(){
+  if(running){if(mode==='observe'&&!$('pause').disabled)$('pause').click();return;}
+  if(replayActive&&replayResult())$('play').click();else $('run').click();
+}
+$('go').addEventListener('click',toggleFlight);$('quick-go').addEventListener('click',toggleFlight);
+function resetView(){
+  resetRequested=false;setPlaying(false);replayActive=false;replayTime=0;
+  const altitude=Number($('altitude').value),z=Number.isFinite(altitude)?altitude:20;
+  rotorRates=[0,0,0,0];updatePath(null);
+  if(vehicle){vehicle.visible=$('profile').value==='selected';vehicle.position.set(0,0,z);vehicle.quaternion.set(0,-Math.SQRT1_2,0,Math.SQRT1_2);
+    for(const rotor of vehicle.userData.rotors)rotor.rotation.x=0;drawModel();}
+  updateTelemetry({t:0,p:[0,0,z],v:[0,0,0],z,soc:1});
+  $('timeline').value='0';$('timeline-time').textContent='0.00 s';$('progress').value=0;
+  $('status').textContent='초기 상태 · Space로 시작. 이전 계산 기록은 저장·재생할 수 있습니다.';
+  $('live-limits').textContent='새 비행 준비 · 기본 검증은 저속 영역입니다.';$('live-limits').classList.toggle('bad',false);
+  $('model-caption').textContent='drone_v2.stl · 초기 상태 · 다음 비행도 선정 기체 공통 물리 사용';
+  for(const id of ['velocity-chart','altitude-chart','angle-chart'])$(id).replaceChildren();
+  updateFlightActions();
+}
+$('reset').addEventListener('click',()=>{
+  if(running){resetRequested=true;$('stop').click();$('status').textContent='초기화 요청 · 현재 풀이 후 기록을 보존하고 초기 상태로 돌아갑니다.';}
+  else resetView();
+});
+document.addEventListener('keydown',event=>{
+  const target=event.target,tag=target?.tagName;
+  if(event.defaultPrevented||event.ctrlKey||event.metaKey||event.altKey||event.repeat||event.isComposing||target?.isContentEditable)return;
+  // A range does not use Space, so pausing still works after dragging it.
+  // Text/numeric fields, selects and native button activation retain their keys.
+  if(['TEXTAREA','SELECT','BUTTON','SUMMARY'].includes(tag)||tag==='INPUT'&&target.type!=='range')return;
+  if(event.code==='Space'){event.preventDefault();toggleFlight();}
+  else if(tag!=='INPUT'&&event.key.toLowerCase()==='r'){event.preventDefault();$('reset').click();}
+  else if(tag!=='INPUT'&&event.key.toLowerCase()==='f'){event.preventDefault();$('follow').click();}
+});
+for(const [id,property,direction] of [['grip-left','--colL',1],['grip-right','--colR',-1]]){
+  const grip=$(id);let drag=null;
+  const setWidth=value=>{
+    const width=Math.max(190,Math.min(innerWidth*.3,value));
+    $('sim-shell').style.setProperty(property,width+'px');grip.setAttribute('aria-valuenow',String(Math.round(width)));
+  };
+  grip.addEventListener('pointerdown',event=>{
+    const panel=id==='grip-left'?document.querySelector('.left'):document.querySelector('.right');
+    drag={x:event.clientX,width:panel.getBoundingClientRect().width};grip.setPointerCapture(event.pointerId);event.preventDefault();
+  });
+  grip.addEventListener('pointermove',event=>{if(drag)setWidth(drag.width+direction*(event.clientX-drag.x));});
+  grip.addEventListener('pointerup',()=>drag=null);grip.addEventListener('pointercancel',()=>drag=null);
+  grip.addEventListener('keydown',event=>{
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+    event.preventDefault();const width=(id==='grip-left'?document.querySelector('.left'):document.querySelector('.right')).getBoundingClientRect().width;
+    setWidth(event.key==='Home'?190:event.key==='End'?innerWidth*.3:width+direction*(event.key==='ArrowRight'?10:-10));
+  });
 }
 const number=value=>!Number.isFinite(value)?'—':value!==0&&Math.abs(value)<.001?value.toExponential(2):value.toLocaleString('ko-KR',{maximumFractionDigits:3});
 function showResults() {
@@ -108,8 +171,7 @@ function showResults() {
   }));
   addRow('NMPC / INDI / IMU 횟수',kinds.map(k=>{const c=results[k]?.counts;return c?`${c.nmpc} / ${c.indi} / ${c.imu}`:'—';}));
   addRow('GPS 융합 / 재적분 IMU 횟수',kinds.map(k=>{const c=results[k]?.counts;return c?`${c.gps_fused} / ${c.gps_replayed_imu}`:'—';}));
-  drawChart('velocity-chart',point=>point.v[0],point=>point.reference[0]);
-  drawChart('altitude-chart',point=>point.z,point=>point.reference[3]);
+  drawCharts();
   $('download').disabled=Object.keys(results).length===0;
   const result=Object.values(results)[0];
   $('result-context').textContent=result?`${imported?'가져온 기록 · ':'현재 실행 · '}${result.profile_id} · ${result.configuration.scenario} · seed ${result.configuration.seed} · ${result.configuration.preview?'미래 목표 예고':'비예고'} · 구현 ${result.implementation?.input_sha256?.slice(0,12)||'알 수 없음'}\n제한 비율은 각 tick에 4개 모터 중 하나라도 해당 제한이 작동한 비율입니다. 모터 추종 제한은 전류·전압·회생 제동 불가를 포함하며 속도 오차 자체와는 다릅니다.`:'';
@@ -119,24 +181,57 @@ function showResults() {
 }
 function drawChart(id,value,reference) {
   const svg=$(id), ns='http://www.w3.org/2000/svg';svg.replaceChildren();
-  const all=Object.values(results).flatMap(r=>r.trace);if(!all.length)return;
-  let lo=Infinity,hi=-Infinity,time=.001;
-  for(const point of all){lo=Math.min(lo,value(point),reference(point));hi=Math.max(hi,value(point),reference(point));time=Math.max(time,point.t);}
-  const margin=Math.max(.05,(hi-lo)*.12);lo-=margin;hi+=margin;
-  const sx=t=>55+t/time*545,sy=v=>185-(v-lo)/(hi-lo)*165;
+  // Use actual CSS pixels, not a large fixed viewBox that shrinks tick labels.
+  const width=Math.max(100,svg.clientWidth||620),height=svg.clientHeight||135;
+  svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
+  const left=width<180?36:46,right=width-8,bottom=height-23,top=12;
   const element=(name,attributes,text)=>{const node=document.createElementNS(ns,name);Object.entries(attributes).forEach(([k,v])=>node.setAttribute(k,v));if(text!==undefined)node.textContent=text;svg.append(node);return node;};
-  for(let i=0;i<5;i++) {
-    const v=lo+(hi-lo)*i/4,y=sy(v);
-    element('line',{x1:55,x2:600,y1:y,y2:y,stroke:'#30404e'});
-    element('text',{x:48,y:y+4,fill:'#aebac6','font-size':11,'text-anchor':'end'},number(v));
-    element('text',{x:sx(time*i/4),y:210,fill:'#aebac6','font-size':11,'text-anchor':'middle'},number(time*i/4));
+  const sources=running?{...results,...Object.fromEntries(Object.entries(liveTraces).map(([k,trace])=>[k,{trace}]))}:results;
+  const all=Object.values(sources).flatMap(r=>r.trace);if(!all.length)return;
+  let lo=Infinity,hi=-Infinity,time=.001;
+  for(const point of all){for(const v of [value(point),reference?.(point)])if(Number.isFinite(v)){lo=Math.min(lo,v);hi=Math.max(hi,v);}time=Math.max(time,point.t);}
+  if(!Number.isFinite(lo)){
+    element('text',{x:width/2,y:height/2,fill:'#aebac6','font-size':11,'text-anchor':'middle'},'저속 · 방향 미정');
+    return;
+  }
+  const margin=Math.max(.05,(hi-lo)*.12);lo-=margin;hi+=margin;
+  const sx=t=>left+t/time*(right-left),sy=v=>bottom-(v-lo)/(hi-lo)*(bottom-top);
+  const ticks=width<240?2:4,tick=v=>Math.abs(v)>0&&Math.abs(v)<.01?v.toExponential(0):String(Number(v.toFixed(Math.abs(v)>=100?0:2)));
+  for(let i=0;i<=ticks;i++) {
+    const v=lo+(hi-lo)*i/ticks,y=sy(v);
+    element('line',{x1:left,x2:right,y1:y,y2:y,stroke:'#30404e'});
+    element('text',{x:left-5,y:y+4,fill:'#aebac6','font-size':10,'text-anchor':'end'},tick(v));
+    element('text',{x:sx(time*i/ticks),y:height-7,fill:'#aebac6','font-size':10,'text-anchor':i===ticks?'end':'middle'},tick(time*i/ticks));
   }
   // Keep long 1 kHz logs responsive. The exported log retains every sample.
-  const path=(trace,fn)=>trace.filter((_,i)=>i%Math.max(1,Math.ceil(trace.length/2000))===0||i===trace.length-1)
-    .map((point,i)=>`${i?'L':'M'}${sx(point.t).toFixed(2)},${sy(fn(point)).toFixed(2)}`).join(' ');
-  element('path',{d:path(Object.values(results)[0].trace,reference),fill:'none',stroke:'#aebac6','stroke-dasharray':'5 4','stroke-width':1.5});
-  for(const [kind,result] of Object.entries(results)) element('path',{d:path(result.trace,value),fill:'none',stroke:colors[kind],'stroke-width':2});
+  const path=(trace,fn)=>{let pen=false;return trace.filter((_,i)=>i%Math.max(1,Math.ceil(trace.length/2000))===0||i===trace.length-1)
+    .map(point=>{const v=fn(point);if(!Number.isFinite(v)){pen=false;return '';}
+      const segment=`${pen?'L':'M'}${sx(point.t).toFixed(2)},${sy(v).toFixed(2)}`;pen=true;return segment;}).join(' ');};
+  if(reference)element('path',{d:path(Object.values(sources)[0].trace,reference),fill:'none',stroke:'#aebac6','stroke-dasharray':'5 4','stroke-width':1.5});
+  for(const [kind,result] of Object.entries(sources)) element('path',{d:path(result.trace,value),fill:'none',stroke:colors[kind],'stroke-width':2});
 }
+function drawCharts(){
+  drawChart('velocity-chart',p=>p.v[0],p=>p.reference?.[0]??0);
+  drawChart('altitude-chart',p=>p.z,p=>p.reference?.[3]??Number($('altitude').value));
+  drawChart('angle-chart',airAngle);
+}
+function airAngle(point){
+  const q=point.q||point.q_xyzw||point.state?.slice(6,10);if(!q)return null;
+  const relative=point.v.map((v,i)=>v-(point.environment?.[i]||0)),speed=Math.hypot(...relative);
+  if(speed<.5)return null; // Direction of near-zero airspeed is undefined.
+  const axis=ResearchRuntime.rotate(q,[1,0,0]);
+  return Math.acos(Math.max(-1,Math.min(1,axis.reduce((s,v,i)=>s+v*relative[i],0)/speed)))*180/Math.PI;
+}
+function plotLiveFrame(frame){
+  const trace=liveTraces[frame.controller]||=([]);
+  if(trace.at(-1)?.t===frame.t)trace.pop();
+  trace.push({...frame});if(trace.length>6001)trace.shift();
+  if(performance.now()-lastPlotWall<180)return;lastPlotWall=performance.now();
+  drawCharts();
+}
+if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{
+  if(running||replayActive)drawCharts();
+}).observe($('velocity-chart'));
 $('run').addEventListener('click',()=>{
   clearTimeout(liveTargetTimer);liveTargetTimer=null;
   const seconds=Number($('seconds').value), speed=Number($('speed').value),seed=Number($('seed').value);
@@ -150,6 +245,7 @@ $('run').addEventListener('click',()=>{
     scales:mismatch,altitude,preview:mode==='observe'?false:$('preview').value==='true',log_hz:Number($('log-hz').value)});}
   catch(error){$('errors').textContent=error.message;$('settings').open=true;return;}
   setPlaying(false);imported=false;
+  replayActive=false;resetRequested=false;Object.keys(liveTraces).forEach(k=>delete liveTraces[k]);lastPlotWall=0;
   Object.keys(results).forEach(k=>delete results[k]);showResults();$('errors').textContent='';
   updatePath(null);
   $('target-state').textContent=`초기 목표: ${number(commands?.[0]?.speed??speed)} m/s · ${number(commands?.[0]?.altitude??altitude)} m`;
@@ -166,6 +262,7 @@ $('run').addEventListener('click',()=>{
         if(m.rpm)rotorRates=m.rpm.slice();
         $('status').textContent=`${controllerNames[m.controller]} · ${number(m.t)} / ${number(m.total)} s\n${m.controller==='pd'?'관찰 진행 · 1 ms 적분 유지':`IPOPT ${m.solves}회 · 풀이 중 시뮬레이션 대기`}`;
         updateTelemetry(m);
+        plotLiveFrame(m);
         $('progress').value=m.t/m.total;
         if(vehicle&&m.q) {vehicle.quaternion.set(...m.q);if(m.p){vehicle.position.set(...m.p);appendLivePath(m.p);}drawModel();}
       }
@@ -178,6 +275,7 @@ $('run').addEventListener('click',()=>{
       if(m.type==='done') {
         paused=false;setBusy(false);setupReplay(true);$('status').textContent=m.stopped?(m.count?'중지됨. 현재까지 계산된 부분 결과도 보존했습니다.':'모델 준비 중에 중지했습니다. 아직 계산된 결과는 없습니다.'):'계산 완료. 기록을 재생하거나 같은 목표 일정으로 정밀 비교할 수 있습니다.';
         if($('target-state').textContent.startsWith('적용 대기'))$('target-state').textContent='실행이 끝나 대기 중 변경은 적용되지 않았습니다. 실제 적용된 일정은 저장한 로그에 남습니다.';
+        showResults();updateFlightActions();if(resetRequested)resetView();
       }
       if(m.type==='target-applied')$('target-state').textContent=`${number(m.command.t)} s 적용 · 목표 ${number(m.command.speed)} m/s / ${number(m.command.altitude)} m · 바람 ${number(m.command.wind_speed)} m/s / ${number(m.command.wind_angle)}° · 기록됨`;
       if(m.type==='command-error')$('errors').textContent=m.text;
@@ -185,6 +283,7 @@ $('run').addEventListener('click',()=>{
         paused=m.paused;$('pause').disabled=false;$('pause').textContent=paused?'계속 관찰':'일시정지';
         if(paused){$('status').textContent=`${number(m.t)} s에서 일시정지 · 물리 시간도 멈춤`;if(vehicle){ResearchSTL.animateRotors(vehicle,rotorRates,0,false);drawModel();}}
         else startFrames();
+        updateFlightActions();
       }
       if(m.type==='error') {$('errors').textContent=m.text;setBusy(false);}
     };
@@ -197,6 +296,7 @@ $('stop').addEventListener('click',()=>{worker?.postMessage({type:'stop'});$('st
 $('pause').addEventListener('click',()=>{if(running&&mode==='observe'){
   worker.postMessage({type:'pause',paused:!paused});$('pause').disabled=true;
   $('pause').textContent=paused?'재개 요청 중…':'일시정지 요청 중…';
+  updateFlightActions();
 }});
 function applyLiveTarget(hover=false){
   clearTimeout(liveTargetTimer);liveTargetTimer=null;
@@ -246,6 +346,7 @@ $('wind-calm').addEventListener('click',()=>{$('live-wind-speed').value='0';appl
 syncLiveControls();
 $('apply-target').addEventListener('click',()=>applyLiveTarget());$('hover-target').addEventListener('click',()=>applyLiveTarget(true));
 function updateTelemetry(frame){
+  if(Number.isFinite(frame.t))$('timeline-time').textContent=frame.t.toFixed(2)+' s';
   if(frame.p)$('flight-position').textContent=`시뮬레이션 ${number(frame.t)} s · X ${number(frame.p[0])} / Y ${number(frame.p[1])} / Z ${number(frame.p[2])} m`;
   $('live-speed').textContent=number(frame.v[0])+' m/s';$('live-altitude').textContent=number(frame.z)+' m';
   $('live-soc').textContent=number((frame.soc??1)*100)+' %';
@@ -270,14 +371,17 @@ function setupReplay(atEnd=false){
   for(const id of ['replay-controller','timeline','play','reuse'])$(id).disabled=running||!r;
   $('compare-record').disabled=running||!r||r.simulated_seconds<=0;
   if(!r)return;
+  if(!running)replayActive=true;
   replayTime=atEnd?r.simulated_seconds:0;$('timeline').max=String(r.simulated_seconds);
   updatePath(r);if(!running)renderReplay();
 }
 function renderReplay(){
   const r=replayResult();if(!r)return;
+  if(!replayActive){replayActive=true;updatePath(r);drawCharts();}updateFlightActions();
   const frame=ResearchResults.sample(r.trace,replayTime);if(!frame)return;
   replayTime=frame.t;const x=frame.state;$('timeline').value=String(replayTime);rotorRates=x.slice(13,17);
   updateTelemetry({t:frame.t,p:x.slice(0,3),v:x.slice(3,6),z:x[2],soc:x[17]});
+  $('status').textContent=`기록 보기 · ${controllerNames[r.configuration.controller]} · ${number(frame.t)} / ${number(r.simulated_seconds)} s (새 물리 계산 아님)`;
   $('live-rate').textContent=playing?$('replay-speed').value+'× 재생':'기록 정지';
   $('replay-state').textContent=`${number(replayTime)} / ${number(r.simulated_seconds)} s · 위치 [${x.slice(0,3).map(number).join(', ')}] m · vx ${number(x[3])} m/s`;
   if(vehicle){vehicle.visible=r.profile_id==='selected-6931';vehicle.position.set(...x.slice(0,3));vehicle.quaternion.set(...x.slice(6,10));drawModel();}
@@ -403,22 +507,51 @@ async function previewSTL() {
     liveBounds.expandByPoint(new THREE.Vector3(...position));liveBounds.getCenter(pathCenter);
     pathRadius=Math.max(1.3,liveBounds.getSize(new THREE.Vector3()).length()*1.6);
   };
-  let azimuth=-.9,elevation=.35,drag=null,zoom=1;
-  $('camera-reset').addEventListener('click',()=>{azimuth=-.9;elevation=.35;zoom=1;drawModel();});
+  let azimuth=-.9,elevation=.35,drag=null,zoom=1,following=true,noseView=false;
+  const pan=new THREE.Vector3(),fixedTarget=vehicle.position.clone();
+  function setFollowing(value){
+    following=value;fixedTarget.copy(vehicle.position);
+    $('follow').setAttribute('aria-pressed',String(value));
+    $('follow').textContent=value?'따라가기 ON (F)':'따라가기 OFF (F)';drawModel();
+  }
+  $('follow').addEventListener('click',()=>setFollowing(!following));
+  for(const [id,az,el] of [['camera-back',Math.PI,.15],['camera-side',-Math.PI/2,.15],['camera-top',0,Math.PI/2-.01]]){
+    $(id).addEventListener('click',()=>{azimuth=az;elevation=el;noseView=false;pan.set(0,0,0);drawModel();});
+  }
+  $('camera-nose').addEventListener('click',()=>{noseView=true;pan.set(0,0,0);setFollowing(true);});
+  $('camera-reset').addEventListener('click',()=>{azimuth=-.9;elevation=.35;zoom=1;noseView=false;pan.set(0,0,0);setFollowing(true);});
   host.addEventListener('wheel',event=>{event.preventDefault();zoom=Math.max(.35,Math.min(6,zoom*Math.exp(event.deltaY*.001)));drawModel();},{passive:false});
-  host.addEventListener('pointerdown',event=>{drag=[event.clientX,event.clientY];host.setPointerCapture(event.pointerId);});
-  host.addEventListener('pointermove',event=>{if(!drag)return;azimuth-=(event.clientX-drag[0])*.01;elevation=Math.max(-1.3,Math.min(1.3,elevation+(event.clientY-drag[1])*.01));drag=[event.clientX,event.clientY];drawModel();});
+  host.addEventListener('pointerdown',event=>{
+    drag=[event.clientX,event.clientY];host.setPointerCapture(event.pointerId);$('flight-view').focus({preventScroll:true});event.preventDefault();
+  });
+  host.addEventListener('pointermove',event=>{
+    if(!drag)return;
+    const dx=event.clientX-drag[0],dy=event.clientY-drag[1];
+    if(event.shiftKey){
+      // Translate the camera target in screen axes; never translate the aircraft.
+      const scale=2*camera.position.distanceTo(vehicle.position.clone().add(pan))*Math.tan(camera.fov*Math.PI/360)/Math.max(1,host.clientHeight);
+      pan.addScaledVector(new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0),-dx*scale);
+      pan.addScaledVector(new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1),dy*scale);
+    }else{noseView=false;azimuth-=dx*.01;elevation=Math.max(-1.55,Math.min(1.55,elevation+dy*.01));}
+    drag=[event.clientX,event.clientY];drawModel();
+  });
   host.addEventListener('pointerup',()=>drag=null);host.addEventListener('pointercancel',()=>drag=null);
   drawModel=function() {
     const w=host.clientWidth,h=host.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
     const entire=$('view-mode').value==='path'&&pathLine,world=$('view-mode').value==='world';
-    const target=entire?pathCenter:world?new THREE.Vector3(vehicle.position.x,vehicle.position.y,vehicle.position.z*.5):vehicle.position;
+    const tracked=following?vehicle.position:fixedTarget;
+    const target=(entire?pathCenter:world?new THREE.Vector3(tracked.x,tracked.y,tracked.z*.5):tracked).clone().add(pan);
     const radius=(entire?pathRadius:world?Math.max(4,vehicle.position.z*1.8):3)*zoom;
     flightGrid.visible=!world;
     const line=altitudeLine.geometry.attributes.position;
     line.setXYZ(0,vehicle.position.x,vehicle.position.y,0);line.setXYZ(1,...vehicle.position.toArray());line.needsUpdate=true;
     altitudeLine.frustumCulled=false;
-    camera.up.set(0,0,1);camera.position.set(target.x+radius*Math.cos(elevation)*Math.cos(azimuth),target.y+radius*Math.cos(elevation)*Math.sin(azimuth),target.z+radius*Math.sin(elevation));camera.lookAt(target);
+    camera.up.set(0,0,1);
+    if(noseView){
+      camera.position.copy(target).addScaledVector(new THREE.Vector3(1,0,0).applyQuaternion(vehicle.quaternion),radius);
+      camera.up.copy(new THREE.Vector3(0,1,0).applyQuaternion(vehicle.quaternion));
+    }else camera.position.set(target.x+radius*Math.cos(elevation)*Math.cos(azimuth),target.y+radius*Math.cos(elevation)*Math.sin(azimuth),target.z+radius*Math.sin(elevation));
+    camera.lookAt(target);
     renderer.render(scene,camera);
   };
   new ResizeObserver(drawModel).observe(host);

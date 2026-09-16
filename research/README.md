@@ -12,6 +12,9 @@ PD–INDI는 빠른 조작용 baseline이며 Hybrid가 아니다. `/research/`�
 
 ## 현재 상태와 알려진 문제
 
+- **[기존 인터페이스 복원](CLASSIC_UI_VALIDATION.md):** 왼쪽 슬라이더 / 가운데 큰 3D와
+  하단 그래프·시간축 / 오른쪽 설정. Space 시작·정지·재개, R 초기화, F 따라가기,
+  카메라 시점·Shift 이동·패널 폭 조절을 복원했다. 선정 기체의 물리·제어기는 유지한다.
 - **[비행 조작성 복원](FLIGHT_CONTROLS_VALIDATION.md):** Hybrid 기본 선택, 슬라이더와
   숫자 입력, 풍속·방향의 실제 플랜트 반영, 적용 시각 기록, 비행 중심 3D 배치.
   사용자가 승인한 실제 브라우저 조작·재생 검사도 수행했다.
@@ -123,6 +126,7 @@ node research/run.cjs selected nmpc eskf 0.2 hover
 node research/benchmark.cjs research/generated/benchmark-new.json
 node research/browser_smoke.cjs http://127.0.0.1:8765/research/ 0.2
 node research/browser_smoke.cjs http://127.0.0.1:8765/research/ 0.2 --extended
+node research/browser_smoke.cjs http://127.0.0.1:8765/sim.html .08 --classic
 node research/validate_v2.cjs research/generated/validation-new.json
 node research/summarize_v2.cjs research/generated/validation-new.json research/validation-new-summary.json
 ```
@@ -154,7 +158,7 @@ IPOPT 계산 성능이나 실제 20 ms 마감 보장으로 해석하지 않는�
 - `eskf.py`: 추정 전파·GPS 갱신·오차 리셋
 - `runtime.js`: 다중 주기, 센서, INDI, 지연 GPS 재적분, 평가
 - `numeric_export.py`: 공통 CasADi 명령열에서 수치 평가기 생성; 별도 물리식 없음
-- `index.html`, `page.js`, `worker.js`, `stl.js`: 웹 UI·Worker·외형
+- `index.html`, `classic.css`, `page.js`, `worker.js`, `stl.js`: 웹 UI·Worker·외형
 - `results.js`: v2 로그 검사·동일 조건 검사·시각적 재생 보간
 - `build_bundle.py`, `build_site.py`: 직렬화 및 정적 배포 패키징
 - `../gz_aero/tools/build_sim.py`: **기존** 실시간 데모 원본

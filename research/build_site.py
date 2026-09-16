@@ -19,14 +19,14 @@ def build(output):
         if not (ROOT / f"generated/{name}.json").is_file():
             raise FileNotFoundError("Run python3 -m research.build_bundle first")
     output.mkdir(parents=True, exist_ok=True)
-    sources=("index.html", "page.js", "worker.js", "runtime.js", "stl.js", "results.js")
+    sources=("index.html", "classic.css", "page.js", "worker.js", "runtime.js", "stl.js", "results.js")
     version=hashlib.sha256(b"".join((ROOT/name).read_bytes() for name in
         (*sources,"generated/simple.json","generated/selected.json"))).hexdigest()[:16]
     # HTML, worker, runtime and serialized functions form one compatible unit.
     # Cache-bust their references together so a returning tab cannot mix versions.
     for name in sources:
         text=(ROOT/name).read_text()
-        for script in ("page.js","worker.js","runtime.js","stl.js","results.js"):
+        for script in ("classic.css","page.js","worker.js","runtime.js","stl.js","results.js"):
             text=text.replace(f"./{script}'",f"./{script}?v={version}'")
             text=text.replace(f'./{script}"',f'./{script}?v={version}"')
         if name=="worker.js":

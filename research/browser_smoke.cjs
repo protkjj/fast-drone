@@ -10,7 +10,7 @@ async function main(){
   if(!Number.isFinite(seconds)||seconds<.02||seconds>2)throw new Error('Smoke-test duration must be 0.02–2 s');
   const executable=process.env.RESEARCH_CHROME||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
   const profile=mkdtempSync(join(tmpdir(),'drone-browser-qa-'));
-  const child=spawn(executable,['--headless=new','--no-first-run','--no-default-browser-check',
+  const child=spawn(executable,['--headless=new','--window-size=1280,900','--no-first-run','--no-default-browser-check',
     '--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{stdio:['ignore','ignore','pipe']});
   let socket;
   try {
@@ -48,6 +48,11 @@ async function main(){
         await new Promise(resolve=>setTimeout(resolve,100));
       }
       if(await evaluate('vehicle?.userData.rotors.length')!==4)throw new Error('STL rotor assembly did not load');
+      if(process.argv.includes('--classic')){
+        await require('./browser_classic.cjs')({evaluate,send,sessionId,profile});
+        if(errors.length)throw new Error(JSON.stringify(errors));
+        return;
+      }
       if(process.argv.includes('--flight')){
         await require('./browser_flight.cjs')({evaluate,send,sessionId,profile});
         if(errors.length)throw new Error(JSON.stringify(errors));
