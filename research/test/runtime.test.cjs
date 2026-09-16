@@ -82,10 +82,15 @@ test('selected-aircraft WASM parity and both controllers survive a sequential ho
 });
 test('selected standalone NMPC solves the first speed-preview problem within 30 iterations',async()=>{
   const selected=JSON.parse(fs.readFileSync(path.join(__dirname,'../generated/selected.json'),'utf8'));
-  const result=await runtime.run(ca,selected,{seconds:.02,scenario:'step',controller:'nmpc',feedback:'truth'});
-  assert.equal(result.metrics.solver_failures,0,JSON.stringify(result.solves));
-  assert.ok(result.solves[0].iterations<=30);assert.ok(result.solves[0].residual<1e-3);
-  assert.equal(result.counts.indi,0);
+  // This is one optimizer problem, not a complete speed-step experiment.
+  const bindings=runtime.makeBindings(ca,selected);
+  try {
+    const optimizer=new runtime.Optimizer(ca,bindings,selected,'nmpc');
+    optimizer.solve(selected.initial,runtime.referenceHorizon(0,{scenario:'step',speed:3}),
+      selected.profile.battery.series*4.2,[0,0,0]);
+    assert.ok(optimizer.stats[0].success,JSON.stringify(optimizer.stats));
+    assert.ok(optimizer.stats[0].iterations<=30);assert.ok(optimizer.stats[0].residual<1e-3);
+  }finally{bindings.dispose();}
 });
 test('STL uses metres and the selected CG, with body +x pointing at the nose',()=>{
   const bytes=fs.readFileSync(path.join(__dirname,'../assets/drone_v2.stl'));

@@ -113,3 +113,27 @@ def test_step_does_not_snap_velocity_to_reference(model):
     assert np.isclose(np.linalg.norm(nxt[6:10]), 1)
     # No target speed is even an argument to the plant.
     assert f["step"].n_in() == 4
+
+
+def test_inverse_force_uses_monotone_physical_propeller_map(model):
+    p, f = model
+    maximum = rpm_limit(p)
+    for axial in (-10, 0, 5, 20, 83):
+        forces = [float(f["rotors"]([n]*4, axial)[0][0]) for n in np.linspace(0, maximum, 101)]
+        assert np.all(np.diff(forces) >= -1e-9)
+        cap = forces[-1]
+        for fraction in (0, .001, .2, .8, 1, 1.1):
+            n = np.asarray(f["inverse_thrust"]([fraction*cap]*4, axial, maximum)).ravel()
+            assert np.all((n >= 0) & (n <= maximum))
+            actual = np.asarray(f["rotors"](n, axial)[0]).ravel()
+            np.testing.assert_allclose(actual, min(fraction, 1)*cap, atol=1e-5)
+
+
+def test_current_limiting_diagnostics_do_not_change_motor_physics(model):
+    p, f = model
+    x = initial_state(p)
+    d = diagnostic(f, x, x[13:17]*1.3)
+    actual = np.minimum(np.clip(d["requested_current"], 0, d["current_limit"]), d["voltage_current_cap"])
+    np.testing.assert_allclose(actual, d["current"], atol=1e-10)
+    assert np.any(d["tracking_limited"])
+    assert np.any(d["current_limited"]+d["voltage_limited"])

@@ -361,12 +361,14 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
         단순 전진비 추력 모델입니다. 고도는 지상 기준입니다. 고도에 따른 밀도 변화,
         돌풍, 센서 오차, 배터리·열 제한, 로터 후류와 지상효과는 포함하지 않습니다.</p>
       <p class="note"><b>지면은 실패 판정 경계</b>입니다. 이륙 후 지면에 닿으면 정지하며,
-        충돌 변형이나 파손을 계산하지 않습니다.</p>
+        무게중심 높이만 검사합니다. STL 표면 충돌·착륙 다리·마찰·반발·파손을
+        계산하지 않으므로 착륙 안전성 검증용이 아닙니다.</p>
       <p class="note">숫자 일치는 구현 검사입니다. 실기체 성능은 별도 실험이 필요합니다.
         명령과 실측 차이는 제어기·모델·구동기 제한을 함께 확인해야 해석할 수 있습니다.</p>
       <p class="note">‘총 받음각’은 기수축과 공기 상대속도 사이의 각도(0~180°)입니다.
         α는 동체 XZ 평면, β는 옆미끄럼각입니다. 대기속도 0.5 m/s 미만에서는
-        방향각을 정의하지 않습니다. 역류(총 받음각 &gt;90°)는 미검증 영역입니다.</p>
+        방향각을 정의하지 않습니다. 역류(총 받음각 &gt;90°)는 미검증 영역입니다.
+        이 영역의 항력·횡력은 병진 에너지를 만들지 않는 연장식이며 실측 공력은 아닙니다.</p>
       <p class="note">마우스 끌기 = 회전 · 휠 = 확대 · Shift+끌기 = 이동.<br>
         Space = 시작/정지 · R = 초기화 · F = 따라가기.<br>
         타임라인은 방향키·Home·End로 이동합니다.</p>
@@ -464,11 +466,11 @@ function xdot(x, u, w, p){
   const V_cf = Math.sqrt(vb*vb + wb*wb + EPS);
   const q_bar = 0.5 * p.rho * V_sq;
 
-  const F_N_fac = 0.5 * p.rho * p.S_ref * (p.C_Na*ub + p.C_dc*V_cf);
+  const F_N_fac = 0.5 * p.rho * p.S_ref * (p.C_Na*Math.abs(ub) + p.C_dc*V_cf);
   const Fy = -F_N_fac * vb;
   const Fz = -F_N_fac * wb;
   const C_A = p.C_A0 + p.C_Aa2 * (vb*vb + wb*wb) / V_sq;
-  const Fx = -q_bar * p.S_ref * C_A;
+  const Fx = -q_bar * p.S_ref * C_A * Math.sign(ub);
 
   const xcp = p.x_cp;
   let Mx = 0.0, My = -xcp*Fz, Mz = xcp*Fy;
@@ -716,8 +718,8 @@ function vXdot(x, u, p){
   const vb=R01*vx+R11*vy+R21*vz;
   const wb=R02*vx+R12*vy+R22*vz;
   const V_sq = ub*ub+vb*vb+wb*wb+EPS, V_cf = Math.sqrt(vb*vb+wb*wb+EPS);
-  const fac = 0.5*p.rho*p.S_ref*(p.C_Na*ub + p.C_dc*V_cf);
-  let Fx = -0.5*p.rho*V_sq*p.S_ref*(p.C_A0 + p.C_Aa2*(vb*vb+wb*wb)/V_sq);
+  const fac = 0.5*p.rho*p.S_ref*(p.C_Na*Math.abs(ub) + p.C_dc*V_cf);
+  let Fx = -0.5*p.rho*V_sq*p.S_ref*(p.C_A0 + p.C_Aa2*(vb*vb+wb*wb)/V_sq)*Math.sign(ub);
   let Fy = -fac*vb, Fz = -fac*wb;
   // 추력축. 로켓형은 동체 +x, 평면형은 동체 -z.
   if (p.thrust_axis === "x") Fx += u[0]; else Fz += -u[0];
@@ -1269,10 +1271,10 @@ function aeroWorld(x){
   const wb = R[0][2]*d0+R[1][2]*d1+R[2][2]*d2;
   const V_sq = ub*ub + vb*vb + wb*wb + EPS;
   const V_cf = Math.sqrt(vb*vb + wb*wb + EPS);
-  const fac = 0.5*P.rho*P.S_ref*(P.C_Na*ub + P.C_dc*V_cf);
+  const fac = 0.5*P.rho*P.S_ref*(P.C_Na*Math.abs(ub) + P.C_dc*V_cf);
   const Fy = -fac*vb, Fz = -fac*wb;
   const C_A = P.C_A0 + P.C_Aa2*(vb*vb + wb*wb)/V_sq;
-  const Fx = -0.5*P.rho*V_sq*P.S_ref*C_A;
+  const Fx = -0.5*P.rho*V_sq*P.S_ref*C_A*Math.sign(ub);
   return [R[0][0]*Fx + R[0][1]*Fy + R[0][2]*Fz,
           R[1][0]*Fx + R[1][1]*Fy + R[1][2]*Fz,
           R[2][0]*Fx + R[2][1]*Fy + R[2][2]*Fz];
@@ -1723,10 +1725,10 @@ function diag(){
   const pitchAlpha = anglesValid ? Math.atan2(wb, ub)*180/Math.PI : null;
   const beta = anglesValid ? Math.atan2(vb, Math.hypot(ub,wb))*180/Math.PI : null;
   const q_bar = 0.5*P.rho*(V*V);
-  const fac = 0.5*P.rho*P.S_ref*(P.C_Na*ub + P.C_dc*Vcf);
+  const fac = 0.5*P.rho*P.S_ref*(P.C_Na*Math.abs(ub) + P.C_dc*Vcf);
   const Fy = -fac*vb, Fz = -fac*wb;
   const C_A = P.C_A0 + P.C_Aa2*(vb*vb+wb*wb)/(V*V+EPS);
-  const Fx = -q_bar*P.S_ref*C_A;
+  const Fx = -q_bar*P.S_ref*C_A*Math.sign(ub);
   // 기울임 = **추력축**(로켓형은 동체 x)이 수직에서 벗어난 각.
   const tAx = (P.thrust_axis === "x") ? R[2][0] : -R[2][2];
   const tilt = Math.acos(Math.max(-1,Math.min(1, tAx)))*180/Math.PI;

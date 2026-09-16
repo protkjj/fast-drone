@@ -70,13 +70,15 @@ def _body_aerodynamics(v_body, omega, p):
     q_bar = 0.5 * rho * V_sq
 
     # 수직력 (V_cf 분모 소거로 특이점 없음)
-    F_N_fac = 0.5 * rho * S * (p['C_Na'] * u_b + p['C_dc'] * V_cf)
+    # Passive continuation outside forward-flight calibration. This prevents
+    # negative axial inflow from turning cross-flow damping into propulsion.
+    F_N_fac = 0.5 * rho * S * (p['C_Na'] * ca.fabs(u_b) + p['C_dc'] * V_cf)
     Fy = -F_N_fac * v_b
     Fz = -F_N_fac * w_b
 
     # 축력 (항력, 전방비행 시 -x 방향)
     C_A = p['C_A0'] + p['C_Aa2'] * (v_b**2 + w_b**2) / V_sq
-    Fx = -q_bar * S * C_A
+    Fx = -q_bar * S * C_A * ca.sign(u_b)
 
     F_aero = ca.vertcat(Fx, Fy, Fz)
 

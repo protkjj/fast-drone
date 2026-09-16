@@ -7,6 +7,14 @@ from control.vehicle_params import vehicle_params as P
 from control.dynamics import AxialDronePlant, build_dynamics, compute_allocation_matrix, NX
 
 
+def test_reverse_and_cross_flow_do_not_add_translational_energy():
+    from control.dynamics import _body_aerodynamics
+    import casadi as ca
+    for velocity in ([-20,0,0], [-20,5,3], [0,5,3], [20,5,3]):
+        force, _ = _body_aerodynamics(ca.DM(velocity), ca.DM.zeros(3), P)
+        assert np.asarray(force).ravel() @ velocity <= 1e-9
+
+
 def test_freefall():
     """로터 0: 순수 자유낙하 → v_z ≈ -g·t (관성 z-up)."""
     print("=" * 55)

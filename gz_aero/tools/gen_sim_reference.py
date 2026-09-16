@@ -77,11 +77,11 @@ def plain_xdot(x, u, w, p):
     V_cf = math.sqrt(vb * vb + wb * wb + EPS)
     q_bar = 0.5 * p["rho"] * V_sq
 
-    F_N_fac = 0.5 * p["rho"] * p["S_ref"] * (p["C_Na"] * ub + p["C_dc"] * V_cf)
+    F_N_fac = 0.5 * p["rho"] * p["S_ref"] * (p["C_Na"] * abs(ub) + p["C_dc"] * V_cf)
     Fy = -F_N_fac * vb
     Fz = -F_N_fac * wb
     C_A = p["C_A0"] + p["C_Aa2"] * (vb * vb + wb * wb) / V_sq
-    Fx = -q_bar * p["S_ref"] * C_A
+    Fx = -q_bar * p["S_ref"] * C_A * (1 if ub > 0 else -1 if ub < 0 else 0)
 
     xcp = p["x_cp"]
     Mx = 0.0

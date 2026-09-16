@@ -6,6 +6,9 @@ Python과 브라우저의 물리·제어·추정 경로를 재현하는 것이�
 
 ## 현재 상태와 알려진 문제
 
+- **v2 시뮬레이터 보강:** 총추력 우선 비선형 INDI 할당, 전류/전압/모터 추종 제한
+  진단, 센서 시각 정렬, 예고/비예고 목표, 풀이 경계 중지, 상세 v2 로그와
+  시간축 재생을 제공한다. [변경 이유와 채널 정의](INTERFACE_V2.md)를 참고한다.
 - 실제 CasADi/IPOPT WebAssembly를 사용한다. Python에서 만든 수식과 NLP를
   직렬화하여 브라우저 Worker에서 계산한다. 서버에서 풀이하지 않는다.
 - 짧은 호버에서 Hybrid와 NMPC 단독의 실행, Python/WASM 수치 일치,
@@ -29,7 +32,7 @@ Python과 브라우저의 물리·제어·추정 경로를 재현하는 것이�
 | 좌표 | body +x 추력, world +z 위쪽, body→world quaternion `[x,y,z,w]` |
 | 플랜트 | 17개 기계 상태 `[p,v,q,omega,n]` + 배터리 SOC 1개 |
 | Hybrid NMPC | 13상태, 가상 입력 `[T,angular acceleration]` |
-| INDI | 자이로 미분/필터, 동기화된 RPM·추력, 제한된 증분 회전수 할당 |
+| INDI | 자이로 미분/동기 필터, 총추력 등식·로터 힘 경계 할당, 공통 추진 맵 역산 |
 | NMPC 단독 | 17상태, 네 로터 회전수 명령을 직접 최적화; INDI 없음 |
 | NMPC 설정 | N=20, 예측 간격 0.05 s, 1 s 범위, 매 0.02 s, 최대 30회 반복 |
 | 빠른 주기 | 플랜트 RK4 / IMU / INDI 0.001 s |
@@ -95,6 +98,9 @@ node research/run.cjs selected hybrid truth 0.2 hover
 node research/run.cjs selected nmpc eskf 0.2 hover
 node research/benchmark.cjs research/generated/benchmark-new.json
 node research/browser_smoke.cjs http://127.0.0.1:8765/research/ 0.2
+node research/browser_smoke.cjs http://127.0.0.1:8765/research/ 0.2 --extended
+node research/validate_v2.cjs research/generated/validation-new.json
+node research/summarize_v2.cjs research/generated/validation-new.json research/validation-new-summary.json
 ```
 
 benchmark 명령은 동일 조건의 6개 속도 변경 시험을 순차 실행한다. 실제 WASM
@@ -104,6 +110,19 @@ benchmark 명령은 동일 조건의 6개 속도 변경 시험을 순차 실행�
 browser_smoke는 macOS의 별도 임시 Chrome 프로필에서 두 제어기·두 피드백
 경로와 로터 회전/정지를 검사한다. `RESEARCH_CHROME`으로 실행 파일을 지정할 수 있다.
 
+`--extended`는 실제 JSON 저장·가져오기·재생·설정 복원·중지·좁은 화면을 추가로
+확인한다. 임시 브라우저 프로필과 다운로드를 보존하고 사용자 브라우저에는
+접속하지 않는다. `validate_v2`는 6개 조건 × 2개 제어기를 동일 설정으로 실행하며,
+외란에 seed 7/42/2026을 쓴다. 새 파일만 생성하도록 `wx`를 사용한다.
+노트북 절전·다른 작업은 경과 시간 통계에 영향을 준다. 이를 포함한 수치를
+IPOPT 계산 성능이나 실제 20 ms 마감 보장으로 해석하지 않는다.
+
+속도 변경 시험은 1.1초 이상, 2–3초 외란 시험은 3.1초 이상이어야 한다.
+이 최소 기간이 정착 시간이나 강건성 평가에 충분하다는 뜻은 아니다.
+상세 1 kHz 로그는 20초 이하이며, JSON 파일은 최대 256 MiB까지 가져온다.
+로그 재생은 기록 보간일 뿐 새 물리 적분이 아니다. 설정 재사용은 현재 버전의
+코드를 실행하므로 원본 로그의 구현 해시와 비교해야 한다.
+
 ## 코드 위치와 배포
 
 - `model.py`: 추진·모터·배터리·6DOF 및 공통 수식
@@ -111,6 +130,7 @@ browser_smoke는 macOS의 별도 임시 Chrome 프로필에서 두 제어기·�
 - `eskf.py`: 추정 전파·GPS 갱신·오차 리셋
 - `runtime.js`: 다중 주기, 센서, INDI, 지연 GPS 재적분, 평가
 - `index.html`, `page.js`, `worker.js`, `stl.js`: 웹 UI·Worker·외형
+- `results.js`: v2 로그 검사·동일 조건 검사·시각적 재생 보간
 - `build_bundle.py`, `build_site.py`: 직렬화 및 정적 배포 패키징
 - `../gz_aero/tools/build_sim.py`: **기존** 실시간 데모 원본
 

@@ -49,7 +49,8 @@ self.onmessage=async event=>{
     for(const controller of event.data.controllers) {
       if(stopping) break;
       postMessage({type:'progress',controller,t:0,total:event.data.options.seconds,solves:0,
-        v:data.initial.slice(3,6),z:data.initial[2],q:data.initial.slice(6,10),rpm:data.initial.slice(13,17)});
+        v:data.initial.slice(3,6),z:event.data.options.altitude??20,p:[0,0,event.data.options.altitude??20],
+        q:data.initial.slice(6,10),rpm:data.initial.slice(13,17)});
       const result=await ResearchRuntime.run(ca,data,{...event.data.options,controller},
         value=>postMessage({type:'progress',controller,...value}),()=>stopping);
       results.push(result);

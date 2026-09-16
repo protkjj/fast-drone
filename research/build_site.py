@@ -1,6 +1,7 @@
 """Package the optional research page with pinned, same-origin WASM dependencies."""
 import argparse
 import gzip
+import hashlib
 from pathlib import Path
 import shutil
 
@@ -18,8 +19,19 @@ def build(output):
         if not (ROOT / f"generated/{name}.json").is_file():
             raise FileNotFoundError("Run python3 -m research.build_bundle first")
     output.mkdir(parents=True, exist_ok=True)
-    for name in ("index.html", "page.js", "worker.js", "runtime.js", "stl.js"):
-        shutil.copy2(ROOT / name, output / name)
+    sources=("index.html", "page.js", "worker.js", "runtime.js", "stl.js", "results.js")
+    version=hashlib.sha256(b"".join((ROOT/name).read_bytes() for name in
+        (*sources,"generated/simple.json","generated/selected.json"))).hexdigest()[:16]
+    # HTML, worker, runtime and serialized functions form one compatible unit.
+    # Cache-bust their references together so a returning tab cannot mix versions.
+    for name in sources:
+        text=(ROOT/name).read_text()
+        for script in ("page.js","worker.js","runtime.js","stl.js","results.js"):
+            text=text.replace(f"./{script}'",f"./{script}?v={version}'")
+            text=text.replace(f'./{script}"',f'./{script}?v={version}"')
+        if name=="worker.js":
+            text=text.replace(".json.gz`",f".json.gz?v={version}`")
+        (output/name).write_text(text)
     (output / "assets").mkdir(exist_ok=True)
     shutil.copy2(ROOT / "assets/drone_v2.stl", output / "assets/drone_v2.stl")
     (output / "generated").mkdir(exist_ok=True)
@@ -33,7 +45,7 @@ def build(output):
     for name in files:
         shutil.copy2(package / name, vendor / name)
     shutil.copytree(package / "licenses", vendor / "licenses", dirs_exist_ok=True)
-    print(f"Research page: {output}/index.html")
+    print(f"Research page: {output}/index.html (asset version {version})")
 
 
 if __name__ == "__main__":

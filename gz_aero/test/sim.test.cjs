@@ -2,6 +2,16 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {simulator} = require('./sim_harness.cjs');
 
+test('역방향·사선 유입 공력은 병진 운동 에너지를 생성하지 않는다',()=>{
+  const sim=simulator();
+  const powers=sim.run(`[[ -20,0,0],[-20,5,3],[0,5,3],[20,5,3]].map(v=>{
+    const x=Array(17).fill(0);x[2]=20;x[9]=1;x.splice(3,3,...v);
+    const dx=xdot(x,[0,0,0,0],[0,0,0],P0);
+    return P0.mass*(dx[3]*v[0]+dx[4]*v[1]+(dx[5]+P0.g)*v[2]);
+  })`);
+  powers.forEach(power=>assert.ok(power<=1e-9,`공력 일률 ${power} W`));
+});
+
 test('STL 외형은 상태의 위치·자세만 따르며 기존 물리 상태를 바꾸지 않는다', () => {
   const sim=simulator();
   const result=sim.run(`const before=Array.from(X), calls={};

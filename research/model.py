@@ -132,6 +132,20 @@ def battery_voltage(n, cmd, torque, soc, p):
     return voltage, voc
 
 
+def motor_limits(n, cmd, torque, voltage, p):
+    """Diagnostic limits; these never change the physical saturation equations."""
+    m, b = p["motor"], p["battery"]
+    kt = 60/(2*np.pi*m["kv_rpm_V"])
+    friction = kt*m["i0_A"]*n/ca.sqrt(n*n+1)
+    requested = (torque+friction+m["rotor_inertia_kg_m2"]*(cmd-n)/m["speed_loop_tau_s"])/kt
+    limit = min(m["current_limit_A"], b["capacity_Ah"]*b["max_C"]*b["esc_efficiency"]/4)
+    cap = ca.fmax((voltage-kt*n)/m["resistance_ohm"], 0)
+    bounded = clip(requested, 0, limit)
+    actual = ca.fmin(bounded, cap)
+    return [requested, ca.DM(limit), cap, requested>limit+1e-8,
+            bounded>cap+1e-8, requested < -1e-8, ca.fabs(actual-requested)>1e-8]
+
+
 def mechanical(x, dn, thrust, torque, wind, moment_disturbance, p, scales):
     r = rotation(x[6:10])
     rate, n = x[10:13], x[13:17]
@@ -177,6 +191,9 @@ def build(p):
                voc-voltage-p["battery"]["resistance_ohm"]*ibus, outside, advance, force, moment]
     names = ["thrust", "torque", "current", "dn", "voltage", "ibus", "power", "shaft", "copper",
              "friction", "rotor_kinetic_rate", "motor_energy_residual", "bus_residual", "outside_map", "J", "aero_force", "moment"]
+    outputs += motor_limits(n, cmd, torque, voltage, p)
+    names += ["requested_current", "current_limit", "voltage_current_cap", "current_limited",
+              "voltage_limited", "coasting", "tracking_limited"]
     diag = ca.Function("diagnostics", [x, cmd, environment, scales], outputs,
                        ["x", "u", "env", "scales"], names)
     k1 = rhs(x, cmd, environment, scales)
@@ -224,9 +241,24 @@ def build(p):
                     -ca.dot(ca.DM([a,-a,-a,a]), ti))
     wrench = ca.vertcat(ca.sum1(ti), mi/ca.DM(p["inertia_kg_m2"]))
     effect = ca.Function("effectiveness", [pn, pa], [wrench, ca.jacobian(wrench, pn)])
+    rotors = ca.Function("rotor_channels", [pn, pa],
+                        [ti, qi, ca.diag(ca.jacobian(ti,pn)), ca.diag(ca.jacobian(qi,pn))])
+    # Invert the SAME propulsion graph. The allocator does not differentiate
+    # through bisection decisions: it uses dQ/dn / dT/dn for its force Jacobian.
+    desired, axial, maximum = ca.MX.sym("rotor_thrust",4), ca.MX.sym("inflow"), ca.MX.sym("maximum_rad_s")
+    low, high = ca.MX.zeros(4), ca.repmat(maximum,4,1)
+    for _ in range(28):
+        middle = (low+high)/2
+        below = rotors(middle,axial)[0] < desired
+        low = ca.if_else(below,middle,low)
+        high = ca.if_else(below,high,middle)
+    cap = rotors(ca.repmat(maximum,4,1),axial)[0]
+    inverse = ca.Function("inverse_rotor_thrust", [desired,axial,maximum],
+                          [ca.if_else(desired<=1e-12,0,
+                           ca.if_else(desired>=cap,maximum,(low+high)/2))])
     af = ca.Function("aerodynamics", [xv, environment[:3]], [fv])
     return {"rhs": rhs, "step": step, "diag": diag, "full": full, "constrained": constrained,
-            "virtual": vf, "effect": effect, "aero": af}
+            "virtual": vf, "effect": effect, "aero": af, "rotors": rotors, "inverse_thrust": inverse}
 
 
 def initial_state(p, altitude=20):
