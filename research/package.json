@@ -1,0 +1,12 @@
+{
+  "name": "fast-drone-research-runtime",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Pinned CasADi/IPOPT WebAssembly runtime for research parity checks",
+  "dependencies": {
+    "@casadi/casadi-wasm": "3.8.0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.cjs"
+  }
+}

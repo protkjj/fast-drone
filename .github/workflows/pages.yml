@@ -1,0 +1,64 @@
+name: Pages
+
+# 공력 페이지(시뮬레이터·대시보드)를 GitHub Pages 로 올린다.
+# 기존 데모는 results/에서 복사하고, 연구 페이지의 공통 CasADi 그래프는
+# 고정 버전으로 생성한다. 모든 계산은 브라우저 Worker에서 실행된다.
+
+on:
+  push:
+    branches: [main, bulnabi]
+    paths:
+      - 'results/*.html'
+      - 'gz_aero/tools/build_site.py'
+      - 'research/**'
+      - 'control/dynamics.py'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: research/package-lock.json
+      - name: 연구 런타임 고정 의존성
+        run: |
+          python -m pip install -r research/requirements.txt
+          npm ci --prefix research --ignore-scripts --no-audit --no-fund
+      - name: 공통 수식 생성 및 연구 회귀 검사
+        run: |
+          python -m research.build_bundle
+          python -m pytest research/test_model.py research/test_estimator.py research/test_nmpc.py control/test_research_parity.py -q
+          npm test --prefix research
+      - name: site/ 조립
+        run: python3 gz_aero/tools/build_site.py --research
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

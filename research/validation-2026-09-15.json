@@ -1,0 +1,523 @@
+{
+  "schema": 1,
+  "raw_log_sha256": "48303ffdd9eec9cb71e145b0ed350c05c5724132124b7498ec01a10b37d69fb0",
+  "raw_log_filename": "benchmark-constraint-v1.json",
+  "reports": [
+    {
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "truth",
+        "scenario": "step",
+        "seconds": 2,
+        "speed": 3,
+        "seed": 42,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "profile_id": "selected-6931",
+      "implementation": {
+        "source_sha256": {
+          "model.py": "a7c4724c8d8411bc87e8542d77e3aa0097a7bc11b1f4ad60427a8773dd5623f4",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "03389615a0931622450d3b3d93de9ab7c97b1edbe4d2a58a66e6d08fe12cfba8",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72"
+        },
+        "input_sha256": "90fd7f7f0317e9f1cb14ec95d907c7f8206e9f1bb26b7f43095fdf392c6d9916"
+      },
+      "solver": "CasADi/IPOPT WebAssembly 3.8.0",
+      "simulated_seconds": 2,
+      "wall_seconds": 31.947204417,
+      "failure": null,
+      "counts": {
+        "plant": 2000,
+        "imu": 2000,
+        "nmpc": 100,
+        "indi": 2000,
+        "gps_captured": 20,
+        "gps_fused": 19,
+        "gps_replayed_imu": 380
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.4292158805792684,
+        "altitude_rmse_m": 0.02033028896895974,
+        "position_estimation_rmse_m": 0.07472381834008075,
+        "electrical_energy_J": 1104.2655443520657,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0,
+        "max_body_rate_rad_s": 1.8867849639646237,
+        "motor_energy_residual_W": 6.821210263296962e-13,
+        "bus_residual_V": 5.717648576819556e-15,
+        "solver_failures": 2,
+        "solve_ms_p50": 223.73133400000006,
+        "solve_ms_p95": 475.33074999999985,
+        "solve_ms_max": 1508.7837080000008,
+        "deadline_misses_20ms": 100
+      },
+      "final": [
+        3.0284521647280003,
+        -0.00043207353567769696,
+        20.00523578264621,
+        3.038514880978784,
+        0.00024949583821869993,
+        0.00339677905899586,
+        -0.0010743863555193074,
+        -0.7068357383204746,
+        -0.0011315693117672548,
+        0.7073759992237518,
+        4.61302983717736e-05,
+        0.04148121300695113,
+        8.748804881582764e-05,
+        1507.6828031437963,
+        1501.9891570673528,
+        1524.9187951076804,
+        1519.115736694231,
+        0.9970642235230381
+      ],
+      "failed_solves": [
+        {
+          "ms": 1508.7837080000008,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 1.0658141036401503e-14,
+          "control_tick": 21,
+          "time_s": 0.42
+        },
+        {
+          "ms": 1471.6619580000006,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 1.730043864848303e-06,
+          "control_tick": 62,
+          "time_s": 1.24
+        }
+      ]
+    },
+    {
+      "configuration": {
+        "controller": "nmpc",
+        "feedback": "truth",
+        "scenario": "step",
+        "seconds": 2,
+        "speed": 3,
+        "seed": 42,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "profile_id": "selected-6931",
+      "implementation": {
+        "source_sha256": {
+          "model.py": "a7c4724c8d8411bc87e8542d77e3aa0097a7bc11b1f4ad60427a8773dd5623f4",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "03389615a0931622450d3b3d93de9ab7c97b1edbe4d2a58a66e6d08fe12cfba8",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72"
+        },
+        "input_sha256": "90fd7f7f0317e9f1cb14ec95d907c7f8206e9f1bb26b7f43095fdf392c6d9916"
+      },
+      "solver": "CasADi/IPOPT WebAssembly 3.8.0",
+      "simulated_seconds": 2,
+      "wall_seconds": 341.327812417,
+      "failure": null,
+      "counts": {
+        "plant": 2000,
+        "imu": 2000,
+        "nmpc": 100,
+        "indi": 0,
+        "gps_captured": 20,
+        "gps_fused": 19,
+        "gps_replayed_imu": 380
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.4541400360254728,
+        "altitude_rmse_m": 0.012171256423349803,
+        "position_estimation_rmse_m": 0.07440934694292806,
+        "electrical_energy_J": 946.008523442722,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0,
+        "max_body_rate_rad_s": 1.221922181721878,
+        "motor_energy_residual_W": 3.410605131648481e-13,
+        "bus_residual_V": 5.800915303666443e-15,
+        "solver_failures": 0,
+        "solve_ms_p50": 3086.8334999999497,
+        "solve_ms_p95": 5796.9777500000055,
+        "solve_ms_max": 10481.780541,
+        "deadline_misses_20ms": 100
+      },
+      "final": [
+        2.999265364259746,
+        -1.3791496006293472e-17,
+        20.000625272971945,
+        3.052450080458663,
+        -5.795569954739838e-18,
+        -0.0013900669120055689,
+        1.234809389600092e-17,
+        -0.7084067425717213,
+        1.739490727298183e-17,
+        0.7058044255166745,
+        -3.4053398085903014e-16,
+        0.028967567701346952,
+        -6.0710663461358245e-18,
+        1505.5686890808165,
+        1505.5686890808165,
+        1518.8230144616223,
+        1518.8230144616225,
+        0.9974879500512571
+      ],
+      "failed_solves": []
+    },
+    {
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "eskf",
+        "scenario": "step",
+        "seconds": 2,
+        "speed": 3,
+        "seed": 42,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "profile_id": "selected-6931",
+      "implementation": {
+        "source_sha256": {
+          "model.py": "a7c4724c8d8411bc87e8542d77e3aa0097a7bc11b1f4ad60427a8773dd5623f4",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "03389615a0931622450d3b3d93de9ab7c97b1edbe4d2a58a66e6d08fe12cfba8",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72"
+        },
+        "input_sha256": "90fd7f7f0317e9f1cb14ec95d907c7f8206e9f1bb26b7f43095fdf392c6d9916"
+      },
+      "solver": "CasADi/IPOPT WebAssembly 3.8.0",
+      "simulated_seconds": 2,
+      "wall_seconds": 27.545669584000017,
+      "failure": null,
+      "counts": {
+        "plant": 2000,
+        "imu": 2000,
+        "nmpc": 100,
+        "indi": 2000,
+        "gps_captured": 20,
+        "gps_fused": 19,
+        "gps_replayed_imu": 380
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.43003143736337696,
+        "altitude_rmse_m": 0.052950705549568565,
+        "position_estimation_rmse_m": 0.07512380960514091,
+        "electrical_energy_J": 1168.8625626523376,
+        "saturation_fraction": 0.0005,
+        "outside_prop_map_fraction": 0,
+        "max_body_rate_rad_s": 2.2135916616426394,
+        "motor_energy_residual_W": 6.821210263296962e-13,
+        "bus_residual_V": 5.793976409762536e-15,
+        "solver_failures": 0,
+        "solve_ms_p50": 220.55420900002355,
+        "solve_ms_p95": 316.02362500003073,
+        "solve_ms_max": 499.12008299998706,
+        "deadline_misses_20ms": 100
+      },
+      "final": [
+        3.0672533581384673,
+        -0.018842351085605464,
+        20.112261306242026,
+        3.063049070846004,
+        -0.01718940878710241,
+        0.06115627842258195,
+        -0.004433260454410068,
+        -0.7123000271595732,
+        -0.001906149562238264,
+        0.7018585214301106,
+        -0.01856959268771246,
+        -0.05788939256639873,
+        0.05038791468043222,
+        1458.713337209913,
+        1482.9177016753288,
+        1509.7186434832215,
+        1500.732522875697,
+        0.9968772899253215
+      ],
+      "failed_solves": []
+    },
+    {
+      "configuration": {
+        "controller": "nmpc",
+        "feedback": "eskf",
+        "scenario": "step",
+        "seconds": 2,
+        "speed": 3,
+        "seed": 42,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "profile_id": "selected-6931",
+      "implementation": {
+        "source_sha256": {
+          "model.py": "a7c4724c8d8411bc87e8542d77e3aa0097a7bc11b1f4ad60427a8773dd5623f4",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "03389615a0931622450d3b3d93de9ab7c97b1edbe4d2a58a66e6d08fe12cfba8",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72"
+        },
+        "input_sha256": "90fd7f7f0317e9f1cb14ec95d907c7f8206e9f1bb26b7f43095fdf392c6d9916"
+      },
+      "solver": "CasADi/IPOPT WebAssembly 3.8.0",
+      "simulated_seconds": 2,
+      "wall_seconds": 357.550111209,
+      "failure": null,
+      "counts": {
+        "plant": 2000,
+        "imu": 2000,
+        "nmpc": 100,
+        "indi": 0,
+        "gps_captured": 20,
+        "gps_fused": 19,
+        "gps_replayed_imu": 380
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.45578203015720054,
+        "altitude_rmse_m": 0.038206879057206766,
+        "position_estimation_rmse_m": 0.07462795400285567,
+        "electrical_energy_J": 952.7255552710936,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0,
+        "max_body_rate_rad_s": 1.2551890198336315,
+        "motor_energy_residual_W": 4.547473508864641e-13,
+        "bus_residual_V": 5.995204332975845e-15,
+        "solver_failures": 1,
+        "solve_ms_p50": 3376.3894579999615,
+        "solve_ms_p95": 5962.104083999991,
+        "solve_ms_max": 9878.983415999915,
+        "deadline_misses_20ms": 100
+      },
+      "final": [
+        3.0256026141931156,
+        -0.013681497930200823,
+        20.082357737782992,
+        3.0776721781130307,
+        -0.015733031379210758,
+        0.07217710352447815,
+        -0.004945793803859036,
+        -0.7130096511501146,
+        -0.001025153421749633,
+        0.7011360249986471,
+        -0.004815331617348183,
+        -0.09362795897888485,
+        0.033478945866473354,
+        1454.8253277369322,
+        1461.6322510371197,
+        1492.5072093712931,
+        1487.3702213768092,
+        0.9974695054645166
+      ],
+      "failed_solves": [
+        {
+          "ms": 9878.983415999915,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 3.883113281152651e-07,
+          "control_tick": 96,
+          "time_s": 1.92
+        }
+      ]
+    },
+    {
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "truth",
+        "scenario": "step",
+        "seconds": 2,
+        "speed": 3,
+        "seed": 42,
+        "scales": [
+          1.1,
+          1.15,
+          1.15,
+          1.15,
+          0.9
+        ]
+      },
+      "profile_id": "selected-6931",
+      "implementation": {
+        "source_sha256": {
+          "model.py": "a7c4724c8d8411bc87e8542d77e3aa0097a7bc11b1f4ad60427a8773dd5623f4",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "03389615a0931622450d3b3d93de9ab7c97b1edbe4d2a58a66e6d08fe12cfba8",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72"
+        },
+        "input_sha256": "90fd7f7f0317e9f1cb14ec95d907c7f8206e9f1bb26b7f43095fdf392c6d9916"
+      },
+      "solver": "CasADi/IPOPT WebAssembly 3.8.0",
+      "simulated_seconds": 2,
+      "wall_seconds": 31.91893983300007,
+      "failure": null,
+      "counts": {
+        "plant": 2000,
+        "imu": 2000,
+        "nmpc": 100,
+        "indi": 2000,
+        "gps_captured": 20,
+        "gps_fused": 19,
+        "gps_replayed_imu": 380
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.4405764667453357,
+        "altitude_rmse_m": 0.06807693566041187,
+        "position_estimation_rmse_m": 0.07437636301532645,
+        "electrical_energy_J": 1185.4465652198987,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0.04,
+        "max_body_rate_rad_s": 1.8756838582426123,
+        "motor_energy_residual_W": 6.821210263296962e-13,
+        "bus_residual_V": 5.995204332975845e-15,
+        "solver_failures": 2,
+        "solve_ms_p50": 227.62162500002887,
+        "solve_ms_p95": 341.32058299996424,
+        "solve_ms_max": 1488.6616249999497,
+        "deadline_misses_20ms": 100
+      },
+      "final": [
+        3.0077671614590997,
+        -1.799330210990826e-17,
+        19.93059909172643,
+        3.047004997965764,
+        -6.044796590020225e-17,
+        0.008976174091995262,
+        -2.4207578720401496e-17,
+        -0.7070599946235903,
+        1.2001941410615137e-17,
+        0.7071535646540209,
+        -9.565642638064414e-18,
+        0.02860942905092729,
+        -7.24519790574749e-17,
+        1663.7123280007138,
+        1663.7123280007133,
+        1680.0451441923642,
+        1680.0451441923642,
+        0.9968271874712324
+      ],
+      "failed_solves": [
+        {
+          "ms": 1488.6616249999497,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 6.238900451815965e-09,
+          "control_tick": 12,
+          "time_s": 0.24
+        },
+        {
+          "ms": 1480.5184590000426,
+          "success": false,
+          "status": "Maximum_Iterations_Exceeded",
+          "iterations": 30,
+          "residual": 1.0658141036401503e-14,
+          "control_tick": 27,
+          "time_s": 0.54
+        }
+      ]
+    },
+    {
+      "configuration": {
+        "controller": "nmpc",
+        "feedback": "truth",
+        "scenario": "step",
+        "seconds": 2,
+        "speed": 3,
+        "seed": 42,
+        "scales": [
+          1.1,
+          1.15,
+          1.15,
+          1.15,
+          0.9
+        ]
+      },
+      "profile_id": "selected-6931",
+      "implementation": {
+        "source_sha256": {
+          "model.py": "a7c4724c8d8411bc87e8542d77e3aa0097a7bc11b1f4ad60427a8773dd5623f4",
+          "nmpc.py": "1f150529ab254c8dacc9b6faae24213998595c71a761fa8caa2089c98e0cf770",
+          "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+          "runtime.js": "03389615a0931622450d3b3d93de9ab7c97b1edbe4d2a58a66e6d08fe12cfba8",
+          "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72"
+        },
+        "input_sha256": "90fd7f7f0317e9f1cb14ec95d907c7f8206e9f1bb26b7f43095fdf392c6d9916"
+      },
+      "solver": "CasADi/IPOPT WebAssembly 3.8.0",
+      "simulated_seconds": 2,
+      "wall_seconds": 378.627661208,
+      "failure": null,
+      "counts": {
+        "plant": 2000,
+        "imu": 2000,
+        "nmpc": 100,
+        "indi": 0,
+        "gps_captured": 20,
+        "gps_fused": 19,
+        "gps_replayed_imu": 380
+      },
+      "metrics": {
+        "velocity_rmse_mps": 0.4637339100243309,
+        "altitude_rmse_m": 0.09262628247143863,
+        "position_estimation_rmse_m": 0.0738302681774007,
+        "electrical_energy_J": 1138.6349849723945,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0.1235,
+        "max_body_rate_rad_s": 1.1943180569574525,
+        "motor_energy_residual_W": 4.547473508864641e-13,
+        "bus_residual_V": 6.050715484207103e-15,
+        "solver_failures": 0,
+        "solve_ms_p50": 3443.827082999982,
+        "solve_ms_p95": 6083.689916999894,
+        "solve_ms_max": 9517.405166000011,
+        "deadline_misses_20ms": 100
+      },
+      "final": [
+        2.983234126373986,
+        -1.3288317970007557e-17,
+        19.90369207304513,
+        3.034980530616208,
+        5.20834134048742e-17,
+        0.03034178114930876,
+        -7.43501380791853e-18,
+        -0.7086724779950229,
+        6.2602710937489326e-18,
+        0.7055376098638498,
+        -3.4841256670271975e-17,
+        0.06963869565033487,
+        -2.0180496652284878e-16,
+        1661.148899931031,
+        1661.1488999310313,
+        1677.622718167613,
+        1677.6227181676131,
+        0.9969716048212401
+      ],
+      "failed_solves": []
+    }
+  ]
+}

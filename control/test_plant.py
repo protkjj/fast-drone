@@ -7,6 +7,14 @@ from control.vehicle_params import vehicle_params as P
 from control.dynamics import AxialDronePlant, build_dynamics, compute_allocation_matrix, NX
 
 
+def test_reverse_and_cross_flow_do_not_add_translational_energy():
+    from control.dynamics import _body_aerodynamics
+    import casadi as ca
+    for velocity in ([-20,0,0], [-20,5,3], [0,5,3], [20,5,3]):
+        force, _ = _body_aerodynamics(ca.DM(velocity), ca.DM.zeros(3), P)
+        assert np.asarray(force).ravel() @ velocity <= 1e-9
+
+
 def test_freefall():
     """로터 0: 순수 자유낙하 → v_z ≈ -g·t (관성 z-up)."""
     print("=" * 55)
@@ -115,6 +123,7 @@ def test_damping():
     xd = plant.evaluate_xdot(x0, np.full(4, n_hov))
     wdot_y = xd[11]
     print(f"  초기 omega_dot_y = {wdot_y:.4f} (음수 = 감쇠)")
+    assert wdot_y < 0, f"양의 피치 각속도에 감속이 없음: {wdot_y}"
     # 양의 q(2 rad/s)에 C_mq < 0 → 감쇠 모멘트는 음의 M_y
     # z-down에서 음의 M_y = 기수 하강 방향 → q 감소 → omega_dot_y < 0 (초기에)
     # 단, 공력 모멘트(정적)도 작용하므로 순수 감쇠만은 아님

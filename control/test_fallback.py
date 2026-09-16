@@ -86,13 +86,16 @@ def test_nmpc_fail_trigger():
     assert np.allclose(u, 500.0), "전환 스텝에 LQR 출력이 아님"
     assert ctrl.fallback_count == 1
     print("  consec_fail=3 → LQR 전환 + LQR 출력 반환 ✓  PASS\n")
-    return ctrl, hyb
 
 
-def test_recovery_resets(ctrl, hyb):
+def test_recovery_resets():
     """쿨다운(2s) 후 안정 상태면 Hybrid 복귀 + reset 호출로 카운터 초기화."""
     print("=" * 55)
     print("TEST 3: 쿨다운 후 복귀 + 카운터 리셋")
+    hyb, ctrl = _make()
+    hyb.nmpc.consec_fail = 3
+    ctrl(0.001, _hover_x())
+    assert ctrl.active_controller == 'LQR'
     x = _hover_x()          # 안정 상태 (z 오차 0, omega 0)
     for k in range(2100):   # cooldown_steps=2000 초과
         ctrl(0.002 + k * 0.001, x)
@@ -174,8 +177,8 @@ def test_smoke_real_hybrid():
 if __name__ == '__main__':
     print("\nHybridWithFallback 전환 로직 검증\n")
     test_no_spurious()
-    c, h = test_nmpc_fail_trigger()
-    test_recovery_resets(c, h)
+    test_nmpc_fail_trigger()
+    test_recovery_resets()
     test_nan_immediate()
     test_omega_trigger()
     test_smoke_real_hybrid()
