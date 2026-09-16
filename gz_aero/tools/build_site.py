@@ -18,6 +18,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from html.parser import HTMLParser
+from urllib.parse import urljoin, urlparse
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PAGES = [
@@ -95,6 +97,35 @@ footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--rule);
 """
 
 
+def validate_unified_entry(site):
+    """Verify canonical entry, referenced assets, and compatibility routes."""
+    class Entry(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.base = "https://local.invalid/sim.html"
+            self.assets = []
+            self.ids = []
+        def handle_starttag(self, tag, attrs):
+            values = dict(attrs)
+            if tag == "base":
+                self.base = urljoin(self.base, values["href"])
+            if "id" in values:
+                self.ids.append(values["id"])
+            if tag == "script" and "src" in values:
+                self.assets.append(urljoin(self.base, values["src"]))
+    page = Entry()
+    page.feed((site / "sim.html").read_text())
+    assert len(page.ids) == len(set(page.ids)), "Duplicate control IDs"
+    assert {"mode-observe", "mode-compare", "apply-target", "pause", "model", "run"} <= set(page.ids)
+    for asset in page.assets + [urljoin(page.base, "worker.js"), urljoin(page.base, "assets/drone_v2.stl")]:
+        parsed = urlparse(asset)
+        if parsed.hostname == "local.invalid":
+            assert (site / parsed.path.lstrip("/")).is_file(), f"Missing asset: {asset}"
+    assert "../sim.html?mode=compare" in (site / "research/index.html").read_text()
+    assert (site / "sim-legacy.html").is_file()
+    print("  통합 진입점·모드 제어·동일 출처 자산·이전 링크 검사 통과")
+
+
 def main(include_research=False):
     site = ROOT / "site"
     # 출력 폴더 전체를 지우지 않고 이 빌드가 관리하는 파일만 갱신한다.
@@ -102,6 +133,9 @@ def main(include_research=False):
     site.mkdir(exist_ok=True)
     cards, missing, out_names = [], [], []
     for src, dst, title, desc in PAGES:
+        if include_research and src == "flight_sim.html":
+            dst, title = "sim-legacy.html", "이전 8 kg 시험 데모"
+            desc = "선정 기체 물리가 아닌 이전 시험 모델입니다. 과거 기능 확인용으로 보존합니다."
         f = ROOT / "results" / src
         if not f.is_file():
             missing.append(src)
@@ -132,9 +166,19 @@ def main(include_research=False):
     if include_research:
         subprocess.run([sys.executable, "-m", "research.build_site", "--output", str(site / "research")],
                        cwd=ROOT, check=True)
-        cards.append('<a class="card" href="research/index.html"><h2>선정 기체 · 제어 연구실</h2>'
-                     '<p>실제 IPOPT · 50 Hz/1 kHz · 센서/ESKF · 선정 기체 STL. 오프라인 비교 실험.</p>'
+        # A single public application. Relative assets resolve under research/.
+        unified = (site / "research/index.html").read_text()
+        unified = unified.replace('<head>', '<head><base href="./research/">', 1)
+        (site / "sim.html").write_text(unified)
+        (site / "research/index.html").write_text('''<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>통합 시뮬레이터로 이동</title><meta http-equiv="refresh" content="0;url=../sim.html?mode=compare">
+</head><body><a href="../sim.html?mode=compare">선정 기체 시뮬레이터 · 정밀 비교 열기</a>
+</body></html>''')
+        cards.insert(0,'<a class="card" href="sim.html"><h2>선정 기체 비행 시뮬레이터</h2>'
+                     '<p>하나의 선정 기체 모델 · 실시간 관찰 / 정밀 비교 · 비행 기록 재생</p>'
                      '<span class="go">열기 →</span></a>')
+        validate_unified_entry(site)
     if not cards:
         print("올릴 페이지가 없습니다. 먼저 생성기를 돌리세요.", file=sys.stderr)
         return 1
@@ -172,8 +216,11 @@ def main(include_research=False):
 
     index = INDEX.replace("%%CARDS%%", "\n".join(cards))
     if include_research:
+        index = index.replace('축대칭 동체 공력', '선정 기체 비행 시뮬레이터')
+        index = index.replace('고속 ISR 미사일형 동체의 공력 모델과 비행 결과입니다.',
+                              '선정 기체를 관찰하고 같은 물리 모델에서 제어기를 비교합니다.')
         index = index.replace('페이지는 저장소의 <code>results/</code> 를 그대로 올린 것입니다.',
-                              '기존 데모는 <code>results/</code>, 연구 모드는 <code>research/</code>에서 만듭니다.')
+                              '통합 화면은 <code>research/</code>, 이전 데모와 공력 자료는 <code>results/</code>에서 만듭니다.')
     (site / "index.html").write_text(index,
                                      encoding="utf-8")
     # Jekyll 이 밑줄로 시작하는 경로를 건너뛰지 않게 한다

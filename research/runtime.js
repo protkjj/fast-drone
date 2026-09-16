@@ -98,18 +98,62 @@
       coasting:d[22].map(Boolean),tracking_limited:d[23].map(Boolean)};
   }
 
-  function makeBindings(ca, data) {
+  const numericCache=new WeakMap();
+  function makeBindings(ca, data, solverKinds=Object.keys(data.solvers),useNumeric=true) {
     const decode=group=>Object.fromEntries(Object.entries(group).map(([k,v])=>[k,ca.Function.deserialize(v)]));
     const functions=decode(data.functions), estimator=decode(data.estimator);
-    const solvers=Object.fromEntries(Object.entries(data.solvers).map(([k,v])=>[k,ca.Function.deserialize(v.function)]));
+    const solvers=Object.fromEntries(solverKinds.map(k=>[k,ca.Function.deserialize(data.solvers[k].function)]));
+    const numeric=new Map();
+    if(useNumeric&&data.numeric){
+      if(data.numeric.format!=='casadi-scalar-js-v1')throw new Error('Unknown numeric graph format');
+      if(!numericCache.has(data))numericCache.set(data,new Function(data.numeric.source)());
+      const compiled=numericCache.get(data);
+      for(const [key,layout] of Object.entries(data.numeric.layout)){
+        const [group,name]=key.split('.'),fn=(group==='functions'?functions:estimator)[name];
+        numeric.set(fn,args=>{
+          const flat=compiled[key](layout.inputs.flatMap((indices,i)=>indices.map(j=>args[i][j])));
+          let offset=0;
+          return layout.outputs.map(({size,indices})=>{
+            const values=Array(size).fill(0);for(const index of indices)values[index]=flat[offset++];return values;
+          });
+        });
+      }
+    }
     // elements() includes structural zeros, unlike nonzeros(). Matrix values
     // returned through the 3.8.0 binding are indexed Proxies. Calling delete()
     // on them does not unregister the original finalizer token and can cause
     // a double free at GC. Let the package's FinalizationRegistry own matrices.
     const array=dm=>dm.elements();
-    const call=(fn,...args)=>fn.call(args.map(v=>ca.DM(v))).map(array);
+    const call=(fn,...args)=>numeric.has(fn)?numeric.get(fn)(args):fn.call(args.map(v=>ca.DM(v))).map(array);
     const dispose=()=>[solvers,functions,estimator].forEach(group=>Object.values(group).forEach(fn=>fn.delete()));
     return {functions,estimator,solvers,call,array,dispose};
+  }
+
+  // Observation controller, explicitly NOT NMPC. It only sees the same feedback
+  // state as other controllers. Bounded virtual actions pass through the SAME
+  // 1 kHz INDI and physical actuator model; no state is assigned to a target.
+  class ObservationController {
+    constructor(binding,data){
+      this.b=binding;this.p=data.profile;this.stats=[];
+      this.previous=[this.p.mass_kg*this.p.g,0,0,0];
+    }
+    solve(state,refs){
+      const p=this.p,q=state.slice(6,10),ref=refs[0],v=state.slice(3,6);
+      const acceleration=[clamp(1.4*(ref[0]-v[0]),-6,6),clamp(-1.8*v[1],-6,6),
+        clamp(4*(ref[3]-state[2])-3*v[2],-6,6)];
+      const [aero]=this.b.call(this.b.functions.aero,state.slice(0,13),[0,0,0]);
+      const force=sub(acceleration.map((v,i)=>p.mass_kg*(v+(i===2?p.g:0))),rotate(q,aero));
+      const unit=v=>v.map(x=>x/Math.max(1e-12,norm(v))),dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0);
+      const desiredX=unit(force),heading=[0,1,0];
+      const desiredY=unit(sub(heading,desiredX.map(v=>v*dot(heading,desiredX))));
+      const desired=[desiredX,desiredY,cross(desiredX,desiredY)];
+      const current=[[1,0,0],[0,1,0],[0,0,1]].map(axis=>rotate(q,axis));
+      const errorWorld=current.map((axis,i)=>cross(axis,desired[i])).reduce(add,[0,0,0]).map(v=>v*.5);
+      const error=rotate(q,errorWorld,true),rate=state.slice(10,13);
+      const alpha=error.map((v,i)=>clamp([60,45,45][i]*v-[12,11,11][i]*rate[i],-80,80));
+      this.previous=[Math.max(0,dot(force,current[0])),...alpha];
+      return this.previous.slice();
+    }
   }
 
   // Warm-start grid nodes are 50 ms apart, but the controller advances 20 ms.
@@ -283,6 +327,11 @@
 
   function reference(t, config) {
     // This changes only the REFERENCE. The actual velocity is always integrated.
+    if(config.scenario==='schedule'){
+      let command=config.commands[0];
+      for(const next of config.commands){if(next.t>t+1e-10)break;command=next;}
+      return [command.speed,0,0,command.altitude];
+    }
     const vx=config.scenario==='hover'?0:(t<1?0:config.speed);
     return [vx,0,0,config.altitude??20];
   }
@@ -292,9 +341,9 @@
   function validateOptions(options={}) {
     const cfg={controller:'hybrid',feedback:'truth',scenario:'step',seconds:4,speed:3,altitude:20,
       seed:42,preview:true,log_hz:50,scales:[1,1,1,1,1],...options};
-    if(!['hybrid','nmpc'].includes(cfg.controller))throw new Error('Unknown controller');
+    if(!['hybrid','nmpc','pd'].includes(cfg.controller))throw new Error('Unknown controller');
     if(!['truth','eskf'].includes(cfg.feedback))throw new Error('Unknown feedback');
-    if(!['hover','step','gust'].includes(cfg.scenario))throw new Error('Unknown scenario');
+    if(!['hover','step','gust','schedule'].includes(cfg.scenario))throw new Error('Unknown scenario');
     if(!Number.isFinite(cfg.seconds)||cfg.seconds<.001||cfg.seconds>120)throw new Error('Duration must be 0.001–120 seconds');
     if(cfg.scenario==='step'&&cfg.seconds<1.1)throw new Error('속도 계단 시험은 1초 입력 이후를 포함하도록 1.1초 이상 필요합니다.');
     if(cfg.scenario==='gust'&&cfg.seconds<3.1)throw new Error('외란 시험은 2–3초 외란과 종료 이후를 포함하도록 3.1초 이상 필요합니다.');
@@ -304,6 +353,18 @@
     if(!Number.isInteger(cfg.seed)||cfg.seed<0||cfg.seed>4294967295)throw new Error('Seed must be an unsigned 32-bit integer');
     if(typeof cfg.preview!=='boolean')throw new Error('Preview must be true or false');
     if(![50,1000].includes(cfg.log_hz)||cfg.log_hz===1000&&cfg.seconds>20)throw new Error('로그는 50 Hz 또는 1 kHz입니다. 상세 1 kHz 로그는 20초 이하로 제한합니다.');
+    if(cfg.scenario==='schedule'){
+      if(!Array.isArray(cfg.commands)||!cfg.commands.length||cfg.commands.length>6001||cfg.commands[0].t!==0)
+        throw new Error('목표 일정은 0초 명령으로 시작해야 합니다.');
+      let previous=-1;
+      cfg.commands=cfg.commands.map(command=>{
+        const {t,speed,altitude}=command||{};
+        if(!Number.isFinite(t)||t<=previous||t>cfg.seconds||Math.abs(t/PERIOD/DT-Math.round(t/PERIOD/DT))>1e-7||
+           !Number.isFinite(speed)||speed<0||speed>100||!Number.isFinite(altitude)||altitude<1||altitude>1000)
+          throw new Error('목표 일정의 시각·속도·고도를 확인하세요. 시각은 증가하는 20 ms 격자여야 합니다.');
+        previous=t;return {t,speed,altitude};
+      });
+    }else delete cfg.commands;
     return cfg;
   }
   function environment(t, config) {
@@ -316,12 +377,26 @@
     return sorted[Math.floor((sorted.length-1)*q)];
   }
 
-  async function run(ca,data,options={},progress=()=>{},shouldStop=()=>false) {
+  // Pacing controls ONLY when the next fixed-size block may start. A suspended
+  // tab or slow machine never creates a large dt or a catch-up flight jump.
+  class ObservationClock {
+    constructor(now=()=>performance.now(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))){
+      this.now=now;this.sleep=sleep;this.reset(0);
+    }
+    reset(t){this.lastTime=t;this.lastWall=this.now();}
+    async wait(t,interrupted=()=>false){
+      const deadline=this.lastWall+Math.max(0,t-this.lastTime)*1000;
+      while(!interrupted()&&this.now()<deadline)await this.sleep(Math.min(20,deadline-this.now()));
+      this.reset(t);
+    }
+  }
+
+  async function run(ca,data,options={},progress=()=>{},shouldStop=()=>false,hooks={}) {
     const cfg=validateOptions(options);
-    const b=makeBindings(ca,data);
+    const b=makeBindings(ca,data,cfg.controller==='pd'?[]:[cfg.controller]);
     try {
-    const optimizer=new Optimizer(ca,b,data,cfg.controller);
-    const indi=cfg.controller==='hybrid'?new INDI(b,data):null;
+    const optimizer=cfg.controller==='pd'?new ObservationController(b,data):new Optimizer(ca,b,data,cfg.controller);
+    const indi=cfg.controller!=='nmpc'?new INDI(b,data):null;
     const initial=data.initial.slice();initial[2]=cfg.altitude;
     const estimator=new Estimator(b,data,initial);
     const s=data.sensors, p=data.profile;
@@ -340,7 +415,7 @@
     if(indi) indi.gyro=cfg.feedback==='eskf'?sensedGyro.slice():x.slice(10,13);
     let u=x.slice(13,17), request=optimizer.previous.slice(), voltage=p.battery.series*4.2;
     let samples=0, sumV2=0, sumZ2=0, sumEstimate2=0, energy=0, outside=0, maxEnergyResidual=0, maxBusResidual=0;
-    let failure=null, stopped=false, saturation=0, imuSamples=0, gpsSamples=0, maxRate=0;
+    let failure=null, stopped=false, saturation=0, imuSamples=0, gpsSamples=0, maxRate=0,outerUpdates=0;
     let currentLimited=0,voltageLimited=0,trackingLimited=0,coasting=0,allocationLimited=0,allocationThrustResidual=0,allocationAlphaResidual=0;
     const pendingGPS=[], gpsEvents=[], trace=[], ticks=Math.round(cfg.seconds/DT), begin=performance.now();
     const yieldMessages=()=>new Promise(resolve=>setTimeout(resolve,0));
@@ -356,23 +431,43 @@
           true_accel_bias_mps2:ba.slice(),true_gyro_bias_rad_s:bg.slice()},
         allocation:indi?.last||null});
     }
-    function report(t){progress({t,total:cfg.seconds,v:x.slice(3,6),z:x[2],p:x.slice(0,3),q:x.slice(6,10),rpm:x.slice(13,17),solves:optimizer.stats.length});}
+    function report(t){progress({t,total:cfg.seconds,v:x.slice(3,6),z:x[2],p:x.slice(0,3),q:x.slice(6,10),rpm:x.slice(13,17),solves:optimizer.stats.length,
+      reference:reference(t,cfg),soc:x[17],voltage,energy_J:energy,outside_map_fraction:samples?outside/samples:0,
+      current_limited_fraction:samples?currentLimited/samples:0,wall_seconds:(performance.now()-begin)/1000});}
     for(let tick=0;tick<ticks;tick++) {
-      const t=tick*DT, env=environment(t,cfg), target=reference(t,cfg);
+      const t=tick*DT, env=environment(t,cfg);
       // Controller receives this explicit observation. No true-state closure in it.
       const feedback=cfg.feedback==='truth'?x.slice(0,17):estimator.feedback(sensedGyro,sensedRpm);
       if(tick%PERIOD===0) {
         await yieldMessages();
+        if(hooks.beforeControl)await hooks.beforeControl(t);
         if(shouldStop()){stopped=true;break;}
+        const command=hooks.command?.();
+        if(command){
+          if(cfg.scenario!=='schedule'||cfg.controller!=='pd')throw new Error('Live commands require observation schedule mode');
+          const previousReference=reference(t,cfg);
+          const applied={t,speed:command.speed,altitude:command.altitude};
+          const commands=cfg.commands.filter(c=>c.t<t);
+          commands.push(applied);
+          cfg.commands=validateOptions({...cfg,commands}).commands;
+          // The preceding tick already sampled velocity error at x(t). Update
+          // that one boundary sample when a newly received command starts at t,
+          // matching a replay that knew the timestamped schedule in advance.
+          if(samples)sumV2+=sub(x.slice(3,6),reference(t,cfg).slice(0,3)).reduce((s,v)=>s+v*v,0)
+            -sub(x.slice(3,6),previousReference.slice(0,3)).reduce((s,v)=>s+v*v,0);
+          hooks.commandApplied?.({...applied});
+        }
         // Delta-input cost starts from the last achieved nominal allocation,
         // not an impossible requested virtual action. This is not plant truth.
         if(indi?.last)optimizer.previous=indi.last.allocated.slice();
         request=optimizer.solve(feedback,referenceHorizon(t,cfg),voltage,[0,0,0]);
+        outerUpdates++;
         const stat=optimizer.stats.at(-1);if(stat)stat.t_s=t;
         report(t);
         await yieldMessages();
         if(shouldStop()){stopped=true;break;}
       }
+      const target=reference(t,cfg);
       u=indi?indi.update(feedback,request,cfg.feedback==='eskf'?sensedGyro:feedback.slice(10,13)):request.slice();
       if(indi)indi.last.t_s=t;
       if(u.some(v=>v<1e-6||v>data.solvers.nmpc.max_rotor_rad_s-1e-6)) saturation++;
@@ -422,11 +517,11 @@
     const fraction=v=>samples?v/samples:null,rmse=v=>samples?Math.sqrt(v/samples):null;
     const timing=optimizer.stats.map(v=>v.ms);
     return {schema_version:2,configuration:cfg,profile_id:p.id,profile_name:p.name||null,
-      implementation:data.provenance||null,solver:'CasADi/IPOPT WebAssembly 3.8.0',
+      implementation:data.provenance||null,solver:cfg.controller==='pd'?'PD–INDI observation controller (not NMPC)':'CasADi/IPOPT WebAssembly 3.8.0',
       simulated_seconds:samples*DT,wall_seconds:(performance.now()-begin)/1000,failure,
       status:failure?'failed':stopped?'stopped':'completed',
-      event_coverage:{speed_step:cfg.scenario!=='hover'&&end>1,gust_started:cfg.scenario==='gust'&&end>2,gust_completed:cfg.scenario==='gust'&&end>=3},
-      counts:{plant:samples,imu:imuSamples,nmpc:optimizer.stats.length,indi:indi?.samples||0,gps_captured:gpsSamples,
+      event_coverage:{speed_step:['step','gust'].includes(cfg.scenario)&&end>1,gust_started:cfg.scenario==='gust'&&end>2,gust_completed:cfg.scenario==='gust'&&end>=3},
+      counts:{plant:samples,imu:imuSamples,nmpc:optimizer.stats.length,outer:outerUpdates,indi:indi?.samples||0,gps_captured:gpsSamples,
               gps_fused:estimator.updates,gps_replayed_imu:estimator.replayed},
       metrics:{velocity_rmse_mps:rmse(sumV2),altitude_rmse_m:rmse(sumZ2),
                position_estimation_rmse_m:rmse(sumEstimate2),electrical_energy_J:energy,
@@ -443,7 +538,8 @@
       final:x,trace,solves:optimizer.stats,gps_events:gpsEvents,
       units:{state:'p[m] v[m/s] q[xyzw] omega[rad/s] rotor[rad/s] SOC[1]',imu:'specific force[m/s²], gyro[rad/s]',
         covariance_diagonal:'15D error: p, v, attitude(rad), accel bias, gyro bias',virtual:'T[N], angular acceleration[rad/s²]'},
-      limitations:[...p.assumptions,'Simulation time is paused while IPOPT solves; wall deadline statistics are NOT a hard-real-time guarantee.',
+      limitations:[...p.assumptions,...(cfg.controller==='pd'?['PD–INDI is a nominal observation controller, not NMPC–INDI Hybrid. Its gains are illustrative, not experimentally identified.']:[]),
+                    'Simulation time is paused while IPOPT solves; wall deadline statistics are NOT a hard-real-time guarantee.',
                     'Allocation reports nominal static rotor forces plus measured angular-acceleration increments, NOT instant actuator achievement. Motor spool reaction is not explicitly allocated.',
                     'Version 2 logs use synchronized gyro/RPM timestamps and independent sensor noise streams; old and new seed traces are not identical.',
                     'GPS innovation and NIS are logged but outliers are not rejected. Contact is only a CG ground-crossing abort, not STL collision dynamics.',
@@ -452,7 +548,7 @@
                     'Outside-map samples use an explicit passive continuation; these are NOT validated propulsion performance results.']};
     } finally {b.dispose();}
   }
-  const api={run,makeBindings,boundedIncrement,allocateThrust,motorDiagnostics,validateOptions,referenceHorizon,Estimator,Optimizer,INDI,rotate,random,reference,environment,shiftPrediction};
+  const api={run,makeBindings,boundedIncrement,allocateThrust,motorDiagnostics,validateOptions,referenceHorizon,Estimator,Optimizer,ObservationController,ObservationClock,INDI,rotate,random,reference,environment,shiftPrediction};
   if(typeof module!=='undefined'&&module.exports) module.exports=api;
   else root.ResearchRuntime=api;
 })(globalThis);

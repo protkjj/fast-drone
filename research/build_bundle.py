@@ -10,6 +10,7 @@ import numpy as np
 from research import eskf
 from research.model import profile, build, initial_state
 from research.nmpc import build_solver
+from research.numeric_export import compile_numeric
 
 
 def bundle(name, include_solvers=True):
@@ -24,9 +25,12 @@ def bundle(name, include_solvers=True):
     # Both profiles read selected.json; model.profile() applies the explicit
     # simple-model overrides. Hash those two sources, not a nonexistent file.
     sources={file:hashlib.sha256((Path(__file__).parent/file).read_bytes()).hexdigest()
-             for file in ("model.py","nmpc.py","eskf.py","runtime.js","profiles/selected.json","../control/dynamics.py")}
+             for file in ("model.py","nmpc.py","eskf.py","runtime.js","numeric_export.py","profiles/selected.json","../control/dynamics.py")}
     payload["provenance"]={"source_sha256":sources,
         "input_sha256":hashlib.sha256(json.dumps(sources,sort_keys=True).encode()).hexdigest()}
+    payload["numeric"] = compile_numeric(functions, estimators, p)
+    payload["provenance"]["numeric_backend"] = "casadi-scalar-js-v1"
+    payload["provenance"]["numeric_source_sha256"] = hashlib.sha256(payload["numeric"]["source"].encode()).hexdigest()
     if include_solvers:
         for kind in ("hybrid", "nmpc"):
             begin = time.perf_counter()

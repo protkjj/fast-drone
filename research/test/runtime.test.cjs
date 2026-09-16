@@ -10,7 +10,7 @@ before(async()=>{
   ca=await require('@casadi/casadi-wasm')();
   await ca.load_nlpsol('ipopt');await ca.load_interpolant('linear');
   data=JSON.parse(fs.readFileSync(path.join(__dirname,'../generated/simple.json'),'utf8'));
-  b=runtime.makeBindings(ca,data);
+  b=runtime.makeBindings(ca,data,Object.keys(data.solvers),false);
 });
 after(()=>b?.dispose());
 test('20 ms warm-start shift interpolates the 50 ms grid without mutating the source',()=>{
@@ -66,7 +66,7 @@ test('standalone NMPC never executes INDI',async()=>{
 });
 test('selected-aircraft WASM parity and both controllers survive a sequential hover run',async()=>{
   const selected=JSON.parse(fs.readFileSync(path.join(__dirname,'../generated/selected.json'),'utf8'));
-  const bindings=runtime.makeBindings(ca,selected);
+  const bindings=runtime.makeBindings(ca,selected,Object.keys(selected.solvers),false);
   try {
     const p=selected.parity;
     for(const key of ['rhs','step']) {

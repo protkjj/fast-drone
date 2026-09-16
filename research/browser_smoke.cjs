@@ -48,6 +48,7 @@ async function main(){
         await new Promise(resolve=>setTimeout(resolve,100));
       }
       if(await evaluate('vehicle?.userData.rotors.length')!==4)throw new Error('STL rotor assembly did not load');
+      await evaluate("$('mode-compare').click()");
       if(uiOnly){
         const file=process.argv[process.argv.indexOf('--log')+1];
         if(!process.argv.includes('--log')||!existsSync(file))throw new Error('--ui-only requires an existing --log file');

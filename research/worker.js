@@ -1,6 +1,6 @@
 /* IPOPT runs here, never on the rendering/input thread. */
 importScripts('./runtime.js');
-let stopping=false, busy=false, ca=null;
+let stopping=false,busy=false,paused=false,observing=false,pendingTarget=null,ca=null,ipoptLoaded=false;
 const loaded=new Map();
 async function loadCasadi() {
   const base=new URL('./vendor/casadi/',self.location.href).href;
@@ -22,7 +22,6 @@ async function loadCasadi() {
     throw new Error('Unexpected dependency '+name);
   });
   const result=await create();
-  await result.load_nlpsol('ipopt');
   await result.load_interpolant('linear');
   return result;
 }
@@ -38,25 +37,54 @@ async function loadProfile(name) {
 }
 self.onmessage=async event=>{
   if(event.data.type==='stop') {stopping=true;return;}
+  if(event.data.type==='pause'&&busy&&observing){paused=!!event.data.paused;return;}
+  if(event.data.type==='target'&&busy&&observing){
+    try{
+      const command={t:0,speed:event.data.speed,altitude:event.data.altitude};
+      ResearchRuntime.validateOptions({scenario:'schedule',commands:[command]});
+      pendingTarget={speed:command.speed,altitude:command.altitude};
+    }catch(error){postMessage({type:'command-error',text:error.message});}
+    return;
+  }
   if(event.data.type!=='run'||busy) return;
-  busy=true; stopping=false;
+  busy=true;stopping=false;paused=false;pendingTarget=null;observing=event.data.mode==='observe';
   try {
-    postMessage({type:'status',text:'CasADi/IPOPT 및 기체 모델 준비 중… 첫 실행에는 시간이 걸립니다.'});
+    if(event.data.mode&&!['observe','compare'].includes(event.data.mode))throw new Error('Unknown execution mode');
+    const controllers=observing?['pd']:event.data.controllers;
+    if(!Array.isArray(controllers)||!controllers.length||controllers.length>2||
+      controllers.some(c=>!['hybrid','nmpc',...(observing?['pd']:[])].includes(c)))throw new Error('Invalid controllers');
+    postMessage({type:'status',text:'선정 기체의 공통 물리 계산 준비 중… 첫 실행에는 시간이 걸립니다.'});
     if(!ca) ca=await loadCasadi();
+    if(!observing&&!ipoptLoaded){await ca.load_nlpsol('ipopt');ipoptLoaded=true;}
     const data=await loadProfile(event.data.profile);
-    postMessage({type:'status',text:'실험 계산 중. 시뮬레이션 시간은 풀이 완료 후 진행됩니다.'});
+    postMessage({type:'status',text:observing?'관찰 시작 · PD–INDI · 물리 적분 1 ms 유지':'정밀 비교 중. IPOPT 풀이를 기다린 뒤 시뮬레이션 시간이 진행됩니다.'});
     const results=[];
-    for(const controller of event.data.controllers) {
+    for(const controller of controllers) {
       if(stopping) break;
       postMessage({type:'progress',controller,t:0,total:event.data.options.seconds,solves:0,
         v:data.initial.slice(3,6),z:event.data.options.altitude??20,p:[0,0,event.data.options.altitude??20],
         q:data.initial.slice(6,10),rpm:data.initial.slice(13,17)});
+      const clock=new ResearchRuntime.ObservationClock();
+      const hooks=observing?{
+        beforeControl:async t=>{
+          await clock.wait(t,()=>stopping||paused);
+          if(paused){
+            postMessage({type:'paused',paused:true,t});
+            while(paused&&!stopping)await new Promise(resolve=>setTimeout(resolve,20));
+            clock.reset(t);postMessage({type:'paused',paused:false,t});
+          }
+        },
+        command:()=>{const command=pendingTarget;pendingTarget=null;return command;},
+        commandApplied:command=>postMessage({type:'target-applied',command})
+      }:{};
       const result=await ResearchRuntime.run(ca,data,{...event.data.options,controller},
-        value=>postMessage({type:'progress',controller,...value}),()=>stopping);
+        value=>postMessage({type:'progress',controller,...value}),()=>stopping,hooks);
+      result.execution={mode:observing?'observe':'compare',pacing:observing?'wall-paced-fixed-step':'offline-fixed-step',
+        fixed_dt_s:.001,effective_speed:result.wall_seconds>0?result.simulated_seconds/result.wall_seconds:null};
       results.push(result);
       postMessage({type:'result',result});
     }
     postMessage({type:'done',stopped:stopping,count:results.length});
   } catch(error) {postMessage({type:'error',text:String(error.stack||error.message||error)});}
-  finally {busy=false;}
+  finally {busy=false;observing=false;paused=false;pendingTarget=null;}
 };

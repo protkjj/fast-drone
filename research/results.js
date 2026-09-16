@@ -5,7 +5,7 @@
   function conditionKey(report){
     const c=report.configuration;
     return JSON.stringify([report.profile_id,report.implementation?.input_sha256,
-      c.feedback,c.scenario,c.seconds,c.speed,c.altitude,c.seed,c.preview,c.scales]);
+      c.feedback,c.scenario,c.seconds,c.speed,c.altitude,c.seed,c.preview,c.scales,c.commands||null]);
   }
   function validateImport(value,validateOptions){
     const reports=value?.results?Object.values(value.results):[value];
