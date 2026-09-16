@@ -37,4 +37,8 @@ test('worker observation supports target acknowledgement, pause, stop and subseq
   await new Promise(resolve=>{done=resolve;ctx.onmessage({data:{type:'run',mode:'compare',profile:'selected',controllers:['nmpc'],options:precise}});});
   assert.equal(results[1].execution.mode,'compare');assert.equal(results[1].counts.nmpc,1);
   assert.equal(results[1].counts.indi,0);assert.equal(results[1].metrics.solver_failures,0);
+  const hybrid=R.validateOptions({...observe,controller:'hybrid',seconds:.04});
+  await new Promise(resolve=>{done=resolve;ctx.onmessage({data:{type:'run',mode:'observe',profile:'selected',options:hybrid}});});
+  assert.equal(results[2].configuration.controller,'hybrid');assert.equal(results[2].counts.nmpc,2);
+  assert.equal(results[2].counts.indi,40);assert.equal(results[2].execution.mode,'observe');
 });

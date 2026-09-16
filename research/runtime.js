@@ -340,7 +340,7 @@
   }
   function validateOptions(options={}) {
     const cfg={controller:'hybrid',feedback:'truth',scenario:'step',seconds:4,speed:3,altitude:20,
-      seed:42,preview:true,log_hz:50,scales:[1,1,1,1,1],...options};
+      wind_speed:0,wind_angle:90,seed:42,preview:true,log_hz:50,scales:[1,1,1,1,1],...options};
     if(!['hybrid','nmpc','pd'].includes(cfg.controller))throw new Error('Unknown controller');
     if(!['truth','eskf'].includes(cfg.feedback))throw new Error('Unknown feedback');
     if(!['hover','step','gust','schedule'].includes(cfg.scenario))throw new Error('Unknown scenario');
@@ -349,6 +349,7 @@
     if(cfg.scenario==='gust'&&cfg.seconds<3.1)throw new Error('외란 시험은 2–3초 외란과 종료 이후를 포함하도록 3.1초 이상 필요합니다.');
     if(!Number.isFinite(cfg.speed)||cfg.speed<0||cfg.speed>100)throw new Error('Reference speed must be 0–100 m/s');
     if(!Number.isFinite(cfg.altitude)||cfg.altitude<1||cfg.altitude>1000)throw new Error('고도는 1–1000 m 범위입니다.');
+    validateWind(cfg);
     if(!Array.isArray(cfg.scales)||cfg.scales.length!==5||cfg.scales.some(v=>!Number.isFinite(v)||v<.5||v>1.5))throw new Error('Invalid model-error scales');
     if(!Number.isInteger(cfg.seed)||cfg.seed<0||cfg.seed>4294967295)throw new Error('Seed must be an unsigned 32-bit integer');
     if(typeof cfg.preview!=='boolean')throw new Error('Preview must be true or false');
@@ -362,14 +363,27 @@
         if(!Number.isFinite(t)||t<=previous||t>cfg.seconds||Math.abs(t/PERIOD/DT-Math.round(t/PERIOD/DT))>1e-7||
            !Number.isFinite(speed)||speed<0||speed>100||!Number.isFinite(altitude)||altitude<1||altitude>1000)
           throw new Error('목표 일정의 시각·속도·고도를 확인하세요. 시각은 증가하는 20 ms 격자여야 합니다.');
-        previous=t;return {t,speed,altitude};
+        // Older logs have no wind fields: their documented environment was calm.
+        const wind_speed=command.wind_speed??cfg.wind_speed,wind_angle=command.wind_angle??cfg.wind_angle;
+        validateWind({wind_speed,wind_angle});
+        previous=t;return {t,speed,altitude,wind_speed,wind_angle};
       });
     }else delete cfg.commands;
     return cfg;
   }
+  function validateWind({wind_speed,wind_angle}){
+    if(!Number.isFinite(wind_speed)||wind_speed<0||wind_speed>30||
+       !Number.isFinite(wind_angle)||wind_angle<0||wind_angle>360)
+      throw new Error('풍속은 0–30 m/s, 바람 방향은 0–360° 범위입니다.');
+  }
   function environment(t, config) {
-    if(config.scenario==='gust' && t>=2 && t<3) return [0,3,0,.015,.025,0];
-    return [0,0,0,0,0,0];
+    let command=config;
+    if(config.scenario==='schedule')for(const c of config.commands){if(c.t>t+1e-10)break;command=c;}
+    const speed=command.wind_speed??config.wind_speed??0,angle=(command.wind_angle??config.wind_angle??90)*Math.PI/180;
+    // Direction TO which air flows, in world axes; not meteorological FROM.
+    const env=[speed*Math.cos(angle),speed*Math.sin(angle),0,0,0,0];
+    if(config.scenario==='gust'&&t>=2&&t<3){env[1]+=3;env[3]=.015;env[4]=.025;}
+    return env;
   }
   function percentile(values, q) {
     if(!values.length) return null;
@@ -423,7 +437,7 @@
       // All channels in a row refer to x(t), not a mixture of x(t) and x(t+dt).
       trace.push({t,state:x.slice(),position_m:x.slice(0,3),v:x.slice(3,6),z:x[2],q_xyzw:x.slice(6,10),
         body_rate_rad_s:x.slice(10,13),rotor_rad_s:x.slice(13,17),command_rad_s:u.slice(),
-        reference:reference(t,cfg),virtual:indi?request.slice():null,soc:x[17],
+        reference:reference(t,cfg),environment:environment(t,cfg),virtual:indi?request.slice():null,soc:x[17],
         motor:motorDiagnostics(d),alpha_rad_s2:dx.slice(10,13),
         estimate:estimator.state.slice(),covariance_diagonal:Array.from({length:15},(_,i)=>estimator.cov[i*16]),
         sensor:{capture_t_s:t,gyro_t_s:t,rotor_t_s:t,imu_t_s:imu?t:null,
@@ -432,10 +446,10 @@
         allocation:indi?.last||null});
     }
     function report(t){progress({t,total:cfg.seconds,v:x.slice(3,6),z:x[2],p:x.slice(0,3),q:x.slice(6,10),rpm:x.slice(13,17),solves:optimizer.stats.length,
-      reference:reference(t,cfg),soc:x[17],voltage,energy_J:energy,outside_map_fraction:samples?outside/samples:0,
+      reference:reference(t,cfg),environment:environment(t,cfg),soc:x[17],voltage,energy_J:energy,outside_map_fraction:samples?outside/samples:0,
       current_limited_fraction:samples?currentLimited/samples:0,wall_seconds:(performance.now()-begin)/1000});}
     for(let tick=0;tick<ticks;tick++) {
-      const t=tick*DT, env=environment(t,cfg);
+      const t=tick*DT;
       // Controller receives this explicit observation. No true-state closure in it.
       const feedback=cfg.feedback==='truth'?x.slice(0,17):estimator.feedback(sensedGyro,sensedRpm);
       if(tick%PERIOD===0) {
@@ -444,9 +458,10 @@
         if(shouldStop()){stopped=true;break;}
         const command=hooks.command?.();
         if(command){
-          if(cfg.scenario!=='schedule'||cfg.controller!=='pd')throw new Error('Live commands require observation schedule mode');
+          if(cfg.scenario!=='schedule'||cfg.preview)throw new Error('Live commands require a non-preview schedule');
           const previousReference=reference(t,cfg);
-          const applied={t,speed:command.speed,altitude:command.altitude};
+          const previousCommand=cfg.commands.filter(c=>c.t<=t).at(-1);
+          const applied={...previousCommand,...command,t};
           const commands=cfg.commands.filter(c=>c.t<t);
           commands.push(applied);
           cfg.commands=validateOptions({...cfg,commands}).commands;
@@ -455,7 +470,7 @@
           // matching a replay that knew the timestamped schedule in advance.
           if(samples)sumV2+=sub(x.slice(3,6),reference(t,cfg).slice(0,3)).reduce((s,v)=>s+v*v,0)
             -sub(x.slice(3,6),previousReference.slice(0,3)).reduce((s,v)=>s+v*v,0);
-          hooks.commandApplied?.({...applied});
+          hooks.commandApplied?.({...cfg.commands.at(-1)});
         }
         // Delta-input cost starts from the last achieved nominal allocation,
         // not an impossible requested virtual action. This is not plant truth.
@@ -467,6 +482,8 @@
         await yieldMessages();
         if(shouldStop()){stopped=true;break;}
       }
+      // Apply a live wind change on this tick, exactly as its recorded replay.
+      const env=environment(t,cfg);
       const target=reference(t,cfg);
       u=indi?indi.update(feedback,request,cfg.feedback==='eskf'?sensedGyro:feedback.slice(10,13)):request.slice();
       if(indi)indi.last.t_s=t;

@@ -40,9 +40,10 @@ self.onmessage=async event=>{
   if(event.data.type==='pause'&&busy&&observing){paused=!!event.data.paused;return;}
   if(event.data.type==='target'&&busy&&observing){
     try{
-      const command={t:0,speed:event.data.speed,altitude:event.data.altitude};
+      const command={t:0,speed:event.data.speed,altitude:event.data.altitude,
+        wind_speed:event.data.wind_speed??0,wind_angle:event.data.wind_angle??90};
       ResearchRuntime.validateOptions({scenario:'schedule',commands:[command]});
-      pendingTarget={speed:command.speed,altitude:command.altitude};
+      pendingTarget=command;
     }catch(error){postMessage({type:'command-error',text:error.message});}
     return;
   }
@@ -50,14 +51,14 @@ self.onmessage=async event=>{
   busy=true;stopping=false;paused=false;pendingTarget=null;observing=event.data.mode==='observe';
   try {
     if(event.data.mode&&!['observe','compare'].includes(event.data.mode))throw new Error('Unknown execution mode');
-    const controllers=observing?['pd']:event.data.controllers;
+    const controllers=observing?[event.data.options.controller]:event.data.controllers;
     if(!Array.isArray(controllers)||!controllers.length||controllers.length>2||
       controllers.some(c=>!['hybrid','nmpc',...(observing?['pd']:[])].includes(c)))throw new Error('Invalid controllers');
     postMessage({type:'status',text:'선정 기체의 공통 물리 계산 준비 중… 첫 실행에는 시간이 걸립니다.'});
     if(!ca) ca=await loadCasadi();
-    if(!observing&&!ipoptLoaded){await ca.load_nlpsol('ipopt');ipoptLoaded=true;}
+    if(controllers.some(c=>c!=='pd')&&!ipoptLoaded){await ca.load_nlpsol('ipopt');ipoptLoaded=true;}
     const data=await loadProfile(event.data.profile);
-    postMessage({type:'status',text:observing?'관찰 시작 · PD–INDI · 물리 적분 1 ms 유지':'정밀 비교 중. IPOPT 풀이를 기다린 뒤 시뮬레이션 시간이 진행됩니다.'});
+    postMessage({type:'status',text:observing?`비행 시작 · ${controllers[0]} · 물리 적분 1 ms 유지`:'정밀 비교 중. IPOPT 풀이를 기다린 뒤 시뮬레이션 시간이 진행됩니다.'});
     const results=[];
     for(const controller of controllers) {
       if(stopping) break;

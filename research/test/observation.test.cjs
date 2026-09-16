@@ -26,11 +26,11 @@ test('live targets are timestamped once and reproduce exactly as a command sched
     commands:[{t:0,speed:0,altitude:20}]};
   let tick=0,applied=[];
   const live=await R.run(ca,data,config,()=>{},()=>false,{
-    beforeControl:async t=>{tick=t;},command:()=>tick===.04?{speed:3,altitude:21}:null,
+    beforeControl:async t=>{tick=t;},command:()=>tick===.04?{speed:3,altitude:21,wind_speed:4,wind_angle:90}:null,
     commandApplied:command=>applied.push(command)
   });
   const replay=await R.run(ca,data,live.configuration);
-  assert.equal(applied.length,1);assert.deepEqual(applied[0],{t:.04,speed:3,altitude:21});
+  assert.equal(applied.length,1);assert.deepEqual(applied[0],{t:.04,speed:3,altitude:21,wind_speed:4,wind_angle:90});
   assert.deepEqual(replay.final,live.final);assert.deepEqual(replay.trace,live.trace);
   for(const key of Object.keys(live.metrics)){
     if(typeof live.metrics[key]==='number')assert.ok(Math.abs(live.metrics[key]-replay.metrics[key])<1e-12,key);
@@ -39,7 +39,33 @@ test('live targets are timestamped once and reproduce exactly as a command sched
   assert.equal(live.trace.find(row=>row.t===.02).reference[0],0);
   assert.equal(live.trace.find(row=>row.t===.04).reference[0],3);
   assert.notEqual(live.trace.find(row=>row.t===.04).v[0],3); // No speed snapping.
+  assert.equal(live.trace.find(row=>row.t===.02).environment[1],0);
+  assert.equal(live.trace.find(row=>row.t===.04).environment[1],4);
   assert.equal(Results.validateImport(live,R.validateOptions).pd.profile_id,'selected-6931');
+});
+test('Hybrid and NMPC live observation keep the selected solver and reproduce wind/target schedules',async()=>{
+  for(const controller of ['hybrid','nmpc']){
+    let t=0;
+    const live=await R.run(ca,data,{controller,scenario:'schedule',seconds:.06,preview:false,
+      commands:[{t:0,speed:0,altitude:20}]},()=>{},()=>false,{
+      beforeControl:async value=>{t=value;},command:()=>t===.02?{speed:1,altitude:20.1,wind_speed:2,wind_angle:180}:null
+    });
+    const replay=await R.run(ca,data,live.configuration);
+    assert.equal(live.counts.nmpc,3);assert.equal(live.counts.indi,controller==='hybrid'?60:0);
+    assert.equal(live.metrics.solver_failures,0);assert.deepEqual(live.final,replay.final);
+    assert.deepEqual(live.trace,replay.trace);assert.notEqual(live.trace[1].v[0],1);
+  }
+});
+test('wind angles are world-frame flow-to directions and gust adds to the baseline',()=>{
+  for(const [angle,expected] of [[0,[3,0]],[90,[0,3]],[180,[-3,0]],[270,[0,-3]],[360,[3,0]]]){
+    const cfg=R.validateOptions({wind_speed:3,wind_angle:angle});
+    R.environment(0,cfg).slice(0,2).forEach((v,i)=>assert.ok(Math.abs(v-expected[i])<1e-12));
+  }
+  assert.equal(R.environment(2,R.validateOptions({scenario:'gust',wind_speed:2,wind_angle:90}))[1],5);
+  assert.throws(()=>R.validateOptions({wind_speed:31}),/풍속/);
+  assert.throws(()=>R.validateOptions({wind_angle:NaN}),/풍속/);
+  const a={configuration:R.validateOptions(),profile_id:'selected-6931'};
+  assert.notEqual(Results.conditionKey(a),Results.conditionKey({...a,configuration:R.validateOptions({wind_speed:1})}));
 });
 test('command schedules validate ordering, bounds and comparisons include every command',()=>{
   const config={scenario:'schedule',commands:[{t:0,speed:0,altitude:20},{t:1,speed:3,altitude:20}]};

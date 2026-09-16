@@ -3,8 +3,8 @@ const $=id=>document.getElementById(id);
 const results={};
 let worker=null,vehicle=null,running=false,drawModel=()=>{},updatePath=()=>{},appendLivePath=()=>{};
 let playing=false,replayTime=0,imported=false,customScales=null,mode='compare',paused=false,recordedCommands=null;
-const controllerNames={pd:'PD–INDI · 관찰용',hybrid:'Hybrid',nmpc:'NMPC 단독'};
-const settingIds=['profile','controller','feedback','scenario','seconds','speed','altitude','preview','mismatch','seed','log-hz'];
+const controllerNames={pd:'PD–INDI · 조작용 baseline',hybrid:'Hybrid',nmpc:'NMPC 단독'};
+const settingIds=['profile','controller','feedback','scenario','seconds','speed','altitude','preview','mismatch','seed','log-hz','wind-speed','wind-angle'];
 const modeSettings={compare:null,observe:{profile:'selected',controller:'both',feedback:'truth',scenario:'hover',seconds:'30',speed:'0',altitude:'20',preview:'false',mismatch:'nominal',seed:'42','log-hz':'50'}};
 const pdOption=document.createElement('option');pdOption.value='pd';pdOption.textContent=controllerNames.pd;$('replay-controller').append(pdOption);
 const compareRecord=document.createElement('button');compareRecord.id='compare-record';compareRecord.textContent='이 목표 일정으로 정밀 비교';compareRecord.disabled=true;
@@ -18,15 +18,20 @@ function setMode(next,restore=true){
     $('mode-'+kind).setAttribute('aria-pressed',String(kind===mode));
     document.querySelectorAll('.'+kind+'-only').forEach(el=>el.hidden=kind!==mode);
   }
-  $('run').textContent=mode==='observe'?'관찰 시작':'정밀 계산 시작';$('pause').hidden=mode!=='observe';
+  $('run').textContent=mode==='observe'?'비행 시작':'정밀 계산 시작';$('pause').hidden=mode!=='observe';
   $('settings').open=mode==='compare'&&!matchMedia('(max-width:850px)').matches;
-  $('mode-note').textContent=mode==='observe'?
-    '선정 기체를 PD–INDI로 관찰합니다. Hybrid 성능 평가는 정밀 비교에서 합니다. 목표를 바꿀 수 있고, 1×를 못 따라가면 진행 배속이 낮아집니다.':
-    'Hybrid와 NMPC 단독을 같은 기체·조건에서 계산합니다. 실제 IPOPT 풀이를 기다리므로 비행 시간보다 오래 걸릴 수 있습니다.';
-  $('status').textContent=mode==='observe'?'관찰 시작을 누른 뒤 목표 속도·고도를 바꿔 보세요.':'정밀 비교 준비됨. 짧은 호버로 확인 후 속도·외란 시험을 선택하세요.';
+  updateModeNote();
+  $('status').textContent=mode==='observe'?'비행 시작 → 슬라이더로 속도·고도·바람 조작':'정밀 비교 준비됨. 짧은 호버로 확인 후 속도·외란 시험을 선택하세요.';
+  $('record-panel').open=mode==='compare';
   $('progress').value=0;scenarioNote(false);updateAircraftLabel();
   const url=new URL(location.href);url.searchParams.set('mode',mode);history.replaceState(null,'',url);
 }
+function updateModeNote(){
+  $('mode-note').textContent=mode!=='observe'?'Hybrid와 NMPC 단독을 같은 기체·조건에서 계산합니다.':
+    $('observe-controller').value==='pd'?'PD–INDI baseline · 빠른 조작용이며 Hybrid가 아닙니다. 목표와 바람은 비행 중 자동 반영됩니다.':
+    `${controllerNames[$('observe-controller').value]} · 실제 IPOPT 계산으로 비행합니다. 풀이가 느리면 비행 진행도 느려지며, 다른 제어기로 대체하지 않습니다.`;
+}
+$('observe-controller').addEventListener('change',updateModeNote);
 function updateAircraftLabel(){
   document.querySelector('.aircraft-tag').textContent=$('profile').value==='selected'?
     '선정안 6931 · 1.712 kg · drone_v2.stl · 개념설계 모델':'단순 검증 기체 · 2 kg · 선정 기체가 아닌 구조 검증용 모델';
@@ -59,7 +64,7 @@ const colors={pd:'#f2aa4c',hybrid:'#59c8f5',nmpc:'#db9bff'};
 function setBusy(value) {
   running=value; $('run').disabled=value; $('stop').disabled=!value;
   for(const id of ['mode-observe','mode-compare'])$(id).disabled=value;
-  for(const id of ['pause','apply-target','hover-target'])$(id).disabled=!value||mode!=='observe';
+  $('pause').disabled=!value||mode!=='observe';$('observe-controller').disabled=value;
   $('compare-record').disabled=value||!replayResult();
   document.querySelectorAll('.controls input,.controls select').forEach(el=>el.disabled=value);
   $('import').disabled=value;$('reuse').disabled=value||!replayResult();
@@ -133,20 +138,22 @@ function drawChart(id,value,reference) {
   for(const [kind,result] of Object.entries(results)) element('path',{d:path(result.trace,value),fill:'none',stroke:colors[kind],'stroke-width':2});
 }
 $('run').addEventListener('click',()=>{
+  clearTimeout(liveTargetTimer);liveTargetTimer=null;
   const seconds=Number($('seconds').value), speed=Number($('speed').value),seed=Number($('seed').value);
   const mismatch=mismatches[$('mismatch').value]||customScales;
   let options;
   const altitude=Number($('altitude').value),scenario=mode==='observe'?'schedule':$('scenario').value;
-  const commands=mode==='observe'&&$('scenario').value!=='schedule'?[{t:0,speed,altitude}]:recordedCommands?.filter(command=>command.t<=seconds);
-  try{options=ResearchRuntime.validateOptions({seconds,speed,seed,controller:mode==='observe'?'pd':'hybrid',feedback:$('feedback').value,scenario,commands,
+  const commands=mode==='observe'&&$('scenario').value!=='schedule'?[{t:0,...readLiveTarget()}]:recordedCommands?.filter(command=>command.t<=seconds);
+  try{options=ResearchRuntime.validateOptions({seconds,speed,seed,controller:mode==='observe'?$('observe-controller').value:'hybrid',feedback:$('feedback').value,scenario,commands,
+    wind_speed:mode==='observe'?Number($('live-wind-speed').value):Number($('wind-speed').value),
+    wind_angle:mode==='observe'?Number($('live-wind-angle').value):Number($('wind-angle').value),
     scales:mismatch,altitude,preview:mode==='observe'?false:$('preview').value==='true',log_hz:Number($('log-hz').value)});}
   catch(error){$('errors').textContent=error.message;$('settings').open=true;return;}
   setPlaying(false);imported=false;
   Object.keys(results).forEach(k=>delete results[k]);showResults();$('errors').textContent='';
   updatePath(null);
   $('target-state').textContent=`초기 목표: ${number(commands?.[0]?.speed??speed)} m/s · ${number(commands?.[0]?.altitude??altitude)} m`;
-  $('live-target-altitude').value=String(altitude);
-  $('model-caption').textContent=`${mode==='observe'?controllerNames.pd:'정밀 비교'} · 선정 기체 공통 물리 · 위치·자세는 적분 상태`;
+  $('model-caption').textContent=`${mode==='observe'?controllerNames[options.controller]:'정밀 비교'} · 선정 기체 공통 물리 · 위치·자세는 적분 상태`;
   setBusy(true);$('progress').value=0;
   if(!worker) {
     worker=new Worker('./worker.js');
@@ -170,11 +177,12 @@ $('run').addEventListener('click',()=>{
       }
       if(m.type==='done') {
         paused=false;setBusy(false);setupReplay(true);$('status').textContent=m.stopped?(m.count?'중지됨. 현재까지 계산된 부분 결과도 보존했습니다.':'모델 준비 중에 중지했습니다. 아직 계산된 결과는 없습니다.'):'계산 완료. 기록을 재생하거나 같은 목표 일정으로 정밀 비교할 수 있습니다.';
+        if($('target-state').textContent.startsWith('적용 대기'))$('target-state').textContent='실행이 끝나 대기 중 변경은 적용되지 않았습니다. 실제 적용된 일정은 저장한 로그에 남습니다.';
       }
-      if(m.type==='target-applied')$('target-state').textContent=`${number(m.command.t)} s에 적용: ${number(m.command.speed)} m/s · ${number(m.command.altitude)} m · 목표 일정 기록됨`;
+      if(m.type==='target-applied')$('target-state').textContent=`${number(m.command.t)} s 적용 · 목표 ${number(m.command.speed)} m/s / ${number(m.command.altitude)} m · 바람 ${number(m.command.wind_speed)} m/s / ${number(m.command.wind_angle)}° · 기록됨`;
       if(m.type==='command-error')$('errors').textContent=m.text;
       if(m.type==='paused'){
-        paused=m.paused;$('pause').textContent=paused?'계속 관찰':'일시정지';
+        paused=m.paused;$('pause').disabled=false;$('pause').textContent=paused?'계속 관찰':'일시정지';
         if(paused){$('status').textContent=`${number(m.t)} s에서 일시정지 · 물리 시간도 멈춤`;if(vehicle){ResearchSTL.animateRotors(vehicle,rotorRates,0,false);drawModel();}}
         else startFrames();
       }
@@ -185,18 +193,60 @@ $('run').addEventListener('click',()=>{
     controllers:$('controller').value==='both'?['hybrid','nmpc']:[$('controller').value],
     options});
 });
-$('stop').addEventListener('click',()=>{worker?.postMessage({type:'stop'});$('status').textContent=mode==='observe'?'현재 적분 구간을 마치고 기록을 보존합니다.':'중지 요청됨. 현재 IPOPT 풀이가 끝나는 시점에 중지합니다.';$('stop').disabled=true;});
-$('pause').addEventListener('click',()=>{if(running&&mode==='observe')worker.postMessage({type:'pause',paused:!paused});});
+$('stop').addEventListener('click',()=>{worker?.postMessage({type:'stop'});$('status').textContent='중지 요청됨. 현재 풀이·적분 구간이 끝나면 기록을 보존합니다.';$('stop').disabled=true;});
+$('pause').addEventListener('click',()=>{if(running&&mode==='observe'){
+  worker.postMessage({type:'pause',paused:!paused});$('pause').disabled=true;
+  $('pause').textContent=paused?'재개 요청 중…':'일시정지 요청 중…';
+}});
 function applyLiveTarget(hover=false){
-  if(!running||mode!=='observe')return;
-  const speed=hover?0:Number($('live-target-speed').value),altitude=Number($('live-target-altitude').value);
-  try{ResearchRuntime.validateOptions({scenario:'schedule',commands:[{t:0,speed,altitude}]});}
+  clearTimeout(liveTargetTimer);liveTargetTimer=null;
+  if(mode!=='observe')return;
+  if(hover)$('live-target-speed').value='0';
+  const command=readLiveTarget();
+  try{ResearchRuntime.validateOptions({scenario:'schedule',commands:[{t:0,...command}]});}
   catch(error){$('errors').textContent=error.message;return;}
-  if(hover)$('live-target-speed').value='0';$('errors').textContent='';
-  worker.postMessage({type:'target',speed,altitude});$('target-state').textContent='다음 20 ms 제어 시각에 목표를 적용합니다.';
+  syncLiveControls();$('errors').textContent='';
+  if(!running){
+    // A deliberate new initial target cancels an imported future schedule.
+    $('scenario').value='hover';
+    $('target-state').textContent='시작 목표를 설정했습니다. 비행 시작을 누르면 적용됩니다.';return;
+  }
+  worker.postMessage({type:'target',...command});
+  $('target-state').textContent='적용 대기 · 현재 풀이 후 다음 20 ms 제어 시각에 반영됩니다.';
 }
+const livePairs=[['live-target-speed','speed-slider'],['live-target-altitude','altitude-slider'],['live-wind-speed','wind-speed-slider'],['live-wind-angle','wind-angle-slider']];
+let liveTargetTimer=null;
+function readLiveTarget(){
+  const read=id=>$(id).value.trim()===''?NaN:Number($(id).value);
+  return {speed:read('live-target-speed'),altitude:read('live-target-altitude'),
+    wind_speed:read('live-wind-speed'),wind_angle:read('live-wind-angle')};
+}
+function syncLiveControls(){
+  const altitude=Number($('live-target-altitude').value);
+  $('altitude-slider').max=String(Math.max(100,Math.min(1000,Math.ceil(altitude/100)*100)));
+  $('altitude-range-max').textContent=$('altitude-slider').max+' m · 숫자로 범위 확장';
+  for(const [input,slider] of livePairs)$(slider).value=$(input).value;
+  const c=readLiveTarget(),a=c.wind_angle*Math.PI/180;
+  $('wind-state').textContent=`흐르는 방향 (지면 기준) · X ${number(c.wind_speed*Math.cos(a))} / Y ${number(c.wind_speed*Math.sin(a))} m/s · 0° 순풍 / 90° 측풍 / 180° 역풍`;
+}
+for(const [input,slider] of livePairs){
+  $(slider).addEventListener('input',()=>{
+    $(input).value=$(slider).value;syncLiveControls();
+    // Throttle instead of debounce: a long drag still sends intermediate targets.
+    if(liveTargetTimer===null)liveTargetTimer=setTimeout(()=>{liveTargetTimer=null;applyLiveTarget();},80);
+  });
+  $(slider).addEventListener('change',()=>{clearTimeout(liveTargetTimer);liveTargetTimer=null;applyLiveTarget();});
+  $(input).addEventListener('change',()=>applyLiveTarget());
+  $(input).addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();applyLiveTarget();}});
+}
+for(const [id,angle] of [['wind-tail',0],['wind-cross',90],['wind-head',180]])$(id).addEventListener('click',()=>{
+  $('live-wind-angle').value=String(angle);applyLiveTarget();
+});
+$('wind-calm').addEventListener('click',()=>{$('live-wind-speed').value='0';applyLiveTarget();});
+syncLiveControls();
 $('apply-target').addEventListener('click',()=>applyLiveTarget());$('hover-target').addEventListener('click',()=>applyLiveTarget(true));
 function updateTelemetry(frame){
+  if(frame.p)$('flight-position').textContent=`시뮬레이션 ${number(frame.t)} s · X ${number(frame.p[0])} / Y ${number(frame.p[1])} / Z ${number(frame.p[2])} m`;
   $('live-speed').textContent=number(frame.v[0])+' m/s';$('live-altitude').textContent=number(frame.z)+' m';
   $('live-soc').textContent=number((frame.soc??1)*100)+' %';
   $('live-rate').textContent=frame.wall_seconds>0?number(frame.t/frame.wall_seconds)+'×':'—';
@@ -227,7 +277,7 @@ function renderReplay(){
   const r=replayResult();if(!r)return;
   const frame=ResearchResults.sample(r.trace,replayTime);if(!frame)return;
   replayTime=frame.t;const x=frame.state;$('timeline').value=String(replayTime);rotorRates=x.slice(13,17);
-  updateTelemetry({v:x.slice(3,6),z:x[2],soc:x[17]});
+  updateTelemetry({t:frame.t,p:x.slice(0,3),v:x.slice(3,6),z:x[2],soc:x[17]});
   $('live-rate').textContent=playing?$('replay-speed').value+'× 재생':'기록 정지';
   $('replay-state').textContent=`${number(replayTime)} / ${number(r.simulated_seconds)} s · 위치 [${x.slice(0,3).map(number).join(', ')}] m · vx ${number(x[3])} m/s`;
   if(vehicle){vehicle.visible=r.profile_id==='selected-6931';vehicle.position.set(...x.slice(0,3));vehicle.quaternion.set(...x.slice(6,10));drawModel();}
@@ -260,6 +310,11 @@ function reuseSettings(nextMode,observedDuration=false){
   $('controller').value=Object.keys(results).length===2||c.controller==='pd'?'both':c.controller;
   for(const id of ['seconds','speed','seed','feedback','scenario','altitude','preview'])$(id).value=String(c[id]);
   $('log-hz').value=String(c.log_hz);
+  $('wind-speed').value=String(c.wind_speed??0);$('wind-angle').value=String(c.wind_angle??90);
+  $('observe-controller').value=c.controller;
+  const first=c.commands?.[0]||c;
+  for(const [id,key] of [['live-target-speed','speed'],['live-target-altitude','altitude'],['live-wind-speed','wind_speed'],['live-wind-angle','wind_angle']])$(id).value=String(first[key]??(key==='wind_angle'?90:0));
+  syncLiveControls();updateModeNote();
   if(observedDuration)$('seconds').value=String(r.simulated_seconds);
   recordedCommands=c.commands?.filter(command=>command.t<=Number($('seconds').value)).map(command=>({...command}))||null;
   $('scenario').querySelector('[value="schedule"]').disabled=!recordedCommands;
@@ -275,12 +330,12 @@ function reuseSettings(nextMode,observedDuration=false){
   $('status').textContent=observedDuration?'기록된 목표·관측 기간·센서·기체 조건을 정밀 비교에 적용했습니다. 비예고 모드이며 실행 버튼을 눌러 계산합니다.':
     '시험 설정을 복원했습니다. 실행 시 현재 구현을 사용하므로 과거 결과와 코드 버전이 다를 수 있습니다.';
 }
-$('reuse').addEventListener('click',()=>reuseSettings(replayResult()?.configuration.controller==='pd'?'observe':'compare'));
+$('reuse').addEventListener('click',()=>reuseSettings(replayResult()?.execution?.mode==='observe'||replayResult()?.configuration.controller==='pd'?'observe':'compare'));
 $('compare-record').addEventListener('click',()=>reuseSettings('compare',true));
 function scenarioNote(adjust=true){
   if(mode==='observe'){
     $('seconds').min='.1';$('scenario-note').textContent=$('scenario').value==='schedule'?
-      '기록한 목표 일정을 재실행합니다. 새 목표를 적용하면 그 시점 이후의 일정을 대체합니다.':'관찰은 호버 상태에서 시작합니다. 비행 중 목표 속도·고도를 바꿀 수 있습니다.';return;
+      '기록한 목표·바람 일정을 재실행합니다. 새 목표를 적용하면 그 시점 이후의 일정을 대체합니다.':'초기 속도 0에서 시작하여 조작부의 목표를 추종합니다. 비행 중 목표·바람을 바꿀 수 있습니다.';return;
   }
   const scenario=$('scenario').value,min={hover:.1,step:1.1,gust:3.1,schedule:.02}[scenario];
   $('seconds').min=String(min);
@@ -316,18 +371,26 @@ async function previewSTL() {
   const axes=new THREE.AxesHelper(.3);scene.add(axes);
   let pathLine=null,pathCenter=new THREE.Vector3(),pathRadius=1.3,livePositions=null,liveCount=0,liveBounds=new THREE.Box3();
   const ground=new THREE.GridHelper(200,40,0x30404e,0x1d2a36);ground.rotation.x=Math.PI/2;scene.add(ground);
+  // A labelled visual reference plane makes translation visible in chase view.
+  // It is not terrain, and neither this grid nor the camera enters the plant.
+  const flightGrid=new THREE.GridHelper(200,200,0x375366,0x20323f);flightGrid.rotation.x=Math.PI/2;
+  flightGrid.position.z=Number($('altitude').value)-1;scene.add(flightGrid);
+  const altitudeLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),
+    new THREE.LineBasicMaterial({color:0x6d8796,transparent:true,opacity:.65}));scene.add(altitudeLine);
   updatePath=function(result){
     if(pathLine){scene.remove(pathLine);pathLine.geometry.dispose();pathLine.material.dispose();pathLine=null;}
     livePositions=null;liveCount=0;
     if(!result){
       axes.position.set(0,0,Number($('altitude').value));liveBounds.makeEmpty();pathCenter.copy(axes.position);pathRadius=1.3;
+      flightGrid.position.z=Number($('altitude').value)-1;
       livePositions=new Float32Array(6002*3);
       const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(livePositions,3));geometry.setDrawRange(0,0);
-      pathLine=new THREE.Line(geometry,new THREE.LineBasicMaterial({color:mode==='observe'?colors.pd:colors.hybrid}));
+      pathLine=new THREE.Line(geometry,new THREE.LineBasicMaterial({color:mode==='observe'?colors[$('observe-controller').value]:colors.hybrid}));
       pathLine.frustumCulled=false;scene.add(pathLine);return;
     }
     const positions=result.trace.filter((_,i)=>i%Math.max(1,Math.ceil(result.trace.length/5000))===0||i===result.trace.length-1)
       .map(row=>new THREE.Vector3(...row.state.slice(0,3)));
+    flightGrid.position.z=result.trace[0].state[2]-1;
     const geometry=new THREE.BufferGeometry().setFromPoints(positions);
     pathLine=new THREE.Line(geometry,new THREE.LineBasicMaterial({color:colors[result.configuration.controller]}));scene.add(pathLine);
     const box=new THREE.Box3().setFromPoints(positions);box.getCenter(pathCenter);pathRadius=Math.max(1.3,box.getSize(new THREE.Vector3()).length()*1.6);
@@ -340,13 +403,21 @@ async function previewSTL() {
     liveBounds.expandByPoint(new THREE.Vector3(...position));liveBounds.getCenter(pathCenter);
     pathRadius=Math.max(1.3,liveBounds.getSize(new THREE.Vector3()).length()*1.6);
   };
-  let azimuth=-.9,elevation=.35,drag=null;
+  let azimuth=-.9,elevation=.35,drag=null,zoom=1;
+  $('camera-reset').addEventListener('click',()=>{azimuth=-.9;elevation=.35;zoom=1;drawModel();});
+  host.addEventListener('wheel',event=>{event.preventDefault();zoom=Math.max(.35,Math.min(6,zoom*Math.exp(event.deltaY*.001)));drawModel();},{passive:false});
   host.addEventListener('pointerdown',event=>{drag=[event.clientX,event.clientY];host.setPointerCapture(event.pointerId);});
   host.addEventListener('pointermove',event=>{if(!drag)return;azimuth-=(event.clientX-drag[0])*.01;elevation=Math.max(-1.3,Math.min(1.3,elevation+(event.clientY-drag[1])*.01));drag=[event.clientX,event.clientY];drawModel();});
   host.addEventListener('pointerup',()=>drag=null);host.addEventListener('pointercancel',()=>drag=null);
   drawModel=function() {
     const w=host.clientWidth,h=host.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
-    const entire=$('view-mode').value==='path'&&pathLine,target=entire?pathCenter:vehicle.position,radius=entire?pathRadius:1.3;
+    const entire=$('view-mode').value==='path'&&pathLine,world=$('view-mode').value==='world';
+    const target=entire?pathCenter:world?new THREE.Vector3(vehicle.position.x,vehicle.position.y,vehicle.position.z*.5):vehicle.position;
+    const radius=(entire?pathRadius:world?Math.max(4,vehicle.position.z*1.8):3)*zoom;
+    flightGrid.visible=!world;
+    const line=altitudeLine.geometry.attributes.position;
+    line.setXYZ(0,vehicle.position.x,vehicle.position.y,0);line.setXYZ(1,...vehicle.position.toArray());line.needsUpdate=true;
+    altitudeLine.frustumCulled=false;
     camera.up.set(0,0,1);camera.position.set(target.x+radius*Math.cos(elevation)*Math.cos(azimuth),target.y+radius*Math.cos(elevation)*Math.sin(azimuth),target.z+radius*Math.sin(elevation));camera.lookAt(target);
     renderer.render(scene,camera);
   };

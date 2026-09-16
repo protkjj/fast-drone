@@ -48,6 +48,11 @@ async function main(){
         await new Promise(resolve=>setTimeout(resolve,100));
       }
       if(await evaluate('vehicle?.userData.rotors.length')!==4)throw new Error('STL rotor assembly did not load');
+      if(process.argv.includes('--flight')){
+        await require('./browser_flight.cjs')({evaluate,send,sessionId,profile});
+        if(errors.length)throw new Error(JSON.stringify(errors));
+        return;
+      }
       await evaluate("$('mode-compare').click()");
       if(uiOnly){
         const file=process.argv[process.argv.indexOf('--log')+1];
@@ -134,7 +139,7 @@ async function main(){
         if(!partialWarning)throw new Error('Partial-result comparison warning missing');
         if(!uiOnly){const stopped=await evaluate(`(async()=>{
           $('controller').value='nmpc';$('seconds').value='2';$('scenario').value='hover';$('run').click();
-          let begin=Date.now();while(running&&!/NMPC [1-9][0-9]*회/.test($('status').textContent)&&Date.now()-begin<45000)
+          let begin=Date.now();while(running&&!/IPOPT [1-9][0-9]*회/.test($('status').textContent)&&Date.now()-begin<45000)
             await new Promise(resolve=>setTimeout(resolve,25));
           $('stop').click();begin=Date.now();while(running&&Date.now()-begin<45000)await new Promise(resolve=>setTimeout(resolve,50));
           const r=results.nmpc;return {busy:running,error:$('errors').textContent,status:r?.status,

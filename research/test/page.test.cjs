@@ -40,17 +40,46 @@ function fixture(){
   return {context,elements,messages,evaluate:code=>vm.runInContext(code,context)};
 }
 test('unified page defaults to selected observation, preserves comparison settings and sends honest mode/controller options',()=>{
-  const {elements:e,messages,evaluate}=fixture();
+  const {context,elements:e,messages,evaluate}=fixture();
   assert.equal(evaluate('mode'),'observe');assert.equal(e.get('profile').value,'selected');
   assert.equal(e.get('seconds').value,'30');assert.equal(e.get('mode-observe')['aria-pressed'],'true');
   e.get('mode-compare').click();assert.equal(evaluate('mode'),'compare');assert.equal(e.get('seconds').value,'0.2');
   e.get('seconds').value='1';e.get('mode-observe').click();assert.equal(e.get('seconds').value,'30');
   e.get('run').click();const request=messages.at(-1);
-  assert.equal(request.mode,'observe');assert.equal(request.options.controller,'pd');assert.equal(request.profile,'selected');
+  assert.equal(request.mode,'observe');assert.equal(request.options.controller,'hybrid');assert.equal(request.profile,'selected');
   assert.equal(request.options.scenario,'schedule');assert.equal(request.options.preview,false);
   assert.equal(e.get('mode-compare').disabled,true);
   e.get('live-target-speed').value='3';e.get('live-target-altitude').value='21';e.get('apply-target').click();
   assert.equal(messages.at(-1).type,'target');assert.equal(messages.at(-1).speed,3);
+  context.activeWorker.onmessage({data:{type:'done',stopped:true,count:0}});
+  assert.match(e.get('target-state').textContent,/적용되지 않았/);
+});
+test('sliders and typed targets work before takeoff and while running; wind is sent, not just displayed',()=>{
+  const {elements:e,messages,evaluate}=fixture();
+  e.get('speed-slider').value='2.5';e.get('speed-slider').events.input();e.get('speed-slider').events.change();
+  e.get('live-target-altitude').value='230';e.get('live-target-altitude').events.change();
+  assert.equal(e.get('altitude-slider').max,'300');assert.equal(e.get('altitude-slider').value,'230');
+  e.get('live-wind-speed').value='4';e.get('wind-head').click();
+  e.get('observe-controller').value='nmpc';e.get('run').click();
+  const config=messages.at(-1).options;
+  assert.equal(config.controller,'nmpc');assert.equal(config.commands[0].speed,2.5);
+  assert.equal(config.commands[0].altitude,230);assert.equal(config.altitude,20); // target != initial state
+  assert.equal(config.commands[0].wind_speed,4);assert.equal(config.commands[0].wind_angle,180);
+  e.get('wind-calm').click();assert.equal(messages.at(-1).wind_speed,0);
+  e.get('hover-target').click();assert.equal(messages.at(-1).speed,0);
+  e.get('live-target-speed').value='';e.get('live-target-altitude').value='-1';e.get('apply-target').click();
+  assert.match(e.get('errors').textContent,/고도|일정/);
+  evaluate('setBusy(false)');
+});
+test('holding a slider drag still applies targets periodically without waiting for release',async()=>{
+  const {elements:e,messages}=fixture();e.get('run').click();
+  for(const value of ['1','2']){
+    e.get('speed-slider').value=value;e.get('speed-slider').events.input();
+    await new Promise(resolve=>setTimeout(resolve,100));
+    assert.equal(messages.at(-1).type,'target');assert.equal(messages.at(-1).speed,Number(value));
+  }
+  const count=messages.length;e.get('live-target-speed').value='';e.get('apply-target').click();
+  assert.equal(messages.length,count);assert.match(e.get('errors').textContent,/일정/);
 });
 test('observed command schedule transfers to precise comparison without overwriting the source log',()=>{
   const {context,elements:e,evaluate,messages}=fixture();
