@@ -1,18 +1,20 @@
 # 선정 기체 비행 시뮬레이터 — 관찰 / 정밀 비교
 
-공개 `/sim.html`에서 **같은 선정 기체**를 관찰하거나 정밀 비교한다.
+공개 `/research/index.html?mode=compare`에서 **선정 기체**를 관찰하거나 정밀 비교한다.
+`/sim.html`은 사용자 요청으로 9월 15일의 원래 8 kg 시뮬레이터로 복원했다.
+[복원 기준과 보존한 수정](../gz_aero/SIMULATOR_RESTORE.md)을 참고한다.
 비행 화면에서는 **Hybrid(기본) / NMPC 단독 / PD–INDI**를 명시적으로 선택한다.
 Hybrid와 NMPC는 관찰에서도 실제 IPOPT를 사용하며 느리다고 PD로 대체하지 않는다.
 속도·고도·풍속·풍향은 슬라이더/숫자로 조작하고 적용된 20 ms 시각을 기록한다.
 정밀 비교는 같은 목표·바람 일정을 두 제어기에 재사용한다.
-PD–INDI는 빠른 조작용 baseline이며 Hybrid가 아니다. `/research/`는 비교 모드로 연결되는
-호환 주소이며, 기존 8 kg 모델은 `/sim-legacy.html`에 명시적으로 보존했다.
+PD–INDI는 빠른 조작용 baseline이며 Hybrid가 아니다. 연구 엔진은 메인 시뮬레이터와
+다른 모델이며, `/sim-legacy.html`은 메인 8 kg 시뮬레이터와 같은 호환 주소다.
 동일한 수식으로 Python과 브라우저의 물리·제어·추정 경로를 재현한다. **실물 검증, 제어기
 우열 검증, 실제 20 ms 실시간 동작을 완료한 구현이 아니다.**
 
 ## 현재 상태와 알려진 문제
 
-- **[기존 인터페이스 복원](CLASSIC_UI_VALIDATION.md):** 왼쪽 슬라이더 / 가운데 큰 3D와
+- **[연구 화면 배치 수정 기록](CLASSIC_UI_VALIDATION.md):** 왼쪽 슬라이더 / 가운데 큰 3D와
   하단 그래프·시간축 / 오른쪽 설정. Space 시작·정지·재개, R 초기화, F 따라가기,
   카메라 시점·Shift 이동·패널 폭 조절을 복원했다. 선정 기체의 물리·제어기는 유지한다.
 - **[비행 조작성 복원](FLIGHT_CONTROLS_VALIDATION.md):** Hybrid 기본 선택, 슬라이더와
@@ -114,8 +116,8 @@ python3 gz_aero/tools/build_site.py --research
 python3 -m http.server 8765 --directory site
 ```
 
-`http://127.0.0.1:8765/sim.html`에서 관찰을 시작한다.
-정밀 비교 모드는 `?mode=compare`로 열고 먼저 기본 0.2초 호버를 실행한다.
+`http://127.0.0.1:8765/research/index.html`에서 선정 기체 관찰을 시작한다.
+정밀 비교 모드는 같은 주소에 `?mode=compare`를 붙이고 먼저 기본 0.2초 호버를 실행한다.
 브라우저 최초 실행은 WASM과 모델을 다운로드한다. STL과 런타임을 합쳐
 수십 MB이며, 저장 공간이나 통신량이 제한된 기기에서는 주의한다.
 풀이 실패와 실제 계산 시간을 반드시 확인한다. 중지는 현재 풀이를 마친 후 처리된다.
@@ -126,7 +128,7 @@ node research/run.cjs selected nmpc eskf 0.2 hover
 node research/benchmark.cjs research/generated/benchmark-new.json
 node research/browser_smoke.cjs http://127.0.0.1:8765/research/ 0.2
 node research/browser_smoke.cjs http://127.0.0.1:8765/research/ 0.2 --extended
-node research/browser_smoke.cjs http://127.0.0.1:8765/sim.html .08 --classic
+node research/browser_smoke.cjs http://127.0.0.1:8765/research/index.html .08 --classic
 node research/validate_v2.cjs research/generated/validation-new.json
 node research/summarize_v2.cjs research/generated/validation-new.json research/validation-new-summary.json
 ```
@@ -164,8 +166,9 @@ IPOPT 계산 성능이나 실제 20 ms 마감 보장으로 해석하지 않는�
 - `../gz_aero/tools/build_sim.py`: **기존** 실시간 데모 원본
 
 GitHub Pages는 `bulnabi`의 `.github/workflows/pages.yml`로 배포한다.
-연구 검사와 빌드가 성공해야 배포한다. 통합 주소는 `/sim.html`이며 `/research/`는
-정밀 비교 모드로 이동한다. 배포는 연구 기능의 공개이지, 미완료 비교 실험의 성공 선언이 아니다.
+연구 검사와 빌드가 성공해야 배포한다. 메인은 `/sim.html`의 원래 시뮬레이터,
+선정 기체 연구는 `/research/index.html?mode=compare`로 분리한다.
+배포는 연구 기능의 공개이지, 미완료 비교 실험의 성공 선언이 아니다.
 
 보존된 `sim-legacy.html`에도 같은 STL을 표시한다. 선택 CAD CG를 원점으로 변환한
 메시가 기존 플랜트의 위치·쿼터니언을 따라가며, 가시성을 위한 표시 배율은 ×5다.

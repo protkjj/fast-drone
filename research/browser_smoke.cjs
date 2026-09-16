@@ -43,6 +43,11 @@ async function main(){
         if(output.exceptionDetails)throw new Error(JSON.stringify(output.exceptionDetails));
         return output.result.value;
       };
+      if(process.argv.includes('--original')){
+        await require('../gz_aero/test/browser_original.cjs')({evaluate,send,sessionId,profile});
+        if(errors.length)throw new Error(JSON.stringify(errors));
+        return;
+      }
       for(let i=0;i<100;i++){
         if(await evaluate('!!document.getElementById("run") && typeof vehicle!=="undefined" && !!vehicle'))break;
         await new Promise(resolve=>setTimeout(resolve,100));

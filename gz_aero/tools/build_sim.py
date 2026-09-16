@@ -2767,20 +2767,19 @@ function initUI(){
   document.addEventListener('visibilitychange',()=>{ lastFrame=null; accumulator=0; });
   refreshControls();
 
-  // 스페이스로 정지·재생. 슬라이더를 만지는 중에는 가로채지 않고, 버튼에
-  // 포커스가 있을 때도 비워 둔다 — 버튼은 브라우저가 이미 스페이스로 누른다.
-  // 둘 다 처리하면 두 번 토글되어 아무 일도 안 일어난다.
+  // 슬라이더에 남은 초점은 Space 정지를 막지 않는다. 숫자 입력은 보존하고,
+  // 버튼은 브라우저의 기본 Space 클릭에 맡겨 중복 토글을 막는다.
   addEventListener("keydown", e => {
     const t = e.target;
     const tag = t && t.tagName;
-    if(e.ctrlKey || e.metaKey || e.altKey || e.repeat || (t && t.isContentEditable)) return;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if(e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.isComposing || (t && t.isContentEditable)) return;
+    if ((tag === "INPUT" && t.type !== "range") || tag === "TEXTAREA" || tag === "SELECT") return;
     if (e.code === "Space"){
       if (tag === "BUTTON" || tag === "SUMMARY") return;
       e.preventDefault(); toggleRun();
-    } else if (e.key === "r" || e.key === "R"){
+    } else if (tag !== "INPUT" && (e.key === "r" || e.key === "R")){
       $("#rst").click();
-    } else if (e.key === "f" || e.key === "F"){
+    } else if (tag !== "INPUT" && (e.key === "f" || e.key === "F")){
       $("#follow").click();
     }
   });
