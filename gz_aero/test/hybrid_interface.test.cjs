@@ -86,7 +86,7 @@ test('Hybrid: 가상 모델의 병진 가속도는 바람을 포함한 플랜트
 
 test('Hybrid: 비정상 NMPC 출력은 유효 상태를 보존하고 정지한다', () => {
   const s=simulator();
-  const r=s.run(`CTRL='sqprti';reset();const before=X.slice();
+  const r=s.run(`CTRL='sqprti';reset();for(let i=0;i<500;i++)advanceStep();const before=X.slice();
     rtiSolve=()=>[NaN,0,0,0];running=true;advanceStep();
     ({before,after:X,running,failed:health.diverged});`);
   assert.deepEqual(Array.from(r.before),Array.from(r.after));
@@ -95,23 +95,26 @@ test('Hybrid: 비정상 NMPC 출력은 유효 상태를 보존하고 정지한�
 
 test('Hybrid: CSV는 당시의 요청·할당·측정과 샘플 시각을 구분해 기록한다', () => {
   const s=simulator();
-  const csv=s.run(`CTRL='sqprti';reset();for(let i=0;i<40;i++)advanceStep();scoreCsv();`);
+  const csv=s.run(`CTRL='sqprti';reset();for(let i=0;i<540;i++)advanceStep();scoreCsv();`);
   const rows=csv.trim().split('\n').filter(row=>!row.startsWith('#'));
   const columns=rows.shift().split(',');
   const records=rows.map(row=>Object.fromEntries(row.split(',').map((v,i)=>[columns[i],v])));
   assert.equal(records[0].hybrid_request_T_N,'');
-  assert.equal(records[1].hybrid_sample_t_s,'0.038');
-  assert.equal(records[1].t_s,'0.04');
+  assert.equal(records[1].hybrid_sample_t_s,'');
+  assert.equal(records[1].startup_phase,'spoolup');
+  assert.equal(records[26].hybrid_sample_t_s,'1.038');
+  assert.equal(records[26].t_s,'1.04');
   for(const prefix of ['request','allocated','measured','residual']){
-    assert.ok(Number.isFinite(+records[1]['hybrid_'+prefix+'_T_N']));
+    assert.ok(records[26]['hybrid_'+prefix+'_T_N']!=='');
+    assert.ok(Number.isFinite(+records[26]['hybrid_'+prefix+'_T_N']));
   }
 });
 
 test('Hybrid: 되감기 후 필터·할당·NMPC 상태까지 같은 궤적을 재현한다', () => {
   const s=simulator();
-  const r=s.run(`CTRL='sqprti';reset();for(let i=0;i<500;i++)advanceStep();
-    const expected=X.slice();restoreTo(10);REC.truncate(11);
-    for(let i=0;i<300;i++)advanceStep();const actual=X.slice();reset();
+  const r=s.run(`CTRL='sqprti';reset();for(let i=0;i<1500;i++)advanceStep();
+    const expected=X.slice();restoreTo(35);REC.truncate(36);
+    for(let i=0;i<800;i++)advanceStep();const actual=X.slice();reset();
     ({expected,actual,cleared:hybridState===null && hybridStat===null});`);
   r.expected.forEach((v,i)=>assert.ok(Math.abs(v-r.actual[i])<1e-8));
   assert.equal(r.cleared,true);

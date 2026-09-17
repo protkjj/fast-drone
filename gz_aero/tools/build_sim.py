@@ -360,7 +360,11 @@ details.more summary:focus-visible{outline:2px solid var(--accent); outline-offs
       <p class="note"><b>모델 가정:</b> 해수면 고정 밀도 1.225 kg/m³, 일정한 수평 바람,
         단순 전진비 추력 모델입니다. 고도는 지상 기준입니다. 고도에 따른 밀도 변화,
         돌풍, 센서 오차, 배터리·열 제한, 로터 후류와 지상효과는 포함하지 않습니다.</p>
-      <p class="note"><b>지면은 실패 판정 경계</b>입니다. 이륙 후 지면에 닿으면 정지하며,
+      <p class="note"><b>정지 모터에서 시작:</b> 시작 버튼을 누르면 1초 동안 공회전 명령을
+        올린 뒤 선택한 비행 제어기를 실행합니다. 공회전은 호버 회전수의 30%로 둔
+        임시 운용 가정이며 실측 ESC 시동 특성이 아닙니다. 기존 모터 시정수 20 ms도
+        실측값이 아닙니다. 회전수나 기체 위치를 순간 변경하지 않습니다.</p>
+      <p class="note"><b>지면은 수직 지지력과 실패 판정 경계</b>입니다. 이륙 후 지면에 닿으면 정지하며,
         무게중심 높이만 검사합니다. STL 표면 충돌·착륙 다리·마찰·반발·파손을
         계산하지 않으므로 착륙 안전성 검증용이 아닙니다.</p>
       <p class="note">숫자 일치는 구현 검사입니다. 실기체 성능은 별도 실험이 필요합니다.
@@ -536,20 +540,33 @@ function xdot(x, u, w, p){
   return [vel0, vel1, vel2, ax, ay, az, qd0, qd1, qd2, qd3, wdx, wdy, wdz,
           (u[0]-x[13])/tau, (u[1]-x[14])/tau, (u[2]-x[15])/tau, (u[3]-x[16])/tau];
 }
-function rk4(x, u, w, p, dt, sub){
+// 마찰 없는 수평면의 일방향 접촉: 지면은 밀어 올릴 수만 있고 당길 수 없다.
+// 자유비행 식은 그대로 둔다. 수직 가속도가 양수면 반력 없이 즉시 이륙한다.
+// 자세/수평 이동은 고정하지 않는다. 착륙 다리의 접촉 모멘트 모델은 아니다.
+function contactXdot(x, u, w, p){
+  const dx = xdot(x,u,w,p);
+  if (x[2] <= 0 && x[5] <= 0){
+    dx[2] = 0;
+    dx[5] = Math.max(0,dx[5]);
+  }
+  return dx;
+}
+function rk4(x, u, w, p, dt, sub, contact=false){
   sub = sub || 4;
   const h = dt / sub;
+  const rhs = contact ? contactXdot : xdot;
   for (let s = 0; s < sub; s++){
-    const k1 = xdot(x, u, w, p);
+    const k1 = rhs(x, u, w, p);
     const x2 = new Array(NX); for (let i=0;i<NX;i++) x2[i] = x[i] + 0.5*h*k1[i];
-    const k2 = xdot(x2, u, w, p);
+    const k2 = rhs(x2, u, w, p);
     const x3 = new Array(NX); for (let i=0;i<NX;i++) x3[i] = x[i] + 0.5*h*k2[i];
-    const k3 = xdot(x3, u, w, p);
+    const k3 = rhs(x3, u, w, p);
     const x4 = new Array(NX); for (let i=0;i<NX;i++) x4[i] = x[i] + h*k3[i];
-    const k4 = xdot(x4, u, w, p);
+    const k4 = rhs(x4, u, w, p);
     const xn = new Array(NX);
     for (let i=0;i<NX;i++) xn[i] = x[i] + (h/6.0)*(k1[i] + 2.0*k2[i] + 2.0*k3[i] + k4[i]);
     x = xn;
+    if (contact && x[2] < 0){ x[2] = 0; x[5] = Math.max(0,x[5]); }
   }
   const qn = Math.sqrt(x[6]*x[6] + x[7]*x[7] + x[8]*x[8] + x[9]*x[9]);
   if (qn > 1e-10) for (let i=6;i<10;i++) x[i] /= qn;
@@ -1532,7 +1549,11 @@ function controlHybrid(x, cmd){
 
 /* ══ 상태 ═════════════════════════════════════════════════════════════ */
 const DT = 0.002;
+// 모든 제어기에 동일한 시동 절차. 1 s/30%는 실측이 아닌 명시적 운용 가정.
+// 비행 제어기 튜닝/자유비행 물리 및 연구실의 호버 초기조건은 변경하지 않는다.
+const STARTUP = Object.freeze({spoolSeconds:1, idleHoverFraction:0.3});
 let X = D.x0.slice(), T = 0, running = false, sat = 0;
+let lastMotorCommand = [0,0,0,0];
 let lastSatHi = false, lastSatLo = false;   // 천장/바닥 포화, 기록에 같이 담는다
 // ★ 고도 판정의 기준점. 지상 0 m 에서 목표 200 m 를 그대로 기준으로 쓰면
 //   **이륙 자체가 고도 오차 200 m** 로 찍혀 RMSE 가 이륙에 먹히고 발산
@@ -1601,6 +1622,17 @@ function loadConfig(config){
 function cmdNow(){
   return {spd:cmdSpd, alt:+$("#alt").value, psi:0, target:+$("#spd").value};
 }
+function startupIdleSpeed(){
+  return Math.min(P.n_max,STARTUP.idleHoverFraction*Math.sqrt(P.mass*P.g/(4*P.k_T)));
+}
+function startupPhase(){
+  if (health.airborne) return 'flight';
+  if (T === 0) return 'stopped';
+  return T < STARTUP.spoolSeconds ? 'spoolup' : 'takeoff';
+}
+function groundReaction(){
+  return X[2] <= 0 && X[5] <= 0 ? Math.max(0,-P.mass*xdot(X,lastMotorCommand,windNow(),P)[5]) : 0;
+}
 function windNow(){
   const s = +$("#wsp").value, d = +$("#wdir").value * Math.PI/180;
   return [s*Math.cos(d), s*Math.sin(d), 0];
@@ -1660,6 +1692,7 @@ function restoreTo(i){
   ctrlLoad(r.cs);
   health = {...r.health}; stepCount = Math.round(T/DT);
   lastSatHi = r.satHi; lastSatLo = r.satLo;
+  lastMotorCommand = r.motorCommand.slice();
   rotorPhase = r.rotorPhase.slice();
   accumulator = 0; physicsFailure = r.failure || '';
   if (typeof refreshControls === 'function') refreshControls();
@@ -1672,9 +1705,10 @@ function reset(){
   resetMotorMpc();
   configRevision = 0; lastConfigKey = ''; activeConfig = null;
   rotorPhase = [0,0,0,0]; lastSatHi = false; lastSatLo = false;
-  // 지상에서 시작한다. 예전엔 목표 고도에 바로 놓고 시작해 이륙 단계가 아예
-  // 없었다 — 미션의 첫 구간이 통째로 빠져 있던 셈이다.
+  lastMotorCommand = [0,0,0,0];
+  // 호버 자세만 재사용한다. 호버 회전수를 그대로 두면 시동이 생략된다.
   X = D.x0.slice(); X[2] = 0; T = 0; sat = 0; cmdSpd = 0; altI = 0; zSettled = false;
+  X.fill(0,13,17);
   omPrev = [0,0,0]; omDotF = [0,0,0]; Mprev = [0,0,0]; trimOK = false; trimV = -1;
   nmpcU = null; nmpcLast = -1e9; nmpcOut = null; nmpcApplied = null;
   rtiU = null; rtiLast = -1e9; rtiOut = null; rtiApplied = null; rtiStat = null;
@@ -1696,11 +1730,12 @@ function ground(){
 }
 // 지금 어떤 미션 구간인가. 화면 아래 띠에 색으로 깔린다.
 const SEGS = {
-  ground: ["지상",  "#7C8A98"], climb: ["상승",  "#2d94bd"],
+  ground: ["지상",  "#7C8A98"], spoolup:["시동", "#7C8A98"], climb: ["상승",  "#2d94bd"],
   accel:  ["가속",  "#c17f2a"], cruise:["순항",  "#4fb894"],
   decel:  ["감속",  "#9085e9"], hover: ["호버",  "#5C6B7A"],
 };
 function segNow(d, cmd, prevCmd){
+  if (startupPhase() === 'spoolup') return 'spoolup';
   if (X[2] < 1.0 && d.gs < 1.0) return "ground";
   if (Math.abs(cmd.alt - X[2]) > 5.0) return "climb";
   if (cmd.spd - prevCmd < -1e-9) return "decel";
@@ -2024,23 +2059,33 @@ function recordState(){
     al:d.alpha, pitchAlpha:d.pitchAlpha, beta:d.beta, F:d.F,
     zr:cmd.alt, st:zSettled, satHi:lastSatHi, satLo:lastSatLo,
     seg:segNow(d,cmd,prev), cs:ctrlSnap(), config:captureConfig(),
+    phase:startupPhase(), motorCommand:lastMotorCommand.slice(), groundNormal:groundReaction(),
     health:{...health}, failure:physicsFailure, rotorPhase:rotorPhase.slice()});
 }
 function advanceStep(){
-  const target = +$("#spd").value, dv = target - cmdSpd;
-  cmdSpd += Math.sign(dv)*Math.min(Math.abs(dv), RAMP*DT);
-  const cmd = cmdNow(), u = control(X, cmd);
+  const spooling = T < STARTUP.spoolSeconds;
+  if (!spooling){
+    const target = +$("#spd").value, dv = target - cmdSpd;
+    cmdSpd += Math.sign(dv)*Math.min(Math.abs(dv), RAMP*DT);
+  }
+  const cmd = cmdNow();
+  // 시동 중 제어기를 호출하지 않아 적분/솔버/INDI 상태가 지상에서 쌓이지 않는다.
+  // 이 값은 회전수 '명령'일 뿐이다. 실제 회전수는 아래 ODE로만 변한다.
+  const u = spooling
+    ? Array(4).fill(startupIdleSpeed()*Math.min(1,(T+DT)/STARTUP.spoolSeconds))
+    : control(X,cmd);
   if(physicsFailure){recordState();return false;}
   // 유효하지 않은 값을 기록/WebGL에 넘기지 않고 마지막 유효 상태를 유지한다.
-  const next = u.every(Number.isFinite) ? rk4(X,u,windNow(),P,DT) : [];
+  const next = u.every(Number.isFinite) ? rk4(X,u,windNow(),P,DT,4,!health.airborne) : [];
   if (next.length !== NX || !next.every(Number.isFinite)){
     physicsFailure = '계산 중단: NaN / Inf';
     health.diverged = true; running = false; recordState(); return false;
   }
+  lastMotorCommand = u.slice();
   X = next; T = ++stepCount * DT;
   for (let i=0;i<4;i++) rotorPhase[i] = (rotorPhase[i] - P.rotor_directions[i]*X[13+i]*DT) % (2*Math.PI);
   health.elapsed += DT;
-  if (X[2] > 1) health.airborne = true;
+  if (X[2] > 1e-6) health.airborne = true;
   const om = Math.hypot(X[10],X[11],X[12]);
   health.maxOm = Math.max(health.maxOm,om);
   if (om > 25){ health.run += DT; health.ms25 += DT; }
@@ -2241,18 +2286,23 @@ function scoreCsv(){
     'F_N','omega_rad_s','tilt_deg','sat_hi','sat_lo','airspeed_mps','pitch_alpha_deg','beta_deg',
     'controller','target_mps','wind_mps','wind_to_deg','config_id',...COEFS.map(([k])=>k),
     'hybrid_sample_t_s',...['request','allocated','measured','residual'].flatMap(prefix=>
-      ['T_N','alpha_x_rad_s2','alpha_y_rad_s2','alpha_z_rad_s2'].map(unit=>'hybrid_'+prefix+'_'+unit))];
+      ['T_N','alpha_x_rad_s2','alpha_y_rad_s2','alpha_z_rad_s2'].map(unit=>'hybrid_'+prefix+'_'+unit)),
+    'startup_phase','ground_normal_N',...['command','actual'].flatMap(kind=>
+      [1,2,3,4].map(i=>'motor_'+i+'_'+kind+'_rad_s'))];
   const header=['# fast_drone · 고정 밀도 '+P0.rho+' kg/m3',
     '# 바람은 향하는 방향: 0 deg=+X, 90 deg=+Y',
     '# 최근 최대 240초. 각 행의 설정은 해당 시점의 값. 수치 일치는 실기 검증 아님.',
     '# Hybrid allocated=할당 예측, measured=실제 로터 추력·LPF 각가속도. 모터 지연 때문에 서로 다름.',
+    '# 시동 가정: '+STARTUP.spoolSeconds+' s, 공회전=호버 회전수의 '+STARTUP.idleHoverFraction+
+      ', 모터 시정수='+P0.tau_m+' s. 실측 ESC 시동/PX4 실행 결과가 아님.',
     columns.join(',')];
   const rows=REC.slice(0,curIdx()+1).map(r=>[r.t,r.seg,r.cmd,r.V,r.x[2],r.zr,r.al,
     r.F,Math.hypot(...r.x.slice(10,13)),tiltOf(r),+r.satHi,+r.satLo,r.airspeed,
     r.pitchAlpha,r.beta,r.config.ctrl,r.config.spd,r.config.wsp,r.config.wdir,r.config.revision,
     ...COEFS.map(([k])=>r.config.params[k]),
     r.cs.hybrid?.stat?.t??null,
-    ...['requested','applied','measured','residual'].flatMap(key=>r.cs.hybrid?.stat?.[key]??[null,null,null,null])
+    ...['requested','applied','measured','residual'].flatMap(key=>r.cs.hybrid?.stat?.[key]??[null,null,null,null]),
+    r.phase,r.groundNormal,...r.motorCommand,...r.x.slice(13,17)
     ].map(v=>v===null?'':typeof v==='number'?+v.toFixed(6):v).join(','));
   return header.concat(rows).join('\n')+'\n';
 }

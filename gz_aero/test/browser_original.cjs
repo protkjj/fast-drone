@@ -16,9 +16,10 @@ module.exports=async function({evaluate,send,sessionId,profile}){
   const space=()=>key('Space',' ',32),blur=()=>evaluate('document.activeElement.blur()');
   await wait('typeof veh!=="undefined" && veh?.userData.rotors?.length===4',90000);
   const initial=await evaluate(`({title:document.title,ctrl:CTRL,speed:$('#spd').value,altitude:$('#alt').value,
-    z:X[2],mass:P.mass,check:selfCheck(),lqrCheck:lqrCheck(),options:Object.keys(CTRLS)})`);
+    z:X[2],motors:X.slice(13),mass:P.mass,check:selfCheck(),lqrCheck:lqrCheck(),options:Object.keys(CTRLS)})`);
   assert.equal(initial.ctrl,'lqr');assert.equal(initial.speed,'83.3');assert.equal(initial.altitude,'200');
   assert.equal(initial.mass,8);assert.equal(initial.z,0);assert.ok(initial.check<1e-9&&initial.lqrCheck<1e-9);
+  assert.deepEqual(initial.motors,[0,0,0,0]);
   for(const controller of ['hybrid','sqprti','nmpc'])assert.ok(initial.options.includes(controller));
   console.log('ORIGINAL DEFAULTS '+JSON.stringify(initial));
   await blur();await space();await wait('T>.25 && running');
@@ -47,9 +48,10 @@ module.exports=async function({evaluate,send,sessionId,profile}){
     await evaluate(`$('#ctrl').value=${JSON.stringify(controller)};$('#ctrl').dispatchEvent(new Event('change'));$('#rst').click()`);
     await blur();await space();
     console.log('ORIGINAL START '+JSON.stringify(await evaluate('({controller:CTRL,running,t:T,hidden:document.hidden,focus:document.activeElement?.id})')));
-    await wait('T>=.3 || !!physicsFailure');await blur();await space();
-    const result=await evaluate('({controller:CTRL,t:T,failure:physicsFailure,finite:X.every(Number.isFinite),pose:veh.position.toArray(),state:X.slice(0,3)})');
-    assert.equal(result.controller,controller);assert.equal(result.failure,'');assert.ok(result.finite&&result.t>=.3);
+    await wait('T>=1.4 || !!physicsFailure');await blur();await space();
+    const result=await evaluate('({controller:CTRL,t:T,airborne:health.airborne,phase:startupPhase(),failure:physicsFailure,finite:X.every(Number.isFinite),pose:veh.position.toArray(),state:X.slice(0,3)})');
+    assert.equal(result.controller,controller);assert.equal(result.failure,'');assert.ok(result.finite&&result.t>=1.4);
+    assert.equal(result.airborne,true);assert.equal(result.phase,'flight');
     assert.deepEqual(result.pose,result.state);console.log('ORIGINAL CONTROLLER '+JSON.stringify(result));
   }
   await evaluate("$('#rst').click()");

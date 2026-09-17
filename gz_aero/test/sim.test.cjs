@@ -50,15 +50,15 @@ test('Python 기준 궤적 및 LQR 보간과 일치한다', () => {
   assert.ok(maxTiltError<1e-6);
 });
 
-test('30/60/144 FPS에서 같은 1초와 같은 궤적을 계산한다', () => {
+test('30/60/144 FPS에서 시동과 비행을 포함한 같은 3초 궤적을 계산한다', () => {
   const ends = [30, 60, 144].map(fps => {
     const sim = simulator();
     return sim.run(`CTRL = 'lqr'; running = true; tick(1000);
-      for (let i = 1; i <= ${fps}; i++) tick(1000 + i * 1000 / ${fps});
+      for (let i = 1; i <= ${fps*3}; i++) tick(1000 + i * 1000 / ${fps});
       ({t:T, x:Array.from(X)});`);
   });
   for (const end of ends) {
-    assert.ok(Math.abs(end.t - 1) < 1e-9, `t=${end.t}`);
+    assert.ok(Math.abs(end.t - 3) < 1e-9, `t=${end.t}`);
     end.x.forEach((value, i) => assert.ok(Math.abs(value - ends[0].x[i]) < 1e-9));
   }
 });
@@ -180,7 +180,8 @@ test('초기 지상 상태는 추락이 아니며, 이륙 후 접촉은 즉시 �
 
 test('NaN 제어 출력은 마지막 유효 상태를 보존하고 실패를 기록한다', () => {
   const sim=simulator();
-  const result=sim.run(`const before=X.slice(); control=()=>[NaN,0,0,0];
+  const result=sim.run(`for(let i=0;i<500;i++)advanceStep();
+    const before=X.slice(); control=()=>[NaN,0,0,0];
     running=true;advanceStep();({before,after:X,diverged:health.diverged,running,
       failure:REC.at(-1).failure});`);
   assert.deepEqual(Array.from(result.after),Array.from(result.before));
@@ -245,8 +246,8 @@ test('단독 NMPC의 예측은 모터 지연·바람을 포함한 실제 플랜�
 test('단독 NMPC의 웜스타트·출력을 되감기와 초기화에서 복원한다', () => {
   const sim=simulator();
   const result=sim.run(`CTRL='nmpc';$('#spd').value='0';reset();
-    for(let i=0;i<100;i++)advanceStep();const expected=X.slice();
-    restoreTo(2);REC.truncate(3);for(let i=0;i<60;i++)advanceStep();
+    for(let i=0;i<600;i++)advanceStep();const expected=X.slice();
+    restoreTo(27);REC.truncate(28);for(let i=0;i<60;i++)advanceStep();
     const actual=X.slice();reset();({expected,actual,cleared:motorU===null && motorOut===null});`);
   result.expected.forEach((v,i)=>assert.ok(Math.abs(v-result.actual[i])<1e-8));
   assert.equal(result.cleared,true);
@@ -271,7 +272,7 @@ test('단독 NMPC 압축 기울기가 실제 비용의 수치 미분과 일치�
 test('단독 NMPC 풀이가 3회 연속 실패하면 숨은 제어기 전환 없이 정지한다', () => {
   const sim=simulator();
   const result=sim.run(`CTRL='nmpc';reset();motorSolve=()=>null;running=true;
-    for(let i=0;i<100 && !physicsFailure;i++)advanceStep();
+    for(let i=0;i<600 && !physicsFailure;i++)advanceStep();
     ({running,ctrl:CTRL,failures:motorFailures,failure:physicsFailure,score:score()});`);
   assert.equal(result.running,false);
   assert.equal(result.ctrl,'nmpc');

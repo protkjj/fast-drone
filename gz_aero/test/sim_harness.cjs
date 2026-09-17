@@ -8,7 +8,8 @@ function simulator() {
   const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
     .map(match => match[1]).find(text => text.includes('function xdot('));
   const elements = new Map();
-  const defaults = {spd: '83', alt: '200', wsp: '0', wdir: '90', rtf: '1', ctrl: 'lqr'};
+  const defaults = {spd: html.match(/id="spd"[^>]*value="([^"]+)"/)[1],
+    alt: html.match(/id="alt"[^>]*value="([^"]+)"/)[1], wsp: '0', wdir: '90', rtf: '1', ctrl: 'lqr'};
   const document = {
     hidden: false,
     querySelector(selector) {
