@@ -175,7 +175,7 @@
       this.constraintScale=this.meta.constraint_scaling||Array.from({length:this.meta.lbg.length},(_,i)=>this.stateScale[i%this.meta.nx]);
       this.lamX=null; this.lamG=null;
     }
-    solve(state, refs, voltage, wind) {
+    solve(state, refs, voltage, wind, envelope=null) {
       const m=this.meta, x=state.slice(0,m.nx);
       if(!this.guess) {
         const scaledX=x.map((v,i)=>v/this.stateScale[i]);
@@ -183,10 +183,20 @@
         this.guess=[...Array.from({length:m.N+1},()=>scaledX).flat(),...Array.from({length:m.N},()=>scaledU).flat()];
       }
       const parameters=[...x,...refs.flat(),...this.previous,...wind,voltage];
+      const lbg=m.lbg.slice(),ubg=m.ubg.slice(),interfaceMeta=m.hybrid_envelope;
+      if(interfaceMeta){
+        if(envelope?.available){
+          parameters.push(...envelope.inverse.flat(),...envelope.offset);
+          for(let i=0;i<4;i++){
+            lbg[interfaceMeta.constraint_start+i]=envelope.force_lower_N[i]/interfaceMeta.force_scale_N;
+            ubg[interfaceMeta.constraint_start+i]=envelope.force_upper_N[i]/interfaceMeta.force_scale_N;
+          }
+        }else parameters.push(...Array(interfaceMeta.parameter_size).fill(0));
+      }
       const begin=performance.now();
       let result, status, values, residual=Infinity, success=false;
       try {
-        const input={x0:this.guess,p:parameters,lbx:m.lbx,ubx:m.ubx,lbg:m.lbg,ubg:m.ubg};
+        const input={x0:this.guess,p:parameters,lbx:m.lbx,ubx:m.ubx,lbg,ubg};
         if(this.lamX) {input.lam_x0=this.lamX; input.lam_g0=this.lamG;}
         const packed=Object.fromEntries(Object.entries(input).map(([k,v])=>[k,this.ca.DM(v)]));
         result=this.solver.call(packed);
@@ -194,19 +204,22 @@
         // Keep the pre-normalization acceptance gate in physical units. Scaling
         // must not disguise a large motor-state defect as a small dimensionless one.
         residual=Math.max(0,...this.binding.array(result.g).map((v,i)=>
-          Math.max(m.lbg[i]-v,v-m.ubg[i])*this.constraintScale[i]));
+          Math.max(lbg[i]-v,v-ubg[i])*this.constraintScale[i]));
         status=this.solver.stats();
         success=status.success && residual<1e-3 && values.every(Number.isFinite);
       } catch(error) {status={return_status:String(error.message||error),iter_count:0};}
       const elapsed=performance.now()-begin;
-      this.stats.push({ms:elapsed,success,status:status.return_status,iterations:status.iter_count,residual});
+      this.stats.push({ms:elapsed,success,status:status.return_status,iterations:status.iter_count,residual,
+        ...(interfaceMeta?{actuator_envelope:envelope||{available:false,reason:'disabled'}}:{})});
       if(success) {
         const shift=m.control_dt_s/m.prediction_dt_s;
         const lamX=this.binding.array(result.lam_x),lamG=this.binding.array(result.lam_g);
         this.lamX=[...shiftPrediction(lamX.slice(0,m.state_count),m.nx,shift),
           ...shiftPrediction(lamX.slice(m.state_count),4,shift)];
         this.lamG=[...shiftPrediction(lamG.slice(0,m.state_count),m.nx,shift),
-          ...shiftPrediction(lamG.slice(m.state_count),160,shift)];
+          // This local map is rebuilt each solve; it is NOT a horizon trajectory
+          // whose four multipliers can be shifted as 160-wide motor constraints.
+          ...(interfaceMeta?Array(4).fill(0):shiftPrediction(lamG.slice(m.state_count),160,shift))];
         const controls=values.slice(m.state_count);
         this.previous=controls.slice(0,4).map((v,i)=>clamp(v*this.commandScale[i],m.lower[i],m.upper[i]));
         this.command=this.previous.slice();
@@ -219,6 +232,11 @@
           if(length>1e-8)q.forEach((v,i)=>shifted[offset+i]=v/length);
         }
         this.guess=[...shifted,...shiftPrediction(controls,4,shift)];
+      }
+      if(interfaceMeta&&envelope?.available){
+        const force=envelope.inverse.map(row=>row.reduce((s,v,i)=>s+v*(this.command[i]-envelope.offset[i]),0));
+        const violation=Math.max(0,...force.map((v,i)=>Math.max(envelope.force_lower_N[i]-v,v-envelope.force_upper_N[i])));
+        Object.assign(this.stats.at(-1),{envelope_force_N:force,envelope_violation_N:violation});
       }
       // Declared fallback: hold the last bounded command; no hidden PD/INDI for NMPC.
       return this.command.slice();
@@ -271,6 +289,53 @@
       const [force,torque]=binding.call(binding.functions.rotors,this.n,[0]);
       this.forceRaw=force.slice();this.torqueRaw=torque.slice();
       this.force=force.slice();this.torque=torque.slice();this.last=null;
+    }
+    envelope(state,voltage){
+      // Capability information flows UP; rotor commands still belong to update().
+      // Only feedback RPM/velocity/attitude and measured bus voltage are used.
+      // Freeze inflow and voltage for 20 x 1 ms nominal motor integration steps.
+      const dt=PERIOD*DT,axial=rotate(state.slice(6,10),state.slice(3,6),true)[0];
+      if(!Number.isFinite(voltage)||voltage<=0||!state.every(Number.isFinite))
+        throw new Error('Invalid measured state/voltage for actuator envelope');
+      const initial=state.slice(13,17).map(n=>Math.max(0,n));
+      let low=initial.slice(),high=initial.slice();
+      for(let k=0;k<PERIOD;k++){
+        [low]=this.b.call(this.b.functions.motor_step,low,[0,0,0,0],[axial],[voltage]);
+        [high]=this.b.call(this.b.functions.motor_step,high,Array(4).fill(this.max),[axial],[voltage]);
+      }
+      const [lo,ql]=this.b.call(this.b.functions.rotors,low,[axial]);
+      const [hi,qh]=this.b.call(this.b.functions.rotors,high,[axial]);
+      const details={horizon_s:dt,voltage_V:voltage,axial_mps:axial,
+        rotor_initial_rad_s:initial,rotor_lower_rad_s:low,rotor_upper_rad_s:high,
+        force_lower_N:lo,force_upper_N:hi};
+      if([...low,...high,...lo,...hi].some(v=>!Number.isFinite(v)||v<0)||lo.some((v,i)=>v>hi[i]+1e-9))
+        return {...details,available:false,reason:'invalid nominal motor interval'};
+      const inertia=this.p.inertia_kg_m2,a=this.p.arm_m/Math.sqrt(2),dirs=[1,-1,1,-1];
+      const ys=[a,-a,-a,a],zs=[a,a,-a,-a],dot=(x,y)=>x.reduce((s,v,i)=>s+v*y[i],0);
+      // A secant in force coordinates preserves thrust/pitch/yaw exactly for the
+      // frozen geometry. Roll torque is locally approximated; do NOT call this
+      // a certified nonlinear reachable set, especially outside the prop map.
+      const middle=low.map((v,i)=>(v+high[i])/2),[fm,qm,df,dq]=this.b.call(this.b.functions.rotors,middle,[axial]);
+      // A voltage below back-EMF can leave only passive coasting. Preserve that
+      // zero-width force bound instead of silently removing the constraint.
+      if(hi.some((v,i)=>v-lo[i]<1e-9&&df[i]<=1e-10))
+        return {...details,available:false,reason:'degenerate force effectiveness outside the local map'};
+      const slope=hi.map((v,i)=>v-lo[i]>=1e-9?(qh[i]-ql[i])/(v-lo[i]):dq[i]/df[i]);
+      const intercept=ql.map((v,i)=>v-slope[i]*lo[i]);
+      const matrix=[Array(4).fill(1),slope.map((v,i)=>dirs[i]*v/inertia[0]),
+        zs.map(v=>v/inertia[1]),ys.map(v=>-v/inertia[2])];
+      const columns=Array.from({length:4},(_,i)=>linearSolve(matrix,Array.from({length:4},(_,j)=>+(i===j))));
+      if(columns.some(v=>!v||v.some(x=>!Number.isFinite(x))))
+        return {...details,available:false,reason:'singular virtual effectiveness'};
+      const inverse=Array.from({length:4},(_,i)=>columns.map(column=>column[i]));
+      const baseline=[dot(dirs,this.torque)/inertia[0],dot(zs,this.force)/inertia[1],-dot(ys,this.force)/inertia[2]];
+      const offset=[0,...sub(this.alpha,baseline)];
+      offset[1]+=dot(dirs,intercept)/inertia[0];
+      // Log a diagnostic of roll-map curvature, not a claim of an error bound.
+      const midpointError=qm.reduce((s,v,i)=>s+Math.abs(v-slope[i]*fm[i]-intercept[i])/inertia[0],0);
+      return {...details,available:true,matrix,inverse,offset,
+        roll_secant_midpoint_error_rad_s2:midpointError,
+        note:'Nominal 20 ms endpoint envelope; frozen inflow/voltage, local roll map. Not instantaneous achievement or a robust reachable-set guarantee.'};
     }
     update(state, desired, rateMeasurement=state.slice(10,13)) {
       // Differentiate the measured gyro, not the bias-corrected state: a GPS
@@ -340,7 +405,7 @@
   }
   function validateOptions(options={}) {
     const cfg={controller:'hybrid',feedback:'truth',scenario:'step',seconds:4,speed:3,altitude:20,
-      wind_speed:0,wind_angle:90,seed:42,preview:true,log_hz:50,scales:[1,1,1,1,1],...options};
+      wind_speed:0,wind_angle:90,seed:42,preview:true,hybrid_actuator_feedback:false,log_hz:50,scales:[1,1,1,1,1],...options};
     if(!['hybrid','nmpc','pd'].includes(cfg.controller))throw new Error('Unknown controller');
     if(!['truth','eskf'].includes(cfg.feedback))throw new Error('Unknown feedback');
     if(!['hover','step','gust','schedule'].includes(cfg.scenario))throw new Error('Unknown scenario');
@@ -353,6 +418,7 @@
     if(!Array.isArray(cfg.scales)||cfg.scales.length!==5||cfg.scales.some(v=>!Number.isFinite(v)||v<.5||v>1.5))throw new Error('Invalid model-error scales');
     if(!Number.isInteger(cfg.seed)||cfg.seed<0||cfg.seed>4294967295)throw new Error('Seed must be an unsigned 32-bit integer');
     if(typeof cfg.preview!=='boolean')throw new Error('Preview must be true or false');
+    if(typeof cfg.hybrid_actuator_feedback!=='boolean')throw new Error('Hybrid actuator feedback must be true or false');
     if(![50,1000].includes(cfg.log_hz)||cfg.log_hz===1000&&cfg.seconds>20)throw new Error('로그는 50 Hz 또는 1 kHz입니다. 상세 1 kHz 로그는 20초 이하로 제한합니다.');
     if(cfg.scenario==='schedule'){
       if(!Array.isArray(cfg.commands)||!cfg.commands.length||cfg.commands.length>6001||cfg.commands[0].t!==0)
@@ -431,6 +497,7 @@
     let samples=0, sumV2=0, sumZ2=0, sumEstimate2=0, energy=0, outside=0, maxEnergyResidual=0, maxBusResidual=0;
     let failure=null, stopped=false, saturation=0, imuSamples=0, gpsSamples=0, maxRate=0,outerUpdates=0;
     let currentLimited=0,voltageLimited=0,trackingLimited=0,coasting=0,allocationLimited=0,allocationThrustResidual=0,allocationAlphaResidual=0;
+    let thrustTrackingSquared=0,alphaTrackingSquared=0;
     const pendingGPS=[], gpsEvents=[], trace=[], ticks=Math.round(cfg.seconds/DT), begin=performance.now();
     const yieldMessages=()=>new Promise(resolve=>setTimeout(resolve,0));
     function record(t,d,dx,imu=null){
@@ -475,7 +542,9 @@
         // Delta-input cost starts from the last achieved nominal allocation,
         // not an impossible requested virtual action. This is not plant truth.
         if(indi?.last)optimizer.previous=indi.last.allocated.slice();
-        request=optimizer.solve(feedback,referenceHorizon(t,cfg),voltage,[0,0,0]);
+        const envelope=cfg.controller==='hybrid'&&cfg.hybrid_actuator_feedback?indi.envelope(feedback,voltage):null;
+        if(envelope)envelope.t_s=t;
+        request=optimizer.solve(feedback,referenceHorizon(t,cfg),voltage,[0,0,0],envelope);
         outerUpdates++;
         const stat=optimizer.stats.at(-1);if(stat)stat.t_s=t;
         report(t);
@@ -497,6 +566,10 @@
         allocationLimited+=indi.last.limited;
         allocationThrustResidual=Math.max(allocationThrustResidual,Math.abs(indi.last.residual[0]));
         allocationAlphaResidual=Math.max(allocationAlphaResidual,norm(indi.last.residual.slice(1)));
+        // Evaluation may use plant truth; the controller/envelope never receives
+        // these accelerations. Measure lag separately from static allocation.
+        thrustTrackingSquared+=(request[0]-motor.thrust_N.reduce((s,v)=>s+v,0))**2;
+        alphaTrackingSquared+=sub(request.slice(1),dx.slice(10,13)).reduce((s,v)=>s+v*v,0);
       }
       voltage=d[4][0]; energy+=d[6][0]*DT;
       outside+=d[13].some(v=>v!==0)?1:0;
@@ -548,6 +621,10 @@
                allocation_limited_fraction:indi?fraction(allocationLimited):null,
                allocation_thrust_residual_max_N:indi?allocationThrustResidual:null,
                allocation_alpha_residual_max_rad_s2:indi?allocationAlphaResidual:null,
+               virtual_thrust_tracking_rmse_N:indi?rmse(thrustTrackingSquared):null,
+               virtual_alpha_tracking_rmse_rad_s2:indi?rmse(alphaTrackingSquared):null,
+               actuator_envelope_unavailable:cfg.controller==='hybrid'&&cfg.hybrid_actuator_feedback?
+                 optimizer.stats.filter(s=>s.actuator_envelope&&!s.actuator_envelope.available).length:0,
                motor_energy_residual_W:maxEnergyResidual,bus_residual_V:maxBusResidual,
                solver_failures:optimizer.stats.filter(s=>!s.success).length,
                solve_ms_p50:percentile(timing,.5),solve_ms_p95:percentile(timing,.95),solve_ms_max:timing.length?Math.max(...timing):null,
@@ -561,6 +638,7 @@
                     'Version 2 logs use synchronized gyro/RPM timestamps and independent sensor noise streams; old and new seed traces are not identical.',
                     'GPS innovation and NIS are logged but outliers are not rejected. Contact is only a CG ground-crossing abort, not STL collision dynamics.',
                     '17-state NMPC holds measured bus voltage over its 1 s horizon. Wind is unobserved and assumed zero by both controllers.',
+                    'Hybrid actuator feedback constrains only the first virtual input using a nominal 20 ms endpoint motor forecast. Voltage/inflow are frozen; roll torque is locally approximated. It neither predicts motor lag through the full horizon nor guarantees instantaneous/robust feasibility. Unavailable envelopes and held-command violations are logged.',
                     'Known initial pose/alignment; IMU Euler propagation, timestamped GPS correction and replay; GPS delay is 20 ms.',
                     'Outside-map samples use an explicit passive continuation; these are NOT validated propulsion performance results.']};
     } finally {b.dispose();}

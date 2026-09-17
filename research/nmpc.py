@@ -13,7 +13,7 @@ PRED_DT = .05
 CONTROL_DT = .02
 
 
-def build_problem(p, functions, kind, normalize=True, actuator_constraints=False):
+def build_problem(p, functions, kind, normalize=True, actuator_constraints=False, hybrid_envelope=False):
     """Return the physical NLP in optional dimensionless decision coordinates.
 
     ``normalize=False`` exists for equivalence tests, not controller tuning.
@@ -119,11 +119,30 @@ def build_problem(p, functions, kind, normalize=True, actuator_constraints=False
         metadata["ubg"] += ([1]*4+[1e8]*4)*20*N
         metadata["constraint_scaling"] += ([current_limit]*4+[voltage_scale]*4)*20*N
     metadata["actuator_constraints"] = bool(kind == "nmpc" and actuator_constraints)
+    if kind == "hybrid" and hybrid_envelope:
+        # INDI supplies a local coupled virtual-input envelope, not motor commands
+        # for NMPC to optimize. Four affine inequalities constrain ONLY u[:,0].
+        # The other 19 inputs retain the original virtual prediction model.
+        # Parameters: row-major inverse effectiveness (16), virtual offset (4).
+        interface = ca.MX.sym("actuator_interface", 20)
+        force = ca.vertcat(*[ca.dot(interface[4*i:4*i+4], u[:,0]-interface[16:20])
+                            for i in range(4)])
+        weight = p["mass_kg"]*p["g"]
+        metadata["hybrid_envelope"] = {"parameter_size": 20,
+            "constraint_start": int(constraints.numel()), "force_scale_N": weight,
+            "horizon_s": CONTROL_DT, "kind": "local-first-move-force-envelope-v1"}
+        parameters = ca.vertcat(parameters, interface)
+        constraints = ca.vertcat(constraints, force/weight)
+        # Runtime replaces these four bounds with the measured-state envelope.
+        # Zero interface / loose bounds explicitly disables it for ablation.
+        metadata["lbg"] += [-1e8]*4
+        metadata["ubg"] += [1e8]*4
+        metadata["constraint_scaling"] += [weight]*4
     return {"x": variables, "p": parameters, "f": cost, "g": constraints}, metadata
 
 
 def build_solver(p, functions, kind):
-    problem, metadata = build_problem(p, functions, kind, actuator_constraints=True)
+    problem, metadata = build_problem(p, functions, kind, actuator_constraints=True, hybrid_envelope=True)
     opts = {"ipopt.print_level": 0, "print_time": False, "ipopt.sb": "yes",
             "ipopt.max_iter": 30, "ipopt.tol": 1e-5, "ipopt.acceptable_tol": 1e-4,
             # Normalized constraints are checked in physical units by runtime.js.

@@ -24,3 +24,9 @@ test('replay follows recorded simulation time and interpolates quaternion short 
   assert.equal(R.sample(r.trace,10).t,.2);assert.equal(R.sample(r.trace,-1).t,0);
   assert.equal(JSON.stringify(r),before);
 });
+test('historical logs are not relabeled as actuator-aware Hybrid',()=>{
+  const old=report();delete old.configuration.hybrid_actuator_feedback;
+  assert.equal(R.validateImport(old,runtime.validateOptions).hybrid.configuration.hybrid_actuator_feedback,false);
+  const different=report('nmpc');different.configuration.hybrid_actuator_feedback=true;
+  assert.throws(()=>R.validateImport({results:{hybrid:report(),nmpc:different}},runtime.validateOptions),/조건/);
+});

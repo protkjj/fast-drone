@@ -103,7 +103,7 @@ def compile_numeric(functions, estimator, profile):
     for group, entries in (("functions", functions), ("estimator", estimator)):
         for key, fn in entries.items():
             # Optimizer graphs stay in WASM. Export only the time-step hot path.
-            if group == "functions" and key not in ("rhs", "step", "diag", "aero", "rotors", "inverse_thrust"):
+            if group == "functions" and key not in ("rhs", "step", "diag", "aero", "rotors", "inverse_thrust", "motor_step"):
                 continue
             name = emit(fn)
             exported[group + "." + key] = {"name": name,

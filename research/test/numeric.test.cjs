@@ -26,6 +26,7 @@ for(const profile of ['simple','selected'])test(`${profile}: generated scalar gr
       check('functions','aero',[x.slice(0,13),env.slice(0,3)]);
       const axial=i%2===0?0:noise()*40;
       check('functions','rotors',[x.slice(13,17),[axial]]);
+      check('functions','motor_step',[x.slice(13,17),u,[axial],[22]]);
       check('functions','inverse_thrust',[[0,2,5,20],[axial],[3000]]);
     }
     // Every interpolation knot, including derivatives at the boundary.

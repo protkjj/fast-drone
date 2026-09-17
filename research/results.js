@@ -5,7 +5,8 @@
   function conditionKey(report){
     const c=report.configuration;
     return JSON.stringify([report.profile_id,report.implementation?.input_sha256,
-      c.feedback,c.scenario,c.seconds,c.speed,c.altitude,c.seed,c.preview,c.scales,c.wind_speed??0,c.wind_angle??90,c.commands||null]);
+      c.feedback,c.scenario,c.seconds,c.speed,c.altitude,c.seed,c.preview,c.scales,c.wind_speed??0,c.wind_angle??90,c.commands||null,
+      c.hybrid_actuator_feedback??false]);
   }
   function validateImport(value,validateOptions){
     const reports=value?.results?Object.values(value.results):[value];
@@ -13,7 +14,9 @@
     const result={};
     for(const r of reports){
       if(r?.schema_version!==2)throw new Error('시각·단위가 명확한 v2 로그만 재생할 수 있습니다. 이전 로그는 원본 파일로 보존하세요.');
-      const cfg=validateOptions(r.configuration);
+      // Historical logs predate capability feedback; do not relabel them as
+      // having used the new default when importing or reusing their settings.
+      const cfg=validateOptions({hybrid_actuator_feedback:false,...r.configuration});
       if(result[cfg.controller])throw new Error('같은 제어기의 중복 결과입니다.');
       if(!['selected-6931','simple-passive'].includes(r.profile_id))throw new Error('알 수 없는 기체 프로필입니다.');
       if(!/^[a-f0-9]{64}$/.test(r.implementation?.input_sha256||''))throw new Error('모델·구현 해시가 없는 로그입니다.');

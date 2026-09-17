@@ -256,9 +256,22 @@ def build(p):
     inverse = ca.Function("inverse_rotor_thrust", [desired,axial,maximum],
                           [ca.if_else(desired<=1e-12,0,
                            ca.if_else(desired>=cap,maximum,(low+high)/2))])
+    # A nominal, frozen-inflow / measured-voltage actuator forecast. Reuse the
+    # physical motor equations (including passive coasting), not a fitted slew
+    # constant. This is an endpoint capability estimate, NOT a full-airframe or
+    # future battery-voltage guarantee. No SOC or hidden plant scales are inputs.
+    motor_rhs = ca.Function("actuator_rhs", [pn, cmd, pa, bus_v],
+                            [motors(pn, cmd, qi, bus_v, p)[0]])
+    k1 = motor_rhs(pn, cmd, pa, bus_v)
+    k2 = motor_rhs(pn+DT/2*k1, cmd, pa, bus_v)
+    k3 = motor_rhs(pn+DT/2*k2, cmd, pa, bus_v)
+    k4 = motor_rhs(pn+DT*k3, cmd, pa, bus_v)
+    motor_step = ca.Function("actuator_step", [pn, cmd, pa, bus_v],
+                            [pn+DT/6*(k1+2*k2+2*k3+k4)])
     af = ca.Function("aerodynamics", [xv, environment[:3]], [fv])
     return {"rhs": rhs, "step": step, "diag": diag, "full": full, "constrained": constrained,
-            "virtual": vf, "effect": effect, "aero": af, "rotors": rotors, "inverse_thrust": inverse}
+            "virtual": vf, "effect": effect, "aero": af, "rotors": rotors,
+            "inverse_thrust": inverse, "motor_step": motor_step}
 
 
 def initial_state(p, altitude=20):

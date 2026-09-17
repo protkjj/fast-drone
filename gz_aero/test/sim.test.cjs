@@ -2,6 +2,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {simulator} = require('./sim_harness.cjs');
 
+test('기본 목표는 약 300 km/h와 200 m이며 실제 속도는 초기화하지 않는다',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const html=fs.readFileSync(path.join(__dirname,'../../results/flight_sim.html'),'utf8');
+  const speed=html.match(/id="spd"[^>]*value="([^"]+)"/)[1];
+  const altitude=html.match(/id="alt"[^>]*value="([^"]+)"/)[1];
+  assert.equal(Number(speed),83.3);assert.ok(Math.abs(Number(speed)*3.6-300)<.2);
+  assert.equal(Number(altitude),200);assert.match(html,/id="spd"[^>]*step="0\.1"/);
+  const sim=simulator(),state=sim.run(`$('#spd').value=${JSON.stringify(speed)};reset();
+    ({velocity:X.slice(3,6),reference:cmdSpd,target:cmdNow().target});`);
+  assert.deepEqual(Array.from(state.velocity),[0,0,0]);assert.equal(state.reference,0);assert.equal(state.target,83.3);
+});
+
 test('역방향·사선 유입 공력은 병진 운동 에너지를 생성하지 않는다',()=>{
   const sim=simulator();
   const powers=sim.run(`[[ -20,0,0],[-20,5,3],[0,5,3],[20,5,3]].map(v=>{
@@ -86,7 +98,7 @@ test('시작·정지 상태를 즉시 그리고 초기화 시 별창에 빈 채�
 });
 
 test('기본 LQR 비행과 고속 예제가 120초 후 속도·고도를 유지한다', () => {
-  for (const target of [60, 83]) {
+  for (const target of [60, 83, 83.3]) {
     const sim = simulator();
     const result = sim.run(`$('#spd').value='${target}'; reset();
       for(let i=0;i<60000 && !physicsFailure;i++) advanceStep();

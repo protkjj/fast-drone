@@ -2,7 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const R=require('../runtime.js'),Results=require('../results.js');
-function fixture(){
+function fixture(url='http://localhost/sim.html'){
   const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8'),elements=new Map(),messages=[],documentEvents={};
   class Element{
     constructor(){this.value='';this.disabled=false;this.options=[];this.events={};this.textContent='';this.classList={toggle(){}};this.style={setProperty(){}};}
@@ -28,7 +28,7 @@ function fixture(){
   }
   const aircraft=new Element(),classes=new Map();
   const context={console,URL,performance,setTimeout,clearTimeout,Blob,ResearchRuntime:R,ResearchResults:Results,
-    location:{href:'http://localhost/sim.html'},history:{replaceState(){}},matchMedia:()=>({matches:false}),
+    location:{href:url},history:{replaceState(){}},matchMedia:()=>({matches:false}),
     requestAnimationFrame:()=>1,
     document:{getElementById:id=>elements.get(id),createElement:()=>new Element(),createElementNS:()=>new Element(),
       addEventListener:(type,fn)=>documentEvents[type]=fn,
@@ -86,11 +86,17 @@ test('unified page defaults to selected observation, preserves comparison settin
   e.get('run').click();const request=messages.at(-1);
   assert.equal(request.mode,'observe');assert.equal(request.options.controller,'hybrid');assert.equal(request.profile,'selected');
   assert.equal(request.options.scenario,'schedule');assert.equal(request.options.preview,false);
+  assert.equal(request.options.hybrid_actuator_feedback,false);
   assert.equal(e.get('mode-compare').disabled,true);
   e.get('live-target-speed').value='3';e.get('live-target-altitude').value='21';e.get('apply-target').click();
   assert.equal(messages.at(-1).type,'target');assert.equal(messages.at(-1).speed,3);
   context.activeWorker.onmessage({data:{type:'done',stopped:true,count:0}});
   assert.match(e.get('target-state').textContent,/적용되지 않았/);
+});
+test('actuator-aware Hybrid is explicit opt-in, without replacing flight controls',()=>{
+  const {elements:e,messages}=fixture('http://localhost/research/index.html?actuator_feedback=1');
+  assert.match(e.get('mode-note').textContent,/실험용 Hybrid 모터 능력 제약 ON/);
+  e.get('run').click();assert.equal(messages.at(-1).options.hybrid_actuator_feedback,true);
 });
 test('sliders and typed targets work before takeoff and while running; wind is sent, not just displayed',()=>{
   const {elements:e,messages,evaluate}=fixture();
@@ -122,7 +128,7 @@ test('holding a slider drag still applies targets periodically without waiting f
 test('observed command schedule transfers to precise comparison without overwriting the source log',()=>{
   const {context,elements:e,evaluate,messages}=fixture();
   const state=[0,0,20,0,0,0,0,-Math.SQRT1_2,0,Math.SQRT1_2,0,0,0,1500,1500,1500,1500,1];
-  const cfg=R.validateOptions({controller:'pd',scenario:'schedule',seconds:30,feedback:'eskf',seed:7,preview:false,
+  const cfg=R.validateOptions({controller:'pd',scenario:'schedule',seconds:30,feedback:'eskf',seed:7,preview:false,hybrid_actuator_feedback:false,
     commands:[{t:0,speed:0,altitude:20},{t:.04,speed:3,altitude:21}]});
   context.report={profile_id:'selected-6931',configuration:cfg,simulated_seconds:.2,status:'stopped',metrics:{},counts:{},
     final:state,trace:[0,.2].map(t=>({t,state,v:state.slice(3,6),z:20,reference:[0,0,0,20]}))};
@@ -133,6 +139,7 @@ test('observed command schedule transfers to precise comparison without overwrit
   assert.equal(e.get('feedback').value,'eskf');assert.equal(e.get('seed').value,'7');
   e.get('run').click();const options=messages.at(-1).options;
   assert.equal(messages.at(-1).mode,'compare');assert.deepEqual(options.commands,cfg.commands);
+  assert.equal(options.hybrid_actuator_feedback,false);
   assert.equal(JSON.stringify(context.report),before);
   // Choosing a shorter prefix trims only the NEW experiment, never the log.
   evaluate('setBusy(false)');e.get('seconds').value='0.02';e.get('run').click();

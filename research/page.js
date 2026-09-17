@@ -4,6 +4,9 @@ const results={};
 let worker=null,vehicle=null,running=false,drawModel=()=>{},updatePath=()=>{},appendLivePath=()=>{};
 let playing=false,replayTime=0,imported=false,customScales=null,mode='compare',paused=false,recordedCommands=null;
 let replayActive=false,resetRequested=false,lastPlotWall=0;
+// Retain the ablation setting when an imported experiment is reused. No layout
+// or flight-control widgets change. Mixed flight results keep this opt-in.
+let hybridActuatorFeedback=new URL(location.href).searchParams.get('actuator_feedback')==='1';
 const liveTraces={};
 const controllerNames={pd:'PD–INDI · 조작용 baseline',hybrid:'Hybrid',nmpc:'NMPC 단독'};
 const settingIds=['profile','controller','feedback','scenario','seconds','speed','altitude','preview','mismatch','seed','log-hz','wind-speed','wind-angle'];
@@ -33,6 +36,7 @@ function updateModeNote(){
   $('mode-note').textContent=mode!=='observe'?'Hybrid와 NMPC 단독을 같은 기체·조건에서 계산합니다.':
     $('observe-controller').value==='pd'?'PD–INDI baseline · 빠른 조작용이며 Hybrid가 아닙니다. 목표와 바람은 비행 중 자동 반영됩니다.':
     `${controllerNames[$('observe-controller').value]} · 실제 IPOPT 계산으로 비행합니다. 풀이가 느리면 비행 진행도 느려지며, 다른 제어기로 대체하지 않습니다.`;
+  if(hybridActuatorFeedback)$('mode-note').textContent+=' · 실험용 Hybrid 모터 능력 제약 ON';
 }
 $('observe-controller').addEventListener('change',updateModeNote);
 function updateAircraftLabel(){
@@ -242,7 +246,8 @@ $('run').addEventListener('click',()=>{
   try{options=ResearchRuntime.validateOptions({seconds,speed,seed,controller:mode==='observe'?$('observe-controller').value:'hybrid',feedback:$('feedback').value,scenario,commands,
     wind_speed:mode==='observe'?Number($('live-wind-speed').value):Number($('wind-speed').value),
     wind_angle:mode==='observe'?Number($('live-wind-angle').value):Number($('wind-angle').value),
-    scales:mismatch,altitude,preview:mode==='observe'?false:$('preview').value==='true',log_hz:Number($('log-hz').value)});}
+    scales:mismatch,altitude,preview:mode==='observe'?false:$('preview').value==='true',
+    hybrid_actuator_feedback:hybridActuatorFeedback,log_hz:Number($('log-hz').value)});}
   catch(error){$('errors').textContent=error.message;$('settings').open=true;return;}
   setPlaying(false);imported=false;
   replayActive=false;resetRequested=false;Object.keys(liveTraces).forEach(k=>delete liveTraces[k]);lastPlotWall=0;
@@ -409,6 +414,7 @@ $('import-file').addEventListener('change',async event=>{
 });
 function reuseSettings(nextMode,observedDuration=false){
   const r=replayResult();if(!r||running)return;const c=r.configuration;
+  hybridActuatorFeedback=c.hybrid_actuator_feedback??false;
   setMode(nextMode);
   $('profile').value=r.profile_id==='selected-6931'?'selected':'simple';
   $('controller').value=Object.keys(results).length===2||c.controller==='pd'?'both':c.controller;

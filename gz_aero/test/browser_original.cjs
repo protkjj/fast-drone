@@ -17,13 +17,13 @@ module.exports=async function({evaluate,send,sessionId,profile}){
   await wait('typeof veh!=="undefined" && veh?.userData.rotors?.length===4',90000);
   const initial=await evaluate(`({title:document.title,ctrl:CTRL,speed:$('#spd').value,altitude:$('#alt').value,
     z:X[2],mass:P.mass,check:selfCheck(),lqrCheck:lqrCheck(),options:Object.keys(CTRLS)})`);
-  assert.equal(initial.ctrl,'lqr');assert.equal(initial.speed,'60');assert.equal(initial.altitude,'200');
+  assert.equal(initial.ctrl,'lqr');assert.equal(initial.speed,'83.3');assert.equal(initial.altitude,'200');
   assert.equal(initial.mass,8);assert.equal(initial.z,0);assert.ok(initial.check<1e-9&&initial.lqrCheck<1e-9);
   for(const controller of ['hybrid','sqprti','nmpc'])assert.ok(initial.options.includes(controller));
   console.log('ORIGINAL DEFAULTS '+JSON.stringify(initial));
   await blur();await space();await wait('T>.25 && running');
   await evaluate("$('#spd').focus()");await key('ArrowRight','ArrowRight',39);
-  assert.equal(await evaluate("$('#spd').value"),'61');
+  assert.equal(await evaluate("$('#spd').value"),'83.4');
   await space();assert.equal(await evaluate('running'),false);
   const frozen=await evaluate('({state:X.slice(),t:T,rotors:veh.userData.rotors.map(r=>r.rotation.x)})');
   await new Promise(r=>setTimeout(r,200));

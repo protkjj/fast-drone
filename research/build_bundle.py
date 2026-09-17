@@ -44,7 +44,8 @@ def bundle(name, include_solvers=True):
     u, env, scales = (x[13:17]*[1.05,.98,1.1,1]).tolist(), [2,0,0,.01,0,0], [1.1,1,.9,1.1,.95]
     payload["parity"] = {"x": x.tolist(), "u": u, "env": env, "scales": scales,
                          "rhs": np.asarray(functions["rhs"](x,u,env,scales)).ravel().tolist(),
-                         "step": np.asarray(functions["step"](x,u,env,scales)).ravel().tolist()}
+                         "step": np.asarray(functions["step"](x,u,env,scales)).ravel().tolist(),
+                         "motor_step": np.asarray(functions["motor_step"](x[13:17],u,2,22)).ravel().tolist()}
     return payload
 
 

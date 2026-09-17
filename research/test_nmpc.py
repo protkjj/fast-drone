@@ -49,3 +49,65 @@ def test_constraint_form_motor_prediction_matches_the_saturated_plant_inside_lim
     free,current,_=functions["constrained"](x,[0]*4,[0,0,0],24)
     assert np.all(np.asarray(current)<0)
     assert not np.allclose(free,functions["full"](x,[0]*4,[0,0,0],24))
+
+
+def test_hybrid_envelope_adds_only_four_first_move_constraints_not_motor_states():
+    p=profile();functions=build(p)
+    old,a=build_problem(p,functions,"hybrid")
+    new,b=build_problem(p,functions,"hybrid",hybrid_envelope=True)
+    assert a["nx"]==b["nx"]==13
+    assert old["x"].numel()==new["x"].numel()
+    assert new["g"].numel()==old["g"].numel()+4
+    assert new["p"].numel()==old["p"].numel()+20
+    assert b["hybrid_envelope"]["horizon_s"]==.02
+    # A known coupled map: infeasible combinations must not pass just because
+    # each virtual axis separately fits in an axis-aligned min/max interval.
+    matrix=np.array([[1,1,1,1],[1,-1,1,-1],[1,1,-1,-1],[-1,1,1,-1]],dtype=float)
+    inverse=np.linalg.inv(matrix);offset=np.array([0,.1,.2,.3])
+    force=np.array([1,2,3,4]);u=matrix@force+offset
+    xs=np.tile(initial_state(p)[:13],N+1)
+    us=np.tile(u/np.array(b["command_scaling"]),N)
+    base=np.r_[initial_state(p)[:13],np.tile([0,0,0,20],N+1),a["hover"],0,0,0,24]
+    params=np.r_[base,inverse.ravel(),offset]
+    evaluate=ca.Function("envelope_test",[new["x"],new["p"]],[new["g"],new["f"]])
+    g,cost=evaluate(np.r_[xs,us],params)
+    np.testing.assert_allclose(np.asarray(g).ravel()[-4:]*p["mass_kg"]*p["g"],force,atol=1e-10)
+    # Later commands do not get today's local envelope frozen over a 1 s horizon.
+    us[4:8]+=1
+    after,_=evaluate(np.r_[xs,us],params)
+    np.testing.assert_allclose(np.asarray(after)[-4:],np.asarray(g)[-4:])
+    old_cost=ca.Function("old_cost",[old["x"],old["p"]],[old["f"]])
+    assert float(cost)==pytest.approx(float(old_cost(np.r_[xs,np.tile(u/np.array(b["command_scaling"]),N)],base)))
+
+
+@pytest.mark.parametrize("name",["simple","selected"])
+def test_motor_endpoint_forecast_matches_independent_frozen_airframe_integration(name):
+    from scipy.integrate import solve_ivp
+    p=profile(name);functions=build(p);x=initial_state(p)[:17]
+    # Same held bus voltage and inflow. Compare RK4 against an independently
+    # integrated full-predictor motor slice; airframe motion is intentionally held.
+    for command,voltage in [(np.zeros(4),24),(x[13:17]*1.4,24),(x[13:17]*1.4,15)]:
+        def rhs(t,n):
+            at=x.copy();at[13:17]=n
+            return np.asarray(functions["full"](at,command,[0,0,0],voltage)).ravel()[13:17]
+        exact=solve_ivp(rhs,(0,.02),x[13:17],rtol=1e-10,atol=1e-10).y[:,-1]
+        actual=x[13:17].copy()
+        for _ in range(20):actual=np.asarray(functions["motor_step"](actual,command,0,voltage)).ravel()
+        np.testing.assert_allclose(actual,exact,atol=.01,rtol=1e-5)
+
+
+def test_larger_rotor_inertia_narrows_the_twenty_ms_response_interval():
+    import copy
+    from research.model import rpm_limit
+    p=profile();slower=copy.deepcopy(p)
+    slower["motor"]["rotor_inertia_kg_m2"]*=2
+    intervals=[]
+    for parameters in (p,slower):
+        functions=build(parameters);endpoints=[]
+        for command in (np.zeros(4),np.full(4,rpm_limit(parameters))):
+            n=initial_state(parameters)[13:17]
+            for _ in range(20):n=np.asarray(functions["motor_step"](n,command,0,24)).ravel()
+            endpoints.append(n)
+        intervals.append(endpoints)
+    assert np.all(intervals[1][0]>intervals[0][0])  # Slower passive deceleration.
+    assert np.all(intervals[1][1]<intervals[0][1])  # Slower powered acceleration.
