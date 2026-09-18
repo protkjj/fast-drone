@@ -1,0 +1,527 @@
+{
+  "schema": "selected-design-source-audit-v1",
+  "upstream_commit": "db793a7039c76c9937597a240efc94f68c5a8af0",
+  "source_csv_sha256": "326342d0e471bbb424eb558e4034f4e2458a7a2b669b19cfc2af59b96e8528ff",
+  "reproduced_csv_fields": 70,
+  "reexport_matches_selected_profile": true,
+  "upstream_file_sha256": {
+    "main.py": "f12d8942808c3f35d9984832c47f040f21ede21e540d8b4cd244bb4bff559665",
+    "constants.py": "2163fe9c9914c6ea3d0ecf14ae9defa509e1d02419f74ec63500a3cf91dc086e",
+    "modules/geom.py": "025865344551a6b958336a5ab4b13d9e420703a0330d8ab55a228d8c13f7c216",
+    "modules/aero.py": "3d136cdb6b23712e81e0a85e9a52d37a1ab0259921fcf0045e68957475c3da10",
+    "modules/wght.py": "4a1c35bd6fc0402b94e70f0d061840a068588e2d77e95fb8506447dc20b99ce2",
+    "modules/prop.py": "8e562db65f7e0a37be701f1cce275758d8da843299592b30f92c6d107e472df2",
+    "modules/stab.py": "af2a1f4c855db3c5134d57e593ecc315c240f77253737b47c8c058acd641d137",
+    "modules/thrm.py": "2ffae353afe0d6bf5193fa0f6e3c2c0374ebe3975283e3c2c6f1fd95f3c97395",
+    "modules/miss.py": "58c825159064ba7e9830cdd11187511a2eb17cffa2f2b7995ace8f86ce481bf5",
+    "data/motor_specs.csv": "6f3bf4468a95dbf707f91fc7ca78ee464dbc9f99a99f69e7e1191df625c391c0"
+  },
+  "local_file_sha256": {
+    "design_source_audit.py": "b6e6612cbc82a7224851a8e22ccdf96d9e8e456dbf7fdfa44fa9079617751b10",
+    "model.py": "0cb0a0a239405dd37b81819e247854055e396b73ffc6d87fb9aa69893ce999b5",
+    "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+    "trim_envelope.py": "241bcd43e33aea65e32e25e06f36eab177dffa642dd2ccdb0e92acac79c857bc"
+  },
+  "source_design_inputs": {
+    "d_body": 0.0871390733339925,
+    "lambda_body": 7.694588763043043,
+    "S_fin": 0.029101065404813,
+    "x_fin": 0.5492354051043412,
+    "AR_fin": 2.1772004034162946,
+    "f_mount": 0.9953185191553516,
+    "n_design": 4.042043634935414,
+    "d_prop": 0.1346799440195245,
+    "pd_prop": 1.558669346893352,
+    "n_ser": 6,
+    "k_E": 1.0332407252437563,
+    "k_mot": 1.0310678432220917
+  },
+  "source_mass_breakdown": [
+    {
+      "name": "shell",
+      "m": 0.4375426933503839,
+      "x": 0.37145587887865805,
+      "r": 0.04356953666699625
+    },
+    {
+      "name": "fin",
+      "m": 0.19365757477424703,
+      "x": 0.5877729449465228,
+      "r": 0.09391190504163785
+    },
+    {
+      "name": "pod_shell",
+      "m": 0.062453317428965,
+      "x": 0.5800654369780865,
+      "r": 0.16883626552054995
+    },
+    {
+      "name": "root_fill",
+      "m": 0.014649178335873793,
+      "x": 0.5877729449465228,
+      "r": 0.09391190504163785
+    },
+    {
+      "name": "motors",
+      "m": 0.09770853593286505,
+      "x": 0.5800654369780865,
+      "r": 0.16883626552054995
+    },
+    {
+      "name": "props",
+      "m": 0.014657504357962259,
+      "x": 0.5800654369780865,
+      "r": 0.16883626552054995
+    },
+    {
+      "name": "batt",
+      "m": 0.697045271343416,
+      "x": 0.3967010460157012,
+      "r": 0.0
+    },
+    {
+      "name": "payload",
+      "m": 0.1,
+      "x": 0.28075214973169854,
+      "r": 0.0
+    },
+    {
+      "name": "fc",
+      "m": 0.015,
+      "x": 0.5213150125699828,
+      "r": 0.0
+    },
+    {
+      "name": "cc",
+      "m": 0.02,
+      "x": 0.48331501256998277,
+      "r": 0.0
+    },
+    {
+      "name": "rtk",
+      "m": 0.035,
+      "x": 0.31258707946141967,
+      "r": 0.0
+    },
+    {
+      "name": "rx_tele",
+      "m": 0.012,
+      "x": 0.5543150125699828,
+      "r": 0.0
+    },
+    {
+      "name": "bec",
+      "m": 0.012,
+      "x": 0.5833150125699829,
+      "r": 0.0
+    }
+  ],
+  "source_mass_properties": {
+    "mass_kg": 1.711714075523713,
+    "cg_from_nose_m": 0.4282511278030152,
+    "inertia_kg_m2": [
+      0.007651084881527969,
+      0.0349665345797696,
+      0.0349665345797696
+    ]
+  },
+  "source_fin_geometry": {
+    "root_le_m": 0.5492354051043412,
+    "root_te_m": 0.6263104847887044,
+    "tip_le_m": 0.5877729449465228,
+    "tip_te_m": 0.6263104847887043,
+    "root_chord_m": 0.07707507968436321,
+    "tip_chord_m": 0.038537539842181605,
+    "span_m": 0.12585592093660397,
+    "leading_edge_sweep_m": 0.038537539842181605,
+    "thickness_m": 0.009249009562123585,
+    "exposed_area_m2": 0.00727526635120325
+  },
+  "source_cp_independent_reproduction": {
+    "fin_cp_from_nose_m": 0.5813500216394926,
+    "nose_cp_from_nose_m": 0.12182042452092151,
+    "CN_fin_incompressible": 12.272684226215645,
+    "CN_total_incompressible": 14.272684226215645,
+    "cp_from_nose_m": 0.5169571450319487
+  },
+  "source_motor_center_from_nose_m": 0.5800654369780865,
+  "source_prop_location_from_nose_m": 0.6434830364248734,
+  "cad_geometry": {
+    "sha256": "276045699ee8e9ee03fe5d75d4915d88a0688fbcb12a9e8d1e8f5c0702302e35",
+    "units_interpreted_as": "mm converted to m",
+    "body_length_m": 0.6704993286132812,
+    "body_diameter_y_m": 0.08713899993896485,
+    "fins": [
+      {
+        "root_le_m": 0.4886540899570381,
+        "root_te_m": 0.5674780544920439,
+        "tip_le_m": 0.5599000244140625,
+        "tip_te_m": 0.5957999877929687,
+        "root_chord_m": 0.07882396453500584,
+        "tip_chord_m": 0.03589996337890622,
+        "span_m": 0.12590046228626664,
+        "leading_edge_sweep_m": 0.07124593445702443,
+        "thickness_m": 0.004000001617416856,
+        "exposed_area_m2": 0.007221897779828929,
+        "whole_area_m2": 0.00742556438745782,
+        "buried_radial_depth_m": 0.002569536947212882
+      },
+      {
+        "root_le_m": 0.4886540899570381,
+        "root_te_m": 0.5674780544920439,
+        "tip_le_m": 0.5599000244140625,
+        "tip_te_m": 0.5957999877929687,
+        "root_chord_m": 0.07882396453500584,
+        "tip_chord_m": 0.03589996337890622,
+        "span_m": 0.12590046228626664,
+        "leading_edge_sweep_m": 0.07124593445702443,
+        "thickness_m": 0.004000001617416856,
+        "exposed_area_m2": 0.007221897779828929,
+        "whole_area_m2": 0.00742556438745782,
+        "buried_radial_depth_m": 0.002569536947212882
+      },
+      {
+        "root_le_m": 0.4886540899570381,
+        "root_te_m": 0.5674780544920439,
+        "tip_le_m": 0.5599000244140625,
+        "tip_te_m": 0.5957999877929687,
+        "root_chord_m": 0.07882396453500584,
+        "tip_chord_m": 0.03589996337890622,
+        "span_m": 0.12590046228626664,
+        "leading_edge_sweep_m": 0.07124593445702443,
+        "thickness_m": 0.004000001617416856,
+        "exposed_area_m2": 0.007221897779828929,
+        "whole_area_m2": 0.00742556438745782,
+        "buried_radial_depth_m": 0.002569536947212882
+      },
+      {
+        "root_le_m": 0.4886540899570381,
+        "root_te_m": 0.5674780544920439,
+        "tip_le_m": 0.5599000244140625,
+        "tip_te_m": 0.5957999877929687,
+        "root_chord_m": 0.07882396453500584,
+        "tip_chord_m": 0.03589996337890622,
+        "span_m": 0.12590046228626664,
+        "leading_edge_sweep_m": 0.07124593445702443,
+        "thickness_m": 0.004000001617416856,
+        "exposed_area_m2": 0.007221897779828929,
+        "whole_area_m2": 0.00742556438745782,
+        "buried_radial_depth_m": 0.002569536947212882
+      }
+    ],
+    "blade_pair_centers_from_nose_m": [
+      [
+        0.6317005310058594,
+        0.11938790893554688,
+        0.11938790893554688
+      ],
+      [
+        0.6316997680664063,
+        -0.11938791275024416,
+        0.11938790512084962
+      ],
+      [
+        0.6317005310058594,
+        -0.11938790893554688,
+        -0.11938791084289552
+      ],
+      [
+        0.6316997680664063,
+        0.11938790512084961,
+        -0.11938790893554688
+      ]
+    ],
+    "rotor_radius_from_body_axis_m": [
+      0.16884000000001442,
+      0.1688400000000145,
+      0.16884000134871358,
+      0.16883999730261612
+    ]
+  },
+  "cad_small_angle_cp_estimate": {
+    "fin_cp_from_nose_m": 0.5348439339116606,
+    "nose_cp_from_nose_m": 0.12182042452092151,
+    "CN_fin_incompressible": 11.783174583604048,
+    "CN_total_incompressible": 13.783174583604048,
+    "cp_from_nose_m": 0.4749123837618052
+  },
+  "prop_mass_position_counterfactual": {
+    "description": "Move only the existing prop mass from motor center to source geom.pod x_prop; do not change profile.",
+    "result": {
+      "mass_kg": 1.711714075523713,
+      "cg_from_nose_m": 0.42879417629081734,
+      "inertia_kg_m2": [
+        0.007651084881527969,
+        0.03530721530658737,
+        0.03530721530658737
+      ]
+    },
+    "cg_shift_aft_m": 0.0005430484878021224
+  },
+  "source_stability_gate": {
+    "speed_mps": 41.65,
+    "SM": 1.0179821041811528,
+    "alpha_max": 150.1771785262378,
+    "g8": 0.017982104181152758,
+    "g9": 0.31809337568685625,
+    "M_dist": 2.888287024337289,
+    "M_ctrl": 5.251175506029927,
+    "increase_room_per_rotor_N": 10.996280325397613,
+    "decrease_room_per_rotor_N": 1.5038647733711201,
+    "increase_only_pitch_estimate_Nm": 5.251175506029927,
+    "fixed_total_pitch_limit_Nm": 0.718157197581458,
+    "research_level_trim": {
+      "speed_mps": 41.65,
+      "speed_kmh": 149.94,
+      "theta_deg": 9.37644923329496,
+      "alpha_deg": 9.37644923329496,
+      "aero_force_body_N": [
+        -3.2814920965334684,
+        -0.0,
+        16.561904226970704
+      ],
+      "total_thrust_N": 6.0163038866483225,
+      "required_rotor_pitch_moment_Nm": -1.4691405617016091,
+      "positive_thrust_pitch_capacity_Nm": 0.7182580534399473,
+      "pitch_authority_ratio": 2.0454216345580347,
+      "required_rotor_thrust_N": [
+        -1.5723935607944364,
+        -1.5723935607944364,
+        4.580545504118597,
+        4.580545504118597
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.04336808398337913,
+      "soc": 1.0,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    }
+  },
+  "electrical_provenance": {
+    "selected_motor_product": null,
+    "confirmed_motor_current_rating_A": null,
+    "confirmed_esc_current_rating_A": null,
+    "sized_motor_mass_kg_each": 0.024427133983216262,
+    "sized_kv_rpm_V": 1981.9766587441336,
+    "source_battery_continuous_C_assumption": 40.0,
+    "csv_predicted_peak_PACK_current_A": 96.06769076643008,
+    "simulator_motor_current_assumption_A": 40,
+    "simulator_uniform_pack_budget_A_per_motor": 39.94890249615378,
+    "simulator_effective_motor_limit_A": 39.94890249615378,
+    "motor_fit_mass_range_kg": [
+      0.0085,
+      0.0764
+    ],
+    "motor_fit_kv_range_rpm_V": [
+      1300.0,
+      3800.0
+    ]
+  },
+  "cad_cp_only_counterfactual": {
+    "changed_fields": {
+      "cp_from_cg_m": -0.046661255958790004
+    },
+    "not_a_complete_cad_aircraft_model": true,
+    "description": "Keep selected mass, CG, inertia, aero forces and propulsion; replace CP only to isolate its influence.",
+    "pitch_boundaries_mps": [
+      32.25005866955737,
+      49.27503146537735
+    ],
+    "cases": [
+      {
+        "speed_mps": 15.0,
+        "speed_kmh": 54.0,
+        "theta_deg": 51.06091919502731,
+        "alpha_deg": 51.06091919502731,
+        "aero_force_body_N": [
+          -0.4856115362315051,
+          -0.0,
+          10.550009616002002
+        ],
+        "total_thrust_N": 13.542148759131244,
+        "required_rotor_pitch_moment_Nm": -0.4922766990599653,
+        "positive_thrust_pitch_capacity_Nm": 1.616733062422911,
+        "pitch_authority_ratio": 0.3044885457604341,
+        "required_rotor_thrust_N": [
+          2.354679894247976,
+          2.354679894247976,
+          4.416394485317646,
+          4.416394485317646
+        ],
+        "rotor_thrust_nonnegative": true,
+        "max_abs_cp_offset_for_positive_thrust_m": 0.1532447003622337,
+        "soc": 1.0,
+        "model_feasible": true,
+        "rotor_rpm": [
+          10853.154504584698,
+          10853.154504584698,
+          14832.441881901894,
+          14832.441881901894
+        ],
+        "rejection_reasons": [],
+        "rotor_thrust_at_speed_limit_N": 22.921195413856516,
+        "required_motor_current_A": [
+          10.240677946787487,
+          10.240677946787487,
+          16.287693750586275,
+          16.287693750586275
+        ],
+        "actual_motor_current_A": [
+          10.240677946787487,
+          10.240677946787487,
+          16.287693750586275,
+          16.287693750586275
+        ],
+        "effective_motor_current_limit_A": 39.94890249615378,
+        "required_motor_voltage_V": [
+          6.555501904525688,
+          6.555501904525688,
+          9.200718105671225,
+          9.200718105671225
+        ],
+        "bus_voltage_V": 24.938635893095263,
+        "bus_current_A": 18.317910917073306,
+        "electrical_power_W": 456.8237106830459,
+        "propeller_advance_ratio": [
+          0.3869764662196663,
+          0.3869764662196663,
+          0.2831573797101721,
+          0.2831573797101721
+        ],
+        "outside_propeller_map": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "helical_tip_mach": [
+          0.22918716295205374,
+          0.22918716295205374,
+          0.3105150757835622,
+          0.3105150757835622
+        ],
+        "max_acceleration_residual_mps2": 3.552713678800501e-15,
+        "max_angular_acceleration_residual_radps2": 6.350203347102588e-15,
+        "max_rotor_acceleration_residual_radps2": 2.6020852139652106e-13,
+        "soc_rate_per_s": -0.0012100190134478718
+      },
+      {
+        "speed_mps": 40.0,
+        "speed_kmh": 144.0,
+        "theta_deg": 10.098152975312287,
+        "alpha_deg": 10.098152975312287,
+        "aero_force_body_N": [
+          -3.0398476164529495,
+          -0.0,
+          16.526143303046997
+        ],
+        "total_thrust_N": 5.983052447560699,
+        "required_rotor_pitch_moment_Nm": -0.7711306026751192,
+        "positive_thrust_pitch_capacity_Nm": 0.7142883214644472,
+        "pitch_authority_ratio": 1.079578903227947,
+        "required_rotor_thrust_N": [
+          -0.11903118793304124,
+          -0.11903118793304124,
+          3.110557411713391,
+          3.110557411713391
+        ],
+        "rotor_thrust_nonnegative": false,
+        "max_abs_cp_offset_for_positive_thrust_m": 0.04322171896771286,
+        "soc": 1.0,
+        "model_feasible": false,
+        "rotor_rpm": null,
+        "rejection_reasons": [
+          "negative_rotor_thrust_required"
+        ]
+      },
+      {
+        "speed_mps": 83.3,
+        "speed_kmh": 299.88,
+        "theta_deg": 2.5089147221659567,
+        "alpha_deg": 2.5089147221659567,
+        "aero_force_body_N": [
+          -12.294650964510941,
+          -0.0,
+          16.77008998672687
+        ],
+        "total_thrust_N": 13.029463177109799,
+        "required_rotor_pitch_moment_Nm": -0.7825134613226037,
+        "positive_thrust_pitch_capacity_Nm": 1.5555259566803525,
+        "pitch_authority_ratio": 0.5030539400271825,
+        "required_rotor_thrust_N": [
+          1.6187350973564059,
+          1.6187350973564059,
+          4.895996491198494,
+          4.895996491198494
+        ],
+        "rotor_thrust_nonnegative": true,
+        "max_abs_cp_offset_for_positive_thrust_m": 0.09275596958105262,
+        "soc": 1.0,
+        "model_feasible": true,
+        "rotor_rpm": [
+          25557.166108187328,
+          25557.166108187328,
+          28341.05749067987,
+          28341.05749067987
+        ],
+        "rejection_reasons": [],
+        "rotor_thrust_at_speed_limit_N": 12.75615605670936,
+        "required_motor_current_A": [
+          16.735177183195756,
+          16.735177183195756,
+          37.06335886422213,
+          37.06335886422213
+        ],
+        "actual_motor_current_A": [
+          16.735177183195756,
+          16.735177183195756,
+          37.06335886422213,
+          37.06335886422213
+        ],
+        "effective_motor_current_limit_A": 39.94890249615378,
+        "required_motor_voltage_V": [
+          14.659017427315723,
+          14.659017427315723,
+          18.206628089080404,
+          18.206628089080404
+        ],
+        "bus_voltage_V": 24.05081183510052,
+        "bus_current_A": 80.54176482333905,
+        "electrical_power_W": 1937.0948306330458,
+        "propeller_advance_ratio": [
+          1.45065495031278,
+          1.45065495031278,
+          1.308159709412219,
+          1.308159709412219
+        ],
+        "outside_propeller_map": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "helical_tip_mach": [
+          0.5834521269235221,
+          0.5834521269235221,
+          0.6362797712363245,
+          0.6362797712363245
+        ],
+        "max_acceleration_residual_mps2": 1.7763568394002505e-15,
+        "max_angular_acceleration_residual_radps2": 0.0,
+        "max_rotor_acceleration_residual_radps2": 2.6020852139652106e-13,
+        "soc_rate_per_s": -0.005320315578238338
+      }
+    ]
+  },
+  "limitations": [
+    "CSV contains conceptual sizing outputs, not measured properties or an identified motor/ESC product.",
+    "STL is geometry only: it cannot supply material density, component mass, true CG, or measured CP.",
+    "CAD fin exposure uses a thin center-plane cylinder intersection and the upstream small-angle Barrowman approximation.",
+    "The prop-position and CAD-CP counterfactuals are isolated diagnostics, not approved model corrections.",
+    "Fixed-total moment bound omits electrical constraints and is an upper bound, not additional control authority.",
+    "The simulator's uniform motor-current budget is sufficient/conservative for pack current, not an equivalent DC bus limit."
+  ]
+}

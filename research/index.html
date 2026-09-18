@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>선정 기체 비행 시뮬레이터</title>
+<meta name="description" content="선정 기체의 비행을 관찰하고 목표와 바람을 조작하는 시뮬레이터.">
+<link rel="stylesheet" href="./classic.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="./stl.js" defer></script><script src="./runtime.js" defer></script><script src="./results.js" defer></script><script src="./page.js" defer></script>
+</head><body><main class="app" id="sim-shell">
+<header><div><h1>선정 기체 비행 시뮬레이터</h1><div class="aircraft-tag">선정안 6931 · 1.712 kg · CSV 기준 형상</div></div>
+<nav class="mode-switch" aria-label="시뮬레이터 모드"><button id="mode-observe" aria-pressed="false">비행</button><button id="mode-compare" aria-pressed="true">정밀 비교</button><a href="../aero.html">공력 자료</a></nav></header>
+<div class="statusbar" aria-label="시뮬레이션 상태"><span id="status" aria-live="polite">준비</span><progress id="progress" aria-label="시뮬레이션 진행률" value="0" max="1"></progress><span id="errors" role="alert"></span></div>
+<div class="body">
+<aside class="col left">
+<section class="observe-only live-controls" id="live-controls" hidden><h2>비행 명령</h2>
+<div class="buttons"><button id="go" class="primary">▶ 시작 (Space)</button><button id="reset">↺ 초기화 (R)</button></div>
+<label for="observe-controller">제어기</label><select id="observe-controller"><option value="hybrid">Hybrid · NMPC → INDI (IPOPT)</option><option value="nmpc">NMPC 단독 (IPOPT)</option><option value="pd">PD–INDI · 빠른 조작용 baseline</option></select>
+<div class="control-row"><label for="live-target-speed">목표 전진 속도 · m/s</label><input id="live-target-speed" type="number" min="0" max="100" step="0.1" value="0"></div><input id="speed-slider" aria-label="목표 전진 속도 슬라이더" type="range" min="0" max="100" step="0.1" value="0"><div class="range-scale"><span>0</span><span>100 m/s · 고속 미검증</span></div>
+<div class="control-row"><label for="live-target-altitude">목표 고도 · m</label><input id="live-target-altitude" type="number" min="1" max="1000" step="0.1" value="20"></div><input id="altitude-slider" aria-label="목표 고도 슬라이더" type="range" min="1" max="100" step="0.1" value="20"><div class="range-scale"><span>1</span><span id="altitude-range-max">100 m · 숫자로 범위 확장</span></div>
+<div class="control-row"><label for="live-wind-speed">풍속 · m/s</label><input id="live-wind-speed" type="number" min="0" max="30" step="0.1" value="0"></div><input id="wind-speed-slider" aria-label="풍속 슬라이더" type="range" min="0" max="30" step="0.1" value="0">
+<div class="control-row"><label for="live-wind-angle">바람 방향 · °</label><input id="live-wind-angle" type="number" min="0" max="360" step="1" value="90"></div><input id="wind-angle-slider" aria-label="바람 방향 슬라이더" type="range" min="0" max="360" step="1" value="90">
+<div class="quick-directions"><button id="wind-tail">순풍 0°</button><button id="wind-cross">측풍 90°</button><button id="wind-head">역풍 180°</button><button id="wind-calm">무풍</button></div>
+<p id="wind-state" class="small">바람이 흐르는 방향 · 지면 좌표 기준 (+X 전진, +Y 측면).</p>
+<div class="buttons"><button id="apply-target">지금 적용</button><button id="hover-target">속도 목표 0</button></div><p id="target-state" class="small" aria-live="polite">목표·바람은 조작하면 자동 반영됩니다.</p>
+</section>
+<h2>계기</h2>
+<div class="gauges" aria-label="현재 비행 상태"><div><span>전진 속도 · m/s</span><strong id="live-speed">0 m/s</strong></div><div><span>고도 · m</span><strong id="live-altitude">20 m</strong></div><div><span>배터리 SOC</span><strong id="live-soc">100 %</strong></div><div><span>진행 배속</span><strong id="live-rate">—</strong></div></div>
+<details><summary>조작 방법</summary><p class="small">Space: 시작·일시정지·계속 / 기록 재생<br>R: 초기 상태로 (기록 보존)<br>F: 따라가기<br>마우스 끌기: 회전 · Shift+끌기: 시점 이동 · 휠: 확대<br>타임라인: 종료한 기록 탐색 · 방향키·Home·End<br>슬라이더는 이동 중 자동 반영, 숫자는 Enter 또는 입력 완료 시 반영합니다.<br>숫자 입력·메뉴·버튼 조작 중에는 단축키가 끼어들지 않습니다.</p></details>
+</aside>
+<div class="grip" id="grip-left" role="separator" tabindex="0" aria-orientation="vertical" aria-label="왼쪽 패널 폭 조절"></div>
+<section class="stage" aria-label="비행 관찰">
+<div class="view" id="flight-view" tabindex="0" aria-label="선정 기체 비행 화면">
+<div id="model"></div><div class="hud" id="flight-position">시뮬레이션 0 s · X 0 / Y 0 / Z 20 m</div>
+<div class="model-caption" id="model-caption">CSV 기준 표시 형상 불러오는 중…</div>
+<div class="viewbtns"><button id="quick-go" class="primary observe-only">▶ 시작</button><button id="camera-back">뒤에서</button><button id="camera-side">옆에서</button><button id="camera-top">위에서</button><button id="camera-nose">기수축</button><button id="follow" aria-pressed="true">따라가기 (F)</button><button id="camera-reset">시점 초기화</button><select id="view-mode" aria-label="비행 시점"><option value="follow">기체 추적</option><option value="world">지면·고도</option><option value="path">전체 궤적</option></select></div>
+</div>
+<div class="replay-strip"><button id="play" disabled aria-label="기록 재생">▶</button><input type="range" id="timeline" aria-label="기록 시간" min="0" max="1" step="0.001" value="0" disabled><span id="timeline-time">0.00 s</span></div>
+<div class="plots"><figure><figcaption>전진 속도 · m/s</figcaption><svg id="velocity-chart" viewBox="0 0 620 220" role="img" aria-label="실제 전진 속도와 목표 속도 시간 이력"></svg></figure><figure><figcaption>총 받음각 · °</figcaption><svg id="angle-chart" viewBox="0 0 620 220" role="img" aria-label="공기 상대속도 기준 총 받음각"></svg></figure><figure><figcaption>고도 · m</figcaption><svg id="altitude-chart" viewBox="0 0 620 220" role="img" aria-label="고도 시간 이력"></svg></figure></div>
+<div class="legend"><span>주황 PD · 파랑 Hybrid · 보라 NMPC · 점선 목표</span><span>추적 격자: 출발 고도 −1 m 기준면, 1 m 눈금 (지면 아님)</span></div>
+</section>
+<div class="grip" id="grip-right" role="separator" tabindex="0" aria-orientation="vertical" aria-label="오른쪽 패널 폭 조절"></div>
+<aside class="col right">
+<h2>기체 · 시험</h2><div class="buttons"><button id="run">새 비행</button><button id="stop" disabled>종료·기록</button><button id="pause" class="internal-action" hidden disabled>일시정지</button></div>
+<p id="mode-note" class="small"></p><p id="live-limits" class="small">기본 검증은 저속 영역입니다. 추진 맵 밖 결과는 실측 성능으로 해석하지 마세요.</p>
+<details class="panel controls" id="settings" open><summary>공통 시험 조건</summary>
+<details><summary>기체 선택 · 기본은 선정안</summary><label for="profile">기체 모델</label><select id="profile"><option value="selected">선정안 6931 · 1.712 kg</option><option value="simple">단순 검증 기체 · 2 kg</option></select><p class="small">단순 기체는 구조 검증용입니다. 선정 기체 결과와 직접 비교하지 않습니다.</p></details>
+<div class="compare-only"><label for="controller">제어기</label><select id="controller"><option value="both">Hybrid / NMPC 단독 비교</option><option value="hybrid">Hybrid · 13-state NMPC → INDI</option><option value="nmpc">NMPC 단독 · 17-state</option></select></div>
+<label for="feedback">피드백 경로</label><select id="feedback"><option value="truth">참 상태 · 구조 검증</option><option value="eskf">IMU / GPS → 15D ESKF</option></select>
+<div class="compare-only"><label for="scenario">시험</label><select id="scenario"><option value="hover">호버 유지</option><option value="step">1초 시점 속도 계단 입력</option><option value="gust">속도 계단 + 2–3초 외란</option><option value="schedule" disabled>관찰에서 기록한 목표 일정</option></select></div>
+<div class="pair"><div><label for="seconds">기간 (시뮬레이션 초)</label><input id="seconds" type="number" min="0.1" max="120" step="0.1" value="0.2"></div><div class="compare-only"><label for="speed">목표 vx (m/s)</label><input id="speed" type="number" min="0" max="100" value="3"></div></div>
+<p id="scenario-note" class="small">호버: 짧은 실행 경로 확인용. 긴 과도응답 검증과는 다릅니다.</p>
+<label for="altitude">초기 고도 · 비교 시 목표 고도 (m)</label><input id="altitude" type="number" min="1" max="1000" value="20">
+<div class="compare-only pair"><div><label for="wind-speed">기본 풍속 (m/s)</label><input id="wind-speed" type="number" min="0" max="30" step="0.1" value="0"></div><div><label for="wind-angle">바람 방향 (°)</label><input id="wind-angle" type="number" min="0" max="360" step="1" value="90"></div></div>
+<div class="compare-only"><label for="preview">미래 목표 제공</label><select id="preview"><option value="true">예고 · 1초 예측 구간에 미래 일정 제공</option><option value="false">비예고 · 입력 시점부터 목표 변경</option></select></div>
+<label for="mismatch">실제 플랜트 오차 · 제어기는 명목 모델 사용</label><select id="mismatch"><option value="nominal">오차 없음</option><option value="mass">질량 +10%</option><option value="inertia">관성 +15%</option><option value="prop">추진 계수 −10%</option><option value="combined">질량 +10% / 관성 +15% / 추진 −10%</option></select>
+<label for="seed">센서 난수 seed</label><input id="seed" type="number" min="0" max="4294967295" value="42">
+<label for="log-hz">상태·센서·구동기 로그</label><select id="log-hz"><option value="50">50 Hz · 일반 기록</option><option value="1000">1 kHz · 상세 진단 (최대 20초)</option></select>
+<p class="small">공통 플랜트·센서·1 ms 적분. 정밀 비교는 두 제어기에 같은 초기값·외란·센서 seed·목표를 적용합니다. 관찰이 느려지거나 일시정지되어도 적분 간격은 커지지 않습니다.</p></details>
+<details class="log-section" id="record-panel"><summary>기록 재생 · 비교 결과</summary>
+<label for="replay-controller">재생할 제어기</label><select id="replay-controller" disabled><option value="hybrid">Hybrid</option><option value="nmpc">NMPC 단독</option></select>
+<label for="replay-speed">재생 배속</label><select id="replay-speed"><option value="0.25">0.25×</option><option value="1" selected>1×</option><option value="4">4×</option></select>
+<p id="replay-state" class="small">계산한 기록을 아래 타임라인에서 재생할 수 있습니다.</p><div class="buttons"><button id="reuse" disabled>이 설정 재사용</button></div>
+<p id="result-context" class="small"></p><div class="table-wrap"><table><thead><tr><th>지표</th><th>Hybrid</th><th>NMPC</th></tr></thead><tbody id="metrics"></tbody></table></div>
+<div class="buttons"><button id="download" disabled>JSON 저장</button><button id="import">로그 가져오기</button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
+<p class="small">재생은 기록의 위치·자세를 보간한 표시이며 새 물리 계산이 아닙니다. 로터는 시각 감속·잔상입니다.</p>
+</details>
+<details class="notice"><summary>공통 모델과 검증 범위</summary><p>두 모드는 같은 18상태 플랜트(기체·로터 17 + 배터리 SOC), 추진·전류·전압 제한, 1 ms 물리 적분을 사용합니다. 비행 화면에서도 Hybrid·NMPC는 실제 IPOPT를 사용합니다. PD–INDI를 선택하면 최적화 없는 baseline입니다. 실측 기체 정확도·고속 성능·Hybrid 우위·실제 IPOPT 20 ms 마감은 아직 입증되지 않았습니다.</p><a href="https://github.com/protkjj/fast-drone/blob/bulnabi/research/UNIFIED_VALIDATION.md">검증 결과와 한계</a> · <a href="../sim-legacy.html">이전 8 kg 시험 데모</a></details>
+<details class="panel details"><summary>모델·제어·센서의 정의와 한계</summary><ul>
+<li>선정안은 제공 CSV의 70개 필드를 원본 사이징 코드에서 재현한 개념설계 모델입니다. CT(J)·CP(J), 모터 KV·저항·무부하전류, 질량·관성·형상을 함께 가져왔습니다.</li>
+<li>기계적 플랜트는 17상태이며, 배터리 SOC 1개를 추가로 적분합니다. 전압 강하·전류 제한·모터 동손·로터 가속 에너지를 계산합니다. 목표 속도에서 실제 속도를 잘라 맞추지 않습니다.</li>
+<li>NMPC: IPOPT, N=20, 예측 간격 0.05초, 예측 범위 1초, 최대 30회 반복. 매 20 tick 재계산. INDI·플랜트·IMU: 매 1 ms tick. 화면 렌더링은 별도 스레드입니다.</li>
+<li>관찰용 PD–INDI: 속도·고도 오차에서 총추력과 각가속도를 계산하고 기존 INDI가 모터에 할당합니다. 임시 PD 이득이며 NMPC–INDI Hybrid가 아닙니다. 관찰·비교의 플랜트·센서·할당 수치는 같은 CasADi 수식에서 생성한 JavaScript로 평가하고, 최적화는 실제 IPOPT/WASM에서 수행합니다.</li>
+<li>관찰 중 목표 변경은 적용된 20 ms 제어 시각에 기록합니다. ‘이 목표 일정으로 정밀 비교’는 관측된 기간과 비예고 목표 일정을 재사용합니다. 계산이 느려져도 물리 tick을 건너뛰거나 목표 속도로 상태를 잘라 맞추지 않습니다.</li>
+<li>Hybrid는 총추력·각가속도만 최적화하고 INDI가 회전수 명령을 생성합니다. NMPC 단독은 4개 회전수 명령을 직접 최적화하며 INDI를 사용하지 않습니다. 풀이 실패 시 마지막 명령을 유지하고 실패 횟수를 공개합니다.</li>
+<li>NMPC 단독의 예측기는 전류·전압 한계를 RK4 내부 단계마다 명시적 부등식으로 검사합니다. 실제 플랜트의 전류·전압 포화는 그대로 유지합니다. 두 제어기의 웜스타트는 50 ms 예측 격자를 20 ms만큼 보간 이동합니다. 예고 모드에서는 1초 이전에도 선제 반응할 수 있으며, 비예고 모드에서는 입력 시점까지 미래 목표를 숨깁니다.</li>
+<li>INDI는 가능한 총추력을 보존하면서 각가속도 오차를 최소화합니다. 요청·명목 할당·측정·잔차를 분리하고 상위의 이전 입력 비용에 할당 결과를 전달합니다. 할당은 실제 모터의 즉시 추력 달성을 뜻하지 않습니다. 로터 가속 반작용은 플랜트에 있지만 할당기에 명시적으로 포함하지 않은 근사입니다.</li>
+<li>센서 모드는 가속도·자이로·10 Hz GPS·가정한 RPM 텔레메트리를 사용합니다. GPS 20 ms 지연은 측정 시점으로 돌아가 보정한 후 IMU를 재적분합니다. 초기 위치·속도·자세 표준편차는 0.1 m / 0.05 m/s / 0.01 rad입니다. 가속도계를 무조건 중력 관측으로 재사용하지 않습니다.</li>
+<li>선정 기체의 로터 관성 1e−5 kg·m², 속도 루프 20 ms, 모터 전류 상한 40 A, 공력 감쇠 및 센서 특성은 별도 가정입니다. 모터 열·전기 인덕턴스·회생 제동은 미구현입니다.</li>
+<li>v2 로그는 같은 시각의 상태·IMU·RPM, 전류·전압·추종 제한, 추정 바이어스·공분산 대각·GPS innovation/NIS를 기록합니다. GPS 이상치 제거는 미구현입니다. 센서 난수 채널 분리로 이전 버전과 같은 seed라도 표본은 달라집니다.</li>
+<li>지면 처리는 무게중심의 z&lt;0에서 실험을 중단하는 검사뿐입니다. STL 표면 충돌, 착륙 다리, 탄성·마찰 접촉은 모델링하지 않으므로 착륙 안전성을 검증할 수 없습니다.</li>
+<li>추진 맵 밖·역유입 영역에는 에너지를 생성하지 않는 연장 모델을 쓰고 비율을 기록합니다. 해당 구간이 포함된 결과로 실제 고속 성능을 단정하면 안 됩니다. 원본 사이징의 전진비 정의와 6DOF 축방향 유입 정의도 구분합니다. 현재 회전수 상한은 정지 팁 마하 기준이며, 전진 속도를 포함한 나선형 팁 마하 제약은 미구현입니다.</li>
+<li>STL: mm→m, CAD X=0 기수, CG=기수에서 428.251 mm로 형상과 사이징 결과에서 추정해 연결했습니다. 사용자가 확인한 CAD 좌표계나 실측 CG는 아닙니다. 원본의 블레이드 8개·허브 4개를 네 축으로 분리합니다. 시각 회전은 실제 RPM·추력·토크·적분 상태를 바꾸지 않으며 STL 외형으로 질량 분포나 추진 계수를 자동 산출하지 않습니다.</li>
+</ul><p class="small">수식 원본: research/model.py · research/nmpc.py · research/eskf.py. <a href="https://web.casadi.org/get/">CasADi 공식 배포</a> · <a href="https://arxiv.org/html/1711.02508v1">Solà, ESKF 회전·오차 리셋</a></p></details>
+
+</aside></div></main></body></html>

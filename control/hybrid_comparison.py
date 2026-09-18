@@ -58,8 +58,10 @@ def build_virtual_dynamics(params):
     # 공력 힘 (모멘트는 INDI가 처리하므로 무시)
     F_aero, _ = _body_aerodynamics(v_body, omega, params)
 
-    # 동체 힘 = 공력 + 추력(body -z)
-    F_body = F_aero + ca.vertcat(0, 0, -T_cmd)
+    # 가상 모델도 물리 플랜트와 같은 추력축을 사용해야 한다.
+    thrust = (ca.vertcat(T_cmd, 0, 0) if params.get('thrust_axis', 'z') == 'x'
+              else ca.vertcat(0, 0, -T_cmd))
+    F_body = F_aero + thrust
 
     p_dot = vel
     v_dot = ca.vertcat(0, 0, -params['g']) + (R @ F_body) / params['mass']
@@ -87,7 +89,7 @@ class VirtualNMPC:
         self._Q_z = Q_z
         self._max_iter = max_iter   # IPOPT 반복 상한 (SITL 실시간용 축소 가능)
 
-        self.T_ref = T_ref if T_ref else params['mass'] * params['g']
+        self.T_ref = T_ref if T_ref is not None else params['mass'] * params['g']
         self.u_ref = np.array([self.T_ref, 0, 0, 0])
 
         f, x_sym, u_sym = build_virtual_dynamics(params)
@@ -155,7 +157,9 @@ class VirtualNMPC:
             w.append(X_k)
             lbw += [-1e6]*nx; ubw += [1e6]*nx
             _xg = [0.0]*nx
-            _xg[6:10] = [1.0, 0.0, 0.0, 0.0]   # 유효 단위 쿼터니언(호버) 초기추측
+            _xg[6:10] = ([0.0, -np.sqrt(0.5), 0.0, np.sqrt(0.5)]
+                         if params.get('thrust_axis', 'z') == 'x'
+                         else [1.0, 0.0, 0.0, 0.0])
             w0 += _xg                          # (nmpc.py와 동일 픽스 — cold 솔브 개선)
 
             g.append(X_k - self.F(X_prev, U_k))
@@ -288,7 +292,8 @@ class ProperHybrid:
         q = x[6:10]
         R = Rotation.from_quat(q).as_matrix()
         v_body = R.T @ x[3:6]
-        V_axial = max(-v_body[2], 0.0)
+        V_axial = max(v_body[0] if self.p.get('thrust_axis', 'z') == 'x'
+                      else -v_body[2], 0.0)
 
         # 전진비 보정된 추력 측정
         T_meas = 0.0
@@ -330,60 +335,25 @@ class ProperHybrid:
 # ══════════════════════════════════════════════════
 
 def compute_control_effectiveness(params, n_actual, v_body=None):
+    """추진 wrench의 국소 미분 ∂[T, M/I]/∂n (각속도 0 기준).
+
+    플랜트의 EPS와 영추력 분기를 그대로 미분한다. n=0에 가짜 제어 효과를
+    넣지 않는다. 랭크가 부족하면 할당기가 처리해야지 G를 왜곡하면 안 된다.
+    회전 중 로터 자이로의 미분은 이 기존 인터페이스에 포함하지 않는다.
     """
-    제어 효과 행렬 G(4×4): ∂[T, ω̇]/∂n.
-
-    전진비(advance ratio) 반영:
-      동역학에서 T = k_T * n^2 * fac,  fac = max(1 - J/J_max, 0)
-      → dT/dn = k_T * n * (1 + fac)
-
-      fac = 1 (호버): dT/dn = 2*k_T*n (기존과 동일)
-      fac < 1 (전진비 큼): dT/dn 감소 → INDI가 추력 변화를 정확히 계산
-
-    왜 중요한가:
-      감속 중 드론이 30도 틸트 → V_axial ≈ 25 m/s → fac ≈ 0.63
-      기존: dT/dn을 38% 과대평가 → 모터 under-command → 고도 추락
-      수정: 정확한 dT/dn → 모터 정확 제어 → 고도 안정
-
-    Parameters
-    ----------
-    v_body : array(3) or None
-        동체 프레임 속도. None이면 fac=1 (호버 가정).
-    """
-    G = np.zeros((4, 4))
-    pos, dirs = params['rotor_positions'], params['rotor_directions']
-    k_T, k_Q = params['k_T'], params['k_Q']
-    Jx, Jy, Jz = params['Ixx'], params['Iyy'], params['Izz']
-    D = params['D_prop']
-    J_max = params['J_max']
-
-    # V_axial: 로터 추력축(body -z) 방향 유입 속도
-    if v_body is not None:
-        V_axial = max(-v_body[2], 0.0)
-    else:
-        V_axial = 0.0
-
-    for i in range(4):
-        ni = max(n_actual[i], 1.0)
-
-        # 전진비 → 추력 감소 팩터
-        if V_axial > 0:
-            n_rps = ni / (2 * np.pi)
-            J = V_axial / (n_rps * D + 1e-8)
-            fac = max(1.0 - J / J_max, 0.0)
-        else:
-            fac = 1.0
-
-        # dT/dn = k_T * n * (1 + fac)  (해석적 미분)
-        # fac=1: 2*k_T*n (기존), fac=0.63: 1.63*k_T*n (감소)
-        dT = k_T * ni * (1.0 + fac)
-        dQ = k_Q * ni * (1.0 + fac)
-
-        G[0, i] = dT
-        G[1, i] = -pos[i, 1] * dT / Jx
-        G[2, i] = pos[i, 0] * dT / Jy
-        G[3, i] = dirs[i] * dQ / Jz
-
+    n = np.asarray(n_actual, dtype=float)
+    axial = 0.0 if v_body is None else max(
+        v_body[0] if params.get('thrust_axis', 'z') == 'x' else -v_body[2], 0.0)
+    b = params['D_prop'] / (2 * np.pi)
+    denominator = b * n + EPS
+    c = axial / params['J_max']
+    factor = 1.0 - c / denominator
+    derivative = np.where(factor > 0.0,
+                          params['k_T'] * (2 * n * factor + n**2 * c * b / denominator**2),
+                          0.0)
+    allocation, _ = compute_allocation_matrix(params)
+    G = allocation * derivative[np.newaxis, :]
+    G[1:4] /= np.array([params['Ixx'], params['Iyy'], params['Izz']])[:, None]
     return G
 
 

@@ -1,0 +1,5 @@
+# Serializer versions are intentionally pinned; Python/WASM parity is tested.
+casadi==3.7.2
+numpy==2.3.3
+scipy>=1.11,<2
+pytest>=8,<9
