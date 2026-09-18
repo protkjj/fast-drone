@@ -18,6 +18,18 @@ module.exports=async function({evaluate,send,sessionId,profile}){
     writeFileSync(file,Buffer.from(image.data,'base64'));console.log('SCREENSHOT '+file);
   };
   await send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false},sessionId);
+  const geometry=await evaluate(`(()=>{
+    const positions=vehicle.children.find(c=>c.name==='airframe').geometry.attributes.position.array;
+    let minimum=Infinity,maximum=-Infinity;
+    for(let i=8300*9;i<8312*9;i+=3){minimum=Math.min(minimum,positions[i]);maximum=Math.max(maximum,positions[i]);}
+    return {basis:vehicle.userData.geometryBasis,finBodyX:[minimum,maximum],
+      centers:vehicle.userData.rotors.map(r=>r.position.toArray()),caption:$('model-caption').textContent};
+  })()`);
+  assert.equal(geometry.basis,'selected_design.csv');
+  assert.ok(Math.abs(geometry.finBodyX[1]-(.4282511278030152-.5492354051043412))<1e-7);
+  assert.ok(Math.abs(geometry.finBodyX[0]-(.4282511278030152-.6263104847887044))<1e-7);
+  assert.ok(geometry.centers.every(c=>Math.abs(c[0]-(.4282511278030152-.6434830364248734))<1e-10));
+  assert.match(geometry.caption,/CSV/);console.log('CSV DISPLAY '+JSON.stringify(geometry));
   await evaluate('drawModel()');await shot('classic-initial');
   assert.equal(await evaluate("$('observe-controller').value"),'hybrid');
   await evaluate("$('seconds').value='.08';$('flight-view').focus()");await space();await wait('!running && !!results.hybrid');

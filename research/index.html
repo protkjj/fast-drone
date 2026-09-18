@@ -7,7 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="./stl.js" defer></script><script src="./runtime.js" defer></script><script src="./results.js" defer></script><script src="./page.js" defer></script>
 </head><body><main class="app" id="sim-shell">
-<header><div><h1>선정 기체 비행 시뮬레이터</h1><div class="aircraft-tag">선정안 6931 · 1.712 kg · drone_v2.stl</div></div>
+<header><div><h1>선정 기체 비행 시뮬레이터</h1><div class="aircraft-tag">선정안 6931 · 1.712 kg · CSV 기준 형상</div></div>
 <nav class="mode-switch" aria-label="시뮬레이터 모드"><button id="mode-observe" aria-pressed="false">비행</button><button id="mode-compare" aria-pressed="true">정밀 비교</button><a href="../aero.html">공력 자료</a></nav></header>
 <div class="statusbar" aria-label="시뮬레이션 상태"><span id="status" aria-live="polite">준비</span><progress id="progress" aria-label="시뮬레이션 진행률" value="0" max="1"></progress><span id="errors" role="alert"></span></div>
 <div class="body">
@@ -31,7 +31,7 @@
 <section class="stage" aria-label="비행 관찰">
 <div class="view" id="flight-view" tabindex="0" aria-label="선정 기체 비행 화면">
 <div id="model"></div><div class="hud" id="flight-position">시뮬레이션 0 s · X 0 / Y 0 / Z 20 m</div>
-<div class="model-caption" id="model-caption">drone_v2.stl 불러오는 중…</div>
+<div class="model-caption" id="model-caption">CSV 기준 표시 형상 불러오는 중…</div>
 <div class="viewbtns"><button id="quick-go" class="primary observe-only">▶ 시작</button><button id="camera-back">뒤에서</button><button id="camera-side">옆에서</button><button id="camera-top">위에서</button><button id="camera-nose">기수축</button><button id="follow" aria-pressed="true">따라가기 (F)</button><button id="camera-reset">시점 초기화</button><select id="view-mode" aria-label="비행 시점"><option value="follow">기체 추적</option><option value="world">지면·고도</option><option value="path">전체 궤적</option></select></div>
 </div>
 <div class="replay-strip"><button id="play" disabled aria-label="기록 재생">▶</button><input type="range" id="timeline" aria-label="기록 시간" min="0" max="1" step="0.001" value="0" disabled><span id="timeline-time">0.00 s</span></div>

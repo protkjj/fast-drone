@@ -14,6 +14,17 @@ PD–INDI는 빠른 조작용 baseline이며 Hybrid가 아니다. 연구 엔진�
 
 ## 현재 상태와 알려진 문제
 
+- **[선정안·STL·제약의 출처 점검](DESIGN_SOURCE_AUDIT.md):** CSV 계산값은 정확히
+  재현되지만 원본 STL의 핀 위치·쓸림·두께는 계산 형상과 다르다. **사용자 결정으로
+  `selected_design.csv`를 설계 기준으로 사용한다.** 연구 화면은 선정안 기준의
+  STL 파생 형상을 표시하며, 원본 STL·물리 프로필·제어기는 보존한다. 아래의 평형
+  제약 문제가 해결된 것은 아니다. 모터 40 A는 제품 정격이 아닌 시험 가정이다.
+- **[선정 기체 힘·모멘트 평형 점검](TRIM_ENVELOPE_AUDIT.md):** 원본 사이징의
+  순항 판정은 6DOF 자세 유지 보장이 아니다. 현재 모델의 무롤·등속 수평 조건에서
+  중간 속도 구간은 음의 로터 추력을 요구하고, 83.3 m/s는 차등 추력 때문에
+  모터 전류 상한을 초과한다. 실측 비행 불가능 판정은 아니며, 가속 전이와도
+  구별한다. 제어기 비교 전에 모델/설계의 목표점 실현 가능성을 확인해야 한다.
+  고받음각 공력의 실측 유효 범위는 미확인이다. UI·물리 계수는 변경하지 않았다.
 - **[모터 능력 피드백 보강](ACTUATOR_FEEDBACK.md):** 현재 관측 회전수·전압에서
   20 ms 뒤의 명목 로터 힘 범위를 계산해 Hybrid의 첫 가상입력에 결합 제약으로
   전달한다. 13상태/모터 명령 역할 분리는 유지한다. 국소 근사이며, 전체 예측
@@ -105,6 +116,10 @@ STL: `assets/drone_v2.stl`, 원본 SHA-256
 질량·관성·공력 계수를 자동 계산하지 않는다. 원본의 21개 연결 성분을 조사해
 블레이드 8개와 허브 4개를 네 로터로 묶었다. 삼각형을 삭제하거나 원본 STL을
 수정하지 않고 각 축 중심으로 회전한다. 파일 해시·분할·초기 형상 복원을 검사한다.
+선정 연구 페이지에서는 `assets/selected_geometry.json`의 출처가 명시된 치수로
+핀·하우징·로터 배치를 변환한 **별도 표시 메시**를 사용한다. 동체 표면과
+블레이드·허브 세부 형상은 기존 STL을 재사용하며 제조용 CAD나 CFD 모델이 아니다.
+원본 STL, CG·관성·CP·추진 모델은 이 표시 변환으로 수정하지 않는다.
 화면의 회전은 실행 중 RPM 상태를 읽되 최대 약 2.9회/초로 시각적 감속하고
 옅은 회전 잔상을 추가한다. 실제 RPM·추력·토크·적분 위상에는 영향을 주지 않는다.
 
@@ -117,7 +132,7 @@ STL: `assets/drone_v2.stl`, 원본 SHA-256
 python3 -m pip install -r research/requirements.txt
 npm ci --prefix research --ignore-scripts --no-audit --no-fund
 python3 -m research.build_bundle
-python3 -m pytest research/test_model.py research/test_estimator.py research/test_nmpc.py control/test_research_parity.py -q
+python3 -m pytest research/test_model.py research/test_trim_envelope.py research/test_design_source_audit.py research/test_estimator.py research/test_nmpc.py control/test_research_parity.py -q
 npm test --prefix research
 python3 gz_aero/tools/build_site.py --research
 python3 -m http.server 8765 --directory site
@@ -163,6 +178,9 @@ IPOPT 계산 성능이나 실제 20 ms 마감 보장으로 해석하지 않는�
 ## 코드 위치와 배포
 
 - `model.py`: 추진·모터·배터리·6DOF 및 공통 수식
+- `trim_envelope.py`: 동일 플랜트의 힘·모멘트·모터 한계를 검사하는 오프라인 평형 진단
+- `design_source_audit.py`: 선정 CSV/원본 코드·STL 형상·시험 가정의 출처와 차이 추적
+- `assets/selected_geometry.json`: 선정안 사이징 치수와 출처를 기록한 표시 전용 명세
 - `nmpc.py`: 두 IPOPT 최적화 문제
 - `eskf.py`: 추정 전파·GPS 갱신·오차 리셋
 - `runtime.js`: 다중 주기, 센서, INDI, 지연 GPS 재적분, 평가
@@ -177,7 +195,7 @@ GitHub Pages는 `bulnabi`의 `.github/workflows/pages.yml`로 배포한다.
 선정 기체 연구는 `/research/index.html?mode=compare`로 분리한다.
 배포는 연구 기능의 공개이지, 미완료 비교 실험의 성공 선언이 아니다.
 
-보존된 `sim-legacy.html`에도 같은 STL을 표시한다. 선택 CAD CG를 원점으로 변환한
+보존된 `sim-legacy.html`에는 CSV 형상 보정 없이 원본 STL을 표시한다. 선정 CG를 원점으로 변환한
 메시가 기존 플랜트의 위치·쿼터니언을 따라가며, 가시성을 위한 표시 배율은 ×5다.
 기존 8 kg 계산 모델은 그대로이고 화면 머리글에 이를 명시한다. 모델의 크기나
 모터 회전수 상태를 바꾸지 않는다. 연구 페이지와 같은 로터 분리·회전 표시를

@@ -1,0 +1,2714 @@
+{
+  "schema": "level-trim-audit-v1",
+  "profile": "selected-6931",
+  "source_hashes": {
+    "model.py": "0cb0a0a239405dd37b81819e247854055e396b73ffc6d87fb9aa69893ce999b5",
+    "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+    "trim_envelope.py": "241bcd43e33aea65e32e25e06f36eab177dffa642dd2ccdb0e92acac79c857bc"
+  },
+  "scope": {
+    "wind_mps": [
+      0,
+      0,
+      0
+    ],
+    "roll_deg": 0,
+    "body_rate_radps": [
+      0,
+      0,
+      0
+    ],
+    "flight_path_deg": 0,
+    "acceleration_mps2": [
+      0,
+      0,
+      0
+    ],
+    "attitude_range_deg": [
+      0,
+      90
+    ],
+    "frozen_soc_operating_points": [
+      1,
+      0.5,
+      0.2
+    ]
+  },
+  "aerodynamics_validated": false,
+  "limitations": [
+    "Model-feasible means algebraic balance and the listed model limits only, not real-flight validation.",
+    "No empirical alpha-validity interval, propeller crossflow/thermal validation, or stability proof.",
+    "No transition trajectory, arbitrary-roll search, gusts, or actuator reserve margin is certified.",
+    "A failed level trim is not proof that an accelerating/climbing transition is impossible.",
+    "Power/current at a rejected point include rotor deceleration; they are not steady cruise consumption.",
+    "Helical tip Mach is the upstream total-speed approximation, not a full crossflow blade calculation."
+  ],
+  "pitch_boundary_scan_max_mps": 100.0,
+  "pitch_balance_boundaries_mps": [
+    19.625690626951886,
+    81.13929111068471
+  ],
+  "cases": [
+    {
+      "speed_mps": 0.0,
+      "speed_kmh": 0.0,
+      "theta_deg": 90.0,
+      "alpha_deg": null,
+      "aero_force_body_N": [
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "total_thrust_N": 16.786180838734616,
+      "required_rotor_pitch_moment_Nm": 0.0,
+      "positive_thrust_pitch_capacity_Nm": 2.004022702489735,
+      "pitch_authority_ratio": 0.0,
+      "required_rotor_thrust_N": [
+        4.196545209683654,
+        4.196545209683654,
+        4.196545209683654,
+        4.196545209683654
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": null,
+      "soc": 1.0,
+      "model_feasible": true,
+      "rotor_rpm": [
+        14447.648641465074,
+        14447.648641465074,
+        14447.648641465074,
+        14447.648641465074
+      ],
+      "rejection_reasons": [],
+      "rotor_thrust_at_speed_limit_N": 22.940070875382865,
+      "required_motor_current_A": [
+        12.086896493642305,
+        12.086896493642305,
+        12.086896493642305,
+        12.086896493642305
+      ],
+      "actual_motor_current_A": [
+        12.086896493642305,
+        12.086896493642305,
+        12.086896493642305,
+        12.086896493642305
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        8.56372174226738,
+        8.56372174226738,
+        8.56372174226738,
+        8.56372174226738
+      ],
+      "bus_voltage_V": 24.950770307600045,
+      "bus_current_A": 17.467460843565473,
+      "electrical_power_W": 435.82660336479984,
+      "propeller_advance_ratio": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.29939642855233317,
+        0.29939642855233317,
+        0.29939642855233317,
+        0.29939642855233317
+      ],
+      "max_acceleration_residual_mps2": 7.105427357601002e-15,
+      "max_angular_acceleration_residual_radps2": 0.0,
+      "max_rotor_acceleration_residual_radps2": 1.7347234759768068e-13,
+      "soc_rate_per_s": -0.001153841168518324
+    },
+    {
+      "speed_mps": 5.0,
+      "speed_kmh": 18.0,
+      "theta_deg": 86.84947086980034,
+      "alpha_deg": 86.84947086980034,
+      "aero_force_body_N": [
+        -0.06410992723845897,
+        -0.0,
+        0.9225584443266788
+      ],
+      "total_thrust_N": 16.824919963376413,
+      "required_rotor_pitch_moment_Nm": -0.0818364852571404,
+      "positive_thrust_pitch_capacity_Nm": 2.0086475832772455,
+      "pitch_authority_ratio": 0.04074208235354985,
+      "required_rotor_thrust_N": [
+        4.034859422159162,
+        4.034859422159162,
+        4.377600559529045,
+        4.377600559529045
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 2.177257815620819,
+      "soc": 1.0,
+      "model_feasible": true,
+      "rotor_rpm": [
+        14167.179245704305,
+        14167.179245704305,
+        14756.607724992295,
+        14756.607724992295
+      ],
+      "rejection_reasons": [],
+      "rotor_thrust_at_speed_limit_N": 22.93927486508524,
+      "required_motor_current_A": [
+        11.773527977737656,
+        11.773527977737656,
+        12.632093946088789,
+        12.632093946088789
+      ],
+      "actual_motor_current_A": [
+        11.773527977737656,
+        11.773527977737656,
+        12.632093946088789,
+        12.632093946088789
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        8.389176336727305,
+        8.389176336727305,
+        8.777081052074188,
+        8.777081052074188
+      ],
+      "bus_voltage_V": 24.947577175374413,
+      "bus_current_A": 17.691254050476264,
+      "electrical_power_W": 441.3539257534118,
+      "propeller_advance_ratio": [
+        0.008641257156431222,
+        0.008641257156431222,
+        0.008296096320130907,
+        0.008296096320130907
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.2939517564150961,
+        0.2939517564150961,
+        0.3061517332466134,
+        0.3061517332466134
+      ],
+      "max_acceleration_residual_mps2": 2.146876200912773e-14,
+      "max_angular_acceleration_residual_radps2": 1.6669283786144295e-14,
+      "max_rotor_acceleration_residual_radps2": 2.6020852139652106e-13,
+      "soc_rate_per_s": -0.0011686241880814409
+    },
+    {
+      "speed_mps": 10.0,
+      "speed_kmh": 36.0,
+      "theta_deg": 74.23776387431546,
+      "alpha_deg": 74.23776387431546,
+      "aero_force_body_N": [
+        -0.22918917132093167,
+        -0.0,
+        4.559898649630845
+      ],
+      "total_thrust_N": 16.38416337296533,
+      "required_rotor_pitch_moment_Nm": -0.4044904481763441,
+      "positive_thrust_pitch_capacity_Nm": 1.9560277394937462,
+      "pitch_authority_ratio": 0.20679177498834103,
+      "required_rotor_thrust_N": [
+        3.249013286842716,
+        3.249013286842716,
+        4.943068399639948,
+        4.943068399639948
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.4289629857567339,
+      "soc": 1.0,
+      "model_feasible": true,
+      "rotor_rpm": [
+        12717.15732622848,
+        12717.15732622848,
+        15685.16322051427,
+        15685.16322051427
+      ],
+      "rejection_reasons": [],
+      "rotor_thrust_at_speed_limit_N": 22.932202048635745,
+      "required_motor_current_A": [
+        10.544727563844381,
+        10.544727563844381,
+        14.954008954661745,
+        14.954008954661745
+      ],
+      "actual_motor_current_A": [
+        10.544727563844381,
+        10.544727563844381,
+        14.954008954661745,
+        14.954008954661745
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        7.528031645085265,
+        7.528031645085265,
+        9.490358214021509,
+        9.490358214021509
+      ],
+      "bus_voltage_V": 24.93339004131042,
+      "bus_current_A": 18.68557060384885,
+      "electrical_power_W": 465.89462001020763,
+      "propeller_advance_ratio": [
+        0.09516156406378586,
+        0.09516156406378586,
+        0.07715473308601488,
+        0.07715473308601488
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.2651690821720932,
+        0.2651690821720932,
+        0.32636694701510094,
+        0.32636694701510094
+      ],
+      "max_acceleration_residual_mps2": 1.0377649309548148e-15,
+      "max_angular_acceleration_residual_radps2": 1.587550836775647e-15,
+      "max_rotor_acceleration_residual_radps2": 1.7347234759768068e-13,
+      "soc_rate_per_s": -0.0012343053643036372
+    },
+    {
+      "speed_mps": 15.0,
+      "speed_kmh": 54.0,
+      "theta_deg": 51.06091919502731,
+      "alpha_deg": 51.06091919502731,
+      "aero_force_body_N": [
+        -0.4856115362315051,
+        -0.0,
+        10.550009616002002
+      ],
+      "total_thrust_N": 13.542148759131244,
+      "required_rotor_pitch_moment_Nm": -0.9358493347624872,
+      "positive_thrust_pitch_capacity_Nm": 1.616733062422911,
+      "pitch_authority_ratio": 0.5788521039830657,
+      "required_rotor_thrust_N": [
+        1.4258118643641153,
+        1.4258118643641153,
+        5.345262515201506,
+        5.345262515201506
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.1532447003622337,
+      "soc": 1.0,
+      "model_feasible": true,
+      "rotor_rpm": [
+        8487.086513690347,
+        8487.086513690347,
+        16310.148469148726,
+        16310.148469148726
+      ],
+      "rejection_reasons": [],
+      "rotor_thrust_at_speed_limit_N": 22.921195413856516,
+      "required_motor_current_A": [
+        7.358991844859529,
+        7.358991844859529,
+        18.940318036508838,
+        18.940318036508838
+      ],
+      "actual_motor_current_A": [
+        7.358991844859529,
+        7.358991844859529,
+        18.940318036508838,
+        18.940318036508838
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        5.057921048727319,
+        5.057921048727319,
+        10.225931237473784,
+        10.225931237473784
+      ],
+      "bus_voltage_V": 24.921689496394833,
+      "bus_current_A": 19.50561258276896,
+      "electrical_power_W": 486.1128202247401,
+      "propeller_advance_ratio": [
+        0.4948594986353469,
+        0.4948594986353469,
+        0.25750319722970916,
+        0.25750319722970916
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.18131631136655454,
+        0.18131631136655454,
+        0.3408549690237093,
+        0.3408549690237093
+      ],
+      "max_acceleration_residual_mps2": 1.0377649309548148e-15,
+      "max_angular_acceleration_residual_radps2": 3.175101673551294e-15,
+      "max_rotor_acceleration_residual_radps2": 3.4694469519536137e-13,
+      "soc_rate_per_s": -0.0012884745537276292
+    },
+    {
+      "speed_mps": 20.0,
+      "speed_kmh": 72.0,
+      "theta_deg": 33.402858770939446,
+      "alpha_deg": 33.402858770939446,
+      "aero_force_body_N": [
+        -0.8293458159633512,
+        -0.0,
+        14.013446135232991
+      ],
+      "total_thrust_N": 10.070514279184048,
+      "required_rotor_pitch_moment_Nm": -1.2430769943087085,
+      "positive_thrust_pitch_capacity_Nm": 1.202271048734467,
+      "pitch_authority_ratio": 1.0339407204533408,
+      "required_rotor_thrust_N": [
+        -0.08545012749279124,
+        -0.08545012749279124,
+        5.120707267084815,
+        5.120707267084815
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.08579410354400151,
+      "soc": 1.0,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 30.0,
+      "speed_kmh": 108.0,
+      "theta_deg": 16.909639885030355,
+      "alpha_deg": 16.909639885030355,
+      "aero_force_body_N": [
+        -1.7699328736271829,
+        -0.0,
+        16.060424611772113
+      ],
+      "total_thrust_N": 6.652414664713139,
+      "required_rotor_pitch_moment_Nm": -1.424656302315844,
+      "positive_thrust_pitch_capacity_Nm": 0.7942003093221612,
+      "pitch_authority_ratio": 1.793824914940877,
+      "required_rotor_thrust_N": [
+        -1.3202131263418375,
+        -1.3202131263418375,
+        4.646420458698407,
+        4.646420458698407
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.049450766621700726,
+      "soc": 1.0,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 40.0,
+      "speed_kmh": 144.0,
+      "theta_deg": 10.098152975312287,
+      "alpha_deg": 10.098152975312287,
+      "aero_force_body_N": [
+        -3.0398476164529495,
+        -0.0,
+        16.526143303046997
+      ],
+      "total_thrust_N": 5.983052447560699,
+      "required_rotor_pitch_moment_Nm": -1.4659683525679101,
+      "positive_thrust_pitch_capacity_Nm": 0.7142883214644472,
+      "pitch_authority_ratio": 2.052348202421054,
+      "required_rotor_thrust_N": [
+        -1.5740636220453472,
+        -1.5740636220453472,
+        4.565589845825697,
+        4.565589845825697
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.04322171896771286,
+      "soc": 1.0,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 60.0,
+      "speed_kmh": 216.0,
+      "theta_deg": 4.726598012491706,
+      "alpha_deg": 4.726598012491706,
+      "aero_force_body_N": [
+        -6.552636556234261,
+        -0.0,
+        16.72909509490191
+      ],
+      "total_thrust_N": 7.935837357430605,
+      "required_rotor_pitch_moment_Nm": -1.483971397712835,
+      "positive_thrust_pitch_capacity_Nm": 0.9474220717829424,
+      "pitch_authority_ratio": 1.566325550047791,
+      "required_rotor_thrust_N": [
+        -1.1235668641341743,
+        -1.1235668641341743,
+        5.091485542849477,
+        5.091485542849477
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.05663319303335561,
+      "soc": 1.0,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 80.0,
+      "speed_kmh": 288.0,
+      "theta_deg": 2.7143089701517105,
+      "alpha_deg": 2.7143089701517105,
+      "aero_force_body_N": [
+        -11.370704373996608,
+        -0.0,
+        16.767348078519582
+      ],
+      "total_thrust_N": 12.165629253759894,
+      "required_rotor_pitch_moment_Nm": -1.4873646675366823,
+      "positive_thrust_pitch_capacity_Nm": 1.4523969120093145,
+      "pitch_authority_ratio": 1.0240758949831363,
+      "required_rotor_thrust_N": [
+        -0.07322460307932399,
+        -0.07322460307932399,
+        6.156039229959271,
+        6.156039229959271
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.08662054996460414,
+      "soc": 1.0,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 83.3,
+      "speed_kmh": 299.88,
+      "theta_deg": 2.5089147221659567,
+      "alpha_deg": 2.5089147221659567,
+      "aero_force_body_N": [
+        -12.294650964510941,
+        -0.0,
+        16.77008998672687
+      ],
+      "total_thrust_N": 13.029463177109799,
+      "required_rotor_pitch_moment_Nm": -1.4876078912933581,
+      "positive_thrust_pitch_capacity_Nm": 1.5555259566803525,
+      "pitch_authority_ratio": 0.9563375557345644,
+      "required_rotor_thrust_N": [
+        0.14222455244477583,
+        0.14222455244477583,
+        6.3725070361101235,
+        6.3725070361101235
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.09275596958105262,
+      "soc": 1.0,
+      "model_feasible": false,
+      "rotor_rpm": [
+        24149.765101873145,
+        24149.765101873145,
+        29472.504466500566,
+        29472.504466500566
+      ],
+      "rejection_reasons": [
+        "current_limit",
+        "nonzero_steady_state_residual"
+      ],
+      "rotor_thrust_at_speed_limit_N": 12.75615605670936,
+      "required_motor_current_A": [
+        6.688013065517069,
+        6.688013065517069,
+        45.60875577158357,
+        45.60875577158357
+      ],
+      "actual_motor_current_A": [
+        6.688013065517069,
+        6.688013065517069,
+        39.94890249615378,
+        39.94890249615378
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        12.88974064050708,
+        12.88974064050708,
+        19.678356094869358,
+        19.678356094869358
+      ],
+      "bus_voltage_V": 24.14436917425201,
+      "bus_current_A": 73.98472443814185,
+      "electrical_power_W": 1786.3145000898016,
+      "propeller_advance_ratio": [
+        1.5351962793027611,
+        1.5351962793027611,
+        1.2579395678370926,
+        1.2579395678370926
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.5571122405298996,
+        0.5571122405298996,
+        0.6579837871170204,
+        0.6579837871170204
+      ],
+      "max_acceleration_residual_mps2": 4.929383422035371e-15,
+      "max_angular_acceleration_residual_radps2": 4.445142342971812e-14,
+      "max_rotor_acceleration_residual_radps2": 2726.95530086703,
+      "soc_rate_per_s": -0.0048871797488332985
+    },
+    {
+      "speed_mps": 90.0,
+      "speed_kmh": 324.0,
+      "theta_deg": 2.157262910340469,
+      "alpha_deg": 2.157262910340469,
+      "aero_force_body_N": [
+        -14.281872566032614,
+        -0.0,
+        16.77428400247105
+      ],
+      "total_thrust_N": 14.913745460776237,
+      "required_rotor_pitch_moment_Nm": -1.4879799257262196,
+      "positive_thrust_pitch_capacity_Nm": 1.7804815025930463,
+      "pitch_authority_ratio": 0.8357177109445759,
+      "required_rotor_thrust_N": [
+        0.6125160606715654,
+        0.6125160606715654,
+        6.844356669716554,
+        6.844356669716554
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.1061435172035218,
+      "soc": 1.0,
+      "model_feasible": false,
+      "rotor_rpm": [
+        26501.54670468685,
+        26501.54670468685,
+        31435.298828815063,
+        31435.298828815063
+      ],
+      "rejection_reasons": [
+        "current_limit",
+        "helical_tip_mach_limit",
+        "nonzero_steady_state_residual"
+      ],
+      "rotor_thrust_at_speed_limit_N": 10.358968773837743,
+      "required_motor_current_A": [
+        10.648458247053894,
+        10.648458247053894,
+        49.554703014938056,
+        49.554703014938056
+      ],
+      "actual_motor_current_A": [
+        10.648458247053894,
+        10.648458247053894,
+        39.94890249615378,
+        39.94890249615378
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        14.493836670010865,
+        14.493836670010865,
+        21.084661473237215,
+        21.084661473237215
+      ],
+      "bus_voltage_V": 24.003400876173245,
+      "bus_current_A": 83.86459951708443,
+      "electrical_power_W": 2013.0356015283028,
+      "propeller_advance_ratio": [
+        1.511860447670571,
+        1.511860447670571,
+        1.2745748174418678,
+        1.2745748174418678
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.6095537935256122,
+        0.6095537935256122,
+        0.7030707852941245,
+        0.7030707852941245
+      ],
+      "max_acceleration_residual_mps2": 5.790923296444817e-13,
+      "max_angular_acceleration_residual_radps2": 1.2700406694205176e-14,
+      "max_rotor_acceleration_residual_radps2": 4628.139170583161,
+      "soc_rate_per_s": -0.005539810758457204
+    },
+    {
+      "speed_mps": 100.0,
+      "speed_kmh": 360.0,
+      "theta_deg": 1.7548756895395703,
+      "alpha_deg": 1.7548756895395703,
+      "aero_force_body_N": [
+        -17.53942139879247,
+        -0.0,
+        16.77830792665882
+      ],
+      "total_thrust_N": 18.05347418685231,
+      "required_rotor_pitch_moment_Nm": -1.488336872014548,
+      "positive_thrust_pitch_capacity_Nm": 2.1553188588186174,
+      "pitch_authority_ratio": 0.6905413859879376,
+      "required_rotor_thrust_N": [
+        1.3967007749914653,
+        1.3967007749914653,
+        7.630036318434689,
+        7.630036318434689
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.1284586543672894,
+      "soc": 1.0,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "rotor_speed_limit"
+      ],
+      "rotor_thrust_at_speed_limit_N": 6.667413482390382
+    },
+    {
+      "speed_mps": 0.0,
+      "speed_kmh": 0.0,
+      "theta_deg": 90.0,
+      "alpha_deg": null,
+      "aero_force_body_N": [
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "total_thrust_N": 16.786180838734616,
+      "required_rotor_pitch_moment_Nm": 0.0,
+      "positive_thrust_pitch_capacity_Nm": 2.004022702489735,
+      "pitch_authority_ratio": 0.0,
+      "required_rotor_thrust_N": [
+        4.196545209683654,
+        4.196545209683654,
+        4.196545209683654,
+        4.196545209683654
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": null,
+      "soc": 0.5,
+      "model_feasible": true,
+      "rotor_rpm": [
+        14447.648641465074,
+        14447.648641465074,
+        14447.648641465074,
+        14447.648641465074
+      ],
+      "rejection_reasons": [],
+      "rotor_thrust_at_speed_limit_N": 22.940070875382865,
+      "required_motor_current_A": [
+        12.086896493642305,
+        12.086896493642305,
+        12.086896493642305,
+        12.086896493642305
+      ],
+      "actual_motor_current_A": [
+        12.086896493642305,
+        12.086896493642305,
+        12.086896493642305,
+        12.086896493642305
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        8.56372174226738,
+        8.56372174226738,
+        8.56372174226738,
+        8.56372174226738
+      ],
+      "bus_voltage_V": 21.916262163570874,
+      "bus_current_A": 19.88599151224013,
+      "electrical_power_W": 435.82660336479984,
+      "propeller_advance_ratio": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.29939642855233317,
+        0.29939642855233317,
+        0.29939642855233317,
+        0.29939642855233317
+      ],
+      "max_acceleration_residual_mps2": 7.105427357601002e-15,
+      "max_angular_acceleration_residual_radps2": 0.0,
+      "max_rotor_acceleration_residual_radps2": 1.7347234759768068e-13,
+      "soc_rate_per_s": -0.0013136010945792973
+    },
+    {
+      "speed_mps": 5.0,
+      "speed_kmh": 18.0,
+      "theta_deg": 86.84947086980034,
+      "alpha_deg": 86.84947086980034,
+      "aero_force_body_N": [
+        -0.06410992723845897,
+        -0.0,
+        0.9225584443266788
+      ],
+      "total_thrust_N": 16.824919963376413,
+      "required_rotor_pitch_moment_Nm": -0.0818364852571404,
+      "positive_thrust_pitch_capacity_Nm": 2.0086475832772455,
+      "pitch_authority_ratio": 0.04074208235354985,
+      "required_rotor_thrust_N": [
+        4.034859422159162,
+        4.034859422159162,
+        4.377600559529045,
+        4.377600559529045
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 2.177257815620819,
+      "soc": 0.5,
+      "model_feasible": true,
+      "rotor_rpm": [
+        14167.179245704305,
+        14167.179245704305,
+        14756.607724992295,
+        14756.607724992295
+      ],
+      "rejection_reasons": [],
+      "rotor_thrust_at_speed_limit_N": 22.93927486508524,
+      "required_motor_current_A": [
+        11.773527977737656,
+        11.773527977737656,
+        12.632093946088789,
+        12.632093946088789
+      ],
+      "actual_motor_current_A": [
+        11.773527977737656,
+        11.773527977737656,
+        12.632093946088789,
+        12.632093946088789
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        8.389176336727305,
+        8.389176336727305,
+        8.777081052074188,
+        8.777081052074188
+      ],
+      "bus_voltage_V": 21.912615876920217,
+      "bus_current_A": 20.1415444067668,
+      "electrical_power_W": 441.3539257534118,
+      "propeller_advance_ratio": [
+        0.008641257156431222,
+        0.008641257156431222,
+        0.008296096320130907,
+        0.008296096320130907
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.2939517564150961,
+        0.2939517564150961,
+        0.3061517332466134,
+        0.3061517332466134
+      ],
+      "max_acceleration_residual_mps2": 2.146876200912773e-14,
+      "max_angular_acceleration_residual_radps2": 1.6669283786144295e-14,
+      "max_rotor_acceleration_residual_radps2": 2.6020852139652106e-13,
+      "soc_rate_per_s": -0.0013304820512953111
+    },
+    {
+      "speed_mps": 10.0,
+      "speed_kmh": 36.0,
+      "theta_deg": 74.23776387431546,
+      "alpha_deg": 74.23776387431546,
+      "aero_force_body_N": [
+        -0.22918917132093167,
+        -0.0,
+        4.559898649630845
+      ],
+      "total_thrust_N": 16.38416337296533,
+      "required_rotor_pitch_moment_Nm": -0.4044904481763441,
+      "positive_thrust_pitch_capacity_Nm": 1.9560277394937462,
+      "pitch_authority_ratio": 0.20679177498834103,
+      "required_rotor_thrust_N": [
+        3.249013286842716,
+        3.249013286842716,
+        4.943068399639948,
+        4.943068399639948
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.4289629857567339,
+      "soc": 0.5,
+      "model_feasible": true,
+      "rotor_rpm": [
+        12717.15732622848,
+        12717.15732622848,
+        15685.16322051427,
+        15685.16322051427
+      ],
+      "rejection_reasons": [],
+      "rotor_thrust_at_speed_limit_N": 22.932202048635745,
+      "required_motor_current_A": [
+        10.544727563844381,
+        10.544727563844381,
+        14.954008954661745,
+        14.954008954661745
+      ],
+      "actual_motor_current_A": [
+        10.544727563844381,
+        10.544727563844381,
+        14.954008954661745,
+        14.954008954661745
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        7.528031645085265,
+        7.528031645085265,
+        9.490358214021509,
+        9.490358214021509
+      ],
+      "bus_voltage_V": 21.896411899844086,
+      "bus_current_A": 21.27721300372163,
+      "electrical_power_W": 465.89462001020763,
+      "propeller_advance_ratio": [
+        0.09516156406378586,
+        0.09516156406378586,
+        0.07715473308601488,
+        0.07715473308601488
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.2651690821720932,
+        0.2651690821720932,
+        0.32636694701510094,
+        0.32636694701510094
+      ],
+      "max_acceleration_residual_mps2": 1.0377649309548148e-15,
+      "max_angular_acceleration_residual_radps2": 1.587550836775647e-15,
+      "max_rotor_acceleration_residual_radps2": 1.7347234759768068e-13,
+      "soc_rate_per_s": -0.0014055004636848048
+    },
+    {
+      "speed_mps": 15.0,
+      "speed_kmh": 54.0,
+      "theta_deg": 51.06091919502731,
+      "alpha_deg": 51.06091919502731,
+      "aero_force_body_N": [
+        -0.4856115362315051,
+        -0.0,
+        10.550009616002002
+      ],
+      "total_thrust_N": 13.542148759131244,
+      "required_rotor_pitch_moment_Nm": -0.9358493347624872,
+      "positive_thrust_pitch_capacity_Nm": 1.616733062422911,
+      "pitch_authority_ratio": 0.5788521039830657,
+      "required_rotor_thrust_N": [
+        1.4258118643641153,
+        1.4258118643641153,
+        5.345262515201506,
+        5.345262515201506
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.1532447003622337,
+      "soc": 0.5,
+      "model_feasible": true,
+      "rotor_rpm": [
+        8487.086513690347,
+        8487.086513690347,
+        16310.148469148726,
+        16310.148469148726
+      ],
+      "rejection_reasons": [],
+      "rotor_thrust_at_speed_limit_N": 22.921195413856516,
+      "required_motor_current_A": [
+        7.358991844859529,
+        7.358991844859529,
+        18.940318036508838,
+        18.940318036508838
+      ],
+      "actual_motor_current_A": [
+        7.358991844859529,
+        7.358991844859529,
+        18.940318036508838,
+        18.940318036508838
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        5.057921048727319,
+        5.057921048727319,
+        10.225931237473784,
+        10.225931237473784
+      ],
+      "bus_voltage_V": 21.883043728259974,
+      "bus_current_A": 22.214131921555744,
+      "electrical_power_W": 486.1128202247401,
+      "propeller_advance_ratio": [
+        0.4948594986353469,
+        0.4948594986353469,
+        0.25750319722970916,
+        0.25750319722970916
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.18131631136655454,
+        0.18131631136655454,
+        0.3408549690237093,
+        0.3408549690237093
+      ],
+      "max_acceleration_residual_mps2": 1.0377649309548148e-15,
+      "max_angular_acceleration_residual_radps2": 3.175101673551294e-15,
+      "max_rotor_acceleration_residual_radps2": 3.4694469519536137e-13,
+      "soc_rate_per_s": -0.001467390146944571
+    },
+    {
+      "speed_mps": 20.0,
+      "speed_kmh": 72.0,
+      "theta_deg": 33.402858770939446,
+      "alpha_deg": 33.402858770939446,
+      "aero_force_body_N": [
+        -0.8293458159633512,
+        -0.0,
+        14.013446135232991
+      ],
+      "total_thrust_N": 10.070514279184048,
+      "required_rotor_pitch_moment_Nm": -1.2430769943087085,
+      "positive_thrust_pitch_capacity_Nm": 1.202271048734467,
+      "pitch_authority_ratio": 1.0339407204533408,
+      "required_rotor_thrust_N": [
+        -0.08545012749279124,
+        -0.08545012749279124,
+        5.120707267084815,
+        5.120707267084815
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.08579410354400151,
+      "soc": 0.5,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 30.0,
+      "speed_kmh": 108.0,
+      "theta_deg": 16.909639885030355,
+      "alpha_deg": 16.909639885030355,
+      "aero_force_body_N": [
+        -1.7699328736271829,
+        -0.0,
+        16.060424611772113
+      ],
+      "total_thrust_N": 6.652414664713139,
+      "required_rotor_pitch_moment_Nm": -1.424656302315844,
+      "positive_thrust_pitch_capacity_Nm": 0.7942003093221612,
+      "pitch_authority_ratio": 1.793824914940877,
+      "required_rotor_thrust_N": [
+        -1.3202131263418375,
+        -1.3202131263418375,
+        4.646420458698407,
+        4.646420458698407
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.049450766621700726,
+      "soc": 0.5,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 40.0,
+      "speed_kmh": 144.0,
+      "theta_deg": 10.098152975312287,
+      "alpha_deg": 10.098152975312287,
+      "aero_force_body_N": [
+        -3.0398476164529495,
+        -0.0,
+        16.526143303046997
+      ],
+      "total_thrust_N": 5.983052447560699,
+      "required_rotor_pitch_moment_Nm": -1.4659683525679101,
+      "positive_thrust_pitch_capacity_Nm": 0.7142883214644472,
+      "pitch_authority_ratio": 2.052348202421054,
+      "required_rotor_thrust_N": [
+        -1.5740636220453472,
+        -1.5740636220453472,
+        4.565589845825697,
+        4.565589845825697
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.04322171896771286,
+      "soc": 0.5,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 60.0,
+      "speed_kmh": 216.0,
+      "theta_deg": 4.726598012491706,
+      "alpha_deg": 4.726598012491706,
+      "aero_force_body_N": [
+        -6.552636556234261,
+        -0.0,
+        16.72909509490191
+      ],
+      "total_thrust_N": 7.935837357430605,
+      "required_rotor_pitch_moment_Nm": -1.483971397712835,
+      "positive_thrust_pitch_capacity_Nm": 0.9474220717829424,
+      "pitch_authority_ratio": 1.566325550047791,
+      "required_rotor_thrust_N": [
+        -1.1235668641341743,
+        -1.1235668641341743,
+        5.091485542849477,
+        5.091485542849477
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.05663319303335561,
+      "soc": 0.5,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 80.0,
+      "speed_kmh": 288.0,
+      "theta_deg": 2.7143089701517105,
+      "alpha_deg": 2.7143089701517105,
+      "aero_force_body_N": [
+        -11.370704373996608,
+        -0.0,
+        16.767348078519582
+      ],
+      "total_thrust_N": 12.165629253759894,
+      "required_rotor_pitch_moment_Nm": -1.4873646675366823,
+      "positive_thrust_pitch_capacity_Nm": 1.4523969120093145,
+      "pitch_authority_ratio": 1.0240758949831363,
+      "required_rotor_thrust_N": [
+        -0.07322460307932399,
+        -0.07322460307932399,
+        6.156039229959271,
+        6.156039229959271
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.08662054996460414,
+      "soc": 0.5,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 83.3,
+      "speed_kmh": 299.88,
+      "theta_deg": 2.5089147221659567,
+      "alpha_deg": 2.5089147221659567,
+      "aero_force_body_N": [
+        -12.294650964510941,
+        -0.0,
+        16.77008998672687
+      ],
+      "total_thrust_N": 13.029463177109799,
+      "required_rotor_pitch_moment_Nm": -1.4876078912933581,
+      "positive_thrust_pitch_capacity_Nm": 1.5555259566803525,
+      "pitch_authority_ratio": 0.9563375557345644,
+      "required_rotor_thrust_N": [
+        0.14222455244477583,
+        0.14222455244477583,
+        6.3725070361101235,
+        6.3725070361101235
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.09275596958105262,
+      "soc": 0.5,
+      "model_feasible": false,
+      "rotor_rpm": [
+        24149.765101873145,
+        24149.765101873145,
+        29472.504466500566,
+        29472.504466500566
+      ],
+      "rejection_reasons": [
+        "current_limit",
+        "nonzero_steady_state_residual"
+      ],
+      "rotor_thrust_at_speed_limit_N": 12.75615605670936,
+      "required_motor_current_A": [
+        6.688013065517069,
+        6.688013065517069,
+        45.60875577158357,
+        45.60875577158357
+      ],
+      "actual_motor_current_A": [
+        6.688013065517069,
+        6.688013065517069,
+        39.94890249615378,
+        39.94890249615378
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        12.88974064050708,
+        12.88974064050708,
+        19.678356094869358,
+        19.678356094869358
+      ],
+      "bus_voltage_V": 20.98546709222281,
+      "bus_current_A": 85.12150300203744,
+      "electrical_power_W": 1786.3145000898016,
+      "propeller_advance_ratio": [
+        1.5351962793027611,
+        1.5351962793027611,
+        1.2579395678370926,
+        1.2579395678370926
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.5571122405298996,
+        0.5571122405298996,
+        0.6579837871170204,
+        0.6579837871170204
+      ],
+      "max_acceleration_residual_mps2": 4.929383422035371e-15,
+      "max_angular_acceleration_residual_radps2": 4.445142342971812e-14,
+      "max_rotor_acceleration_residual_radps2": 2726.95530086703,
+      "soc_rate_per_s": -0.005622837536005538
+    },
+    {
+      "speed_mps": 90.0,
+      "speed_kmh": 324.0,
+      "theta_deg": 2.157262910340469,
+      "alpha_deg": 2.157262910340469,
+      "aero_force_body_N": [
+        -14.281872566032614,
+        -0.0,
+        16.77428400247105
+      ],
+      "total_thrust_N": 14.913745460776237,
+      "required_rotor_pitch_moment_Nm": -1.4879799257262196,
+      "positive_thrust_pitch_capacity_Nm": 1.7804815025930463,
+      "pitch_authority_ratio": 0.8357177109445759,
+      "required_rotor_thrust_N": [
+        0.6125160606715654,
+        0.6125160606715654,
+        6.844356669716554,
+        6.844356669716554
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.1061435172035218,
+      "soc": 0.5,
+      "model_feasible": false,
+      "rotor_rpm": [
+        26501.54670468685,
+        26501.54670468685,
+        31435.298828815063,
+        31435.298828815063
+      ],
+      "rejection_reasons": [
+        "current_limit",
+        "voltage_limit",
+        "helical_tip_mach_limit",
+        "nonzero_steady_state_residual"
+      ],
+      "rotor_thrust_at_speed_limit_N": 10.358968773837743,
+      "required_motor_current_A": [
+        10.648458247053894,
+        10.648458247053894,
+        49.554703014938056,
+        49.554703014938056
+      ],
+      "actual_motor_current_A": [
+        10.648458247053894,
+        10.648458247053894,
+        39.94890249615378,
+        39.94890249615378
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        14.493836670010865,
+        14.493836670010865,
+        21.084661473237215,
+        21.084661473237215
+      ],
+      "bus_voltage_V": 20.820470746970475,
+      "bus_current_A": 96.68540284187443,
+      "electrical_power_W": 2013.0356015283028,
+      "propeller_advance_ratio": [
+        1.511860447670571,
+        1.511860447670571,
+        1.2745748174418678,
+        1.2745748174418678
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.6095537935256122,
+        0.6095537935256122,
+        0.7030707852941245,
+        0.7030707852941245
+      ],
+      "max_acceleration_residual_mps2": 5.790923296444817e-13,
+      "max_angular_acceleration_residual_radps2": 1.2700406694205176e-14,
+      "max_rotor_acceleration_residual_radps2": 4628.139170583161,
+      "soc_rate_per_s": -0.0063867095047663285
+    },
+    {
+      "speed_mps": 100.0,
+      "speed_kmh": 360.0,
+      "theta_deg": 1.7548756895395703,
+      "alpha_deg": 1.7548756895395703,
+      "aero_force_body_N": [
+        -17.53942139879247,
+        -0.0,
+        16.77830792665882
+      ],
+      "total_thrust_N": 18.05347418685231,
+      "required_rotor_pitch_moment_Nm": -1.488336872014548,
+      "positive_thrust_pitch_capacity_Nm": 2.1553188588186174,
+      "pitch_authority_ratio": 0.6905413859879376,
+      "required_rotor_thrust_N": [
+        1.3967007749914653,
+        1.3967007749914653,
+        7.630036318434689,
+        7.630036318434689
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.1284586543672894,
+      "soc": 0.5,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "rotor_speed_limit"
+      ],
+      "rotor_thrust_at_speed_limit_N": 6.667413482390382
+    },
+    {
+      "speed_mps": 0.0,
+      "speed_kmh": 0.0,
+      "theta_deg": 90.0,
+      "alpha_deg": null,
+      "aero_force_body_N": [
+        -0.0,
+        -0.0,
+        -0.0
+      ],
+      "total_thrust_N": 16.786180838734616,
+      "required_rotor_pitch_moment_Nm": 0.0,
+      "positive_thrust_pitch_capacity_Nm": 2.004022702489735,
+      "pitch_authority_ratio": 0.0,
+      "required_rotor_thrust_N": [
+        4.196545209683654,
+        4.196545209683654,
+        4.196545209683654,
+        4.196545209683654
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": null,
+      "soc": 0.2,
+      "model_feasible": true,
+      "rotor_rpm": [
+        14447.648641465074,
+        14447.648641465074,
+        14447.648641465074,
+        14447.648641465074
+      ],
+      "rejection_reasons": [],
+      "rotor_thrust_at_speed_limit_N": 22.940070875382865,
+      "required_motor_current_A": [
+        12.086896493642305,
+        12.086896493642305,
+        12.086896493642305,
+        12.086896493642305
+      ],
+      "actual_motor_current_A": [
+        12.086896493642305,
+        12.086896493642305,
+        12.086896493642305,
+        12.086896493642305
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        8.56372174226738,
+        8.56372174226738,
+        8.56372174226738,
+        8.56372174226738
+      ],
+      "bus_voltage_V": 20.821341393360562,
+      "bus_current_A": 20.93172553732656,
+      "electrical_power_W": 435.82660336479984,
+      "propeller_advance_ratio": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.29939642855233317,
+        0.29939642855233317,
+        0.29939642855233317,
+        0.29939642855233317
+      ],
+      "max_acceleration_residual_mps2": 7.105427357601002e-15,
+      "max_angular_acceleration_residual_radps2": 0.0,
+      "max_rotor_acceleration_residual_radps2": 1.7347234759768068e-13,
+      "soc_rate_per_s": -0.0013826787344418524
+    },
+    {
+      "speed_mps": 5.0,
+      "speed_kmh": 18.0,
+      "theta_deg": 86.84947086980034,
+      "alpha_deg": 86.84947086980034,
+      "aero_force_body_N": [
+        -0.06410992723845897,
+        -0.0,
+        0.9225584443266788
+      ],
+      "total_thrust_N": 16.824919963376413,
+      "required_rotor_pitch_moment_Nm": -0.0818364852571404,
+      "positive_thrust_pitch_capacity_Nm": 2.0086475832772455,
+      "pitch_authority_ratio": 0.04074208235354985,
+      "required_rotor_thrust_N": [
+        4.034859422159162,
+        4.034859422159162,
+        4.377600559529045,
+        4.377600559529045
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 2.177257815620819,
+      "soc": 0.2,
+      "model_feasible": true,
+      "rotor_rpm": [
+        14167.179245704305,
+        14167.179245704305,
+        14756.607724992295,
+        14756.607724992295
+      ],
+      "rejection_reasons": [],
+      "rotor_thrust_at_speed_limit_N": 22.93927486508524,
+      "required_motor_current_A": [
+        11.773527977737656,
+        11.773527977737656,
+        12.632093946088789,
+        12.632093946088789
+      ],
+      "actual_motor_current_A": [
+        11.773527977737656,
+        11.773527977737656,
+        12.632093946088789,
+        12.632093946088789
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        8.389176336727305,
+        8.389176336727305,
+        8.777081052074188,
+        8.777081052074188
+      ],
+      "bus_voltage_V": 20.817497848004994,
+      "bus_current_A": 21.2011034647811,
+      "electrical_power_W": 441.3539257534118,
+      "propeller_advance_ratio": [
+        0.008641257156431222,
+        0.008641257156431222,
+        0.008296096320130907,
+        0.008296096320130907
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.2939517564150961,
+        0.2939517564150961,
+        0.3061517332466134,
+        0.3061517332466134
+      ],
+      "max_acceleration_residual_mps2": 2.146876200912773e-14,
+      "max_angular_acceleration_residual_radps2": 1.6669283786144295e-14,
+      "max_rotor_acceleration_residual_radps2": 2.6020852139652106e-13,
+      "soc_rate_per_s": -0.0014004729259028102
+    },
+    {
+      "speed_mps": 10.0,
+      "speed_kmh": 36.0,
+      "theta_deg": 74.23776387431546,
+      "alpha_deg": 74.23776387431546,
+      "aero_force_body_N": [
+        -0.22918917132093167,
+        -0.0,
+        4.559898649630845
+      ],
+      "total_thrust_N": 16.38416337296533,
+      "required_rotor_pitch_moment_Nm": -0.4044904481763441,
+      "positive_thrust_pitch_capacity_Nm": 1.9560277394937462,
+      "pitch_authority_ratio": 0.20679177498834103,
+      "required_rotor_thrust_N": [
+        3.249013286842716,
+        3.249013286842716,
+        4.943068399639948,
+        4.943068399639948
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.4289629857567339,
+      "soc": 0.2,
+      "model_feasible": true,
+      "rotor_rpm": [
+        12717.15732622848,
+        12717.15732622848,
+        15685.16322051427,
+        15685.16322051427
+      ],
+      "rejection_reasons": [],
+      "rotor_thrust_at_speed_limit_N": 22.932202048635745,
+      "required_motor_current_A": [
+        10.544727563844381,
+        10.544727563844381,
+        14.954008954661745,
+        14.954008954661745
+      ],
+      "actual_motor_current_A": [
+        10.544727563844381,
+        10.544727563844381,
+        14.954008954661745,
+        14.954008954661745
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        7.528031645085265,
+        7.528031645085265,
+        9.490358214021509,
+        9.490358214021509
+      ],
+      "bus_voltage_V": 20.80041551457239,
+      "bus_current_A": 22.398332364265052,
+      "electrical_power_W": 465.89462001020763,
+      "propeller_advance_ratio": [
+        0.09516156406378586,
+        0.09516156406378586,
+        0.07715473308601488,
+        0.07715473308601488
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.2651690821720932,
+        0.2651690821720932,
+        0.32636694701510094,
+        0.32636694701510094
+      ],
+      "max_acceleration_residual_mps2": 1.0377649309548148e-15,
+      "max_angular_acceleration_residual_radps2": 1.587550836775647e-15,
+      "max_rotor_acceleration_residual_radps2": 1.7347234759768068e-13,
+      "soc_rate_per_s": -0.001479557802905603
+    },
+    {
+      "speed_mps": 15.0,
+      "speed_kmh": 54.0,
+      "theta_deg": 51.06091919502731,
+      "alpha_deg": 51.06091919502731,
+      "aero_force_body_N": [
+        -0.4856115362315051,
+        -0.0,
+        10.550009616002002
+      ],
+      "total_thrust_N": 13.542148759131244,
+      "required_rotor_pitch_moment_Nm": -0.9358493347624872,
+      "positive_thrust_pitch_capacity_Nm": 1.616733062422911,
+      "pitch_authority_ratio": 0.5788521039830657,
+      "required_rotor_thrust_N": [
+        1.4258118643641153,
+        1.4258118643641153,
+        5.345262515201506,
+        5.345262515201506
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.1532447003622337,
+      "soc": 0.2,
+      "model_feasible": true,
+      "rotor_rpm": [
+        8487.086513690347,
+        8487.086513690347,
+        16310.148469148726,
+        16310.148469148726
+      ],
+      "rejection_reasons": [],
+      "rotor_thrust_at_speed_limit_N": 22.921195413856516,
+      "required_motor_current_A": [
+        7.358991844859529,
+        7.358991844859529,
+        18.940318036508838,
+        18.940318036508838
+      ],
+      "actual_motor_current_A": [
+        7.358991844859529,
+        7.358991844859529,
+        18.940318036508838,
+        18.940318036508838
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        5.057921048727319,
+        5.057921048727319,
+        10.225931237473784,
+        10.225931237473784
+      ],
+      "bus_voltage_V": 20.786320552650732,
+      "bus_current_A": 23.386188959870996,
+      "electrical_power_W": 486.1128202247401,
+      "propeller_advance_ratio": [
+        0.4948594986353469,
+        0.4948594986353469,
+        0.25750319722970916,
+        0.25750319722970916
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.18131631136655454,
+        0.18131631136655454,
+        0.3408549690237093,
+        0.3408549690237093
+      ],
+      "max_acceleration_residual_mps2": 1.0377649309548148e-15,
+      "max_angular_acceleration_residual_radps2": 3.175101673551294e-15,
+      "max_rotor_acceleration_residual_radps2": 3.4694469519536137e-13,
+      "soc_rate_per_s": -0.0015448122562466205
+    },
+    {
+      "speed_mps": 20.0,
+      "speed_kmh": 72.0,
+      "theta_deg": 33.402858770939446,
+      "alpha_deg": 33.402858770939446,
+      "aero_force_body_N": [
+        -0.8293458159633512,
+        -0.0,
+        14.013446135232991
+      ],
+      "total_thrust_N": 10.070514279184048,
+      "required_rotor_pitch_moment_Nm": -1.2430769943087085,
+      "positive_thrust_pitch_capacity_Nm": 1.202271048734467,
+      "pitch_authority_ratio": 1.0339407204533408,
+      "required_rotor_thrust_N": [
+        -0.08545012749279124,
+        -0.08545012749279124,
+        5.120707267084815,
+        5.120707267084815
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.08579410354400151,
+      "soc": 0.2,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 30.0,
+      "speed_kmh": 108.0,
+      "theta_deg": 16.909639885030355,
+      "alpha_deg": 16.909639885030355,
+      "aero_force_body_N": [
+        -1.7699328736271829,
+        -0.0,
+        16.060424611772113
+      ],
+      "total_thrust_N": 6.652414664713139,
+      "required_rotor_pitch_moment_Nm": -1.424656302315844,
+      "positive_thrust_pitch_capacity_Nm": 0.7942003093221612,
+      "pitch_authority_ratio": 1.793824914940877,
+      "required_rotor_thrust_N": [
+        -1.3202131263418375,
+        -1.3202131263418375,
+        4.646420458698407,
+        4.646420458698407
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.049450766621700726,
+      "soc": 0.2,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 40.0,
+      "speed_kmh": 144.0,
+      "theta_deg": 10.098152975312287,
+      "alpha_deg": 10.098152975312287,
+      "aero_force_body_N": [
+        -3.0398476164529495,
+        -0.0,
+        16.526143303046997
+      ],
+      "total_thrust_N": 5.983052447560699,
+      "required_rotor_pitch_moment_Nm": -1.4659683525679101,
+      "positive_thrust_pitch_capacity_Nm": 0.7142883214644472,
+      "pitch_authority_ratio": 2.052348202421054,
+      "required_rotor_thrust_N": [
+        -1.5740636220453472,
+        -1.5740636220453472,
+        4.565589845825697,
+        4.565589845825697
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.04322171896771286,
+      "soc": 0.2,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 60.0,
+      "speed_kmh": 216.0,
+      "theta_deg": 4.726598012491706,
+      "alpha_deg": 4.726598012491706,
+      "aero_force_body_N": [
+        -6.552636556234261,
+        -0.0,
+        16.72909509490191
+      ],
+      "total_thrust_N": 7.935837357430605,
+      "required_rotor_pitch_moment_Nm": -1.483971397712835,
+      "positive_thrust_pitch_capacity_Nm": 0.9474220717829424,
+      "pitch_authority_ratio": 1.566325550047791,
+      "required_rotor_thrust_N": [
+        -1.1235668641341743,
+        -1.1235668641341743,
+        5.091485542849477,
+        5.091485542849477
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.05663319303335561,
+      "soc": 0.2,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 80.0,
+      "speed_kmh": 288.0,
+      "theta_deg": 2.7143089701517105,
+      "alpha_deg": 2.7143089701517105,
+      "aero_force_body_N": [
+        -11.370704373996608,
+        -0.0,
+        16.767348078519582
+      ],
+      "total_thrust_N": 12.165629253759894,
+      "required_rotor_pitch_moment_Nm": -1.4873646675366823,
+      "positive_thrust_pitch_capacity_Nm": 1.4523969120093145,
+      "pitch_authority_ratio": 1.0240758949831363,
+      "required_rotor_thrust_N": [
+        -0.07322460307932399,
+        -0.07322460307932399,
+        6.156039229959271,
+        6.156039229959271
+      ],
+      "rotor_thrust_nonnegative": false,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.08662054996460414,
+      "soc": 0.2,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "negative_rotor_thrust_required"
+      ]
+    },
+    {
+      "speed_mps": 83.3,
+      "speed_kmh": 299.88,
+      "theta_deg": 2.5089147221659567,
+      "alpha_deg": 2.5089147221659567,
+      "aero_force_body_N": [
+        -12.294650964510941,
+        -0.0,
+        16.77008998672687
+      ],
+      "total_thrust_N": 13.029463177109799,
+      "required_rotor_pitch_moment_Nm": -1.4876078912933581,
+      "positive_thrust_pitch_capacity_Nm": 1.5555259566803525,
+      "pitch_authority_ratio": 0.9563375557345644,
+      "required_rotor_thrust_N": [
+        0.14222455244477583,
+        0.14222455244477583,
+        6.3725070361101235,
+        6.3725070361101235
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.09275596958105262,
+      "soc": 0.2,
+      "model_feasible": false,
+      "rotor_rpm": [
+        24149.765101873145,
+        24149.765101873145,
+        29472.504466500566,
+        29472.504466500566
+      ],
+      "rejection_reasons": [
+        "current_limit",
+        "nonzero_steady_state_residual"
+      ],
+      "rotor_thrust_at_speed_limit_N": 12.75615605670936,
+      "required_motor_current_A": [
+        6.688013065517069,
+        6.688013065517069,
+        45.60875577158357,
+        45.60875577158357
+      ],
+      "actual_motor_current_A": [
+        6.688013065517069,
+        6.688013065517069,
+        39.94890249615378,
+        39.94890249615378
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        12.88974064050708,
+        12.88974064050708,
+        19.678356094869358,
+        19.678356094869358
+      ],
+      "bus_voltage_V": 19.835023430235633,
+      "bus_current_A": 90.05860297431374,
+      "electrical_power_W": 1786.3145000898016,
+      "propeller_advance_ratio": [
+        1.5351962793027611,
+        1.5351962793027611,
+        1.2579395678370926,
+        1.2579395678370926
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.5571122405298996,
+        0.5571122405298996,
+        0.6579837871170204,
+        0.6579837871170204
+      ],
+      "max_acceleration_residual_mps2": 4.929383422035371e-15,
+      "max_angular_acceleration_residual_radps2": 4.445142342971812e-14,
+      "max_rotor_acceleration_residual_radps2": 2726.95530086703,
+      "soc_rate_per_s": -0.005948965600760957
+    },
+    {
+      "speed_mps": 90.0,
+      "speed_kmh": 324.0,
+      "theta_deg": 2.157262910340469,
+      "alpha_deg": 2.157262910340469,
+      "aero_force_body_N": [
+        -14.281872566032614,
+        -0.0,
+        16.77428400247105
+      ],
+      "total_thrust_N": 14.913745460776237,
+      "required_rotor_pitch_moment_Nm": -1.4879799257262196,
+      "positive_thrust_pitch_capacity_Nm": 1.7804815025930463,
+      "pitch_authority_ratio": 0.8357177109445759,
+      "required_rotor_thrust_N": [
+        0.6125160606715654,
+        0.6125160606715654,
+        6.844356669716554,
+        6.844356669716554
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.1061435172035218,
+      "soc": 0.2,
+      "model_feasible": false,
+      "rotor_rpm": [
+        26501.54670468685,
+        26501.54670468685,
+        31435.298828815063,
+        31435.298828815063
+      ],
+      "rejection_reasons": [
+        "current_limit",
+        "voltage_limit",
+        "helical_tip_mach_limit",
+        "nonzero_steady_state_residual"
+      ],
+      "rotor_thrust_at_speed_limit_N": 10.358968773837743,
+      "required_motor_current_A": [
+        10.648458247053894,
+        10.648458247053894,
+        49.554703014938056,
+        49.554703014938056
+      ],
+      "actual_motor_current_A": [
+        10.648458247053894,
+        10.648458247053894,
+        37.09566009135176,
+        37.09566009135176
+      ],
+      "effective_motor_current_limit_A": 39.94890249615378,
+      "required_motor_voltage_V": [
+        14.493836670010865,
+        14.493836670010865,
+        21.084661473237215,
+        21.084661473237215
+      ],
+      "bus_voltage_V": 19.771222896195162,
+      "bus_current_A": 94.53011405077933,
+      "electrical_power_W": 1868.9759553007084,
+      "propeller_advance_ratio": [
+        1.511860447670571,
+        1.511860447670571,
+        1.2745748174418678,
+        1.2745748174418678
+      ],
+      "outside_propeller_map": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "helical_tip_mach": [
+        0.6095537935256122,
+        0.6095537935256122,
+        0.7030707852941245,
+        0.7030707852941245
+      ],
+      "max_acceleration_residual_mps2": 5.790923296444817e-13,
+      "max_angular_acceleration_residual_radps2": 1.2700406694205176e-14,
+      "max_rotor_acceleration_residual_radps2": 6002.850514110454,
+      "soc_rate_per_s": -0.006244338443540924
+    },
+    {
+      "speed_mps": 100.0,
+      "speed_kmh": 360.0,
+      "theta_deg": 1.7548756895395703,
+      "alpha_deg": 1.7548756895395703,
+      "aero_force_body_N": [
+        -17.53942139879247,
+        -0.0,
+        16.77830792665882
+      ],
+      "total_thrust_N": 18.05347418685231,
+      "required_rotor_pitch_moment_Nm": -1.488336872014548,
+      "positive_thrust_pitch_capacity_Nm": 2.1553188588186174,
+      "pitch_authority_ratio": 0.6905413859879376,
+      "required_rotor_thrust_N": [
+        1.3967007749914653,
+        1.3967007749914653,
+        7.630036318434689,
+        7.630036318434689
+      ],
+      "rotor_thrust_nonnegative": true,
+      "max_abs_cp_offset_for_positive_thrust_m": 0.1284586543672894,
+      "soc": 0.2,
+      "model_feasible": false,
+      "rotor_rpm": null,
+      "rejection_reasons": [
+        "rotor_speed_limit"
+      ],
+      "rotor_thrust_at_speed_limit_N": 6.667413482390382
+    }
+  ],
+  "sensitivity": [
+    {
+      "variant": "cp_toward_cg_10mm",
+      "illustrative_not_measured": true,
+      "cp_delta_m": 0.01,
+      "normal_coefficient_scale": 1,
+      "cases": [
+        {
+          "speed_mps": 15.0,
+          "speed_kmh": 54.0,
+          "theta_deg": 51.06091919502731,
+          "alpha_deg": 51.06091919502731,
+          "aero_force_body_N": [
+            -0.4856115362315051,
+            -0.0,
+            10.550009616002002
+          ],
+          "total_thrust_N": 13.542148759131244,
+          "required_rotor_pitch_moment_Nm": -0.8303492386024672,
+          "positive_thrust_pitch_capacity_Nm": 1.616733062422911,
+          "pitch_authority_ratio": 0.5135969925412841,
+          "required_rotor_thrust_N": [
+            1.6467354709736888,
+            1.6467354709736888,
+            5.124338908591933,
+            5.124338908591933
+          ],
+          "rotor_thrust_nonnegative": true,
+          "max_abs_cp_offset_for_positive_thrust_m": 0.1532447003622337,
+          "soc": 1.0,
+          "model_feasible": true,
+          "rotor_rpm": [
+            9104.914838451497,
+            9104.914838451497,
+            15971.1448298984,
+            15971.1448298984
+          ],
+          "rejection_reasons": [],
+          "rotor_thrust_at_speed_limit_N": 22.921195413856516,
+          "required_motor_current_A": [
+            8.059167127129262,
+            8.059167127129262,
+            18.31269261040035,
+            18.31269261040035
+          ],
+          "actual_motor_current_A": [
+            8.059167127129262,
+            8.059167127129262,
+            18.31269261040035,
+            18.31269261040035
+          ],
+          "effective_motor_current_limit_A": 39.94890249615378,
+          "required_motor_voltage_V": [
+            5.44345718964012,
+            5.44345718964012,
+            9.988723444450356,
+            9.988723444450356
+          ],
+          "bus_voltage_V": 24.926702437297386,
+          "bus_current_A": 19.154276640075807,
+          "electrical_power_W": 477.45295420884605,
+          "propeller_advance_ratio": [
+            0.46128002861183376,
+            0.46128002861183376,
+            0.26296896201268816,
+            0.26296896201268816
+          ],
+          "outside_propeller_map": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "helical_tip_mach": [
+            0.19376036554603338,
+            0.19376036554603338,
+            0.3338900756751676,
+            0.3338900756751676
+          ],
+          "max_acceleration_residual_mps2": 2.0755298619096296e-15,
+          "max_angular_acceleration_residual_radps2": 2.857591506196165e-14,
+          "max_rotor_acceleration_residual_radps2": 1.7347234759768068e-13,
+          "soc_rate_per_s": -0.0012652664939935845
+        },
+        {
+          "speed_mps": 40.0,
+          "speed_kmh": 144.0,
+          "theta_deg": 10.098152975312287,
+          "alpha_deg": 10.098152975312287,
+          "aero_force_body_N": [
+            -3.0398476164529495,
+            -0.0,
+            16.526143303046997
+          ],
+          "total_thrust_N": 5.983052447560699,
+          "required_rotor_pitch_moment_Nm": -1.30070691953744,
+          "positive_thrust_pitch_capacity_Nm": 0.7142883214644472,
+          "pitch_authority_ratio": 1.8209830406728569,
+          "required_rotor_thrust_N": [
+            -1.22799614772589,
+            -1.22799614772589,
+            4.2195223715062395,
+            4.2195223715062395
+          ],
+          "rotor_thrust_nonnegative": false,
+          "max_abs_cp_offset_for_positive_thrust_m": 0.04322171896771286,
+          "soc": 1.0,
+          "model_feasible": false,
+          "rotor_rpm": null,
+          "rejection_reasons": [
+            "negative_rotor_thrust_required"
+          ]
+        },
+        {
+          "speed_mps": 83.3,
+          "speed_kmh": 299.88,
+          "theta_deg": 2.5089147221659567,
+          "alpha_deg": 2.5089147221659567,
+          "aero_force_body_N": [
+            -12.294650964510941,
+            -0.0,
+            16.77008998672687
+          ],
+          "total_thrust_N": 13.029463177109799,
+          "required_rotor_pitch_moment_Nm": -1.3199069914260895,
+          "positive_thrust_pitch_capacity_Nm": 1.5555259566803525,
+          "pitch_authority_ratio": 0.8485277830033146,
+          "required_rotor_thrust_N": [
+            0.49340041842837445,
+            0.49340041842837445,
+            6.021331170126524,
+            6.021331170126524
+          ],
+          "rotor_thrust_nonnegative": true,
+          "max_abs_cp_offset_for_positive_thrust_m": 0.09275596958105262,
+          "soc": 1.0,
+          "model_feasible": false,
+          "rotor_rpm": [
+            24492.654574913093,
+            24492.654574913093,
+            29209.692295838235,
+            29209.692295838235
+          ],
+          "rejection_reasons": [
+            "current_limit",
+            "nonzero_steady_state_residual"
+          ],
+          "rotor_thrust_at_speed_limit_N": 12.75615605670936,
+          "required_motor_current_A": [
+            9.134222515095919,
+            9.134222515095919,
+            43.589302884766624,
+            43.589302884766624
+          ],
+          "actual_motor_current_A": [
+            9.134222515095919,
+            9.134222515095919,
+            39.94890249615378,
+            39.94890249615378
+          ],
+          "effective_motor_current_limit_A": 39.94890249615378,
+          "required_motor_voltage_V": [
+            13.320625061824071,
+            13.320625061824071,
+            19.33286331267451,
+            19.33286331267451
+          ],
+          "bus_voltage_V": 24.105051758193486,
+          "bus_current_A": 76.74031675484824,
+          "electrical_power_W": 1849.8293073157795,
+          "propeller_advance_ratio": [
+            1.5137040134678266,
+            1.5137040134678266,
+            1.269257791424884,
+            1.269257791424884
+          ],
+          "outside_propeller_map": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "helical_tip_mach": [
+            0.5635038664658091,
+            0.5635038664658091,
+            0.6529316392786952,
+            0.6529316392786952
+          ],
+          "max_acceleration_residual_mps2": 4.929383422035371e-15,
+          "max_angular_acceleration_residual_radps2": 1.2700406694205176e-14,
+          "max_rotor_acceleration_residual_radps2": 1753.969344064375,
+          "soc_rate_per_s": -0.005069204823178312
+        }
+      ]
+    },
+    {
+      "variant": "cp_away_from_cg_10mm",
+      "illustrative_not_measured": true,
+      "cp_delta_m": -0.01,
+      "normal_coefficient_scale": 1,
+      "cases": [
+        {
+          "speed_mps": 15.0,
+          "speed_kmh": 54.0,
+          "theta_deg": 51.06091919502731,
+          "alpha_deg": 51.06091919502731,
+          "aero_force_body_N": [
+            -0.4856115362315051,
+            -0.0,
+            10.550009616002002
+          ],
+          "total_thrust_N": 13.542148759131244,
+          "required_rotor_pitch_moment_Nm": -1.0413494309225073,
+          "positive_thrust_pitch_capacity_Nm": 1.616733062422911,
+          "pitch_authority_ratio": 0.6441072154248475,
+          "required_rotor_thrust_N": [
+            1.2048882577545412,
+            1.2048882577545412,
+            5.56618612181108,
+            5.56618612181108
+          ],
+          "rotor_thrust_nonnegative": true,
+          "max_abs_cp_offset_for_positive_thrust_m": 0.1532447003622337,
+          "soc": 1.0,
+          "model_feasible": true,
+          "rotor_rpm": [
+            7828.694474264147,
+            7828.694474264147,
+            16642.216074196207,
+            16642.216074196207
+          ],
+          "rejection_reasons": [],
+          "rotor_thrust_at_speed_limit_N": 22.921195413856516,
+          "required_motor_current_A": [
+            6.639633669372228,
+            6.639633669372228,
+            19.566117453533067,
+            19.566117453533067
+          ],
+          "actual_motor_current_A": [
+            6.639633669372228,
+            6.639633669372228,
+            19.566117453533067,
+            19.566117453533067
+          ],
+          "effective_motor_current_limit_A": 39.94890249615378,
+          "required_motor_voltage_V": [
+            4.649896344732199,
+            4.649896344732199,
+            10.459446977771536,
+            10.459446977771536
+          ],
+          "bus_voltage_V": 24.91605582694374,
+          "bus_current_A": 19.900452778553767,
+          "electrical_power_W": 495.84079241190335,
+          "propeller_advance_ratio": [
+            0.5364771087517732,
+            0.5364771087517732,
+            0.2523651513353388,
+            0.2523651513353388
+          ],
+          "outside_propeller_map": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "helical_tip_mach": [
+            0.1681146071988168,
+            0.1681146071988168,
+            0.34767970983890994,
+            0.34767970983890994
+          ],
+          "max_acceleration_residual_mps2": 3.552713678800501e-15,
+          "max_angular_acceleration_residual_radps2": 6.350203347102588e-15,
+          "max_rotor_acceleration_residual_radps2": 2.6020852139652106e-13,
+          "soc_rate_per_s": -0.0013145563567419562
+        },
+        {
+          "speed_mps": 40.0,
+          "speed_kmh": 144.0,
+          "theta_deg": 10.098152975312287,
+          "alpha_deg": 10.098152975312287,
+          "aero_force_body_N": [
+            -3.0398476164529495,
+            -0.0,
+            16.526143303046997
+          ],
+          "total_thrust_N": 5.983052447560699,
+          "required_rotor_pitch_moment_Nm": -1.63122978559838,
+          "positive_thrust_pitch_capacity_Nm": 0.7142883214644472,
+          "pitch_authority_ratio": 2.283713364169251,
+          "required_rotor_thrust_N": [
+            -1.9201310963648035,
+            -1.9201310963648035,
+            4.911657320145153,
+            4.911657320145153
+          ],
+          "rotor_thrust_nonnegative": false,
+          "max_abs_cp_offset_for_positive_thrust_m": 0.04322171896771286,
+          "soc": 1.0,
+          "model_feasible": false,
+          "rotor_rpm": null,
+          "rejection_reasons": [
+            "negative_rotor_thrust_required"
+          ]
+        },
+        {
+          "speed_mps": 83.3,
+          "speed_kmh": 299.88,
+          "theta_deg": 2.5089147221659567,
+          "alpha_deg": 2.5089147221659567,
+          "aero_force_body_N": [
+            -12.294650964510941,
+            -0.0,
+            16.77008998672687
+          ],
+          "total_thrust_N": 13.029463177109799,
+          "required_rotor_pitch_moment_Nm": -1.6553087911606268,
+          "positive_thrust_pitch_capacity_Nm": 1.5555259566803525,
+          "pitch_authority_ratio": 1.064147328465814,
+          "required_rotor_thrust_N": [
+            -0.2089513135388228,
+            -0.2089513135388228,
+            6.7236829020937225,
+            6.7236829020937225
+          ],
+          "rotor_thrust_nonnegative": false,
+          "max_abs_cp_offset_for_positive_thrust_m": 0.09275596958105262,
+          "soc": 1.0,
+          "model_feasible": false,
+          "rotor_rpm": null,
+          "rejection_reasons": [
+            "negative_rotor_thrust_required"
+          ]
+        }
+      ]
+    },
+    {
+      "variant": "normal_force_minus20pct",
+      "illustrative_not_measured": true,
+      "cp_delta_m": 0,
+      "normal_coefficient_scale": 0.8,
+      "cases": [
+        {
+          "speed_mps": 15.0,
+          "speed_kmh": 54.0,
+          "theta_deg": 58.509223333813026,
+          "alpha_deg": 58.509223333813026,
+          "aero_force_body_N": [
+            -0.4856115350085756,
+            -0.0,
+            8.768451278995963
+          ],
+          "total_thrust_N": 14.799595233426539,
+          "required_rotor_pitch_moment_Nm": -0.7778143902256794,
+          "positive_thrust_pitch_capacity_Nm": 1.7668536470789862,
+          "pitch_authority_ratio": 0.44022570375966613,
+          "required_rotor_thrust_N": [
+            2.071108251608285,
+            2.071108251608285,
+            5.328689365104984,
+            5.328689365104984
+          ],
+          "rotor_thrust_nonnegative": true,
+          "max_abs_cp_offset_for_positive_thrust_m": 0.20150122192174635,
+          "soc": 1.0,
+          "model_feasible": true,
+          "rotor_rpm": [
+            10169.971566494856,
+            10169.971566494856,
+            16285.067263970728,
+            16285.067263970728
+          ],
+          "rejection_reasons": [],
+          "rotor_thrust_at_speed_limit_N": 22.92204520638766,
+          "required_motor_current_A": [
+            8.89933444915272,
+            8.89933444915272,
+            18.155102889193856,
+            18.155102889193856
+          ],
+          "actual_motor_current_A": [
+            8.89933444915272,
+            8.89933444915272,
+            18.155102889193856,
+            18.155102889193856
+          ],
+          "effective_motor_current_limit_A": 39.94890249615378,
+          "required_motor_voltage_V": [
+            6.069399025925143,
+            6.069399025925143,
+            10.130498819301625,
+            10.130498819301625
+          ],
+          "bus_voltage_V": 24.913117158566678,
+          "bus_current_A": 20.1064116846305,
+          "electrical_power_W": 500.91338993757364,
+          "propeller_advance_ratio": [
+            0.3432344248018162,
+            0.3432344248018162,
+            0.21434878252997489,
+            0.21434878252997489
+          ],
+          "outside_propeller_map": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "helical_tip_mach": [
+            0.2153112033932461,
+            0.2153112033932461,
+            0.3403395861520737,
+            0.3403395861520737
+          ],
+          "max_acceleration_residual_mps2": 2.0755298619096296e-15,
+          "max_angular_acceleration_residual_radps2": 3.175101673551294e-15,
+          "max_rotor_acceleration_residual_radps2": 1.7347234759768068e-13,
+          "soc_rate_per_s": -0.0013281613029320532
+        },
+        {
+          "speed_mps": 40.0,
+          "speed_kmh": 144.0,
+          "theta_deg": 12.36588640764021,
+          "alpha_deg": 12.36588640764021,
+          "aero_force_body_N": [
+            -3.0398476164374193,
+            -0.0,
+            16.39674072899382
+          ],
+          "total_thrust_N": 6.634671759125988,
+          "required_rotor_pitch_moment_Nm": -1.4544895656044807,
+          "positive_thrust_pitch_capacity_Nm": 0.7920820677789311,
+          "pitch_authority_ratio": 1.836286446533248,
+          "required_rotor_thrust_N": [
+            -1.3871215173384916,
+            -1.3871215173384916,
+            4.704457396901486,
+            4.704457396901486
+          ],
+          "rotor_thrust_nonnegative": false,
+          "max_abs_cp_offset_for_positive_thrust_m": 0.04830728745855683,
+          "soc": 1.0,
+          "model_feasible": false,
+          "rotor_rpm": null,
+          "rejection_reasons": [
+            "negative_rotor_thrust_required"
+          ]
+        },
+        {
+          "speed_mps": 83.3,
+          "speed_kmh": 299.88,
+          "theta_deg": 3.116281773504208,
+          "alpha_deg": 3.116281773504208,
+          "aero_force_body_N": [
+            -12.294650964510017,
+            -0.0,
+            16.76135848201351
+          ],
+          "total_thrust_N": 13.20719082015191,
+          "required_rotor_pitch_moment_Nm": -1.4868333542858203,
+          "positive_thrust_pitch_capacity_Nm": 1.5767440190221158,
+          "pitch_authority_ratio": 0.942977005999961,
+          "required_rotor_thrust_N": [
+            0.1882783907237231,
+            0.1882783907237231,
+            6.415317019352232,
+            6.415317019352232
+          ],
+          "rotor_thrust_nonnegative": true,
+          "max_abs_cp_offset_for_positive_thrust_m": 0.09407018057122925,
+          "soc": 1.0,
+          "model_feasible": false,
+          "rotor_rpm": [
+            24182.87765823668,
+            24182.87765823668,
+            29493.865933629255,
+            29493.865933629255
+          ],
+          "rejection_reasons": [
+            "current_limit",
+            "nonzero_steady_state_residual"
+          ],
+          "rotor_thrust_at_speed_limit_N": 12.7713005304825,
+          "required_motor_current_A": [
+            7.004662620945354,
+            7.004662620945354,
+            45.847198378233614,
+            45.847198378233614
+          ],
+          "actual_motor_current_A": [
+            7.004662620945354,
+            7.004662620945354,
+            39.94890249615378,
+            39.94890249615378
+          ],
+          "effective_motor_current_limit_A": 39.94890249615378,
+          "required_motor_voltage_V": [
+            12.939828830718744,
+            12.939828830718744,
+            19.71427069458693,
+            19.71427069458693
+          ],
+          "bus_voltage_V": 24.138040764090256,
+          "bus_current_A": 74.42825608815524,
+          "electrical_power_W": 1796.55227945604,
+          "propeller_advance_ratio": [
+            1.5322959823214282,
+            1.5322959823214282,
+            1.2563739986240667,
+            1.2563739986240667
+          ],
+          "outside_propeller_map": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "helical_tip_mach": [
+            0.557728720859723,
+            0.557728720859723,
+            0.6583947036206251,
+            0.6583947036206251
+          ],
+          "max_acceleration_residual_mps2": 7.069773592129676e-15,
+          "max_angular_acceleration_residual_radps2": 2.5400813388410352e-14,
+          "max_rotor_acceleration_residual_radps2": 2841.8385493391406,
+          "soc_rate_per_s": -0.00491647794402661
+        }
+      ]
+    },
+    {
+      "variant": "normal_force_plus20pct",
+      "illustrative_not_measured": true,
+      "cp_delta_m": 0,
+      "normal_coefficient_scale": 1.2,
+      "cases": [
+        {
+          "speed_mps": 15.0,
+          "speed_kmh": 54.0,
+          "theta_deg": 45.03580238155373,
+          "alpha_deg": 45.03580238155373,
+          "aero_force_body_N": [
+            -0.4856115368024924,
+            -0.0,
+            11.862203020239885
+          ],
+          "total_thrust_N": 12.36264848451437,
+          "required_rotor_pitch_moment_Nm": -1.0522487854865057,
+          "positive_thrust_pitch_capacity_Nm": 1.4759181057252757,
+          "pitch_authority_ratio": 0.7129452382247345,
+          "required_rotor_thrust_N": [
+            0.8871892789084046,
+            0.8871892789084046,
+            5.29413496334878,
+            5.29413496334878
+          ],
+          "rotor_thrust_nonnegative": true,
+          "max_abs_cp_offset_for_positive_thrust_m": 0.12442192257264441,
+          "soc": 1.0,
+          "model_feasible": true,
+          "rotor_rpm": [
+            6870.5232605043375,
+            6870.5232605043375,
+            16241.906923043725,
+            16241.906923043725
+          ],
+          "rejection_reasons": [],
+          "rotor_thrust_at_speed_limit_N": 22.920569505554116,
+          "required_motor_current_A": [
+            5.771296205505428,
+            5.771296205505428,
+            19.329588439285388,
+            19.329588439285388
+          ],
+          "actual_motor_current_A": [
+            5.771296205505428,
+            5.771296205505428,
+            19.329588439285388,
+            19.329588439285388
+          ],
+          "effective_motor_current_limit_A": 39.94890249615378,
+          "required_motor_voltage_V": [
+            4.074913543144026,
+            4.074913543144026,
+            10.232537264924172,
+            10.232537264924172
+          ],
+          "bus_voltage_V": 24.933379906343056,
+          "bus_current_A": 18.686280921082076,
+          "electrical_power_W": 465.9121412419895,
+          "propeller_advance_ratio": [
+            0.6873267125740468,
+            0.6873267125740468,
+            0.29074752062350656,
+            0.29074752062350656
+          ],
+          "outside_propeller_map": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "helical_tip_mach": [
+            0.1490442239083298,
+            0.1490442239083298,
+            0.33945273411927734,
+            0.33945273411927734
+          ],
+          "max_acceleration_residual_mps2": 4.151059723819259e-15,
+          "max_angular_acceleration_residual_radps2": 6.350203347102588e-15,
+          "max_rotor_acceleration_residual_radps2": 4.336808689942017e-13,
+          "soc_rate_per_s": -0.0012343522854488308
+        },
+        {
+          "speed_mps": 40.0,
+          "speed_kmh": 144.0,
+          "theta_deg": 8.538544971983477,
+          "alpha_deg": 8.538544971983477,
+          "aero_force_body_N": [
+            -3.0398476164616666,
+            -0.0,
+            16.600126213824804
+          ],
+          "total_thrust_N": 5.532171198139615,
+          "required_rotor_pitch_moment_Nm": -1.472531081926013,
+          "positive_thrust_pitch_capacity_Nm": 0.6604597425490003,
+          "pitch_authority_ratio": 2.2295546375663675,
+          "required_rotor_thrust_N": [
+            -1.7005266881209131,
+            -1.7005266881209131,
+            4.466612287190721,
+            4.466612287190721
+          ],
+          "rotor_thrust_nonnegative": false,
+          "max_abs_cp_offset_for_positive_thrust_m": 0.03978642897298942,
+          "soc": 1.0,
+          "model_feasible": false,
+          "rotor_rpm": null,
+          "rejection_reasons": [
+            "negative_rotor_thrust_required"
+          ]
+        },
+        {
+          "speed_mps": 83.3,
+          "speed_kmh": 299.88,
+          "theta_deg": 2.0998160797362564,
+          "alpha_deg": 2.0998160797362564,
+          "aero_force_body_N": [
+            -12.294650964511453,
+            -0.0,
+            16.774909109668624
+          ],
+          "total_thrust_N": 12.909705037768957,
+          "required_rotor_pitch_moment_Nm": -1.4880353764960577,
+          "positive_thrust_pitch_capacity_Nm": 1.5412285990888523,
+          "pitch_authority_ratio": 0.9654864809644451,
+          "required_rotor_thrust_N": [
+            0.11138983764110977,
+            0.11138983764110977,
+            6.343462681243368,
+            6.343462681243368
+          ],
+          "rotor_thrust_nonnegative": true,
+          "max_abs_cp_offset_for_positive_thrust_m": 0.09187701638279089,
+          "soc": 1.0,
+          "model_feasible": false,
+          "rotor_rpm": [
+            24126.061962733547,
+            24126.061962733547,
+            29456.669741227717,
+            29456.669741227717
+          ],
+          "rejection_reasons": [
+            "current_limit",
+            "nonzero_steady_state_residual"
+          ],
+          "rotor_thrust_at_speed_limit_N": 12.74779746521692,
+          "required_motor_current_A": [
+            6.4754901759023795,
+            6.4754901759023795,
+            45.446005183203894,
+            45.446005183203894
+          ],
+          "actual_motor_current_A": [
+            6.4754901759023795,
+            6.4754901759023795,
+            39.94890249615378,
+            39.94890249615378
+          ],
+          "effective_motor_current_limit_A": 39.94890249615378,
+          "required_motor_voltage_V": [
+            12.855377027265298,
+            12.855377027265298,
+            19.653209485793354,
+            19.653209485793354
+          ],
+          "bus_voltage_V": 24.14863702358456,
+          "bus_current_A": 73.6856088296256,
+          "electrical_power_W": 1779.407021488466,
+          "propeller_advance_ratio": [
+            1.537146157866422,
+            1.537146157866422,
+            1.2589774668179,
+            1.2589774668179
+          ],
+          "outside_propeller_map": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "helical_tip_mach": [
+            0.5566710422791893,
+            0.5566710422791893,
+            0.6576792115120612,
+            0.6576792115120612
+          ],
+          "max_acceleration_residual_mps2": 4.742872761198669e-13,
+          "max_angular_acceleration_residual_radps2": 1.9050610041307763e-14,
+          "max_rotor_acceleration_residual_radps2": 2648.540974893626,
+          "soc_rate_per_s": -0.0048674211871085355
+        }
+      ]
+    }
+  ]
+}

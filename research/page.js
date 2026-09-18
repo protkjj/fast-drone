@@ -1,5 +1,6 @@
 'use strict';
 const $=id=>document.getElementById(id);
+const SELECTED_DISPLAY_LABEL='선정안 CSV 기준 · STL 파생 표시';
 const results={};
 let worker=null,vehicle=null,running=false,drawModel=()=>{},updatePath=()=>{},appendLivePath=()=>{};
 let playing=false,replayTime=0,imported=false,customScales=null,mode='compare',paused=false,recordedCommands=null;
@@ -41,7 +42,7 @@ function updateModeNote(){
 $('observe-controller').addEventListener('change',updateModeNote);
 function updateAircraftLabel(){
   document.querySelector('.aircraft-tag').textContent=$('profile').value==='selected'?
-    '선정안 6931 · 1.712 kg · drone_v2.stl · 개념설계 모델':'단순 검증 기체 · 2 kg · 선정 기체가 아닌 구조 검증용 모델';
+    '선정안 6931 · 1.712 kg · CSV 기준 형상 · 개념설계 모델':'단순 검증 기체 · 2 kg · 선정 기체가 아닌 구조 검증용 모델';
 }
 $('mode-observe').addEventListener('click',()=>setMode('observe'));
 $('mode-compare').addEventListener('click',()=>setMode('compare'));
@@ -104,7 +105,7 @@ function resetView(){
   $('timeline').value='0';$('timeline-time').textContent='0.00 s';$('progress').value=0;
   $('status').textContent='초기 상태 · Space로 시작. 이전 계산 기록은 저장·재생할 수 있습니다.';
   $('live-limits').textContent='새 비행 준비 · 기본 검증은 저속 영역입니다.';$('live-limits').classList.toggle('bad',false);
-  $('model-caption').textContent='drone_v2.stl · 초기 상태 · 다음 비행도 선정 기체 공통 물리 사용';
+  $('model-caption').textContent=SELECTED_DISPLAY_LABEL+' · 초기 상태 · 선정 기체 공통 물리 사용';
   for(const id of ['velocity-chart','altitude-chart','angle-chart'])$(id).replaceChildren();
   updateFlightActions();
 }
@@ -390,7 +391,7 @@ function renderReplay(){
   $('live-rate').textContent=playing?$('replay-speed').value+'× 재생':'기록 정지';
   $('replay-state').textContent=`${number(replayTime)} / ${number(r.simulated_seconds)} s · 위치 [${x.slice(0,3).map(number).join(', ')}] m · vx ${number(x[3])} m/s`;
   if(vehicle){vehicle.visible=r.profile_id==='selected-6931';vehicle.position.set(...x.slice(0,3));vehicle.quaternion.set(...x.slice(6,10));drawModel();}
-  $('model-caption').textContent=r.profile_id==='selected-6931'?`${controllerNames[r.configuration.controller]} 기록 · drone_v2.stl · 로터는 시각 감속·잔상`:'단순 검증 모델 기록 · 선정안 STL은 해당 형상이 아니므로 숨김';
+  $('model-caption').textContent=r.profile_id==='selected-6931'?`${controllerNames[r.configuration.controller]} 기록 · ${SELECTED_DISPLAY_LABEL} · 로터는 시각 감속·잔상`:'단순 검증 모델 기록 · 선정안 STL은 해당 형상이 아니므로 숨김';
 }
 $('play').addEventListener('click',()=>{
   if(!replayResult()||running)return;
@@ -464,7 +465,7 @@ $('profile').addEventListener('change',()=>{
   if(replayResult())return; // Editing future settings must not relabel a past log.
   if(vehicle) vehicle.visible=$('profile').value==='selected';
   drawModel();
-  $('model-caption').textContent=$('profile').value==='selected'?'drone_v2.stl · 로터 시각 감속·잔상 · 물리 RPM 유지':'단순 시험 모델 선택됨. 선정안 STL은 이 모델의 형상이 아니므로 숨겼습니다.';
+  $('model-caption').textContent=$('profile').value==='selected'?SELECTED_DISPLAY_LABEL+' · 로터 시각 감속·잔상 · 물리 RPM 유지':'단순 시험 모델 선택됨. 선정안 STL은 이 모델의 형상이 아니므로 숨겼습니다.';
 });
 setMode(new URL(location.href).searchParams.get('mode')==='compare'?'compare':'observe');
 async function previewSTL() {
@@ -474,8 +475,11 @@ async function previewSTL() {
   const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));host.append(renderer.domElement);
   scene.add(new THREE.HemisphereLight(0xe9f2ff,0x202a36,1.8));
   const lamp=new THREE.DirectionalLight(0xffffff,1.4);lamp.position.set(1,1,2);scene.add(lamp);
-  const response=await fetch('./assets/drone_v2.stl');if(!response.ok)throw new Error('STL HTTP '+response.status);
-  const mesh=ResearchSTL.parse(await response.arrayBuffer());
+  const [response,geometryResponse]=await Promise.all([fetch('./assets/drone_v2.stl'),fetch('./assets/selected_geometry.json')]);
+  if(!response.ok)throw new Error('STL HTTP '+response.status);
+  if(!geometryResponse.ok)throw new Error('선정안 표시 형상 HTTP '+geometryResponse.status);
+  const geometry=await geometryResponse.json();
+  const mesh=ResearchSTL.alignSelectedGeometry(ResearchSTL.parse(await response.arrayBuffer(),geometry.cg_from_nose_m),geometry);
   vehicle=ResearchSTL.createVehicle(mesh,THREE);scene.add(vehicle);
   vehicle.position.set(0,0,Number($('altitude').value));vehicle.quaternion.set(0,-Math.SQRT1_2,0,Math.SQRT1_2);
   const axes=new THREE.AxesHelper(.3);scene.add(axes);
@@ -561,7 +565,7 @@ async function previewSTL() {
     renderer.render(scene,camera);
   };
   new ResizeObserver(drawModel).observe(host);
-  drawModel();$('model-caption').textContent='drone_v2.stl · 4개 로터 · 시각 감속·잔상 (물리 RPM 유지)';
+  drawModel();$('model-caption').textContent=SELECTED_DISPLAY_LABEL+' · 4개 로터 · 시각 감속·잔상 (물리 RPM 유지)';
   if(replayResult())setupReplay();
 }
 previewSTL().catch(error=>$('model-caption').textContent=error.message);
