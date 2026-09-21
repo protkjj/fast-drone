@@ -193,20 +193,86 @@
   // repo's other baseline controllers (control/controller.py, ObservationController);
   // the paper's own protocol requires an independent tuning pass before any
   // comparison is reported, not a specific numeric target.
+  // Shared outer loop for every "explicit attitude reference" baseline (표5
+  // CPID and GINDI both build R_d this way -- 식37-39). Thrust axis is body
+  // +x, so R_d's FIRST column equals F_d/||F_d|| (not the third column, the
+  // way a conventional z-down quad would). Returns {Td,Md}; Md is a MOMENT
+  // (Nm), not yet divided by inertia -- callers decide how to use it (CPID:
+  // static allocateThrust; GINDI: divide by inertia and hand to shared INDI).
+  // mem carries the integrator/filter/heading-hold state across calls.
+  function geometricAttitudeCommand(binding, mem, gains, p, maxRotorRadS, state, refs, wind) {
+    const dt = PERIOD*DT, q = state.slice(6, 10), v = state.slice(3, 6), z = state[2];
+    const ref = refs[0];
+    const vd = [ref[0], ref[1], gains.kz*(ref[3]-z)];
+    const ev = sub(vd, v);
+    if (!mem.lastEv) mem.lastEv = ev.slice();
+    const alpha = 1-Math.exp(-2*Math.PI*10*dt);
+    mem.filteredDerivV = mem.filteredDerivV.map((x, i) => x+alpha*((ev[i]-mem.lastEv[i])/dt-x));
+    mem.lastEv = ev.slice();
+    const ad = ev.map((e, i) => gains.kpV[i]*e+gains.kiV[i]*mem.integralV[i]+gains.kdV[i]*mem.filteredDerivV[i]);
+    const [aero] = binding.call(binding.functions.aero, state.slice(0, 13), wind);
+    const worldAero = rotate(q, aero);
+    const Fd = sub([p.mass_kg*ad[0], p.mass_kg*ad[1], p.mass_kg*(ad[2]+p.g)], worldAero);
+    const Fnorm = norm(Fd);
+    let ex, ey, ez;
+    if (Fnorm < 1e-6 && mem.desiredAxes) {
+      [ex, ey, ez] = mem.desiredAxes;
+    } else {
+      ex = Fnorm < 1e-6 ? [1, 0, 0] : Fd.map(x => x/Fnorm);
+      const heading = [0, 1, 0], proj = sub(heading, ex.map(x => x*dot3(heading, ex)));
+      const pn = norm(proj);
+      ey = (pn > 1e-6 ? proj.map(x => x/pn) : cross([0, 0, 1], ex));
+      const eyn = Math.max(norm(ey), 1e-9); ey = ey.map(x => x/eyn);
+      ez = cross(ex, ey);
+    }
+    mem.desiredAxes = [ex, ey, ez];
+    const Td = Fnorm;
+    const current = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].map(axis => rotate(q, axis));
+    const eR = relativeRotationVector(current, [ex, ey, ez]);
+    const omega = state.slice(10, 13);
+    const omegaD = eR.map(x => gains.kR*x);
+    const eOmega = sub(omegaD, omega);
+    const Md = eOmega.map((e, i) => gains.kpW*e+gains.kiW*mem.integralW[i]);
+    const axial = rotate(q, v, true)[0];
+    const [caps] = binding.call(binding.functions.rotors, Array(4).fill(maxRotorRadS), [axial]);
+    const capacity = caps.reduce((s, x) => s+x, 0);
+    // Conditional integration: hold both integrators while thrust-saturated
+    // (documented anti-windup choice, per paper 식37 commentary). Shared by
+    // CPID and GINDI since both track the SAME Td/Md reference.
+    if (Td <= capacity+1e-9) {
+      mem.integralV = mem.integralV.map((x, i) => x+ev[i]*dt);
+      mem.integralW = mem.integralW.map((x, i) => x+eOmega[i]*dt);
+    }
+    return {Td, Md, axial, caps, capacity};
+  }
+  function newGuidanceMemory() {
+    return {integralV: [0, 0, 0], integralW: [0, 0, 0], filteredDerivV: [0, 0, 0],
+            lastEv: null, desiredAxes: null};
+  }
+  // Placeholder gains, same order of magnitude as this repo's other baseline
+  // controllers -- the paper's protocol requires an independent tuning pass
+  // per controller, not a shared number. CPID and GINDI genuinely need
+  // DIFFERENT attitude-rate gains here: sharing CPID's kR/kpW/kiW with GINDI
+  // diverges by ~9s of a 3 m/s step (checked directly, not assumed) because
+  // INDI tracks the commanded [T,alpha] much tighter than the static
+  // allocator, so the same outer-loop gains are effectively higher-bandwidth
+  // through GINDI. GINDI's own values below were empirically checked stable
+  // over 15s; neither set claims to be tuned.
+  const CPID_GAINS = {kpV: [1.4, 1.4, 4.0], kiV: [.15, .15, .6], kdV: [.1, .1, .2],
+                      kz: 1.8, kR: 8.0, kpW: 45.0, kiW: 5.0};
+  const GINDI_GAINS = {kpV: [1.4, 1.4, 4.0], kiV: [.15, .15, .6], kdV: [.1, .1, .2],
+                       kz: 1.8, kR: 3.0, kpW: 15.0, kiW: 2.0};
+
   class CPID {
     constructor(binding, data) {
       this.b = binding; this.p = data.profile;
-      this.gains = {kpV: [1.4, 1.4, 4.0], kiV: [.15, .15, .6], kdV: [.1, .1, .2],
-                    kz: 1.8, kR: 8.0, kpW: 45.0, kiW: 5.0};
-      this.max = data.solvers.hybrid.max_rotor_rad_s;
-      this.integralV = [0, 0, 0]; this.integralW = [0, 0, 0];
-      this.filteredDerivV = [0, 0, 0]; this.lastEv = null;
-      this.desiredAxes = null; this.stats = [];
+      this.gains = CPID_GAINS; this.mem = newGuidanceMemory();
+      this.max = data.solvers.hybrid.max_rotor_rad_s; this.stats = [];
       // Fixed (non-measured) nominal effectiveness at the hover rotor speed --
       // "정적 배분": the matrix does not re-linearize around the current
-      // measurement the way INDI does. The thrust ceiling below still uses
-      // the CURRENT axial inflow, since that bound is a physical fact, not
-      // a control-law choice.
+      // measurement the way INDI does. The thrust ceiling in geometricAttitudeCommand
+      // still uses the CURRENT axial inflow, since that bound is a physical
+      // fact, not a control-law choice.
       const a = this.p.arm_m/Math.sqrt(2), inertia = this.p.inertia_kg_m2;
       this.dirs = [1, -1, 1, -1]; this.ys = [a, -a, -a, a]; this.zs = [a, a, -a, -a];
       const nHov = data.initial.slice(13, 17);
@@ -216,53 +282,65 @@
       this.previous = nHov.slice(); // rotor-speed command, not a [T,alpha] virtual input
     }
     solve(state, refs, voltage, wind) {
-      const p = this.p, dt = PERIOD*DT, q = state.slice(6, 10), v = state.slice(3, 6), z = state[2];
-      const ref = refs[0];
-      const vd = [ref[0], ref[1], this.gains.kz*(ref[3]-z)];
-      const ev = sub(vd, v);
-      if (!this.lastEv) this.lastEv = ev.slice();
-      const alpha = 1-Math.exp(-2*Math.PI*10*dt);
-      this.filteredDerivV = this.filteredDerivV.map((x, i) => x+alpha*((ev[i]-this.lastEv[i])/dt-x));
-      this.lastEv = ev.slice();
-      const ad = ev.map((e, i) => this.gains.kpV[i]*e+this.gains.kiV[i]*this.integralV[i]+this.gains.kdV[i]*this.filteredDerivV[i]);
-      const [aero] = this.b.call(this.b.functions.aero, state.slice(0, 13), wind);
-      const worldAero = rotate(q, aero);
-      const Fd = sub([p.mass_kg*(ad[0]), p.mass_kg*(ad[1]), p.mass_kg*(ad[2]+p.g)], worldAero);
-      const Fnorm = norm(Fd);
-      let ex, ey, ez;
-      if (Fnorm < 1e-6 && this.desiredAxes) {
-        [ex, ey, ez] = this.desiredAxes;
-      } else {
-        ex = Fnorm < 1e-6 ? [1, 0, 0] : Fd.map(x => x/Fnorm);
-        const heading = [0, 1, 0], proj = sub(heading, ex.map(x => x*dot3(heading, ex)));
-        const pn = norm(proj);
-        ey = (pn > 1e-6 ? proj.map(x => x/pn) : cross([0, 0, 1], ex));
-        const eyn = Math.max(norm(ey), 1e-9); ey = ey.map(x => x/eyn);
-        ez = cross(ex, ey);
-      }
-      this.desiredAxes = [ex, ey, ez];
-      const Td = Fnorm;
-      const current = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].map(axis => rotate(q, axis));
-      const eR = relativeRotationVector(current, [ex, ey, ez]);
-      const omega = state.slice(10, 13);
-      const omegaD = eR.map(x => this.gains.kR*x);
-      const eOmega = sub(omegaD, omega);
-      const Md = eOmega.map((e, i) => this.gains.kpW*e+this.gains.kiW*this.integralW[i]);
-      const axial = rotate(q, v, true)[0];
-      const [caps] = this.b.call(this.b.functions.rotors, Array(4).fill(this.max), [axial]);
-      const capacity = caps.reduce((s, x) => s+x, 0);
+      const {Td, Md, axial, caps, capacity} =
+        geometricAttitudeCommand(this.b, this.mem, this.gains, this.p, this.max, state, refs, wind);
       const total = clamp(Td, 0, capacity);
-      // Conditional integration: hold both integrators while saturated (the
-      // documented anti-windup choice, per paper 식37 commentary).
-      if (Td <= capacity+1e-9) {
-        this.integralV = this.integralV.map((x, i) => x+ev[i]*dt);
-        this.integralW = this.integralW.map((x, i) => x+eOmega[i]*dt);
-      }
       const target = Md.map((m, i) => m/this.p.inertia_kg_m2[i]);
       const anchor = caps.map(c => capacity > 0 ? total*c/capacity : 0);
       const force = allocateThrust(total, target, this.matrix, caps, anchor);
       const [n] = this.b.call(this.b.functions.inverse_thrust, force, [axial], [this.max]);
       return n.map(x => clamp(x, 0, this.max));
+    }
+  }
+
+  // GINDI (표5): same outer geometric loop as CPID (식37-39), but the inner
+  // loop is the SAME measured-feedback INDI allocation as V13/F13, not a
+  // static one -- "DFBC 또는 기하학적 외부 제어와 공통 INDI". The caller
+  // (run()) owns the shared INDI instance and calls indi.update() with this
+  // class's [T,alpha] output, exactly as it does for hybrid/f13.
+  class GINDI {
+    constructor(binding, data) {
+      this.b = binding; this.p = data.profile;
+      this.gains = GINDI_GAINS; this.mem = newGuidanceMemory();
+      this.max = data.solvers.hybrid.max_rotor_rad_s; this.stats = [];
+      this.previous = [this.p.mass_kg*this.p.g, 0, 0, 0];
+    }
+    solve(state, refs, voltage, wind) {
+      const {Td, Md} = geometricAttitudeCommand(this.b, this.mem, this.gains, this.p, this.max, state, refs, wind);
+      this.previous = [Td, ...Md.map((m, i) => m/this.p.inertia_kg_m2[i])];
+      return this.previous.slice();
+    }
+  }
+
+  // F13 (표5): wraps the rotor-thrust-output NMPC (research/nmpc.py kind="f13",
+  // research/model.py functions["f13"]) so the SAME shared INDI as
+  // hybrid/gindi can consume it. The NMPC itself already predicts real
+  // rigid-body rotation (J*omega_dot = M - omega x J*omega), unlike hybrid's
+  // idealized omega_dot=nu -- that prediction-model difference, not the
+  // allocation, is what distinguishes F13 from V13 (표5 "가장 가까운 인터페이스 비교").
+  // Reaction torque uses a fixed nominal dQ/dT ratio at hover, matching
+  // model.py's f13 prediction model and control/nmpc_f13.py's simplification.
+  class F13Adapter {
+    constructor(ca, binding, data) {
+      this.inner = new Optimizer(ca, binding, data, 'f13');
+      this.b = binding; this.p = data.profile; this.stats = this.inner.stats;
+      const a = this.p.arm_m/Math.sqrt(2);
+      this.dirs = [1, -1, 1, -1]; this.ys = [a, -a, -a, a]; this.zs = [a, a, -a, -a];
+      const nHov = data.initial.slice(13, 17);
+      const [, , dT, dQ] = binding.call(binding.functions.rotors, nHov, [0]);
+      this.kRatio = dQ.map((q, i) => q/Math.max(dT[i], 1e-9));
+      this.previous = [this.p.mass_kg*this.p.g, 0, 0, 0];
+    }
+    solve(...args) {
+      const f = this.inner.solve(...args); // rotor thrust, 4D (N)
+      const torque = f.map((fi, i) => this.kRatio[i]*fi);
+      const T = f.reduce((s, v) => s+v, 0);
+      const inertia = this.p.inertia_kg_m2;
+      const Mx = this.dirs.reduce((s, d, i) => s+d*torque[i], 0)/inertia[0];
+      const My = this.zs.reduce((s, z, i) => s+z*f[i], 0)/inertia[1];
+      const Mz = -this.ys.reduce((s, y, i) => s+y*f[i], 0)/inertia[2];
+      this.previous = [T, Mx, My, Mz];
+      return this.previous.slice();
     }
   }
 
@@ -560,7 +638,7 @@
   function validateOptions(options={}) {
     const cfg={controller:'hybrid',feedback:'truth',scenario:'step',seconds:4,speed:3,altitude:20,
       wind_speed:0,wind_angle:90,seed:42,preview:true,hybrid_actuator_feedback:false,log_hz:50,scales:[1,1,1,1,1],...options};
-    if(!['hybrid','nmpc','pd','cpid','gslqr'].includes(cfg.controller))throw new Error('Unknown controller');
+    if(!['hybrid','nmpc','pd','cpid','gslqr','f13','gindi'].includes(cfg.controller))throw new Error('Unknown controller');
     if(!['truth','eskf'].includes(cfg.feedback))throw new Error('Unknown feedback');
     if(!['hover','step','gust','schedule'].includes(cfg.scenario))throw new Error('Unknown scenario');
     if(!Number.isFinite(cfg.seconds)||cfg.seconds<.001||cfg.seconds>120)throw new Error('Duration must be 0.001–120 seconds');
@@ -627,11 +705,13 @@
 
   async function run(ca,data,options={},progress=()=>{},shouldStop=()=>false,hooks={}) {
     const cfg=validateOptions(options);
-    const b=makeBindings(ca,data,['pd','cpid','gslqr'].includes(cfg.controller)?[]:[cfg.controller]);
+    const b=makeBindings(ca,data,['pd','cpid','gslqr','gindi'].includes(cfg.controller)?[]:[cfg.controller]);
     try {
     const optimizer=cfg.controller==='pd'?new ObservationController(b,data)
       :cfg.controller==='cpid'?new CPID(b,data)
       :cfg.controller==='gslqr'?new GSLQR(b,data)
+      :cfg.controller==='gindi'?new GINDI(b,data)
+      :cfg.controller==='f13'?new F13Adapter(ca,b,data)
       :new Optimizer(ca,b,data,cfg.controller);
     const indi=['nmpc','cpid','gslqr'].includes(cfg.controller)?null:new INDI(b,data);
     const initial=data.initial.slice();initial[2]=cfg.altitude;

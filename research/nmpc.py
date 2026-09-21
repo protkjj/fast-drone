@@ -19,9 +19,9 @@ def build_problem(p, functions, kind, normalize=True, actuator_constraints=False
     ``normalize=False`` exists for equivalence tests, not controller tuning.
     Tracking/input costs and actuator bounds describe the same physical problem.
     """
-    if kind not in ("hybrid", "nmpc"):
+    if kind not in ("hybrid", "nmpc", "f13"):
         raise ValueError(kind)
-    nx = 13 if kind == "hybrid" else 17
+    nx = 13 if kind in ("hybrid", "f13") else 17
     decision_x = ca.MX.sym("X_scaled", nx, N+1)
     decision_u = ca.MX.sym("U_scaled", 4, N)
     x0 = ca.MX.sym("measured_state", nx)
@@ -36,6 +36,14 @@ def build_problem(p, functions, kind, normalize=True, actuator_constraints=False
         hover = [p["mass_kg"]*p["g"], 0, 0, 0]
         scaling = ca.DM([p["mass_kg"]*p["g"], 100, 100, 100])
         fun = lambda state, command: functions["virtual"](state, command, wind)
+    elif kind == "f13":
+        # 표5 F13: 결정변수가 로터별 추력(N) 직접, [0,max single-rotor thrust]^4.
+        max_f = float(functions["rotors"]([max_n]*4, 0)[0][0])
+        hover_f = p["mass_kg"]*p["g"]/4
+        lower, upper = [0]*4, [max_f]*4
+        hover = [hover_f]*4
+        scaling = ca.DM([hover_f]*4)
+        fun = lambda state, command: functions["f13"](state, command, wind)
     else:
         lower, upper = [0]*4, [max_n]*4
         hover = initial_state(p)[13:17].tolist()

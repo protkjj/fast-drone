@@ -269,9 +269,29 @@ def build(p):
     motor_step = ca.Function("actuator_step", [pn, cmd, pa, bus_v],
                             [pn+DT/6*(k1+2*k2+2*k3+k4)])
     af = ca.Function("aerodynamics", [xv, environment[:3]], [fv])
+
+    # F13 (표5): 13상태 예측모델이되 hybrid의 이상화(omega_dot=nu)와 달리 실제
+    # 강체 회전방정식을 쓴다 -- 결정변수는 로터별 추력 f(N) 직접(Sun et al. 재구성).
+    # 반작용 토크는 f와 같은 rpm에서 나오지만, 매 예측 스텝 inverse_thrust의
+    # 이분법을 그래프에 다시 넣는 비용을 피하려고 호버점의 고정 dQ/dT 비율로
+    # 근사한다(control/nmpc_f13.py, CPID의 정적 배분행렬과 같은 단순화).
+    xf, thrust_f = ca.SX.sym("f13_state", 13), ca.SX.sym("f13_thrust", 4)
+    rf = rotation(xf[6:10])
+    ff, _ = aero(rf.T @ (xf[3:6]-environment[:3]), xf[10:13], p)
+    n_hover = initial_state(p)[13:17]
+    _, _, dT_hover, dQ_hover = rotors(ca.DM(n_hover), 0)
+    k_ratio = ca.DM(dQ_hover)/ca.fmax(ca.DM(dT_hover), 1e-9)
+    torque_f = k_ratio*thrust_f
+    mf = ca.vertcat(ca.dot(DIRS, torque_f), ca.dot(ca.DM([a,a,-a,-a]), thrust_f),
+                    -ca.dot(ca.DM([a,-a,-a,a]), thrust_f))
+    inertia_f = ca.DM(p["inertia_kg_m2"])
+    alpha_f = (mf - ca.cross(xf[10:13], inertia_f*xf[10:13]))/inertia_f
+    dxf = ca.vertcat(xf[3:6], rf @ (ff + ca.vertcat(ca.sum1(thrust_f), 0, 0))/p["mass_kg"]
+                     + ca.DM([0, 0, -p["g"]]), qdot(xf[6:10], xf[10:13]), alpha_f)
+    f13 = ca.Function("f13_prediction", [xf, thrust_f, environment[:3]], [dxf])
     return {"rhs": rhs, "step": step, "diag": diag, "full": full, "constrained": constrained,
             "virtual": vf, "effect": effect, "aero": af, "rotors": rotors,
-            "inverse_thrust": inverse, "motor_step": motor_step}
+            "inverse_thrust": inverse, "motor_step": motor_step, "f13": f13}
 
 
 def initial_state(p, altitude=20):

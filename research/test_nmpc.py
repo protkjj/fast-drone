@@ -6,7 +6,7 @@ from research.model import profile, build, initial_state
 from research.nmpc import build_problem, N
 
 
-@pytest.mark.parametrize("kind", ["hybrid", "nmpc"])
+@pytest.mark.parametrize("kind", ["hybrid", "nmpc", "f13"])
 def test_dimensionless_coordinates_preserve_cost_defects_and_bounds(kind):
     p=profile("selected")
     functions=build(p)

@@ -38,7 +38,7 @@ def bundle(name, include_solvers=True):
     # 테스트용 축소 물리 모델이라 트림 특성이 달라 같은 표를 쓰지 않는다.
     payload["gslqr"] = build_schedule(p, speeds=[0, 2, 4, 6, 8, 10, 12, 14, 16, 18])
     if include_solvers:
-        for kind in ("hybrid", "nmpc"):
+        for kind in ("hybrid", "nmpc", "f13"):
             begin = time.perf_counter()
             solver, meta = build_solver(p, functions, kind)
             payload["solvers"][kind] = {"function": solver.serialize(), **meta}
