@@ -9,7 +9,7 @@ let replayActive=false,resetRequested=false,lastPlotWall=0;
 // or flight-control widgets change. Mixed flight results keep this opt-in.
 let hybridActuatorFeedback=new URL(location.href).searchParams.get('actuator_feedback')==='1';
 const liveTraces={};
-const controllerNames={pd:'PD–INDI · 조작용 baseline',hybrid:'Hybrid',nmpc:'NMPC 단독'};
+const controllerNames={pd:'PD–INDI · 조작용 baseline',hybrid:'Hybrid',nmpc:'NMPC 단독',cpid:'CPID',gslqr:'GSLQR'};
 const settingIds=['profile','controller','feedback','scenario','seconds','speed','altitude','preview','mismatch','seed','log-hz','wind-speed','wind-angle'];
 const modeSettings={compare:null,observe:{profile:'selected',controller:'both',feedback:'truth',scenario:'hover',seconds:'30',speed:'0',altitude:'20',preview:'false',mismatch:'nominal',seed:'42','log-hz':'50'}};
 const pdOption=document.createElement('option');pdOption.value='pd';pdOption.textContent=controllerNames.pd;$('replay-controller').append(pdOption);

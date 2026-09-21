@@ -7,6 +7,35 @@
   const add = (a, b) => a.map((v, i) => v+b[i]);
   const sub = (a, b) => a.map((v, i) => v-b[i]);
   const cross = (a,b) => [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+  const dot3 = (a,b) => a.reduce((s,v,i)=>s+v*b[i],0);
+  function quatMultiply(a, b) {
+    // Hamilton product a (x) b, scalar-last [x,y,z,w].
+    return [a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1],
+            a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],
+            a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],
+            a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]];
+  }
+  // Exact SO(3) logarithm of the relative rotation, not the small-angle
+  // antisymmetric-part shortcut used elsewhere in this file (ObservationController).
+  // Paper 식(37)-(39) calls this "국소 회전벡터" (local rotation vector) of R^T R_d.
+  // current/desired: each an array of 3 world-frame column vectors (body axes).
+  function relativeRotationVector(current, desired) {
+    const R = current.map(ci => desired.map(dj => dot3(ci, dj))); // R = current^T . desired
+    const trace = R[0][0]+R[1][1]+R[2][2];
+    const angle = Math.acos(clamp((trace-1)/2, -1, 1));
+    const raw = [R[2][1]-R[1][2], R[0][2]-R[2][0], R[1][0]-R[0][1]];
+    if (angle < 1e-6) return raw.map(v => v/2);
+    const s = Math.sin(angle);
+    if (s < 1e-6) {
+      // Near-180 deg fallback: axis magnitude from the diagonal, sign left
+      // unresolved (ambiguous at this singularity). Only keeps the loop
+      // finite; this operating point is already a control failure elsewhere.
+      const axis = [Math.sqrt(Math.max(0,(R[0][0]+1)/2)), Math.sqrt(Math.max(0,(R[1][1]+1)/2)),
+                    Math.sqrt(Math.max(0,(R[2][2]+1)/2))];
+      return axis.map(v => v*angle);
+    }
+    return raw.map(v => v*angle/(2*s));
+  }
   function rotate(q, v, inverse=false) {
     const a = q.slice(0,3).map(x => inverse ? -x : x);
     const t = cross(a,v).map(x => 2*x);
@@ -153,6 +182,131 @@
       const alpha=error.map((v,i)=>clamp([60,45,45][i]*v-[12,11,11][i]*rate[i],-80,80));
       this.previous=[Math.max(0,dot(force,current[0])),...alpha];
       return this.previous.slice();
+    }
+  }
+
+  // Cascaded PID baseline (표5 CPID, 식37-39). Thrust axis is body +x, so
+  // R_d's FIRST column (not the third, unlike a conventional z-down quad)
+  // equals F_d/||F_d||. Static constrained allocation only -- deliberately
+  // no INDI feedback (paper: "주 CPID는... INDI 각가속도 피드백은 사용하지 않는다").
+  // Gains below are placeholders at the same order of magnitude as this
+  // repo's other baseline controllers (control/controller.py, ObservationController);
+  // the paper's own protocol requires an independent tuning pass before any
+  // comparison is reported, not a specific numeric target.
+  class CPID {
+    constructor(binding, data) {
+      this.b = binding; this.p = data.profile;
+      this.gains = {kpV: [1.4, 1.4, 4.0], kiV: [.15, .15, .6], kdV: [.1, .1, .2],
+                    kz: 1.8, kR: 8.0, kpW: 45.0, kiW: 5.0};
+      this.max = data.solvers.hybrid.max_rotor_rad_s;
+      this.integralV = [0, 0, 0]; this.integralW = [0, 0, 0];
+      this.filteredDerivV = [0, 0, 0]; this.lastEv = null;
+      this.desiredAxes = null; this.stats = [];
+      // Fixed (non-measured) nominal effectiveness at the hover rotor speed --
+      // "정적 배분": the matrix does not re-linearize around the current
+      // measurement the way INDI does. The thrust ceiling below still uses
+      // the CURRENT axial inflow, since that bound is a physical fact, not
+      // a control-law choice.
+      const a = this.p.arm_m/Math.sqrt(2), inertia = this.p.inertia_kg_m2;
+      this.dirs = [1, -1, 1, -1]; this.ys = [a, -a, -a, a]; this.zs = [a, a, -a, -a];
+      const nHov = data.initial.slice(13, 17);
+      const [, , dT, dQ] = binding.call(binding.functions.rotors, nHov, [0]);
+      this.matrix = [this.dirs.map((d, i) => d*dQ[i]/Math.max(dT[i], 1e-9)/inertia[0]),
+                    this.zs.map(v => v/inertia[1]), this.ys.map(v => -v/inertia[2])];
+      this.previous = nHov.slice(); // rotor-speed command, not a [T,alpha] virtual input
+    }
+    solve(state, refs, voltage, wind) {
+      const p = this.p, dt = PERIOD*DT, q = state.slice(6, 10), v = state.slice(3, 6), z = state[2];
+      const ref = refs[0];
+      const vd = [ref[0], ref[1], this.gains.kz*(ref[3]-z)];
+      const ev = sub(vd, v);
+      if (!this.lastEv) this.lastEv = ev.slice();
+      const alpha = 1-Math.exp(-2*Math.PI*10*dt);
+      this.filteredDerivV = this.filteredDerivV.map((x, i) => x+alpha*((ev[i]-this.lastEv[i])/dt-x));
+      this.lastEv = ev.slice();
+      const ad = ev.map((e, i) => this.gains.kpV[i]*e+this.gains.kiV[i]*this.integralV[i]+this.gains.kdV[i]*this.filteredDerivV[i]);
+      const [aero] = this.b.call(this.b.functions.aero, state.slice(0, 13), wind);
+      const worldAero = rotate(q, aero);
+      const Fd = sub([p.mass_kg*(ad[0]), p.mass_kg*(ad[1]), p.mass_kg*(ad[2]+p.g)], worldAero);
+      const Fnorm = norm(Fd);
+      let ex, ey, ez;
+      if (Fnorm < 1e-6 && this.desiredAxes) {
+        [ex, ey, ez] = this.desiredAxes;
+      } else {
+        ex = Fnorm < 1e-6 ? [1, 0, 0] : Fd.map(x => x/Fnorm);
+        const heading = [0, 1, 0], proj = sub(heading, ex.map(x => x*dot3(heading, ex)));
+        const pn = norm(proj);
+        ey = (pn > 1e-6 ? proj.map(x => x/pn) : cross([0, 0, 1], ex));
+        const eyn = Math.max(norm(ey), 1e-9); ey = ey.map(x => x/eyn);
+        ez = cross(ex, ey);
+      }
+      this.desiredAxes = [ex, ey, ez];
+      const Td = Fnorm;
+      const current = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].map(axis => rotate(q, axis));
+      const eR = relativeRotationVector(current, [ex, ey, ez]);
+      const omega = state.slice(10, 13);
+      const omegaD = eR.map(x => this.gains.kR*x);
+      const eOmega = sub(omegaD, omega);
+      const Md = eOmega.map((e, i) => this.gains.kpW*e+this.gains.kiW*this.integralW[i]);
+      const axial = rotate(q, v, true)[0];
+      const [caps] = this.b.call(this.b.functions.rotors, Array(4).fill(this.max), [axial]);
+      const capacity = caps.reduce((s, x) => s+x, 0);
+      const total = clamp(Td, 0, capacity);
+      // Conditional integration: hold both integrators while saturated (the
+      // documented anti-windup choice, per paper 식37 commentary).
+      if (Td <= capacity+1e-9) {
+        this.integralV = this.integralV.map((x, i) => x+ev[i]*dt);
+        this.integralW = this.integralW.map((x, i) => x+eOmega[i]*dt);
+      }
+      const target = Md.map((m, i) => m/this.p.inertia_kg_m2[i]);
+      const anchor = caps.map(c => capacity > 0 ? total*c/capacity : 0);
+      const force = allocateThrust(total, target, this.matrix, caps, anchor);
+      const [n] = this.b.call(this.b.functions.inverse_thrust, force, [axial], [this.max]);
+      return n.map(x => clamp(x, 0, this.max));
+    }
+  }
+
+  // Gain-scheduled LQR baseline (표5 GSLQR, 식40-42). K_j precomputed offline
+  // (research/gain_schedule.py) at level-flight trims of the SAME selected
+  // profile and linearly interpolated by speed here. The schedule only
+  // covers 0-18 m/s: research/TRIM_ENVELOPE_AUDIT.md and a direct 2 m/s scan
+  // (2026-09-22) found NO level-flight trim for this airframe from 20-80 m/s
+  // (negative rotor thrust required) and current-limited trims at 82+ m/s.
+  // Outside the table this class clamps to the nearest edge gain/trim --
+  // it does not claim validity there.
+  class GSLQR {
+    constructor(binding, data) {
+      this.b = binding; this.p = data.profile;
+      this.schedule = data.gslqr;
+      if (!this.schedule || !this.schedule.speeds_mps.length)
+        throw new Error('GSLQR gain schedule missing from bundle (research/gain_schedule.py)');
+      this.max = data.solvers.hybrid.max_rotor_rad_s;
+      this.previous = data.initial.slice(13, 17);
+      this.stats = [];
+    }
+    _interpolate(speed) {
+      const V = this.schedule.speeds_mps, target = clamp(speed, V[0], V[V.length-1]);
+      let i = 0; while (i < V.length-2 && V[i+1] < target) i++;
+      const t = (target-V[i])/((V[i+1]-V[i]) || 1);
+      const lerp = (a, b) => a.map((x, k) => x+t*(b[k]-x));
+      return {K: this.schedule.K_r[i].map((row, r) => lerp(row, this.schedule.K_r[i+1][r])),
+              xTrim: lerp(this.schedule.x_trim[i], this.schedule.x_trim[i+1]),
+              uTrim: lerp(this.schedule.u_trim[i], this.schedule.u_trim[i+1])};
+    }
+    solve(state, refs) {
+      const ref = refs[0];
+      const {K, xTrim, uTrim} = this._interpolate(ref[0]);
+      xTrim[2] = ref[3];
+      const dz = state[2]-xTrim[2], dv = sub(state.slice(3, 6), xTrim.slice(3, 6));
+      const q = state.slice(6, 10), qt = xTrim.slice(6, 10);
+      let dq = quatMultiply([-qt[0], -qt[1], -qt[2], qt[3]], q);
+      if (dq[3] < 0) dq = dq.map(x => -x);
+      const dphi = dq.slice(0, 3).map(x => 2*x);
+      const dw = sub(state.slice(10, 13), xTrim.slice(10, 13));
+      const dn = sub(state.slice(13, 17), xTrim.slice(13, 17));
+      const dx = [dz, ...dv, ...dphi, ...dw, ...dn];
+      const u = uTrim.map((u0, i) => u0-dot3(K[i], dx));
+      return u.map(x => clamp(x, 0, this.max));
     }
   }
 
@@ -406,7 +560,7 @@
   function validateOptions(options={}) {
     const cfg={controller:'hybrid',feedback:'truth',scenario:'step',seconds:4,speed:3,altitude:20,
       wind_speed:0,wind_angle:90,seed:42,preview:true,hybrid_actuator_feedback:false,log_hz:50,scales:[1,1,1,1,1],...options};
-    if(!['hybrid','nmpc','pd'].includes(cfg.controller))throw new Error('Unknown controller');
+    if(!['hybrid','nmpc','pd','cpid','gslqr'].includes(cfg.controller))throw new Error('Unknown controller');
     if(!['truth','eskf'].includes(cfg.feedback))throw new Error('Unknown feedback');
     if(!['hover','step','gust','schedule'].includes(cfg.scenario))throw new Error('Unknown scenario');
     if(!Number.isFinite(cfg.seconds)||cfg.seconds<.001||cfg.seconds>120)throw new Error('Duration must be 0.001–120 seconds');
@@ -473,10 +627,13 @@
 
   async function run(ca,data,options={},progress=()=>{},shouldStop=()=>false,hooks={}) {
     const cfg=validateOptions(options);
-    const b=makeBindings(ca,data,cfg.controller==='pd'?[]:[cfg.controller]);
+    const b=makeBindings(ca,data,['pd','cpid','gslqr'].includes(cfg.controller)?[]:[cfg.controller]);
     try {
-    const optimizer=cfg.controller==='pd'?new ObservationController(b,data):new Optimizer(ca,b,data,cfg.controller);
-    const indi=cfg.controller!=='nmpc'?new INDI(b,data):null;
+    const optimizer=cfg.controller==='pd'?new ObservationController(b,data)
+      :cfg.controller==='cpid'?new CPID(b,data)
+      :cfg.controller==='gslqr'?new GSLQR(b,data)
+      :new Optimizer(ca,b,data,cfg.controller);
+    const indi=['nmpc','cpid','gslqr'].includes(cfg.controller)?null:new INDI(b,data);
     const initial=data.initial.slice();initial[2]=cfg.altitude;
     const estimator=new Estimator(b,data,initial);
     const s=data.sensors, p=data.profile;

@@ -11,6 +11,7 @@ from research import eskf
 from research.model import profile, build, initial_state
 from research.nmpc import build_solver
 from research.numeric_export import compile_numeric
+from research.gain_schedule import build_schedule
 
 
 def bundle(name, include_solvers=True):
@@ -31,6 +32,11 @@ def bundle(name, include_solvers=True):
     payload["numeric"] = compile_numeric(functions, estimators, p)
     payload["provenance"]["numeric_backend"] = "casadi-scalar-js-v1"
     payload["provenance"]["numeric_source_sha256"] = hashlib.sha256(payload["numeric"]["source"].encode()).hexdigest()
+    # GSLQR(표5) 이득 스케줄 — 이 프로파일은 20-80 m/s에 수평 트림이 없으므로
+    # (research/TRIM_ENVELOPE_AUDIT.md) 0-18 m/s만 스케줄링한다. runtime.js의
+    # GSLQR 클래스가 이 표를 속도로 선형보간한다(식42). "simple" 프로파일은
+    # 테스트용 축소 물리 모델이라 트림 특성이 달라 같은 표를 쓰지 않는다.
+    payload["gslqr"] = build_schedule(p, speeds=[0, 2, 4, 6, 8, 10, 12, 14, 16, 18])
     if include_solvers:
         for kind in ("hybrid", "nmpc"):
             begin = time.perf_counter()
