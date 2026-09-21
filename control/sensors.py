@@ -22,6 +22,8 @@
   └─────────────┴──────────────────┴───────────┘
 """
 
+import collections
+
 import numpy as np
 from scipy.spatial.transform import Rotation
 from dataclasses import dataclass, field
@@ -155,14 +157,17 @@ class GPSSensor:
     GPS 센서 모델 — 위치 + 속도.
 
     특성:
-      - 저주파 (10 Hz): 매 스텝이 아니라 gps_period마다 출력
+      - 저주파 (기본 10 Hz, set_rate()로 런타임 변경 가능 — 논문 §5.7/표7 스윕용)
       - 높은 위치 노이즈 (~1.5m): IMU 대비 부정확
       - 속도 노이즈 (~0.5 m/s): 위치보다 정확 (도플러)
-      - 지연: v1에서는 무시 (나중에 추가)
+      - 지연(delay_s)·누락(dropout_prob 또는 schedule_outage)을 함께 모델링한다.
+        지연은 FIFO 링버퍼로 구현 — 표본을 만든 시각을 같이 저장해 두고,
+        나이가 delay_s 이상인 가장 오래된 표본만 내보낸다.
     """
 
     def __init__(self, dt_plant, gps_rate=10.0,
-                 noise_pos=1.5, noise_vel=0.5, seed=None):
+                 noise_pos=1.5, noise_vel=0.5, seed=None,
+                 delay_s=0.0, dropout_prob=0.0):
         """
         Parameters
         ----------
@@ -174,40 +179,76 @@ class GPSSensor:
             위치 노이즈 표준편차 [m].
         noise_vel : float
             속도 노이즈 표준편차 [m/s].
+        delay_s : float
+            취득~가용 지연 [s]. 0이면 기존과 동일하게 즉시 가용.
+        dropout_prob : float
+            매 GPS 표본이 누락될 베르누이 확률 (0~1). schedule_outage()로
+            정해진 시간 구간 연속 누락(표7의 "1초 연속" 조건)을 추가로 걸 수 있다.
         """
         self._seed = seed
         self.rng = np.random.default_rng(seed)
         self.noise_pos = noise_pos
         self.noise_vel = noise_vel
+        self.dt_plant = dt_plant
+        self.delay_s = delay_s
+        self.dropout_prob = dropout_prob
 
         # GPS 주기를 플랜트 스텝 수로 변환
         self.period_steps = max(1, int(round(1.0 / (gps_rate * dt_plant))))
         self._step_count = 0
+        self._buffer = collections.deque()   # (t_sample, pos_meas, vel_meas)
+        self._outage_start = None
+        self._outage_end = -1.0
+
+    def set_rate(self, hz):
+        """런타임 갱신률 변경 (논문 §5.7/표7의 1~20 Hz 스윕용)."""
+        self.period_steps = max(1, int(round(1.0 / (hz * self.dt_plant))))
+
+    def schedule_outage(self, t_start, duration_s):
+        """[t_start, t_start+duration_s) 구간을 통째로 누락시킨다
+        (표7의 "5,10,20% 및 1초 연속" 중 연속 누락 모드)."""
+        self._outage_start = t_start
+        self._outage_end = t_start + duration_s
 
     def measure(self, x_true):
         """
-        진짜 상태 → GPS 측정값 (gps_rate마다).
+        진짜 상태 → GPS 측정값 (gps_rate마다 표본 생성, delay_s 뒤 가용).
 
         Returns
         -------
         (pos_meas, vel_meas) or None
-            None이면 이번 스텝에서 GPS 출력 없음.
+            None이면 이번 스텝에서 GPS 출력 없음(주기 대기/지연 대기/누락).
         """
         self._step_count += 1
-        if self._step_count % self.period_steps != 0:
+        t_now = self._step_count * self.dt_plant
+
+        if self._step_count % self.period_steps == 0:
+            pos_true = x_true[0:3]
+            vel_true = x_true[3:6]
+            pos_meas = pos_true + self.rng.normal(0, self.noise_pos, 3)
+            vel_meas = vel_true + self.rng.normal(0, self.noise_vel, 3)
+            self._buffer.append((t_now, pos_meas, vel_meas))
+
+        if not self._buffer:
             return None
+        t_sample, pos_meas, vel_meas = self._buffer[0]
+        if t_now - t_sample < self.delay_s:
+            return None
+        self._buffer.popleft()
 
-        pos_true = x_true[0:3]
-        vel_true = x_true[3:6]
-
-        pos_meas = pos_true + self.rng.normal(0, self.noise_pos, 3)
-        vel_meas = vel_true + self.rng.normal(0, self.noise_vel, 3)
+        in_scheduled_outage = self._outage_start is not None and t_now < self._outage_end
+        bernoulli_drop = self.dropout_prob > 0.0 and self.rng.random() < self.dropout_prob
+        if in_scheduled_outage or bernoulli_drop:
+            return None
 
         return pos_meas, vel_meas
 
     def reset(self):
         self._step_count = 0
         self.rng = np.random.default_rng(self._seed)   # 재시드: 제어기 간 동일 노이즈(공정 비교)
+        self._buffer.clear()
+        self._outage_start = None
+        self._outage_end = -1.0
 
 
 class SensorSuite:

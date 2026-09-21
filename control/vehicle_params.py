@@ -81,6 +81,19 @@ vehicle_params = {
     'tau_m': 0.02,
     'n_min': 0.0,
     'n_max': 1800.0,           # [rad/s] ← 팁 마하 0.79 (한계 0.8 이내)
+
+    # ── 배터리·전기 (논문 식11-14, M17 전류·전압 제약용) ──
+    # [플레이스홀더] 실측 전 임시값 — 12S(44.4V급) LiPo, Kv≈400rpm/V 가정.
+    # control/battery.py의 BatteryModel과 NMPCController(electrical_constraints=True)
+    # 둘 다 이 키들을 참조한다. rocket_params는 이 dict를 복사해 쓰므로 자동 상속.
+    'V_oc':     44.4,      # [V]   개방전압(공칭, SOC 의존성은 단순화해 상수로 둠)
+    'R_b':      0.01,      # [Ω]   배터리 내부저항
+    'C_b':      16.0,      # [Ah]  배터리 용량
+    'k_e':      0.0239,    # [V/(rad/s)]  역기전력 상수 (Kv 400rpm/V 환산)
+    'k_t':      0.0239,    # [N·m/A]      토크 상수 (이상적 모터: k_t=k_e, SI)
+    'R_m':      0.05,      # [Ω]   모터 권선 저항
+    'I_lim':    40.0,      # [A]   모터 1개당 전류 한계
+    'eta_esc':  0.95,      # [-]   ESC 변환 효율
 }
 
 

@@ -32,19 +32,31 @@ class NMPCController:
     """
 
     def __init__(self, params, v_ref=None, z_ref=0.0, u_ref=None,
-                 N=20, dt_nmpc=0.05, dt_ctrl=0.02, Q_z=20.0):
+                 N=20, dt_nmpc=0.05, dt_ctrl=0.02, Q_z=20.0,
+                 electrical_constraints=False, V_b=None):
         """
         Parameters
         ----------
         N        : int    예측 지평선 스텝 수 (N * dt_nmpc = 예측 시간)
         dt_nmpc  : float  NMPC 내부 적분 스텝 [s]
         dt_ctrl  : float  제어 주기 (이 간격마다 NLP 재풀이) [s]
+        electrical_constraints : bool
+            논문 식(22) — 모터 전류·전압 제약을 예측 격자마다 부과할지.
+            기본값 False로 기존 M17 동작·테스트를 보존한다(표6의 E0).
+            True가 실제 논문 M17(E1) — 이게 표6의 E0↔E1 제거실험 플래그다.
+        V_b : float or None
+            예측 구간 내내 고정해서 쓸 버스 전압(식22 앞부분: "예측 전압은
+            현재 측정된 V_b로 유지, SOC의 미래 변화는 직접 예측하지 않음").
+            None이면 params['V_oc'](만충 가정)로 시작하고, 매 호출 전
+            self.V_b를 갱신해 실제 배터리 상태를 반영할 수 있다.
         """
         self.p = params
         self.N = N
         self.dt_nmpc = dt_nmpc
         self.dt_ctrl = dt_ctrl
         self.nx, self.nu = NX, NU
+        self.electrical_constraints = electrical_constraints
+        self.V_b = V_b if V_b is not None else params.get('V_oc', 44.4)
 
         self.v_ref = np.array(v_ref) if v_ref is not None else np.zeros(3)
         self.z_ref = z_ref
@@ -99,12 +111,15 @@ class NMPCController:
         n_min = params['n_min']
         n_max = params['n_max']
 
-        # ── 파라미터: [x_init(17), v_ref(3), z_ref(1), u_ref(4)] = 25 ──
-        p = ca.SX.sym('p', nx + 3 + 1 + nu)
+        # ── 파라미터: [x_init(17), v_ref(3), z_ref(1), u_ref(4), V_b(1)] = 26 ──
+        # V_b: 전기제약(electrical_constraints)용 — 예측 구간 내내 고정해서 쓰는
+        # 현재 측정 버스전압(식22). 제약을 안 쓸 때도 자리만 차지, 계산엔 안 씀.
+        p = ca.SX.sym('p', nx + 3 + 1 + nu + 1)
         x_init = p[0:nx]
         v_ref  = p[nx:nx+3]
         z_ref  = p[nx+3]
         u_ref  = p[nx+4:nx+4+nu]
+        V_b_param = p[nx+4+nu]
 
         # ── 결정 변수 + 제약 ──
         w, w0, lbw, ubw = [], [], [], []
@@ -136,6 +151,22 @@ class NMPCController:
             g.append(X_k - X_pred)
             lbg += [0.0] * nx
             ubg += [0.0] * nx
+
+            # ── 전류·전압 제약 (식22, electrical_constraints=True일 때만) ──
+            # M17만의 특징 — 모터 상태(X_k[13:17]=n)와 명령(U_k=n_c)이 이미
+            # 결정변수에 있어 추가 상태 없이 바로 부과할 수 있다.
+            if self.electrical_constraints:
+                n_i = X_k[13:17]
+                Q_i = self.p['k_Q'] * n_i**2   # 마찰 Q_f=0 (battery.py와 동일 가정)
+                I_req = (Q_i / self.p['k_t']
+                         + self.p['I_rotor'] * (U_k - n_i)
+                           / (self.p['k_t'] * self.p['tau_m']))
+                g.append(I_req)
+                lbg += [0.0] * 4
+                ubg += [float(self.p['I_lim'])] * 4
+                g.append(V_b_param - (self.p['k_e'] * n_i + self.p['R_m'] * I_req))
+                lbg += [0.0] * 4
+                ubg += [1e6] * 4
 
             # ── 스테이지 비용 ──
             e_v = X_k[3:6] - v_ref
@@ -189,7 +220,8 @@ class NMPCController:
 
     def _solve(self, x_current):
         """NLP 풀이 → 첫 제어 추출."""
-        p_val = np.concatenate([x_current, self.v_ref, [self.z_ref], self.u_ref])
+        p_val = np.concatenate([x_current, self.v_ref, [self.z_ref], self.u_ref,
+                                 [self.V_b]])
 
         sol = self.solver(
             x0=self.w0, lbx=self.lbw, ubx=self.ubw,
