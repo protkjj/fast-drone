@@ -59,6 +59,45 @@ const CONDITIONS = [
 
 function rmse(values) { return Math.sqrt(values.reduce((s, v) => s+v*v, 0)/values.length); }
 
+// 원시 결과 -> 요약·통계. 스윕 본체와 merge_sweep.cjs 가 **같은 함수**를 쓴다.
+// 갈라지면 분할 실행으로 만든 표와 단일 실행으로 만든 표가 달라진다.
+// 부분 결과에서도 불리므로 빈 칸은 건너뛴다(끝난 칸만 요약에 들어간다).
+function summarise(results, {conditionIds, controllers, seeds, seconds, profile}) {
+  // 표9 형태: 조건x제어기 요약 (실패율, RMSE 평균).
+  const summary = {};
+  for (const id of conditionIds) {
+    if (!results[id]) continue;
+    summary[id] = {};
+    for (const controller of controllers) {
+      const rows = results[id][controller];
+      if (!rows?.length) continue;
+      const ok = rows.filter(r => !r.failed);
+      summary[id][controller] = {
+        success_fraction: ok.length/rows.length,
+        rmse_v_mean: ok.length ? ok.reduce((s,r)=>s+r.rmse_v,0)/ok.length : null,
+        rmse_z_mean: ok.length ? ok.reduce((s,r)=>s+r.rmse_z,0)/ok.length : null,
+      };
+    }
+  }
+
+  // 표9 "주 비교": V13(hybrid) 대 나머지 5개. 짝지은(같은 시드) RMSE_v 차이의
+  // 부트스트랩 median/95%CI + Holm 보정 p-value.
+  const primaryComparisons = controllers.filter(c => c !== 'hybrid').map(other => {
+    const a = results[conditionIds[0]]?.['hybrid'], b = results[conditionIds[0]]?.[other];
+    if (!a?.length || !b?.length) return null;
+    const diffs = a.map((r, i) => (b[i]?.rmse_v-r.rmse_v)).filter(Number.isFinite);
+    if (!diffs.length) return {pair: `hybrid-vs-${other}`, note: '유한 표본 없음(둘 다 실패했거나 표본 부족)'};
+    return {pair: `hybrid-vs-${other}`, ...bootstrapPairedMedianCI(diffs), p: bootstrapPValue(diffs)};
+  }).filter(Boolean);
+  const pValues = primaryComparisons.map(c => c.p ?? 1);
+  const adjusted = holmCorrection(pValues);
+  primaryComparisons.forEach((c, i) => { c.p_holm = adjusted[i]; });
+
+  const complete = conditionIds.every(id => controllers.every(k => results[id]?.[k]?.length === seeds));
+  return {conditions: conditionIds, controllers, seeds, seconds, profile, complete,
+          summary, primary_comparisons_first_condition: primaryComparisons, raw: results};
+}
+
 // 식(47)-(48) 근사: 램프가 끝난(RAMP_T0+RAMP_DURATION_S 이후) 정착 구간에서
 // v/z 오차 RMSE. 논문의 돌풍 전용 12초 평가창(돌풍전3s+돌풍2s+돌풍후7s)은
 // gust 시나리오 전용이라 여기 ramp 시나리오엔 안 맞는다 — 대신 램프 종료
@@ -157,6 +196,10 @@ async function main() {
       console.error(`  이어받기: 이미 끝난 조건x제어기 ${have}칸`);
     } catch (e) { console.error(`  이어받기 실패(${e.message}) — 처음부터 시작한다`); results = {}; }
   }
+  // 루프 안의 중간 저장이 이걸 부르므로 루프보다 먼저 정의해야 한다
+  // (const 는 호이스팅되지 않는다).
+  const render = () => summarise(results, {conditionIds: conditions.map(c => c.id),
+                                           controllers, seeds, seconds, profile});
   let done = 0, total = conditions.length*controllers.length*seeds;
   for (const cond of conditions) {
     results[cond.id] = results[cond.id] || {};
@@ -196,49 +239,13 @@ async function main() {
     }
   }
 
-  // 부분 결과에서도 불려야 하므로 빈 칸을 건너뛴다. 끝난 칸만 요약에 들어간다.
-  function render() {
-    // 표9 형태: 조건x제어기 요약 (실패율, RMSE 평균).
-    const summary = {};
-    for (const cond of conditions) {
-      if (!results[cond.id]) continue;
-      summary[cond.id] = {};
-      for (const controller of controllers) {
-        const rows = results[cond.id][controller];
-        if (!rows?.length) continue;
-        const ok = rows.filter(r => !r.failed);
-        summary[cond.id][controller] = {
-          success_fraction: ok.length/rows.length,
-          rmse_v_mean: ok.length ? ok.reduce((s,r)=>s+r.rmse_v,0)/ok.length : null,
-          rmse_z_mean: ok.length ? ok.reduce((s,r)=>s+r.rmse_z,0)/ok.length : null,
-        };
-      }
-    }
-
-    // 표9 "주 비교": V13(hybrid) 대 나머지 5개. 짝지은(같은 시드) RMSE_v 차이의
-    // 부트스트랩 median/95%CI + Holm 보정 p-value.
-    const primaryComparisons = controllers.filter(c => c !== 'hybrid').map(other => {
-      const a = results[conditions[0]?.id]?.['hybrid'], b = results[conditions[0]?.id]?.[other];
-      if (!a?.length || !b?.length) return null;
-      const diffs = a.map((r, i) => (b[i]?.rmse_v-r.rmse_v)).filter(Number.isFinite);
-      if (!diffs.length) return {pair: `hybrid-vs-${other}`, note: '유한 표본 없음(둘 다 실패했거나 표본 부족)'};
-      return {pair: `hybrid-vs-${other}`, ...bootstrapPairedMedianCI(diffs), p: bootstrapPValue(diffs)};
-    }).filter(Boolean);
-    const pValues = primaryComparisons.map(c => c.p ?? 1);
-    const adjusted = holmCorrection(pValues);
-    primaryComparisons.forEach((c, i) => { c.p_holm = adjusted[i]; });
-
-    const complete = conditions.every(c => controllers.every(k => results[c.id]?.[k]?.length === seeds));
-    return {conditions: conditions.map(c => c.id), controllers, seeds, seconds, profile, complete,
-            summary, primary_comparisons_first_condition: primaryComparisons, raw: results};
-  }
   const output = render();
   const text = JSON.stringify(output, null, 2);
   if (outFile) { fs.writeFileSync(outFile, text); console.error(`written: ${outFile}`); }
   else console.log(text);
 }
 
-module.exports = {rmse, evaluateRun, bootstrapPairedMedianCI, bootstrapPValue, holmCorrection,
-                  CONDITIONS, CONTROLLERS, V_L, V_H, RAMP_T0, RAMP_DURATION_S};
+module.exports = {rmse, evaluateRun, summarise, bootstrapPairedMedianCI, bootstrapPValue,
+                  holmCorrection, CONDITIONS, CONTROLLERS, V_L, V_H, RAMP_T0, RAMP_DURATION_S};
 
 if (require.main === module) main().catch(e => { console.error(e); process.exitCode = 1; });
