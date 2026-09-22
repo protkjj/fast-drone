@@ -9,7 +9,10 @@ let replayActive=false,resetRequested=false,lastPlotWall=0;
 // or flight-control widgets change. Mixed flight results keep this opt-in.
 let hybridActuatorFeedback=new URL(location.href).searchParams.get('actuator_feedback')==='1';
 const liveTraces={};
-const controllerNames={pd:'PD–INDI · 조작용 baseline',hybrid:'Hybrid',nmpc:'NMPC 단독',cpid:'CPID',gslqr:'GSLQR'};
+const controllerNames={pd:'PD–INDI · 조작용 baseline',hybrid:'Hybrid',nmpc:'NMPC 단독',cpid:'CPID',gslqr:'GSLQR',f13:'F13',gindi:'GINDI'};
+// 표5 비교군 중 NLP 를 실제로 푸는 것만. 나머지는 IPOPT 없이 돌아서 훨씬 빠르고,
+// 안내 문구에서 "IPOPT 계산" 이라고 말하면 거짓이 된다.
+const solverControllers=new Set(['hybrid','nmpc','f13']);
 const settingIds=['profile','controller','feedback','scenario','seconds','speed','altitude','preview','mismatch','seed','log-hz','wind-speed','wind-angle'];
 const modeSettings={compare:null,observe:{profile:'selected',controller:'both',feedback:'truth',scenario:'hover',seconds:'30',speed:'0',altitude:'20',preview:'false',mismatch:'nominal',seed:'42','log-hz':'50'}};
 const pdOption=document.createElement('option');pdOption.value='pd';pdOption.textContent=controllerNames.pd;$('replay-controller').append(pdOption);
@@ -34,12 +37,18 @@ function setMode(next,restore=true){
   const url=new URL(location.href);url.searchParams.set('mode',mode);history.replaceState(null,'',url);
 }
 function updateModeNote(){
-  $('mode-note').textContent=mode!=='observe'?'Hybrid와 NMPC 단독을 같은 기체·조건에서 계산합니다.':
-    $('observe-controller').value==='pd'?'PD–INDI baseline · 빠른 조작용이며 Hybrid가 아닙니다. 목표와 바람은 비행 중 자동 반영됩니다.':
-    `${controllerNames[$('observe-controller').value]} · 실제 IPOPT 계산으로 비행합니다. 풀이가 느리면 비행 진행도 느려지며, 다른 제어기로 대체하지 않습니다.`;
+  const observed=$('observe-controller').value,compared=$('controller').value;
+  $('mode-note').textContent=mode!=='observe'
+    ?(compared==='both'?'Hybrid와 NMPC 단독을 같은 기체·조건에서 계산합니다.'
+      :`${controllerNames[compared]} 단독으로 계산합니다. 비교하려면 제어기에서 비교 항목을 고르세요.`)
+    :observed==='pd'?'PD–INDI baseline · 빠른 조작용이며 Hybrid가 아닙니다. 목표와 바람은 비행 중 자동 반영됩니다.'
+    :solverControllers.has(observed)
+      ?`${controllerNames[observed]} · 실제 IPOPT 계산으로 비행합니다. 풀이가 느리면 비행 진행도 느려지며, 다른 제어기로 대체하지 않습니다.`
+      :`${controllerNames[observed]} · 표5 비교군. IPOPT 를 풀지 않아 빠르지만, 게인 기반이라 제약을 직접 다루지 않습니다.`;
   if(hybridActuatorFeedback)$('mode-note').textContent+=' · 실험용 Hybrid 모터 능력 제약 ON';
 }
 $('observe-controller').addEventListener('change',updateModeNote);
+$('controller').addEventListener('change',updateModeNote);
 function updateAircraftLabel(){
   document.querySelector('.aircraft-tag').textContent=$('profile').value==='selected'?
     '선정안 6931 · 1.712 kg · CSV 기준 형상 · 개념설계 모델':'단순 검증 기체 · 2 kg · 선정 기체가 아닌 구조 검증용 모델';
@@ -464,12 +473,15 @@ function scenarioNote(adjust=true){
     $('seconds').min='.1';$('scenario-note').textContent=$('scenario').value==='schedule'?
       '기록한 목표·바람 일정을 재실행합니다. 새 목표를 적용하면 그 시점 이후의 일정을 대체합니다.':'초기 속도 0에서 시작하여 조작부의 목표를 추종합니다. 비행 중 목표·바람을 바꿀 수 있습니다.';return;
   }
-  const scenario=$('scenario').value,min={hover:.1,step:1.1,gust:3.1,schedule:.02}[scenario];
+  // ramp 최소값은 기본 타이밍(ramp_t0=1 + ramp_duration_s=2)이 끝나는 3초 직후다.
+  // 그 전에 끊으면 램프 종료 이후 표본이 없어 정착을 전혀 못 본다.
+  const scenario=$('scenario').value,min={hover:.1,step:1.1,gust:3.1,ramp:3.1,schedule:.02}[scenario];
   $('seconds').min=String(min);
-  if(adjust&&Number($('seconds').value)<min)$('seconds').value=String({hover:.2,step:2,gust:4}[scenario]);
+  if(adjust&&Number($('seconds').value)<min)$('seconds').value=String({hover:.2,step:2,gust:4,ramp:6}[scenario]);
   $('scenario-note').textContent={hover:'호버: 짧은 실행 경로 확인용. 긴 과도응답 검증과는 다릅니다.',
     step:'1초에 목표 속도 변경 · 최소 1.1초. 정착 성능 평가는 더 긴 기록이 필요합니다.',
     gust:'2–3초 측풍·모멘트 외란 · 최소 3.1초. 외란 이후 복귀까지 보려면 기간을 늘리세요.',
+    ramp:'식(43) 매끄러운 속도 램프 · 1초에 시작해 2초에 걸쳐 목표 속도까지 · 최소 3.1초. 논문 §5.5가 주 기동 비교에 쓰라고 지정한 연속 참조입니다(계단은 진단 전용).',
     schedule:`선택한 앞 ${number(Number($('seconds').value))}초 구간의 목표 ${recordedCommands?.filter(c=>c.t<=Number($('seconds').value)).length||0}개를 원래 시각에 적용합니다. 원본 기록은 보존됩니다.`}[scenario];
   const solves=Math.ceil(Number($('seconds').value)/.02);
   $('scenario-note').textContent+=` 제어기마다 IPOPT 약 ${number(solves)}회. 긴 관찰 기록은 먼저 0.2–2초 구간으로 계산하세요(속도 계단 시험은 1.1초 이상).`;
