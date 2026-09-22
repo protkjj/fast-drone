@@ -44,7 +44,7 @@ jobs:
       - name: 공통 수식 생성 및 연구 회귀 검사
         run: |
           python -m research.build_bundle
-          python -m pytest research/test_model.py research/test_trim_envelope.py research/test_design_source_audit.py research/test_estimator.py research/test_nmpc.py research/test_gain_schedule.py research/test_f13.py control/test_research_parity.py -q
+          python -m pytest research/test_model.py research/test_trim_envelope.py research/test_design_source_audit.py research/test_estimator.py research/test_nmpc.py research/test_gain_schedule.py research/test_f13.py research/test_trim_levers.py research/test_tune_gains.py research/test_sweep_conditions.py control/test_research_parity.py -q
           npm test --prefix research
       - name: site/ 조립
         run: python3 gz_aero/tools/build_site.py --research

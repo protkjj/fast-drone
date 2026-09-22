@@ -25,7 +25,7 @@ jobs:
       - run: python -m pip install -r research/requirements.txt
       - run: npm ci --prefix research --ignore-scripts --no-audit --no-fund
       - name: 물리·추진·전력·ESKF 회귀 검사
-        run: python -m pytest research/test_model.py research/test_trim_envelope.py research/test_design_source_audit.py research/test_estimator.py research/test_nmpc.py research/test_gain_schedule.py research/test_f13.py research/test_plot_run.py control/test_research_parity.py control/test_plant.py control/test_safety.py control/test_fallback.py control/test_allocation_a1.py control/test_f13.py control/test_battery.py control/test_sensors_delay.py -q
+        run: python -m pytest research/test_model.py research/test_trim_envelope.py research/test_design_source_audit.py research/test_estimator.py research/test_nmpc.py research/test_gain_schedule.py research/test_f13.py research/test_plot_run.py research/test_trim_levers.py research/test_tune_gains.py research/test_sweep_conditions.py control/test_research_parity.py control/test_plant.py control/test_safety.py control/test_fallback.py control/test_allocation_a1.py control/test_f13.py control/test_battery.py control/test_sensors_delay.py -q
       - name: 공통 CasADi 그래프 생성
         run: python -m research.build_bundle
       - name: 실제 WASM IPOPT·주기·지연 GPS·STL 검사
