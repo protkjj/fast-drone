@@ -127,7 +127,8 @@ def validate_entries(site):
             parsed = urlparse(asset)
             if parsed.hostname == "local.invalid":
                 assert (site / parsed.path.lstrip("/")).is_file(), f"Missing asset: {asset}"
-    for asset in ["assets/drone_v2.stl", "research/worker.js", "research/assets/drone_v2.stl"]:
+    for asset in ["assets/drone_v2.stl", "research/worker.js", "research/assets/drone_v2.stl",
+                  "research/assets/drone_hsd.stl", "research/profiles/selected.json"]:
         assert (site / asset).is_file(), f"Missing asset: {asset}"
     assert "http-equiv=\"refresh\"" not in (site / "research/index.html").read_text()
     assert (site / "sim-legacy.html").read_bytes() == (site / "sim.html").read_bytes()

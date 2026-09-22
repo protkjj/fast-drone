@@ -1,6 +1,6 @@
 'use strict';
 const $=id=>document.getElementById(id);
-const SELECTED_DISPLAY_LABEL='선정안 CSV 기준 · STL 파생 표시';
+const SELECTED_DISPLAY_LABEL='선정안 CSV 기준 · 형상팀 CAD(HSD) 표시';
 const results={};
 let worker=null,vehicle=null,running=false,drawModel=()=>{},updatePath=()=>{},appendLivePath=()=>{};
 let playing=false,replayTime=0,imported=false,customScales=null,mode='compare',paused=false,recordedCommands=null;
@@ -491,11 +491,12 @@ async function previewSTL() {
   const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));host.append(renderer.domElement);
   scene.add(new THREE.HemisphereLight(0xe9f2ff,0x202a36,1.8));
   const lamp=new THREE.DirectionalLight(0xffffff,1.4);lamp.position.set(1,1,2);scene.add(lamp);
-  const [response,geometryResponse]=await Promise.all([fetch('./assets/drone_v2.stl'),fetch('./assets/selected_geometry.json')]);
+  const [response,profileResponse]=await Promise.all([fetch('./assets/drone_hsd.stl'),fetch('./profiles/selected.json')]);
   if(!response.ok)throw new Error('STL HTTP '+response.status);
-  if(!geometryResponse.ok)throw new Error('선정안 표시 형상 HTTP '+geometryResponse.status);
-  const geometry=await geometryResponse.json();
-  const mesh=ResearchSTL.alignSelectedGeometry(ResearchSTL.parse(await response.arrayBuffer(),geometry.cg_from_nose_m),geometry);
+  if(!profileResponse.ok)throw new Error('선정 기체 프로필 HTTP '+profileResponse.status);
+  const profile=await profileResponse.json();
+  const mesh=ResearchSTL.parse(await response.arrayBuffer(),profile.cg_from_nose_m);
+  mesh.sourceLabel='HSD_drone_assembly.step (형상팀 CAD, 2026-09-21)';
   vehicle=ResearchSTL.createVehicle(mesh,THREE);scene.add(vehicle);
   vehicle.position.set(0,0,Number($('altitude').value));vehicle.quaternion.set(0,-Math.SQRT1_2,0,Math.SQRT1_2);
   const axes=new THREE.AxesHelper(.3);scene.add(axes);

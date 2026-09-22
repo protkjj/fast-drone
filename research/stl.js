@@ -4,12 +4,30 @@
   // Face ranges audited by inspect_stl.py (21 disconnected CAD components).
   // Order follows body (y,z): (+,+),(-,+),(-,-),(+,-), just like the plant.
   const SOURCE_SHA256='276045699ee8e9ee03fe5d75d4915d88a0688fbcb12a9e8d1e8f5c0702302e35';
-  const ROTOR_PARTS=[
+  const ROTOR_PARTS_V2=[
     {yz:[1,1],ranges:[[18070,18308],[132560,173804]]},
     {yz:[-1,1],ranges:[[15580,15818],[96056,132560]]},
     {yz:[-1,-1],ranges:[[13090,13328],[54812,96056]]},
     {yz:[1,-1],ranges:[[10600,10838],[18308,54812]]}
   ];
+  // 형상팀 HSD_drone_assembly.step -> FreeCAD 2mm 테셀레이션(2026-09-22).
+  // 51개 솔리드를 동체(중심선 라디얼<=100mm -- 암 마운트까지 포함, 78mm대)와
+  // 사분면별 로터 4묶음(모터벨 이후, 119mm대)으로 나눠 export할 때부터 각
+  // 묶음을 통짜 연속 구간으로 만들어서, drone_v2.stl과 달리 로터당 range가
+  // 하나뿐이다. armHalf/centerXFromNose는 이 STEP에서 직접 측정한 로터 허브
+  // 위치(모터벨 솔리드 중심) -- radial_arm_m/√2=0.11938679m와 소수점 8자리까지
+  // 일치해 기존 drone_v2.stl의 근사 상수와도 거의 같다.
+  const HSD_SOURCE_SHA256='70c466080b72c836f9e520f75a0cb06183fc9003813512a1c7148ff733792cfd';
+  const ROTOR_PARTS_HSD=[
+    {yz:[1,1],ranges:[[129788,150444]]},
+    {yz:[-1,1],ranges:[[150444,170018]]},
+    {yz:[-1,-1],ranges:[[170018,191666]]},
+    {yz:[1,-1],ranges:[[191666,211220]]}
+  ];
+  const PARTITION_TABLES={
+    173804:{parts:ROTOR_PARTS_V2,armHalf:.11938790893554688,centerXFromNose:.6317},
+    211220:{parts:ROTOR_PARTS_HSD,armHalf:.11938790893553698,centerXFromNose:.611}
+  };
   function parse(buffer,cgFromNose=.4282511278030152) {
     if(buffer.byteLength<84) throw new Error('STL header is incomplete');
     const view=new DataView(buffer), triangles=view.getUint32(80,true);
@@ -31,14 +49,16 @@
   }
 
   function splitRotors(mesh){
-    if(mesh.triangles!==173804)throw new Error('Rotor partition requires the reviewed drone_v2.stl');
+    const known=PARTITION_TABLES[mesh.triangles];
+    if(!known)throw new Error('Rotor partition requires a reviewed mesh (drone_v2.stl or drone_hsd.stl)');
     const owner=new Int8Array(mesh.triangles);owner.fill(-1);
     const g=mesh.selectedGeometry;
-    const a=g?g.radial_arm_m/Math.SQRT2:.11938790893554688;
-    const rotors=ROTOR_PARTS.map((part,index)=>{
+    const a=g?g.radial_arm_m/Math.SQRT2:known.armHalf;
+    const centerX=g?g.prop.plane_from_nose_m:known.centerXFromNose;
+    const rotors=known.parts.map((part,index)=>{
       const count=part.ranges.reduce((sum,[first,end])=>sum+end-first,0);
       for(const [first,end]of part.ranges)owner.fill(index,first,end);
-      return {center:[mesh.cgFromNose-(g?g.prop.plane_from_nose_m:.6317),part.yz[0]*a,part.yz[1]*a],
+      return {center:[mesh.cgFromNose-centerX,part.yz[0]*a,part.yz[1]*a],
         positions:new Float32Array(count*9),ranges:part.ranges,offset:0,radius:0};
     });
     const body=new Float32Array(owner.reduce((count,index)=>count+(index<0?1:0),0)*9);
@@ -112,7 +132,7 @@
     }
     const originalRotors=splitRotors(mesh).rotors;
     for(let index=0;index<4;index++){
-      const rotor=originalRotors[index],part=ROTOR_PARTS[index];
+      const rotor=originalRotors[index],part=ROTOR_PARTS_V2[index];
       const center=[cg-g.prop.plane_from_nose_m,part.yz[0]*g.radial_arm_m/Math.SQRT2,
         part.yz[1]*g.radial_arm_m/Math.SQRT2];
       const scale=g.prop.diameter_m/(2*rotor.radius);
@@ -128,8 +148,9 @@
   }
 
   function createVehicle(mesh,THREE){
-    const parts=splitRotors(mesh),vehicle=new THREE.Group();vehicle.name='drone_v2.stl';
-    vehicle.userData.geometryBasis=mesh.selectedGeometry?'selected_design.csv':'original drone_v2.stl';
+    const parts=splitRotors(mesh),vehicle=new THREE.Group();
+    vehicle.name=mesh.sourceLabel||'drone_v2.stl';
+    vehicle.userData.geometryBasis=mesh.selectedGeometry?'selected_design.csv':(mesh.sourceLabel||'original drone_v2.stl');
     const geometry=positions=>{
       const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(positions,3));
       g.computeVertexNormals();return g;
@@ -163,7 +184,7 @@
       rotor.userData.blades.material.opacity=1-.25*strength;
     });
   }
-  const api={parse,splitRotors,alignSelectedGeometry,createVehicle,animateRotors,SOURCE_SHA256};
+  const api={parse,splitRotors,alignSelectedGeometry,createVehicle,animateRotors,SOURCE_SHA256,HSD_SOURCE_SHA256};
   if(typeof module!=='undefined'&&module.exports) module.exports=api;
   else root.ResearchSTL=api;
 })(globalThis);
