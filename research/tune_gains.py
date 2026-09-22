@@ -148,7 +148,7 @@ def evaluate(candidates, tag, out_dir):
     return {r["id"]: r for r in json.loads(out_path.read_text())["results"]}
 
 
-def tune(controller, budget, out_dir, factory=None):
+def tune(controller, budget, out_dir, factory=None, start=None):
     """곱셈 나침반 탐색(완전 폴링). 세 제어기 모두 같은 절차·같은 예산.
 
     한 바퀴(poll)는 각 게인을 x step / ÷ step 한 후보 전부다. 한 바퀴를 한 번의
@@ -170,8 +170,16 @@ def tune(controller, budget, out_dir, factory=None):
     # 기준선(placeholder)은 예산 밖이다 — 탐색 단계가 아니라 비교 기준이라서.
     base_row = evaluate([c for c in [make(base, "baseline")] if c],
                         f"{controller}_base", out_dir).get("baseline")
-    current = dict(base)
-    current_score = base_row["score"] if base_row else float("inf")
+    # start 를 주면 **출발점만** 옮긴다. 탐색 절차·예산·기준선 보고는 그대로다.
+    # 나침반 탐색은 한 번에 한 좌표만 움직이므로 출발점에 따라 다른 국소점에
+    # 멈춘다 — gslqr 이 개정1·개정2 에서 각각 q_v_h 와 q_z 한 축만 찾고 그 조합을
+    # 한 번도 방문하지 않은 것이 실례다(GAIN_TUNING.md).
+    current = dict(start or base)
+    start_row = None
+    if start:
+        start_row = evaluate([c for c in [make(current, "start")] if c],
+                             f"{controller}_start", out_dir).get("start")
+    current_score = (start_row or base_row or {}).get("score", float("inf"))
 
     history, spent, rejected, step, poll_index = [], 0, 0, INITIAL_STEP, 0
     while spent < budget and step > MIN_STEP:
@@ -218,6 +226,9 @@ def tune(controller, budget, out_dir, factory=None):
     scored = [h for h in history if h["score"] is not None]
     best = min(scored, key=lambda h: h["score"]) if scored else None
     return {"controller": controller, "budget": budget, "evaluations_spent": spent,
+            "start": {"params": start or base,
+                      "source": "placeholder" if start is None else "given",
+                      "score": (start_row or base_row or {}).get("score")},
             "search": {"method": "multiplicative compass search, complete polling",
                        "initial_step": INITIAL_STEP, "min_step": MIN_STEP,
                        "polls": poll_index, "final_step": step,
@@ -234,6 +245,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--budget", type=int, default=64, help="제어기당 폐루프 평가 횟수")
     parser.add_argument("--controllers", default="cpid,gindi,gslqr")
+    parser.add_argument("--start-from", choices=["placeholder", "selected"], default="placeholder",
+                        help="탐색 출발점. selected 면 results/tuned_gains.json 의 "
+                             "selection.chosen 값에서 출발한다(절차·예산은 동일).")
     parser.add_argument("--out", type=Path,
                         # results/ 로 둔다 — research/generated/ 는 43MB 번들 때문에
                         # gitignore 대상이라, 거기 두면 논문 재현의 근거인 이 기록이
@@ -261,9 +275,13 @@ def main():
     report = (json.loads(args.out.read_text()) if args.out.exists()
               else {"protocol": protocol, "results": {}})
     report["protocol"] = protocol
+    chosen = {}
+    if args.start_from == "selected":
+        chosen = json.loads(args.out.read_text()).get("selection", {}).get("chosen", {})
     for name in controllers:
         started = time.time()
-        result = tune(name, args.budget, out_dir, factory)
+        result = tune(name, args.budget, out_dir, factory,
+                      start=chosen.get(name, {}).get("params"))
         result["wall_seconds"] = round(time.time()-started, 1)
         report["results"][name] = result
         args.out.parent.mkdir(parents=True, exist_ok=True)
