@@ -643,7 +643,7 @@
   }
   function validateOptions(options={}) {
     const cfg={controller:'hybrid',feedback:'truth',scenario:'step',seconds:4,speed:3,altitude:20,
-      wind_speed:0,wind_angle:90,seed:42,preview:true,hybrid_actuator_feedback:false,log_hz:50,scales:[1,1,1,1,1,1],
+      wind_speed:0,wind_angle:90,wind_vertical_mps:0,seed:42,preview:true,hybrid_actuator_feedback:false,log_hz:50,scales:[1,1,1,1,1,1],
       indi_rpm_desync_ms:0,
       // 표7 센서·구동기 조건 스윕. null이면 번들 프로파일 기본값을 그대로 쓴다
       // (기존 동작과 완전히 동일). gps_dropout_prob·outage는 truth/eskf 둘 다
@@ -661,6 +661,11 @@
     if(!Number.isFinite(cfg.speed)||cfg.speed<0||cfg.speed>100)throw new Error('Reference speed must be 0–100 m/s');
     if(!Number.isFinite(cfg.altitude)||cfg.altitude<1||cfg.altitude>1000)throw new Error('고도는 1–1000 m 범위입니다.');
     validateWind(cfg);
+    // 표8 Q06/Q07 수직풍. environment()의 z성분은 model.py쪽 심볼("environment
+    // world xyz")엔 이미 있었지만 JS가 항상 0으로 채웠다 -- 물리 그래프 변경
+    // 없이 여기만 고치면 된다.
+    if(!Number.isFinite(cfg.wind_vertical_mps)||cfg.wind_vertical_mps<-10||cfg.wind_vertical_mps>10)
+      throw new Error('wind_vertical_mps must be -10 to 10');
     // 6번째 요소(모터 속도루프 시간 배율, 표7)는 m/Ixx/Iyy/Izz/CT-CP와 성격이
     // 달라(고의적 불일치가 아니라 실제 있을 수 있는 하드웨어 조건) 범위를 더
     // 넓게 둔다 -- 표7이 5~80ms(공칭 20ms 기준 0.25~4배)까지 요구한다.
@@ -719,8 +724,10 @@
     let command=config;
     if(config.scenario==='schedule')for(const c of config.commands){if(c.t>t+1e-10)break;command=c;}
     const speed=command.wind_speed??config.wind_speed??0,angle=(command.wind_angle??config.wind_angle??90)*Math.PI/180;
+    const vertical=command.wind_vertical_mps??config.wind_vertical_mps??0;
     // Direction TO which air flows, in world axes; not meteorological FROM.
-    const env=[speed*Math.cos(angle),speed*Math.sin(angle),0,0,0,0];
+    // env[2]>0 means air moving up (world +z), matching the world +z-up convention.
+    const env=[speed*Math.cos(angle),speed*Math.sin(angle),vertical,0,0,0];
     if(config.scenario==='gust'&&t>=2&&t<3){env[1]+=3;env[3]=.015;env[4]=.025;}
     return env;
   }
