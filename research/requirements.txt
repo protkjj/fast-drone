@@ -3,3 +3,6 @@ casadi==3.7.2
 numpy==2.3.3
 scipy>=1.11,<2
 pytest>=8,<9
+# plot_run.py only (CSV -> PNG plotting), not the CasADi/WASM parity path above.
+pandas>=2,<3
+matplotlib>=3.8,<4
