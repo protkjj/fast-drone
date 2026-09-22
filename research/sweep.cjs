@@ -16,6 +16,7 @@ const path = require('node:path');
 const runtime = require('./runtime.js');
 
 const CONTROLLERS = ['cpid', 'gslqr', 'nmpc', 'f13', 'hybrid', 'gindi']; // 표5: CPID,GSLQR,M17,F13,V13,GINDI
+const RAMP_T0 = 1, RAMP_DURATION_S = 3; // 식(43) 참조: t0=1s에 시작, 3초에 걸쳐 목표 속도로.
 const V_L = 8, V_H = 18; // 트림이 실제로 존재하는 0-18 m/s로 재설정(§5.8 규칙:
 // "해당 모델에서 유효한 트림이 존재하지 않으면 낮춘다" — 20/40 후보는 20-80 m/s에
 // 트림이 아예 없어 그대로 못 씀, research/TRIM_ENVELOPE_AUDIT.md와 2026-09-22
@@ -39,15 +40,17 @@ const CONDITIONS = [
 
 function rmse(values) { return Math.sqrt(values.reduce((s, v) => s+v*v, 0)/values.length); }
 
-// 식(47)-(48) 근사: 정착 구간(후반부)에서 v/z 오차 RMSE. 논문의 돌풍 전용
-// 12초 평가창(돌풍전3s+돌풍2s+돌풍후7s)은 gust 시나리오 전용이라 여기 12조건
-// (hover/step 시나리오)에는 안 맞는다 — 대신 "steady 구간"을 뒤 40%로 잡는다.
-// 정확한 평가창 규칙은 실제 §5.8 본시험 설계 시 다시 검토가 필요하다(문서화된
+// 식(47)-(48) 근사: 램프가 끝난(RAMP_T0+RAMP_DURATION_S 이후) 정착 구간에서
+// v/z 오차 RMSE. 논문의 돌풍 전용 12초 평가창(돌풍전3s+돌풍2s+돌풍후7s)은
+// gust 시나리오 전용이라 여기 ramp 시나리오엔 안 맞는다 — 대신 램프 종료
+// 시점을 명시적으로 아는 걸 이용해 "그 이후"를 평가창으로 잡는다. 정확한
+// 평가창 규칙은 실제 §5.8 본시험 설계 시 다시 검토가 필요하다(문서화된
 // 단순화이지 §5.9 규칙의 완전한 재현이 아니다).
 function evaluateRun(result, speed, altitude) {
   if (result.failure) return {failed: true, reason: result.failure, rmse_v: Infinity, rmse_z: Infinity};
   const tr = result.trace;
-  const steady = tr.slice(Math.floor(tr.length*0.6));
+  const steady = tr.filter(f => f.t >= RAMP_T0+RAMP_DURATION_S);
+  if (!steady.length) return {failed: true, reason: 'no post-ramp samples (seconds too short)', rmse_v: Infinity, rmse_z: Infinity};
   const ev = steady.map(f => Math.hypot(f.v[0]-speed, f.v[1], f.v[2]));
   const ez = steady.map(f => f.z-altitude);
   return {failed: false, rmse_v: rmse(ev), rmse_z: rmse(ez),
@@ -107,7 +110,7 @@ async function main() {
   const seeds = Number(flag('seeds', '2'));
   const conditionIds = flag('conditions', null)?.split(',');
   const controllerIds = flag('controllers', null)?.split(',');
-  const seconds = Number(flag('seconds', '6'));
+  const seconds = Number(flag('seconds', String(RAMP_T0+RAMP_DURATION_S+4))); // 램프 끝난 뒤 정착 4초
   const outFile = flag('out', null);
   const profile = flag('profile', 'selected');
 
@@ -129,8 +132,14 @@ async function main() {
       const rows = [];
       for (let s = 0; s < seeds; s++) {
         const seed = 1000+s;
-        const opts = {controller, feedback: 'truth', scenario: 'step', speed: cond.speed,
-                     altitude: 20, seconds, seed, ...cond.opts};
+        // 'step'(순간 계단)이 아니라 'ramp'(식43 매끄러운 참조)를 쓴다 -- 논문
+        // §5.5 자신의 규칙("계단형은 입력포화·지연 진단 전용, 주 기동 비교는
+        // 연속 참조") + 실측: V=8 m/s 순간 스텝은 무풍에서도 hybrid/M17 둘 다
+        // 예고(preview)가 과도한 피치 오버슈트를 만들어 추락했다(2026-09-22
+        // 재현·원인 확인, ramp로 바꾸자 동일 조건이 정확히 수렴).
+        const opts = {controller, feedback: 'truth', scenario: 'ramp', speed: cond.speed,
+                     altitude: 20, ramp_t0: RAMP_T0, ramp_duration_s: RAMP_DURATION_S,
+                     seconds, seed, ...cond.opts};
         let result;
         try {
           result = await runtime.run(ca, data, opts, () => {});
@@ -182,6 +191,6 @@ async function main() {
 }
 
 module.exports = {rmse, evaluateRun, bootstrapPairedMedianCI, bootstrapPValue, holmCorrection,
-                  CONDITIONS, CONTROLLERS, V_L, V_H};
+                  CONDITIONS, CONTROLLERS, V_L, V_H, RAMP_T0, RAMP_DURATION_S};
 
 if (require.main === module) main().catch(e => { console.error(e); process.exitCode = 1; });

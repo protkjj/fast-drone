@@ -34,16 +34,25 @@ test('evaluateRun reports a failed run as infinite RMSE, not a silently small nu
   assert.equal(failed.rmse_z, Infinity);
 });
 
-test('evaluateRun computes steady-state RMSE from the tail of the trace only', () => {
-  // 앞부분(과도구간, 큰 오차)과 뒷부분(정착, 오차 0)을 섞은 합성 trace.
+test('evaluateRun computes steady-state RMSE only from samples after the ramp completes', () => {
+  // 램프 구간(t < RAMP_T0+RAMP_DURATION_S, 과도구간, 큰 오차)과 그 이후
+  // (정착, 오차 0)를 섞은 합성 trace.
+  const rampEnd = S.RAMP_T0+S.RAMP_DURATION_S;
   const trace = [
-    ...Array.from({length: 10}, () => ({v: [0, 0, 0], z: 0})),   // 과도구간
-    ...Array.from({length: 10}, () => ({v: [10, 0, 0], z: 20})), // 정착(목표 v=10,z=20)
+    ...Array.from({length: 10}, (_, i) => ({t: i*(rampEnd/10), v: [0, 0, 0], z: 0})),  // 과도구간(t<rampEnd)
+    ...Array.from({length: 10}, (_, i) => ({t: rampEnd+1+i, v: [10, 0, 0], z: 20})),   // 정착(목표 v=10,z=20)
   ];
   const result = S.evaluateRun({failure: null, trace}, 10, 20);
   assert.equal(result.failed, false);
   assert.ok(result.rmse_v < 1e-9, `steady-state RMSE_v should be ~0, got ${result.rmse_v}`);
   assert.ok(result.rmse_z < 1e-9, `steady-state RMSE_z should be ~0, got ${result.rmse_z}`);
+});
+
+test('evaluateRun fails cleanly (not silently 0) when no sample lies after the ramp window', () => {
+  const before = (S.RAMP_T0+S.RAMP_DURATION_S)/2;
+  const trace = [{t: 0, v: [0, 0, 0], z: 0}, {t: before, v: [0, 0, 0], z: 0}];
+  const result = S.evaluateRun({failure: null, trace}, 10, 20);
+  assert.equal(result.failed, true);
 });
 
 test('CONDITIONS covers all 12 표8 IDs exactly once, each referencing a valid runtime option', () => {

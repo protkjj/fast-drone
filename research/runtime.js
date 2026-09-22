@@ -7,6 +7,17 @@
   const add = (a, b) => a.map((v, i) => v+b[i]);
   const sub = (a, b) => a.map((v, i) => v-b[i]);
   const cross = (a,b) => [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+  // 논문 식(43): 0<=u<=1에서 5-9차 다항식, 양 끝에서 1-4차 도함수가 0이라
+  // 부드럽게 이어진다. 구간 밖은 0/1로 연장. "계단형 속도 명령은 입력
+  // 포화·지연 진단 전용이고 주 기동 비교엔 연속 참조를 쓴다"(§5.5)는
+  // 논문 자신의 규칙을 반영한 참조 생성기 -- 'step' 시나리오는 그 진단
+  // 용도로 남겨두고 새 'ramp' 시나리오가 이 매끄러운 참조를 쓴다.
+  function smoothstep(u) {
+    if (u <= 0) return 0;
+    if (u >= 1) return 1;
+    const u2=u*u, u3=u2*u, u4=u3*u, u5=u4*u;
+    return 126*u5 - 420*u5*u + 540*u5*u2 - 315*u5*u3 + 70*u5*u4;
+  }
   const dot3 = (a,b) => a.reduce((s,v,i)=>s+v*b[i],0);
   function quatMultiply(a, b) {
     // Hamilton product a (x) b, scalar-last [x,y,z,w].
@@ -635,6 +646,11 @@
       for(const next of config.commands){if(next.t>t+1e-10)break;command=next;}
       return [command.speed,0,0,command.altitude];
     }
+    if(config.scenario==='ramp'){
+      const t0=config.ramp_t0??1, Tr=config.ramp_duration_s??2;
+      const vx=config.speed*smoothstep((t-t0)/Tr);
+      return [vx,0,0,config.altitude??20];
+    }
     const vx=config.scenario==='hover'?0:(t<1?0:config.speed);
     return [vx,0,0,config.altitude??20];
   }
@@ -654,10 +670,16 @@
       ...options};
     if(!['hybrid','nmpc','pd','cpid','gslqr','f13','gindi'].includes(cfg.controller))throw new Error('Unknown controller');
     if(!['truth','eskf'].includes(cfg.feedback))throw new Error('Unknown feedback');
-    if(!['hover','step','gust','schedule'].includes(cfg.scenario))throw new Error('Unknown scenario');
+    if(!['hover','step','gust','schedule','ramp'].includes(cfg.scenario))throw new Error('Unknown scenario');
     if(!Number.isFinite(cfg.seconds)||cfg.seconds<.001||cfg.seconds>120)throw new Error('Duration must be 0.001–120 seconds');
     if(cfg.scenario==='step'&&cfg.seconds<1.1)throw new Error('속도 계단 시험은 1초 입력 이후를 포함하도록 1.1초 이상 필요합니다.');
     if(cfg.scenario==='gust'&&cfg.seconds<3.1)throw new Error('외란 시험은 2–3초 외란과 종료 이후를 포함하도록 3.1초 이상 필요합니다.');
+    if(cfg.scenario==='ramp'){
+      const t0=cfg.ramp_t0??1, Tr=cfg.ramp_duration_s??2;
+      if(!Number.isFinite(t0)||t0<0)throw new Error('ramp_t0 must be >= 0');
+      if(!Number.isFinite(Tr)||Tr<=0)throw new Error('ramp_duration_s must be > 0');
+      if(cfg.seconds<t0+Tr+.1)throw new Error('연속 참조 시험은 램프 시작+지속시간 이후를 포함하도록 충분히 길어야 합니다.');
+    }
     if(!Number.isFinite(cfg.speed)||cfg.speed<0||cfg.speed>100)throw new Error('Reference speed must be 0–100 m/s');
     if(!Number.isFinite(cfg.altitude)||cfg.altitude<1||cfg.altitude>1000)throw new Error('고도는 1–1000 m 범위입니다.');
     validateWind(cfg);
@@ -864,7 +886,10 @@
         if(indi?.last)optimizer.previous=indi.last.allocated.slice();
         const envelope=cfg.controller==='hybrid'&&cfg.hybrid_actuator_feedback?indi.envelope(feedback,voltage):null;
         if(envelope)envelope.t_s=t;
+        if(globalThis.__DEBUG_SOLVE__)console.error(`[solve] t=${t.toFixed(3)} feedback=${JSON.stringify(feedback)}`);
+        const __t0=Date.now();
         request=optimizer.solve(feedback,referenceHorizon(t,cfg),voltage,[0,0,0],envelope);
+        if(globalThis.__DEBUG_SOLVE__)console.error(`[solve] done in ${Date.now()-__t0}ms status=${optimizer.stats.at(-1)?.status} request=${JSON.stringify(request)}`);
         outerUpdates++;
         const stat=optimizer.stats.at(-1);if(stat)stat.t_s=t;
         report(t);
@@ -937,7 +962,9 @@
       implementation:data.provenance||null,solver:cfg.controller==='pd'?'PD–INDI observation controller (not NMPC)':'CasADi/IPOPT WebAssembly 3.8.0',
       simulated_seconds:samples*DT,wall_seconds:(performance.now()-begin)/1000,failure,
       status:failure?'failed':stopped?'stopped':'completed',
-      event_coverage:{speed_step:['step','gust'].includes(cfg.scenario)&&end>1,gust_started:cfg.scenario==='gust'&&end>2,gust_completed:cfg.scenario==='gust'&&end>=3},
+      event_coverage:{speed_step:['step','gust'].includes(cfg.scenario)&&end>1,
+        speed_ramp_completed:cfg.scenario==='ramp'&&end>=(cfg.ramp_t0??1)+(cfg.ramp_duration_s??2),
+        gust_started:cfg.scenario==='gust'&&end>2,gust_completed:cfg.scenario==='gust'&&end>=3},
       counts:{plant:samples,imu:imuSamples,nmpc:optimizer.stats.length,outer:outerUpdates,indi:indi?.samples||0,gps_captured:gpsSamples,
               gps_fused:estimator.updates,gps_replayed_imu:estimator.replayed},
       metrics:{velocity_rmse_mps:rmse(sumV2),altitude_rmse_m:rmse(sumZ2),
@@ -970,7 +997,7 @@
                     'Outside-map samples use an explicit passive continuation; these are NOT validated propulsion performance results.']};
     } finally {b.dispose();}
   }
-  const api={run,makeBindings,boundedIncrement,allocateThrust,motorDiagnostics,validateOptions,referenceHorizon,Estimator,Optimizer,ObservationController,ObservationClock,INDI,rotate,random,reference,environment,shiftPrediction};
+  const api={run,makeBindings,boundedIncrement,allocateThrust,motorDiagnostics,validateOptions,referenceHorizon,Estimator,Optimizer,ObservationController,ObservationClock,INDI,rotate,random,reference,environment,shiftPrediction,smoothstep};
   if(typeof module!=='undefined'&&module.exports) module.exports=api;
   else root.ResearchRuntime=api;
 })(globalThis);
