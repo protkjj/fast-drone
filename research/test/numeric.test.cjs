@@ -15,7 +15,7 @@ for(const profile of ['simple','selected'])test(`${profile}: generated scalar gr
   function check(group,key,args){close(fast.call(fast[group][key],...args),original.call(original[group][key],...args),key);}
   try{
     for(let i=0;i<36;i++){
-      const x=data.initial.slice(),env=[noise()*4,noise()*4,noise()*4,...[0,0,0]],scales=[1,1,1,1,1].map(()=>1+noise()*.08);
+      const x=data.initial.slice(),env=[noise()*4,noise()*4,noise()*4,...[0,0,0]],scales=[1,1,1,1,1,1].map(()=>1+noise()*.08);
       x[3]=noise()*35;x[4]=noise()*8;x[5]=noise()*8;
       const q=Array.from({length:4},noise),norm=Math.hypot(...q);q.forEach((v,j)=>x[6+j]=v/norm);
       for(let j=10;j<13;j++)x[j]=noise();

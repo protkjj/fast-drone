@@ -46,6 +46,12 @@
     const uniform = () => { state=(Math.imul(1664525,state)+1013904223)>>>0; return (state+.5)/4294967296; };
     return () => Math.sqrt(-2*Math.log(uniform()))*Math.cos(2*Math.PI*uniform());
   }
+  // Same LCG as random(), but returns the raw uniform draw -- for GPS dropout
+  // (표7), not a noise magnitude.
+  function uniformRandom(seed) {
+    let state=seed>>>0;
+    return () => { state=(Math.imul(1664525,state)+1013904223)>>>0; return (state+.5)/4294967296; };
+  }
   function linearSolve(matrix, rhs) {
     const n=rhs.length, a=matrix.map((row,i)=>[...row,rhs[i]]);
     for(let j=0;j<n;j++) {
@@ -476,8 +482,8 @@
   }
 
   class Estimator {
-    constructor(binding, data, initial) {
-      this.b=binding; this.config=data.sensors;
+    constructor(binding, data, initial, historyTicks=200) {
+      this.b=binding; this.config=data.sensors; this.historyTicks=historyTicks;
       this.state=[...initial.slice(0,10),0,0,0,0,0,0];
       // Surveyed launch pose: 0.1 m position / 0.05 m/s velocity / 0.01 rad
       // attitude standard deviations. Same initialization for BOTH controllers.
@@ -491,7 +497,7 @@
       [this.state,this.cov]=this.b.call(this.b.estimator.predict,this.state,this.cov,imu);
       this.tick++;
       this.nodes.set(this.tick,[this.state.slice(),this.cov.slice()]);
-      const oldest=this.tick-200;
+      const oldest=this.tick-this.historyTicks;
       this.nodes.delete(oldest); this.inputs.delete(oldest);
     }
     gps(captureTick, measurement) {
@@ -637,7 +643,15 @@
   }
   function validateOptions(options={}) {
     const cfg={controller:'hybrid',feedback:'truth',scenario:'step',seconds:4,speed:3,altitude:20,
-      wind_speed:0,wind_angle:90,seed:42,preview:true,hybrid_actuator_feedback:false,log_hz:50,scales:[1,1,1,1,1],...options};
+      wind_speed:0,wind_angle:90,seed:42,preview:true,hybrid_actuator_feedback:false,log_hz:50,scales:[1,1,1,1,1,1],
+      indi_rpm_desync_ms:0,
+      // 표7 센서·구동기 조건 스윕. null이면 번들 프로파일 기본값을 그대로 쓴다
+      // (기존 동작과 완전히 동일). gps_dropout_prob·outage는 truth/eskf 둘 다
+      // 영향, rpm_feedback_rate_hz는 INDI가 보는 회전수 갱신률(기본 1kHz).
+      gps_position_std_m:null, gps_velocity_std_mps:null, gps_rate_hz:null, gps_delay_ms:null,
+      gps_dropout_prob:0, gps_outage_start_s:null, gps_outage_duration_s:0,
+      rpm_feedback_rate_hz:1000, initial_soc:1.0,
+      ...options};
     if(!['hybrid','nmpc','pd','cpid','gslqr','f13','gindi'].includes(cfg.controller))throw new Error('Unknown controller');
     if(!['truth','eskf'].includes(cfg.feedback))throw new Error('Unknown feedback');
     if(!['hover','step','gust','schedule'].includes(cfg.scenario))throw new Error('Unknown scenario');
@@ -647,10 +661,37 @@
     if(!Number.isFinite(cfg.speed)||cfg.speed<0||cfg.speed>100)throw new Error('Reference speed must be 0–100 m/s');
     if(!Number.isFinite(cfg.altitude)||cfg.altitude<1||cfg.altitude>1000)throw new Error('고도는 1–1000 m 범위입니다.');
     validateWind(cfg);
-    if(!Array.isArray(cfg.scales)||cfg.scales.length!==5||cfg.scales.some(v=>!Number.isFinite(v)||v<.5||v>1.5))throw new Error('Invalid model-error scales');
+    // 6번째 요소(모터 속도루프 시간 배율, 표7)는 m/Ixx/Iyy/Izz/CT-CP와 성격이
+    // 달라(고의적 불일치가 아니라 실제 있을 수 있는 하드웨어 조건) 범위를 더
+    // 넓게 둔다 -- 표7이 5~80ms(공칭 20ms 기준 0.25~4배)까지 요구한다.
+    if(!Array.isArray(cfg.scales)||cfg.scales.length!==6||cfg.scales.slice(0,5).some(v=>!Number.isFinite(v)||v<.5||v>1.5)
+       ||!Number.isFinite(cfg.scales[5])||cfg.scales[5]<.1||cfg.scales[5]>5)
+      throw new Error('Invalid model-error scales');
     if(!Number.isInteger(cfg.seed)||cfg.seed<0||cfg.seed>4294967295)throw new Error('Seed must be an unsigned 32-bit integer');
     if(typeof cfg.preview!=='boolean')throw new Error('Preview must be true or false');
     if(typeof cfg.hybrid_actuator_feedback!=='boolean')throw new Error('Hybrid actuator feedback must be true or false');
+    // 표6 S0<->S1: INDI가 쓰는 로터회전수 피드백을 각가속도(자이로) 피드백과
+    // 의도적으로 시간축에서 어긋내는 진단 옵션. 0이면 S1(정렬, 기존 기본값과
+    // 동일). 잡음 크기·필터 주파수는 이 옵션과 무관하게 고정돼 있다.
+    if(!Number.isFinite(cfg.indi_rpm_desync_ms)||cfg.indi_rpm_desync_ms<0||cfg.indi_rpm_desync_ms>200)
+      throw new Error('INDI rpm desync must be 0-200 ms');
+    // 표7 스윕 인자 검증. null은 "번들 기본값 사용"이라 여기서 범위를 안 본다.
+    const optionalPositive=(v,name,max)=>{if(v!==null&&(!Number.isFinite(v)||v<=0||v>max))throw new Error(`${name} must be null or 0-${max}`);};
+    optionalPositive(cfg.gps_position_std_m,'gps_position_std_m',10);
+    optionalPositive(cfg.gps_velocity_std_mps,'gps_velocity_std_mps',5);
+    optionalPositive(cfg.gps_rate_hz,'gps_rate_hz',1000);
+    if(cfg.gps_delay_ms!==null&&(!Number.isFinite(cfg.gps_delay_ms)||cfg.gps_delay_ms<0||cfg.gps_delay_ms>2000))
+      throw new Error('gps_delay_ms must be null or 0-2000');
+    if(!Number.isFinite(cfg.gps_dropout_prob)||cfg.gps_dropout_prob<0||cfg.gps_dropout_prob>1)
+      throw new Error('gps_dropout_prob must be 0-1');
+    if(cfg.gps_outage_start_s!==null&&(!Number.isFinite(cfg.gps_outage_start_s)||cfg.gps_outage_start_s<0||cfg.gps_outage_start_s>cfg.seconds))
+      throw new Error('gps_outage_start_s must be null or within [0, seconds]');
+    if(!Number.isFinite(cfg.gps_outage_duration_s)||cfg.gps_outage_duration_s<0||cfg.gps_outage_duration_s>cfg.seconds)
+      throw new Error('gps_outage_duration_s must be 0-seconds');
+    if(![100,250,500,1000].includes(cfg.rpm_feedback_rate_hz))
+      throw new Error('rpm_feedback_rate_hz must be one of 100,250,500,1000');
+    if(!Number.isFinite(cfg.initial_soc)||cfg.initial_soc<=0||cfg.initial_soc>1)
+      throw new Error('initial_soc must be in (0,1]');
     if(![50,1000].includes(cfg.log_hz)||cfg.log_hz===1000&&cfg.seconds>20)throw new Error('로그는 50 Hz 또는 1 kHz입니다. 상세 1 kHz 로그는 20초 이하로 제한합니다.');
     if(cfg.scenario==='schedule'){
       if(!Array.isArray(cfg.commands)||!cfg.commands.length||cfg.commands.length>6001||cfg.commands[0].t!==0)
@@ -714,9 +755,26 @@
       :cfg.controller==='f13'?new F13Adapter(ca,b,data)
       :new Optimizer(ca,b,data,cfg.controller);
     const indi=['nmpc','cpid','gslqr'].includes(cfg.controller)?null:new INDI(b,data);
-    const initial=data.initial.slice();initial[2]=cfg.altitude;
-    const estimator=new Estimator(b,data,initial);
-    const s=data.sensors, p=data.profile;
+    const initial=data.initial.slice();initial[2]=cfg.altitude;initial[17]=cfg.initial_soc;
+    const p=data.profile;
+    // 표7: null이면 번들 프로파일 기본값 그대로(기존 동작과 동일). eskf 피드백의
+    // ESKF 자체 R(측정공분산, research/eskf.py)은 번들에 고정돼 있어 이 스윕과
+    // 별개다 -- 추정기의 잡음 가정이 아니라 "실제로 얼마나 나쁜 측정을 받는지"만
+    // 바꾼다는 뜻. gps_dropout_prob/outage는 research/ACTUATOR_FEEDBACK.md류
+    // 기존 기능이 아니라 이번에 새로 추가한 것.
+    const s={...data.sensors,
+      gps_position_std_m: cfg.gps_position_std_m ?? data.sensors.gps_position_std_m,
+      gps_velocity_std_mps: cfg.gps_velocity_std_mps ?? data.sensors.gps_velocity_std_mps,
+      gps_period_ticks: cfg.gps_rate_hz ? Math.max(1,Math.round(1/(cfg.gps_rate_hz*DT))) : data.sensors.gps_period_ticks,
+      gps_latency_ticks: cfg.gps_delay_ms!==null ? Math.round(cfg.gps_delay_ms/1000/DT) : data.sensors.gps_latency_ticks};
+    // ESKF는 GPS 표본의 취득 시각(capture tick)까지 거슬러 재적분해야 하므로,
+    // 지연(gps_latency_ticks)보다 짧게 이력을 지우면 표7의 큰 지연 조건에서
+    // "GPS timestamp is outside the ESKF history"로 죽는다 -- 직접 겪은 오류.
+    const estimator=new Estimator(b,data,initial,Math.max(200,s.gps_latency_ticks+50));
+    const gpsDropoutNoise=uniformRandom(cfg.seed+5);
+    const gpsOutageEndTick=cfg.gps_outage_start_s!==null?Math.round((cfg.gps_outage_start_s+cfg.gps_outage_duration_s)/DT):-1;
+    const gpsOutageStartTick=cfg.gps_outage_start_s!==null?Math.round(cfg.gps_outage_start_s/DT):-1;
+    const rpmUpdatePeriodTicks=Math.max(1,Math.round(1000/cfg.rpm_feedback_rate_hz));
     const imuNoise=random(cfg.seed), gpsNoise=random(cfg.seed+1), rpmNoise=random(cfg.seed+2), biasNoise=random(cfg.seed+3);
     // Independent gyro stream: both controllers see the same noise realization,
     // including their observation at t=0, without borrowing a previous-tick gyro.
@@ -724,9 +782,27 @@
     let ba=Array.from({length:3},()=>s.accel_bias_std_mps2*biasNoise());
     let bg=Array.from({length:3},()=>s.gyro_bias_std_rad_s*biasNoise());
     let x=initial.slice(), sensedGyro, sensedRpm;
+    // 표6 S0<->S1: rpm 피드백만 desyncTicks만큼 지연시켜 INDI에 전달한다
+    // (자이로/각가속도 쪽은 그대로) -- "정렬된 입력·각가속도"와 "의도한 시간
+    // 불일치"를 가르는 유일한 차이. desyncTicks=0(S1)이면 버퍼를 아예 안 써서
+    // 기존 동작과 바이트 단위로 동일하다.
+    const desyncTicks=Math.round(cfg.indi_rpm_desync_ms/1000/DT);
+    const rpmHistory=[];
+    function desyncedRpmFeedback(feedback){
+      rpmHistory.push(feedback.slice(13,17));
+      if(rpmHistory.length>desyncTicks+1)rpmHistory.shift();
+      if(desyncTicks<=0||rpmHistory.length<=desyncTicks)return feedback;
+      return [...feedback.slice(0,13),...rpmHistory[0]];
+    }
+    // 표7 회전수 피드백 갱신률: 기본 1kHz(매 틱)를 낮추면 sensedRpm이 다음
+    // 갱신 틱까지 held(직전 값 유지)된다. 자이로는 이 스윕과 무관 -- 그래야
+    // "회전수 피드백 갱신률"만의 효과를 본다.
+    let rpmCaptureCount=0;
     function captureRates(){
       sensedGyro=x.slice(10,13).map((v,i)=>v+bg[i]+s.gyro_std_rad_s*gyroNoise());
-      sensedRpm=x.slice(13,17).map(v=>v+s.rpm_std_rad_s*rpmNoise());
+      if(rpmCaptureCount%rpmUpdatePeriodTicks===0)
+        sensedRpm=x.slice(13,17).map(v=>v+s.rpm_std_rad_s*rpmNoise());
+      rpmCaptureCount++;
     }
     captureRates();
     if(indi) indi.gyro=cfg.feedback==='eskf'?sensedGyro.slice():x.slice(10,13);
@@ -791,7 +867,7 @@
       // Apply a live wind change on this tick, exactly as its recorded replay.
       const env=environment(t,cfg);
       const target=reference(t,cfg);
-      u=indi?indi.update(feedback,request,cfg.feedback==='eskf'?sensedGyro:feedback.slice(10,13)):request.slice();
+      u=indi?indi.update(desyncedRpmFeedback(feedback),request,cfg.feedback==='eskf'?sensedGyro:feedback.slice(10,13)):request.slice();
       if(indi)indi.last.t_s=t;
       if(u.some(v=>v<1e-6||v>data.solvers.nmpc.max_rotor_rad_s-1e-6)) saturation++;
       const dx=b.call(b.functions.rhs,x,u,env,cfg.scales)[0];
@@ -822,8 +898,15 @@
       captureRates();
       const nextTick=tick+1;
       if(nextTick%s.gps_period_ticks===0) {
-        pendingGPS.push({capture:nextTick,arrival:nextTick+s.gps_latency_ticks,
-          value:x.slice(0,6).map((v,i)=>v+(i<3?s.gps_position_std_m:s.gps_velocity_std_mps)*gpsNoise())});
+        // 표7 GNSS 누락: 매 표본 베르누이 확률(gps_dropout_prob) 또는 예약된
+        // 연속 구간(gps_outage_*, "1초 연속" 조건) 중 하나라도 걸리면 이번
+        // 표본을 통째로 버린다 -- pendingGPS에도 안 들어가 추정기가 아예 못 본다.
+        const scheduledOutage=gpsOutageStartTick>=0&&nextTick>=gpsOutageStartTick&&nextTick<gpsOutageEndTick;
+        const dropped=scheduledOutage||(cfg.gps_dropout_prob>0&&gpsDropoutNoise()<cfg.gps_dropout_prob);
+        if(!dropped){
+          pendingGPS.push({capture:nextTick,arrival:nextTick+s.gps_latency_ticks,
+            value:x.slice(0,6).map((v,i)=>v+(i<3?s.gps_position_std_m:s.gps_velocity_std_mps)*gpsNoise())});
+        }
         gpsSamples++;
       }
       while(pendingGPS.length && pendingGPS[0].arrival<=nextTick) {

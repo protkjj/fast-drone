@@ -112,8 +112,8 @@ class LevelTrimAudit:
         x = self.state(speed, theta, soc)
         x[13:17] = n
         d = {k: np.asarray(v).ravel() for k, v in self.f["diag"](
-            x=x, u=n, env=np.zeros(6), scales=np.ones(5)).items()}
-        dx = np.asarray(self.f["rhs"](x, n, np.zeros(6), np.ones(5))).ravel()
+            x=x, u=n, env=np.zeros(6), scales=np.ones(6)).items()}
+        dx = np.asarray(self.f["rhs"](x, n, np.zeros(6), np.ones(6))).ravel()
         motor = self.p["motor"]
         kt = 60/(2*np.pi*motor["kv_rpm_V"])
         required_voltage = kt*n + motor["resistance_ohm"]*d["requested_current"]

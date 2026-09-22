@@ -39,7 +39,7 @@ test('nonlinear allocation preserves feasible total thrust under angular saturat
 test('motor diagnostic distinguishes electrical limiting from command bounds',()=>{
   const x=data.initial.slice(),u=x.slice(13,17).map(n=>n*1.3);
   assert.ok(u.every(n=>n<data.solvers.nmpc.max_rotor_rad_s));
-  const d=b.call(b.functions.diag,x,u,[0,0,0,0,0,0],[1,1,1,1,1]);
+  const d=b.call(b.functions.diag,x,u,[0,0,0,0,0,0],[1,1,1,1,1,1]);
   const channels=R.motorDiagnostics(d);
   assert.ok(channels.current_limited.some(Boolean));
   assert.ok(channels.tracking_limited.some(Boolean));

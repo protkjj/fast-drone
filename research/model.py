@@ -97,11 +97,17 @@ def propellers(n, axial, p, scale=1):
     return tuple(ca.vertcat(*v) for v in (thrust, torque, advance, outside))
 
 
-def motors(n, cmd, torque, voltage, p):
+def motors(n, cmd, torque, voltage, p, tau_scale=1):
+    """tau_scale(표7 모터 속도루프 시간 스윕): speed_loop_tau_s에 곱하는 배율,
+    기본 1이면 기존과 완전히 동일. 참 플랜트(rhs/step/diag)에만 흘려보내고
+    M17(full/constrained) 자신의 예측모델은 항상 공칭값을 쓴다(§5.6의 scales
+    m/Ixx/Iyy/Izz/CT-CP가 이미 그렇듯, 제어기 자신의 모델과 실제 플랜트를
+    분리하는 기존 원칙과 동일)."""
     m, b = p["motor"], p["battery"]
     kt = 60/(2*np.pi*m["kv_rpm_V"])
     friction = kt*m["i0_A"]*n/ca.sqrt(n*n + 1)
-    desired_torque = torque + friction + m["rotor_inertia_kg_m2"]*(cmd-n)/m["speed_loop_tau_s"]
+    tau = m["speed_loop_tau_s"]*tau_scale
+    desired_torque = torque + friction + m["rotor_inertia_kg_m2"]*(cmd-n)/tau
     # No regeneration: negative requested torque means passive coasting.
     limit = min(m["current_limit_A"], b["capacity_Ah"]*b["max_C"]*b["esc_efficiency"]/4)
     request = clip(desired_torque/kt, 0, limit)
@@ -114,30 +120,30 @@ def motors(n, cmd, torque, voltage, p):
     return dn, current, electrical, friction
 
 
-def battery_voltage(n, cmd, torque, soc, p):
+def battery_voltage(n, cmd, torque, soc, p, tau_scale=1):
     b = p["battery"]
     voc = b["series"]*table(soc, [0, .5, 1], [3.4, 3.7, 4.2])
     voltage = voc
     # Newton on the high-voltage branch: V^2 - Voc V + R P(V) = 0.
     # Motor current is voltage-limited inside P(V); we don't draw impossible power.
     z = ca.SX.sym("voltage")
-    power_expr = motors(n, cmd, torque, z, p)[2]
+    power_expr = motors(n, cmd, torque, z, p, tau_scale)[2]
     dp = ca.jacobian(power_expr, z)
-    f = ca.Function("bus_power", [z, n, cmd, torque], [power_expr, dp])
+    f = ca.Function("bus_power", [z, n, cmd, torque, tau_scale], [power_expr, dp])
     for _ in range(8):
-        power, derivative = f(voltage, n, cmd, torque)
+        power, derivative = f(voltage, n, cmd, torque, tau_scale)
         residual = voltage**2 - voc*voltage + b["resistance_ohm"]*power
         gradient = 2*voltage-voc+b["resistance_ohm"]*derivative
         voltage = clip(voltage-residual/ca.fmax(gradient, 1e-6), .5*voc, voc)
     return voltage, voc
 
 
-def motor_limits(n, cmd, torque, voltage, p):
+def motor_limits(n, cmd, torque, voltage, p, tau_scale=1):
     """Diagnostic limits; these never change the physical saturation equations."""
     m, b = p["motor"], p["battery"]
     kt = 60/(2*np.pi*m["kv_rpm_V"])
     friction = kt*m["i0_A"]*n/ca.sqrt(n*n+1)
-    requested = (torque+friction+m["rotor_inertia_kg_m2"]*(cmd-n)/m["speed_loop_tau_s"])/kt
+    requested = (torque+friction+m["rotor_inertia_kg_m2"]*(cmd-n)/(m["speed_loop_tau_s"]*tau_scale))/kt
     limit = min(m["current_limit_A"], b["capacity_Ah"]*b["max_C"]*b["esc_efficiency"]/4)
     cap = ca.fmax((voltage-kt*n)/m["resistance_ohm"], 0)
     bounded = clip(requested, 0, limit)
@@ -168,16 +174,17 @@ def build(p):
     x = ca.SX.sym("state", 18)
     cmd = ca.SX.sym("rotor_command", 4)
     environment = ca.SX.sym("environment", 6)  # wind world xyz, applied moment body xyz
-    scales = ca.SX.sym("plant_scales", 5)  # m, Ixx, Iyy, Izz, CT/CP; nominal controller uses 1
+    # m, Ixx, Iyy, Izz, CT/CP, motor speed-loop tau(표7); nominal controller uses 1s.
+    scales = ca.SX.sym("plant_scales", 6)
     n, soc = x[13:17], x[17]
     vb = rotation(x[6:10]).T @ (x[3:6]-environment[:3])
     thrust, torque, advance, outside = propellers(n, vb[0], p, scales[4])
     # Helpers require primitive symbols; substitute the physical torque afterwards.
-    nn, uu, qq, ss = ca.SX.sym("n", 4), ca.SX.sym("u", 4), ca.SX.sym("Q", 4), ca.SX.sym("soc")
-    vv, ocv = battery_voltage(nn, uu, qq, ss, p)
-    bus = ca.Function("bus", [nn, uu, qq, ss], [vv, ocv])
-    voltage, voc = bus(n, cmd, torque, soc)
-    dn, current, power, friction = motors(n, cmd, torque, voltage, p)
+    nn, uu, qq, ss, tt = ca.SX.sym("n", 4), ca.SX.sym("u", 4), ca.SX.sym("Q", 4), ca.SX.sym("soc"), ca.SX.sym("tau_scale")
+    vv, ocv = battery_voltage(nn, uu, qq, ss, p, tt)
+    bus = ca.Function("bus", [nn, uu, qq, ss, tt], [vv, ocv])
+    voltage, voc = bus(n, cmd, torque, soc, scales[5])
+    dn, current, power, friction = motors(n, cmd, torque, voltage, p, scales[5])
     dx17, force, moment = mechanical(x[:17], dn, thrust, torque, environment[:3], environment[3:], p, scales)
     ibus = power/voltage
     dsoc = -ibus/(3600*p["battery"]["capacity_Ah"])
@@ -191,7 +198,7 @@ def build(p):
                voc-voltage-p["battery"]["resistance_ohm"]*ibus, outside, advance, force, moment]
     names = ["thrust", "torque", "current", "dn", "voltage", "ibus", "power", "shaft", "copper",
              "friction", "rotor_kinetic_rate", "motor_energy_residual", "bus_residual", "outside_map", "J", "aero_force", "moment"]
-    outputs += motor_limits(n, cmd, torque, voltage, p)
+    outputs += motor_limits(n, cmd, torque, voltage, p, scales[5])
     names += ["requested_current", "current_limit", "voltage_current_cap", "current_limited",
               "voltage_limited", "coasting", "tracking_limited"]
     diag = ca.Function("diagnostics", [x, cmd, environment, scales], outputs,
@@ -210,7 +217,7 @@ def build(p):
     vbm = rotation(xm[6:10]).T @ (xm[3:6]-environment[:3])
     tm, qm, _, _ = propellers(xm[13:17], vbm[0], p)
     dnm = motors(xm[13:17], cmd, qm, bus_v, p)[0]
-    full_rhs = mechanical(xm, dnm, tm, qm, environment[:3], ca.DM.zeros(3), p, ca.DM.ones(5))[0]
+    full_rhs = mechanical(xm, dnm, tm, qm, environment[:3], ca.DM.zeros(3), p, ca.DM.ones(6))[0]
     full = ca.Function("full_prediction", [xm, cmd, environment[:3], bus_v], [full_rhs])
 
     # A constraint-form motor predictor avoids differentiating a nested current
@@ -223,7 +230,7 @@ def build(p):
     free_dn = (cmd-xm[13:17])/motor["speed_loop_tau_s"]
     requested_current = (qm+friction_m+motor["rotor_inertia_kg_m2"]*free_dn)/kt
     required_voltage = kt*xm[13:17]+motor["resistance_ohm"]*requested_current
-    free_rhs = mechanical(xm,free_dn,tm,qm,environment[:3],ca.DM.zeros(3),p,ca.DM.ones(5))[0]
+    free_rhs = mechanical(xm,free_dn,tm,qm,environment[:3],ca.DM.zeros(3),p,ca.DM.ones(6))[0]
     constrained = ca.Function("constraint_form_prediction", [xm,cmd,environment[:3],bus_v],
                               [free_rhs,requested_current,required_voltage])
 

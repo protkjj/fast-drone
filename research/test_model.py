@@ -11,13 +11,13 @@ def model(request):
 
 
 def diagnostic(f, x, u):
-    return {k: np.asarray(v).ravel() for k, v in f["diag"](x=x, u=u, env=np.zeros(6), scales=np.ones(5)).items()}
+    return {k: np.asarray(v).ravel() for k, v in f["diag"](x=x, u=u, env=np.zeros(6), scales=np.ones(6)).items()}
 
 
 def test_hover_and_state_dimensions(model):
     p, f = model
     x = initial_state(p)
-    dx = np.asarray(f["rhs"](x, x[13:17], np.zeros(6), np.ones(5))).ravel()
+    dx = np.asarray(f["rhs"](x, x[13:17], np.zeros(6), np.ones(6))).ravel()
     np.testing.assert_allclose(dx[:17], 0, atol=1e-8)
     assert dx[17] < 0  # A hovering vehicle consumes battery charge.
     assert f["full"].size1_in(0) == 17
@@ -99,7 +99,7 @@ def test_virtual_translation_matches_actual_at_equal_thrust(model):
     x[3:6] = [10, 2, 3]
     x[10:13] = [.1, -.2, .3]
     d = diagnostic(f, x, x[13:17])
-    actual = np.asarray(f["rhs"](x, x[13:17], [0]*6, [1]*5)).ravel()
+    actual = np.asarray(f["rhs"](x, x[13:17], [0]*6, [1]*6)).ravel()
     virtual = np.asarray(f["virtual"](x[:13], [sum(d["thrust"]), 0,0,0], [0]*3)).ravel()
     np.testing.assert_allclose(actual[:10], virtual[:10], atol=1e-9)
 
@@ -108,7 +108,7 @@ def test_step_does_not_snap_velocity_to_reference(model):
     p, f = model
     x = initial_state(p)
     u = x[13:17]*1.1
-    nxt = np.asarray(f["step"](x, u, [0]*6, [1]*5)).ravel()
+    nxt = np.asarray(f["step"](x, u, [0]*6, [1]*6)).ravel()
     assert 0 < nxt[5] < .1
     assert np.isclose(np.linalg.norm(nxt[6:10]), 1)
     # No target speed is even an argument to the plant.

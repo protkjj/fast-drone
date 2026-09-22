@@ -70,7 +70,7 @@ def test_equal_rotors_do_not_cancel_cruise_aerodynamic_pitch_moment(audit):
     result = audit.evaluate(83.3)
     x = audit.state(83.3, np.deg2rad(result["theta_deg"]), 1)
     x[13:17] = audit.p["anchors"]["cruise"]["rpm"]*2*np.pi/60
-    rhs = np.asarray(audit.f["rhs"](x, x[13:17], np.zeros(6), np.ones(5))).ravel()
+    rhs = np.asarray(audit.f["rhs"](x, x[13:17], np.zeros(6), np.ones(6))).ravel()
     assert rhs[11] > 40  # rad/s², despite approximately balanced translational forces.
 
 
@@ -108,7 +108,7 @@ def test_actual_1khz_integration_accepts_only_the_feasible_operating_point(audit
     start = x.copy()
     command = x[13:17].copy()
     for _ in range(100):  # 100 ms; no controller or target-speed correction.
-        x = np.asarray(audit.f["step"](x, command, np.zeros(6), np.ones(5))).ravel()
+        x = np.asarray(audit.f["step"](x, command, np.zeros(6), np.ones(6))).ravel()
     if holds:
         np.testing.assert_allclose(x[3:17], start[3:17], atol=1e-8)
         assert np.isclose(x[0]-start[0], speed*.1)

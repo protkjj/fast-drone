@@ -46,8 +46,8 @@ function updateAircraftLabel(){
 }
 $('mode-observe').addEventListener('click',()=>setMode('observe'));
 $('mode-compare').addEventListener('click',()=>setMode('compare'));
-const mismatches={nominal:[1,1,1,1,1],mass:[1.1,1,1,1,1],inertia:[1,1.15,1.15,1.15,1],
-  prop:[1,1,1,1,.9],combined:[1.1,1.15,1.15,1.15,.9]};
+const mismatches={nominal:[1,1,1,1,1,1],mass:[1.1,1,1,1,1,1],inertia:[1,1.15,1.15,1.15,1,1],
+  prop:[1,1,1,1,.9,1],combined:[1.1,1.15,1.15,1.15,.9,1]};
 if(matchMedia('(max-width:850px)').matches)$('settings').open=false;
 let rotorRates=[0,0,0,0],rotorFrame=null,lastRotorFrame=0;
 function animateModel(now){

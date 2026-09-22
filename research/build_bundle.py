@@ -47,7 +47,7 @@ def bundle(name, include_solvers=True):
     x = x0.copy()
     x[3:6] = [8, 1, 2]
     x[10:13] = [.1, -.2, .3]
-    u, env, scales = (x[13:17]*[1.05,.98,1.1,1]).tolist(), [2,0,0,.01,0,0], [1.1,1,.9,1.1,.95]
+    u, env, scales = (x[13:17]*[1.05,.98,1.1,1]).tolist(), [2,0,0,.01,0,0], [1.1,1,.9,1.1,.95,1.05]
     payload["parity"] = {"x": x.tolist(), "u": u, "env": env, "scales": scales,
                          "rhs": np.asarray(functions["rhs"](x,u,env,scales)).ravel().tolist(),
                          "step": np.asarray(functions["step"](x,u,env,scales)).ravel().tolist(),

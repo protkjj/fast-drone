@@ -9,8 +9,8 @@ async function main() {
   const output=process.argv[2]||path.join(__dirname,'generated/benchmark.json');
   const reports=[];
   for(const configuration of [
-    {feedback:'truth',scales:[1,1,1,1,1]},
-    {feedback:'eskf',scales:[1,1,1,1,1]},
+    {feedback:'truth',scales:[1,1,1,1,1,1]},
+    {feedback:'eskf',scales:[1,1,1,1,1,1]},
     {feedback:'truth',scales:[1.1,1.15,1.15,1.15,.9]}
   ]) for(const controller of ['hybrid','nmpc']) {
     console.log(`START ${controller}/${configuration.feedback}/${configuration.scales.join(',')}`);

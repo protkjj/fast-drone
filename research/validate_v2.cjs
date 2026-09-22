@@ -10,10 +10,10 @@ async function main(){
   await ca.load_nlpsol('ipopt');await ca.load_interpolant('linear');
   const data=JSON.parse(fs.readFileSync(path.join(__dirname,'generated/selected.json')));
   const cases=[
-    {id:'nominal-truth',feedback:'truth',scales:[1,1,1,1,1],seed:42,scenario:'step',seconds:2},
-    {id:'nominal-eskf',feedback:'eskf',scales:[1,1,1,1,1],seed:42,scenario:'step',seconds:2},
+    {id:'nominal-truth',feedback:'truth',scales:[1,1,1,1,1,1],seed:42,scenario:'step',seconds:2},
+    {id:'nominal-eskf',feedback:'eskf',scales:[1,1,1,1,1,1],seed:42,scenario:'step',seconds:2},
     {id:'combined-truth',feedback:'truth',scales:[1.1,1.15,1.15,1.15,.9],seed:42,scenario:'step',seconds:2},
-    ...[7,42,2026].map(seed=>({id:'gust-eskf-'+seed,feedback:'eskf',scales:[1,1,1,1,1],seed,scenario:'gust',seconds:3.2}))
+    ...[7,42,2026].map(seed=>({id:'gust-eskf-'+seed,feedback:'eskf',scales:[1,1,1,1,1,1],seed,scenario:'gust',seconds:3.2}))
   ];
   const reports=[],started_at=new Date().toISOString();
   for(const item of cases)for(const controller of ['hybrid','nmpc']){
