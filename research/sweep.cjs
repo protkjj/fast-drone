@@ -17,26 +17,45 @@ const runtime = require('./runtime.js');
 
 const CONTROLLERS = ['cpid', 'gslqr', 'nmpc', 'f13', 'hybrid', 'gindi']; // 표5: CPID,GSLQR,M17,F13,V13,GINDI
 const RAMP_T0 = 1, RAMP_DURATION_S = 3; // 식(43) 참조: t0=1s에 시작, 3초에 걸쳐 목표 속도로.
-const V_L = 8, V_H = 18; // 트림이 실제로 존재하는 0-18 m/s로 재설정(§5.8 규칙:
-// "해당 모델에서 유효한 트림이 존재하지 않으면 낮춘다" — 20/40 후보는 20-80 m/s에
-// 트림이 아예 없어 그대로 못 씀, research/TRIM_ENVELOPE_AUDIT.md와 2026-09-22
-// 재확인 참고).
+const V_L = 8, V_H = 14; // 트림 존재(0-19.63 m/s)에 더해 **조종 권한**까지 만족하는 값.
+// §5.8 규칙 "해당 모델에서 유효한 트림이 존재하지 않으면 낮춘다" — 20/40 후보는 20-80
+// m/s에 트림이 아예 없고(TRIM_ENVELOPE_AUDIT.md), 트림만 보고 잡았던 V_H=18은 외란을
+// 걸면 권한이 모자랐다: 피치·요 요구는 더해지므로(T >= (|My|+|Mz|)/a) 측풍이 트림이
+// 이미 쓰는 권한 위에 얹힌다. V_H=18에서는 12조건 중 8개가 100%를 넘어, 그 런들은
+// 제어기 성능이 아니라 기체 권한 부족을 재게 된다.
+// 근거·유도·조건별 수치: research/TRIM_CAUSE_AND_LEVERS.md §6.5
+// 재현: python3 -c "from research.trim_envelope import LevelTrimAudit;
+//        from research.trim_levers import combined_authority as c;
+//        print(c(LevelTrimAudit(), 14, 5))"
+const V_H_MAX_CROSSWIND = 7; // Q05(강한 측풍). 10 m/s는 V_H<=13.71을 강요해 V_H를 더
+// 깎아야 했고, 7로 낮추면 V_H=14에서 84.8%로 들어온다(자세각 대비도 더 넓게 유지).
 
 // 표8. 확인 시험 12조건. wind_angle=90은 순수 측풍(진행방향 vx에 수직).
+// 괄호 안 %는 권한 소모율 — 100% 초과면 비음수 로터추력으로 자세 유지가 불가능하다.
 const CONDITIONS = [
-  {id: 'Q01', speed: V_L, opts: {}},
-  {id: 'Q02', speed: V_H, opts: {}},
-  {id: 'Q03', speed: V_L, opts: {wind_speed: 5, wind_angle: 90}},
-  {id: 'Q04', speed: V_H, opts: {wind_speed: 5, wind_angle: 90}},
-  {id: 'Q05', speed: V_H, opts: {wind_speed: 10, wind_angle: 90}},
-  {id: 'Q06', speed: V_H, opts: {wind_vertical_mps: 5}},
-  {id: 'Q07', speed: V_H, opts: {wind_vertical_mps: -5}},
-  {id: 'Q08', speed: V_H, opts: {wind_speed: 5, wind_angle: 90, scales: [1.2, 1, 1, 1, 1, 1]}},
-  {id: 'Q09', speed: V_H, opts: {wind_speed: 5, wind_angle: 90, scales: [1, 1, 1, 1, 1, 2.0]}}, // 20ms->40ms
-  {id: 'Q10', speed: V_H, opts: {wind_speed: 5, wind_angle: 90, initial_soc: 0.2}},
-  {id: 'Q11', speed: V_H, opts: {wind_speed: 5, wind_angle: 90, gps_position_std_m: 3.0, gps_delay_ms: 100}},
-  {id: 'Q12', speed: V_H, opts: {wind_speed: 5, wind_angle: 90, indi_rpm_desync_ms: 5}},
+  {id: 'Q01', speed: V_L, opts: {}},                                      // 11.8%
+  {id: 'Q02', speed: V_H, opts: {}},                                      // 49.2%
+  {id: 'Q03', speed: V_L, opts: {wind_speed: 5, wind_angle: 90}},         // 22.1%
+  {id: 'Q04', speed: V_H, opts: {wind_speed: 5, wind_angle: 90}},         // 73.2%
+  {id: 'Q05', speed: V_H, opts: {wind_speed: V_H_MAX_CROSSWIND, wind_angle: 90}}, // 84.8%
+  {id: 'Q06', speed: V_H, opts: {wind_vertical_mps: 5}},                  // 51.6% (받음각 증가측)
+  {id: 'Q07', speed: V_H, opts: {wind_vertical_mps: -5}},                 // 42.8% (받음각 감소측)
+  {id: 'Q08', speed: V_H, opts: {wind_speed: 5, wind_angle: 90, scales: [1.2, 1, 1, 1, 1, 1]}}, // 57.3%
+  {id: 'Q09', speed: V_H, opts: {wind_speed: 5, wind_angle: 90, scales: [1, 1, 1, 1, 1, 2.0]}}, // 73.2%, 20ms->40ms
+  // initial_soc 는 0.2 였는데 그 값이 profile.battery.minimum_soc 와 **같아서**,
+  // runtime.js:959 의 컷오프(SOC < minimum_soc -> 즉시 실패)에 첫 스텝부터 걸렸다.
+  // 실측: 세 제어기 전부 'Battery minimum SOC reached' 로 동일 실패 = 제어기를
+  // 구분하지 못하는 조건이었다. 8초 런의 SOC 소비가 0.0169 이므로 0.25 로 올리면
+  // 종료 시 0.233 으로 바닥까지 소비량의 2배 여유가 남는다. 저전압 효과 자체는
+  // 그대로다(버스 24.9V -> 20.9V). seconds 를 크게 늘리면 이 값도 다시 봐야 한다.
+  {id: 'Q10', speed: V_H, opts: {wind_speed: 5, wind_angle: 90, initial_soc: 0.25}},            // 73.2%
+  {id: 'Q11', speed: V_H, opts: {wind_speed: 5, wind_angle: 90, gps_position_std_m: 3.0, gps_delay_ms: 100}}, // 73.2%
+  {id: 'Q12', speed: V_H, opts: {wind_speed: 5, wind_angle: 90, indi_rpm_desync_ms: 5}},        // 73.2%
 ];
+// 주: 소모율은 무풍 트림 자세를 유지한 채 버티는 준정적 값이라 스크리닝 기준이다.
+// Q08(질량 1.2배)이 오히려 낮은 건 직관과 반대인데 실측값이다 — 무거우면 받음각이
+// 커져(55.69->61.62도) cos(theta)가 줄고, 요구 모멘트 |cp|*W*cos(theta)는 거의 그대로인데
+// (x1.01) 가용 추력은 x1.27로 늘기 때문이다. 즉 이 기체에선 무게가 피치 권한을 돕는다.
 
 function rmse(values) { return Math.sqrt(values.reduce((s, v) => s+v*v, 0)/values.length); }
 
