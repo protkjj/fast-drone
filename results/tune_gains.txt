@@ -1,0 +1,93 @@
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_cpid_base.json  (1 candidates)
+  eval 20/80
+  eval 40/80
+  eval 60/80
+  eval 80/80
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_cpid_p0.json  (20 candidates)
+  eval 20/80
+  eval 40/80
+  eval 60/80
+  eval 80/80
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_cpid_p1.json  (20 candidates)
+  eval 20/80
+  eval 40/80
+  eval 60/80
+  eval 80/80
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_cpid_p2.json  (20 candidates)
+  eval 20/80
+  eval 40/80
+  eval 60/80
+  eval 80/80
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_cpid_p3.json  (20 candidates)
+  eval 20/80
+  eval 40/80
+  eval 60/80
+  eval 80/80
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_cpid_p4.json  (20 candidates)
+  eval 20/80
+  eval 40/80
+  eval 60/80
+  eval 80/80
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_cpid_p5.json  (20 candidates)
+[cpid] 완료 827.7s 기준선=4.0716437256004046 최적=0.4668320640944484
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gindi_base.json  (1 candidates)
+  eval 20/80
+  eval 40/80
+  eval 60/80
+  eval 80/80
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gindi_p0.json  (20 candidates)
+  eval 20/80
+  eval 40/80
+  eval 60/80
+  eval 80/80
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gindi_p1.json  (20 candidates)
+  eval 20/80
+  eval 40/80
+  eval 60/80
+  eval 80/80
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gindi_p2.json  (20 candidates)
+  eval 20/80
+  eval 40/80
+  eval 60/80
+  eval 80/80
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gindi_p3.json  (20 candidates)
+  eval 20/80
+  eval 40/80
+  eval 60/80
+  eval 80/80
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gindi_p4.json  (20 candidates)
+  eval 20/80
+  eval 40/80
+  eval 60/80
+  eval 80/80
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gindi_p5.json  (20 candidates)
+[gindi] 완료 1274.8s 기준선=1.3357495008604985 최적=0.09655284285576557
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gslqr_base.json  (1 candidates)
+  eval 20/56
+  eval 40/56
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gslqr_p0.json  (14 candidates)
+  eval 20/56
+  eval 40/56
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gslqr_p1.json  (14 candidates)
+  eval 20/56
+  eval 40/56
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gslqr_p2.json  (14 candidates)
+  eval 20/56
+  eval 40/56
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gslqr_p3.json  (14 candidates)
+  eval 20/56
+  eval 40/56
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gslqr_p4.json  (14 candidates)
+  eval 20/56
+  eval 40/56
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gslqr_p5.json  (14 candidates)
+  eval 20/56
+  eval 40/56
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gslqr_p6.json  (14 candidates)
+  eval 20/56
+  eval 40/56
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gslqr_p7.json  (14 candidates)
+  eval 20/32
+written: /private/tmp/claude-501/-Users-kj-Desktop-dynamic-fast-drone/d750fe14-8979-46c0-93d8-2e81df528cff/scratchpad/tuning_work/out_gslqr_p8.json  (8 candidates)
+[gslqr] 완료 1014.9s 기준선=3001.061522037973 최적=5.495985906756641
+saved: /Users/kj/Desktop/dynamic/fast_drone/research/generated/tuned_gains.json

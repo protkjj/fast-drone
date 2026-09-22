@@ -266,24 +266,35 @@
     return {integralV: [0, 0, 0], integralW: [0, 0, 0], filteredDerivV: [0, 0, 0],
             lastEv: null, desiredAxes: null};
   }
-  // Placeholder gains, same order of magnitude as this repo's other baseline
-  // controllers -- the paper's protocol requires an independent tuning pass
-  // per controller, not a shared number. CPID and GINDI genuinely need
-  // DIFFERENT attitude-rate gains here: sharing CPID's kR/kpW/kiW with GINDI
-  // diverges by ~9s of a 3 m/s step (checked directly, not assumed) because
-  // INDI tracks the commanded [T,alpha] much tighter than the static
-  // allocator, so the same outer-loop gains are effectively higher-bandwidth
-  // through GINDI. GINDI's own values below were empirically checked stable
-  // over 15s; neither set claims to be tuned.
-  const CPID_GAINS = {kpV: [1.4, 1.4, 4.0], kiV: [.15, .15, .6], kdV: [.1, .1, .2],
-                      kz: 1.8, kR: 8.0, kpW: 45.0, kiW: 5.0};
-  const GINDI_GAINS = {kpV: [1.4, 1.4, 4.0], kiV: [.15, .15, .6], kdV: [.1, .1, .2],
-                       kz: 1.8, kR: 3.0, kpW: 15.0, kiW: 2.0};
+  // Tuned 2026-09-22 by research/tune_gains.py under the paper's §5.3 protocol
+  // (independent tuning scenarios, equal budget, test set never consulted).
+  // The record -- search history, pre-tuning placeholders, and the selection
+  // rule that picked between the two protocol revisions -- is in
+  // results/tuned_gains.json; the write-up is research/GAIN_TUNING.md.
+  // Do NOT hand-edit these: §5.3 forbids re-picking weights after seeing test
+  // results, and test_tune_gains.py checks that these literals still match the
+  // recorded selection.
+  //
+  // Both moved the same way: outer velocity loop much faster (kpV x4), inner
+  // rate loop unchanged or much slower. That is the opposite of the usual
+  // "inner loop fastest" cascade rule, and it is what removes the attitude
+  // overshoot that was tipping the airframe past horizontal during the ramp.
+  // GINDI still needs its own rate gains -- INDI tracks the commanded [T,alpha]
+  // far tighter than CPID's static allocator, so a shared number is effectively
+  // a different bandwidth through each.
+  const CPID_GAINS = {kpV: [5.6, 5.6, 4.0], kiV: [.15, .15, .3], kdV: [.05, .05, .2],
+                      kz: 3.6, kR: 4.0, kpW: 45.0, kiW: 5.0};
+  const GINDI_GAINS = {kpV: [5.6, 5.6, 8.0], kiV: [.15, .15, 1.2], kdV: [.1, .1, .2],
+                       kz: 1.8, kR: 3.0, kpW: 3.75, kiW: 2.0};
 
   class CPID {
-    constructor(binding, data) {
+    // `override` (cfg.gains) exists so the tuning driver (research/tune_gains.py)
+    // can evaluate candidate gains without editing this file. Undefined override
+    // leaves the published behaviour byte-identical.
+    constructor(binding, data, override) {
       this.b = binding; this.p = data.profile;
-      this.gains = CPID_GAINS; this.mem = newGuidanceMemory();
+      this.gains = override ? {...CPID_GAINS, ...override} : CPID_GAINS;
+      this.mem = newGuidanceMemory();
       this.max = data.solvers.hybrid.max_rotor_rad_s; this.stats = [];
       // Fixed (non-measured) nominal effectiveness at the hover rotor speed --
       // "정적 배분": the matrix does not re-linearize around the current
@@ -316,9 +327,10 @@
   // (run()) owns the shared INDI instance and calls indi.update() with this
   // class's [T,alpha] output, exactly as it does for hybrid/f13.
   class GINDI {
-    constructor(binding, data) {
+    constructor(binding, data, override) {   // override: see CPID
       this.b = binding; this.p = data.profile;
-      this.gains = GINDI_GAINS; this.mem = newGuidanceMemory();
+      this.gains = override ? {...GINDI_GAINS, ...override} : GINDI_GAINS;
+      this.mem = newGuidanceMemory();
       this.max = data.solvers.hybrid.max_rotor_rad_s; this.stats = [];
       this.previous = [this.p.mass_kg*this.p.g, 0, 0, 0];
     }
@@ -654,8 +666,12 @@
     const vx=config.scenario==='hover'?0:(t<1?0:config.speed);
     return [vx,0,0,config.altitude??20];
   }
-  function referenceHorizon(t,config) {
-    return Array.from({length:21},(_,k)=>reference(config.preview===false?t:t+k*.05,config));
+  // nodes/dt 는 솔버 메타(N, prediction_dt_s)에서 와야 한다. 예전엔 21과 .05 가
+  // 하드코딩돼 있어서, nmpc.py 의 N 을 바꾸면 참조 파라미터 개수가 어긋나 솔버가
+  // 조용히 실패했다(반복 0회 반환 -> 기체가 아예 안 움직임). 기본값은 기존 값
+  // 그대로라 호출부를 안 고친 곳의 동작은 바뀌지 않는다.
+  function referenceHorizon(t,config,nodes=21,dt=.05) {
+    return Array.from({length:nodes},(_,k)=>reference(config.preview===false?t:t+k*dt,config));
   }
   function validateOptions(options={}) {
     const cfg={controller:'hybrid',feedback:'truth',scenario:'step',seconds:4,speed:3,altitude:20,
@@ -778,9 +794,9 @@
     const b=makeBindings(ca,data,['pd','cpid','gslqr','gindi'].includes(cfg.controller)?[]:[cfg.controller]);
     try {
     const optimizer=cfg.controller==='pd'?new ObservationController(b,data)
-      :cfg.controller==='cpid'?new CPID(b,data)
+      :cfg.controller==='cpid'?new CPID(b,data,cfg.gains)
       :cfg.controller==='gslqr'?new GSLQR(b,data)
-      :cfg.controller==='gindi'?new GINDI(b,data)
+      :cfg.controller==='gindi'?new GINDI(b,data,cfg.gains)
       :cfg.controller==='f13'?new F13Adapter(ca,b,data)
       :new Optimizer(ca,b,data,cfg.controller);
     const indi=['nmpc','cpid','gslqr'].includes(cfg.controller)?null:new INDI(b,data);
@@ -888,7 +904,8 @@
         if(envelope)envelope.t_s=t;
         if(globalThis.__DEBUG_SOLVE__)console.error(`[solve] t=${t.toFixed(3)} feedback=${JSON.stringify(feedback)}`);
         const __t0=Date.now();
-        request=optimizer.solve(feedback,referenceHorizon(t,cfg),voltage,[0,0,0],envelope);
+        request=optimizer.solve(feedback,referenceHorizon(t,cfg,(optimizer.meta?.N??20)+1,
+          optimizer.meta?.prediction_dt_s??.05),voltage,[0,0,0],envelope);
         if(globalThis.__DEBUG_SOLVE__)console.error(`[solve] done in ${Date.now()-__t0}ms status=${optimizer.stats.at(-1)?.status} request=${JSON.stringify(request)}`);
         outerUpdates++;
         const stat=optimizer.stats.at(-1);if(stat)stat.t_s=t;
