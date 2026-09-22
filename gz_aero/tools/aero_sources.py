@@ -25,11 +25,19 @@ from dataclasses import dataclass, field
 ROCKET_DRONE = os.environ.get(
     "ROCKET_DRONE_PATH", os.path.expanduser("~/Desktop/dynamic/rocket-drone"))
 
-# 팀 확정 설계점 (rocket-drone/main.py 예시점 + HANDOFF 통과안 S_fin/x_fin)
+# 선정안 "selected-6931" 설계점 — research/profiles/selected.json의 provenance와
+# 동일 출처: research/export_selected.py가 읽는 selected_design.csv(sha256
+# 326342d0e471bbb424eb558e4034f4e2458a7a2b669b19cfc2af59b96e8528ff)의 dv_* 값,
+# rocket-drone 커밋 db793a7039c76c9937597a240efc94f68c5a8af0. 2026-09-22 전까지는
+# 8월의 다른(1.661kg 테일시터 탐색 당시) 설계점이 들어있었다 — mass_kg 1.661 vs
+# selected.json의 1.7117, S_ref/d_ref도 어긋나 있었다.
 SIZED_DESIGN_POINT = dict(
-    d_body=0.09, lambda_body=8.0, S_fin=0.022, x_fin=0.60, AR_fin=2.2,
-    f_mount=1.0, n_design=4.0, d_prop=0.13, pd_prop=1.50, n_ser=6,
-    k_E=1.0, k_mot=1.0,
+    d_body=0.0871390733339925, lambda_body=7.694588763043043,
+    S_fin=0.029101065404813, x_fin=0.5492354051043412,
+    AR_fin=2.1772004034162946, f_mount=0.9953185191553516,
+    n_design=4.042043634935414, d_prop=0.1346799440195245,
+    pd_prop=1.558669346893352, n_ser=6,
+    k_E=1.0332407252437563, k_mot=1.0310678432220917,
 )
 
 # 감쇠 미분계수 — 팀 aero.py 에는 없다. dynamics.py 값을 잠정 사용.
