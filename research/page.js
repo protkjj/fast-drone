@@ -177,7 +177,7 @@ function showResults() {
   addRow('NMPC / INDI / IMU 횟수',kinds.map(k=>{const c=results[k]?.counts;return c?`${c.nmpc} / ${c.indi} / ${c.imu}`:'—';}));
   addRow('GPS 융합 / 재적분 IMU 횟수',kinds.map(k=>{const c=results[k]?.counts;return c?`${c.gps_fused} / ${c.gps_replayed_imu}`:'—';}));
   drawCharts();
-  $('download').disabled=Object.keys(results).length===0;
+  $('download').disabled=$('download-csv').disabled=Object.keys(results).length===0;
   const result=Object.values(results)[0];
   $('result-context').textContent=result?`${imported?'가져온 기록 · ':'현재 실행 · '}${result.profile_id} · ${result.configuration.scenario} · seed ${result.configuration.seed} · ${result.configuration.preview?'미래 목표 예고':'비예고'} · 구현 ${result.implementation?.input_sha256?.slice(0,12)||'알 수 없음'}\n제한 비율은 각 tick에 4개 모터 중 하나라도 해당 제한이 작동한 비율입니다. 모터 추종 제한은 전류·전압·회생 제동 불가를 포함하며 속도 오차 자체와는 다릅니다.`:'';
   if(Object.values(results).some(r=>r.status!=='completed'))
@@ -367,6 +367,22 @@ $('download').addEventListener('click',()=>{
   // Compact JSON keeps the maximum 20 s / 1 kHz paired log practical to reopen.
   const blob=new Blob([JSON.stringify({exported_at:new Date().toISOString(),results})],{type:'application/json'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='drone-research-results.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
+$('download-csv').addEventListener('click',()=>{
+  // 엑셀 등에서 바로 플롯하기 좋은 평평한 CSV. 여러 제어기 결과가 있으면
+  // controller 열을 앞에 붙여 한 파일에 이어 붙인다(같은 열 배치를 공유하는
+  // ResearchRuntime.traceToCSV/CSV_COLUMNS를 그대로 재사용 -- 노드 스크립트
+  // export_csv.cjs와 형식이 갈라지지 않는다).
+  const kinds=Object.keys(results);
+  if(!kinds.length)return;
+  const header=['controller',...ResearchRuntime.CSV_COLUMNS].join(',');
+  const rows=[header];
+  for(const kind of kinds){
+    const csv=ResearchRuntime.traceToCSV(results[kind]);
+    for(const line of csv.trim().split('\n').slice(1))rows.push(`${kind},${line}`);
+  }
+  const blob=new Blob([rows.join('\n')+'\n'],{type:'text/csv'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='drone-research-results.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 });
 function replayResult(){return results[$('replay-controller').value]||null;}
 function setupReplay(atEnd=false){

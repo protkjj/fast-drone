@@ -997,7 +997,33 @@
                     'Outside-map samples use an explicit passive continuation; these are NOT validated propulsion performance results.']};
     } finally {b.dispose();}
   }
-  const api={run,makeBindings,boundedIncrement,allocateThrust,motorDiagnostics,validateOptions,referenceHorizon,Estimator,Optimizer,ObservationController,ObservationClock,INDI,rotate,random,reference,environment,shiftPrediction,smoothstep};
+  // 시뮬 결과(run()의 반환값 하나)의 trace를 플롯하기 좋은 평평한 CSV로 만든다.
+  // 웹 UI("CSV 저장" 버튼)와 헤드리스 스크립트(export_csv.cjs)가 이 함수를
+  // 공유해서 형식이 갈라지지 않게 한다. 여기 없는 필드(센서 원시값, 공분산,
+  // 배분 진단 등)는 그대로 남는 JSON 저장 기능으로 받을 것 -- CSV는 "자주
+  // 플롯하는 것" 위주의 선택이지 전체 로그의 대체가 아니다.
+  const CSV_COLUMNS = ['t_s',
+    'pos_x_m','pos_y_m','pos_z_m','vx_mps','vy_mps','vz_mps',
+    'qx','qy','qz','qw','wx_rads','wy_rads','wz_rads',
+    'n1_rads','n2_rads','n3_rads','n4_rads','u1_rads','u2_rads','u3_rads','u4_rads',
+    'ref_vx_mps','ref_vy_mps','ref_vz_mps','ref_z_m','soc',
+    'voltage_V','bus_current_A','power_W',
+    'thrust1_N','thrust2_N','thrust3_N','thrust4_N'];
+  function traceToCSVRow(f) {
+    const m = f.motor||{};
+    const thrust = m.thrust_N||[null,null,null,null];
+    return [f.t, ...f.position_m, ...f.v, ...f.q_xyzw, ...f.body_rate_rad_s,
+      ...f.rotor_rad_s, ...f.command_rad_s, ...(f.reference||[null,null,null,null]),
+      f.soc, m.voltage_V??'', m.bus_current_A??'', m.power_W??'',
+      ...thrust];
+  }
+  function traceToCSV(result) {
+    if (!result || !Array.isArray(result.trace)) throw new Error('result.trace missing -- pass a single run() result, not a sweep summary');
+    const lines = [CSV_COLUMNS.join(',')];
+    for (const f of result.trace) lines.push(traceToCSVRow(f).map(v => v??'').join(','));
+    return lines.join('\n')+'\n';
+  }
+  const api={run,makeBindings,boundedIncrement,allocateThrust,motorDiagnostics,validateOptions,referenceHorizon,Estimator,Optimizer,ObservationController,ObservationClock,INDI,rotate,random,reference,environment,shiftPrediction,smoothstep,traceToCSV,CSV_COLUMNS};
   if(typeof module!=='undefined'&&module.exports) module.exports=api;
   else root.ResearchRuntime=api;
 })(globalThis);

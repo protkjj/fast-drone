@@ -61,7 +61,7 @@
 <label for="replay-speed">재생 배속</label><select id="replay-speed"><option value="0.25">0.25×</option><option value="1" selected>1×</option><option value="4">4×</option></select>
 <p id="replay-state" class="small">계산한 기록을 아래 타임라인에서 재생할 수 있습니다.</p><div class="buttons"><button id="reuse" disabled>이 설정 재사용</button></div>
 <p id="result-context" class="small"></p><div class="table-wrap"><table><thead><tr><th>지표</th><th>Hybrid</th><th>NMPC</th></tr></thead><tbody id="metrics"></tbody></table></div>
-<div class="buttons"><button id="download" disabled>JSON 저장</button><button id="import">로그 가져오기</button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
+<div class="buttons"><button id="download" disabled>JSON 저장</button><button id="download-csv" disabled>CSV 저장</button><button id="import">로그 가져오기</button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
 <p class="small">재생은 기록의 위치·자세를 보간한 표시이며 새 물리 계산이 아닙니다. 로터는 시각 감속·잔상입니다.</p>
 </details>
 <details class="notice"><summary>공통 모델과 검증 범위</summary><p>두 모드는 같은 18상태 플랜트(기체·로터 17 + 배터리 SOC), 추진·전류·전압 제한, 1 ms 물리 적분을 사용합니다. 비행 화면에서도 Hybrid·NMPC는 실제 IPOPT를 사용합니다. PD–INDI를 선택하면 최적화 없는 baseline입니다. 실측 기체 정확도·고속 성능·Hybrid 우위·실제 IPOPT 20 ms 마감은 아직 입증되지 않았습니다.</p><a href="https://github.com/protkjj/fast-drone/blob/bulnabi/research/UNIFIED_VALIDATION.md">검증 결과와 한계</a> · <a href="../sim-legacy.html">이전 8 kg 시험 데모</a></details>
