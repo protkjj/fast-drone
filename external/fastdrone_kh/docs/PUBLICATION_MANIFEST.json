@@ -1,0 +1,371 @@
+{
+  "parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807",
+  "original_base_git_commit": "a00c75e3d9a70dd796a07138c28c9e25242428a9",
+  "replaced_repository_parent_commit": "2107a0edace46697f8b6da3816d785f95443ad86",
+  "note": "Original source included uncommitted research changes. This is a curated export, not that base commit alone.",
+  "unchanged_numerical_definitions": [
+    {
+      "source": "control/dynamics.py",
+      "published": "control/dynamics.py",
+      "preserved_definitions": [
+        "_quat_to_rotmat",
+        "_quat_derivative",
+        "_body_aerodynamics",
+        "_rotor_forces_moments",
+        "_compute_xdot",
+        "build_dynamics",
+        "compute_allocation_matrix",
+        "AxialDronePlant"
+      ]
+    },
+    {
+      "source": "control/geometry.py",
+      "published": "control/geometry.py",
+      "preserved_definitions": [
+        "thrust_axis",
+        "pitch_quaternion",
+        "hover_quaternion",
+        "axial_speed",
+        "rotor_thrusts",
+        "rotor_torques",
+        "rotor_wrench",
+        "control_effectiveness",
+        "rotor_speeds_for_thrust",
+        "allocate_wrench",
+        "force_to_attitude"
+      ]
+    },
+    {
+      "source": "control/light_aero.py",
+      "published": "control/light_aero.py",
+      "preserved_definitions": [
+        "light_aerodynamics"
+      ]
+    },
+    {
+      "source": "control/propeller_curve.py",
+      "published": "control/propeller_curve.py",
+      "preserved_definitions": [
+        "uses_curve",
+        "_key",
+        "_splines",
+        "coefficients",
+        "_symbolic_spline",
+        "symbolic_force_torque",
+        "values_and_derivatives",
+        "positive_thrust_j_limit",
+        "domain_status",
+        "supported_rate_bounds"
+      ]
+    },
+    {
+      "source": "control/trim.py",
+      "published": "control/trim.py",
+      "preserved_definitions": [
+        "find_trim",
+        "print_trim",
+        "trim_speed_sweep"
+      ]
+    },
+    {
+      "source": "control/curve_authority.py",
+      "published": "control/curve_authority.py",
+      "preserved_definitions": [
+        "nonlinear_trim_authority"
+      ]
+    },
+    {
+      "source": "control/controller.py",
+      "published": "control/controller.py",
+      "preserved_definitions": [
+        "CascadedPID",
+        "_quat_left_mult_matrix",
+        "linearize_error_state",
+        "LQRController",
+        "ScheduledLQR",
+        "INDIController"
+      ]
+    },
+    {
+      "source": "control/hybrid_comparison.py",
+      "published": "control/hybrid_comparison.py",
+      "preserved_definitions": [
+        "build_virtual_dynamics",
+        "ProperHybrid",
+        "compute_control_effectiveness",
+        "NaiveHybrid"
+      ]
+    },
+    {
+      "source": "control/mission_sim.py",
+      "published": "control/mission_sim.py",
+      "preserved_definitions": [
+        "MissionProfile"
+      ]
+    },
+    {
+      "source": "control/comparison_nmpc.py",
+      "published": "control/comparison_nmpc.py",
+      "preserved_definitions": [
+        "virtual_wrench_residual",
+        "positive_thrust_domain",
+        "ComparisonNMPC"
+      ]
+    },
+    {
+      "source": "control/evaluate_light_rocket.py",
+      "published": "control/serialization.py",
+      "preserved_definitions": [
+        "jsonable",
+        "lqr_weights"
+      ]
+    }
+  ],
+  "archived_case_count": 61,
+  "archived_file_sha256": {
+    "70_aero_minus_short.png": "fad0e00193c31308e88b56bfc92f635fcefa33d541e23603f737f42f644c8510",
+    "70_aero_plus_short.png": "7aae25268128165a39eb072a9deed2bb0ce5e37e2f318b1f63b838f91860e78b",
+    "70_lateral_short.png": "7d92a6fb257c7b2337bf07c0f774746e07fc0582fc85d60721372182b32f00eb",
+    "70_legacy_vertical10_mission.png": "58502f63e8047c6b81fa27bec2c5ceaea5ab7af5eabcddf49ba18d5b0f3658e8",
+    "70_lqr_smoke_short.png": "ade7df22fbe76023fc914501cdc8a0120c2b28ec614ab4e749fdc7583a775546",
+    "70_nominal_short.png": "dbd4e0a65a9a252824da8c2c1db4f28d77be0e6005816668a1658b87ef8e1e6b",
+    "70_vertical_short.png": "cd722f46e58e88d3295359ae3cad2d6ea3921a5dfa1a4b93846acf3942f7815a",
+    "80_nominal_short.png": "109f472b172248e80084c719d3ebfcd83fe1e107a61bf38f91dc174f9d271fb6",
+    "80_vertical_short.png": "81963c9d89b5627bb59bd1850ba99622d12ff9f92defbf964a1af8fdde507842",
+    "85_nominal_short.png": "e1ad3f8ec2eb73ff507517e736f21852e1d6a6e63284ad67573a1a3724500f49",
+    "85_vertical_short.png": "fcc12ceff90dd64f7cd8454c95803db3c583c49e432034397093d3cc946baaff",
+    "DIAGNOSTICS.json": "55eb8e55aac7bf6e65ebb4bbeecc36209a4a97b7f61071da78e7e1627838ef4d",
+    "DIAGNOSTICS.md": "e8927a4f928f3d83e9c461aab07ca1531cfa43e0ead07cd9cf96603fb3dda4ce",
+    "GS-LQR_70_aero_minus.json": "1bce9811edddb5c4d8d0edda98da20a6747013ddd994cc0e5ffe78a23a2a2320",
+    "GS-LQR_70_aero_minus.npz": "ea98797e38009c965edce2c802e69c1fe18575af5c7af1e4b734447435382c5b",
+    "GS-LQR_70_aero_plus.json": "d42601ce42498fc6ed1a5cf378349d6a2ae41c932266813b9b7433ca9a685291",
+    "GS-LQR_70_aero_plus.npz": "d6ba53ef64f1a18bbd36f7e3c41e1a12dea287b46a6ffa5a147f759c7987f560",
+    "GS-LQR_70_lateral.json": "b8451d2fe1522327fb5a0c7714470f70dd60b0131cf1e24e5d0653ba137e2daa",
+    "GS-LQR_70_lateral.npz": "56c77f4f86881a3bdf4a57824b309f6f428892287e29012f042016229d3086af",
+    "GS-LQR_70_legacy_vertical10_mission.json": "3f76975a6c9fd97fd0ba36985878202e0abdf54f676f5e36ea86e80490279904",
+    "GS-LQR_70_legacy_vertical10_mission.npz": "d0752948d25c5155848da940ca4cc70abf3c2cc60f32910e973f906541f0846a",
+    "GS-LQR_70_lqr_smoke.json": "794ded1910aa01e746d0efb936b0875f25f8c97e3f08b09680abc29e72b1bb78",
+    "GS-LQR_70_lqr_smoke.npz": "2e8a77941f45617c18988fe659426c486faf61720ca74a0105f57fb54176c001",
+    "GS-LQR_70_nominal.json": "fa67900f879def832a2d10b51866fa542be01828b58c6044904320d842782469",
+    "GS-LQR_70_nominal.npz": "2e8a77941f45617c18988fe659426c486faf61720ca74a0105f57fb54176c001",
+    "GS-LQR_70_vertical.json": "1824abc55ef84072109fdc528b45372b6e14e2c668f183474e2294c12c45a499",
+    "GS-LQR_70_vertical.npz": "fa4476ebeb4521e59b9a96947728e6a95ea62ec5551315d2153623ccaa7b5ec2",
+    "GS-LQR_80_nominal.json": "8cb4c3353a028306183568a79dc38dee292950eb3d91a7e8db746fd604a8b86d",
+    "GS-LQR_80_nominal.npz": "c61983d26c7cd02f45e2c530533a8715af7a6f4efba7086d14cc9c7a29b6971a",
+    "GS-LQR_80_vertical.json": "d239eb2477d37d47ed434b6dc294a0fa2ee6a338f62681c7552c6b3d08073337",
+    "GS-LQR_80_vertical.npz": "cff109c6812ea7c4e2aa0f24970c1aba944e399849bc2ac7e626cec85238f6d6",
+    "GS-LQR_85_nominal.json": "047dccd1e68f6d7630f046813c76ec69bc410c7f073bf4a6e5327e4e9a50384c",
+    "GS-LQR_85_nominal.npz": "3f15a485cf03ed18e8469f2e833c8dc2feb099fe7e209ac53d331f6111ed0268",
+    "GS-LQR_85_vertical.json": "65032a2e574a8ef337a2ca469fe7be3bd6bc2130768e0868cec600c326d0f732",
+    "GS-LQR_85_vertical.npz": "6921855add919a528d85deb13ff69f37d52c046bab9161c00e88eeeb20d4a8e4",
+    "INDI_70_aero_minus.json": "50db44775cec6b4866a15dbef1394cf45238b969bcb9e770f750980f192a3755",
+    "INDI_70_aero_minus.npz": "32e210655a843a3e8637e4b891476ddcad2987a00bcd642a13d4958aa3f1ab27",
+    "INDI_70_aero_plus.json": "062bc56d5a286acc70fd1a2b82c120e9eae95cc0139d85c260c9f200f9449522",
+    "INDI_70_aero_plus.npz": "7e1a74b78b84642c071020181380cffe301ab611ce585bf7070abdc6162b93b9",
+    "INDI_70_lateral.json": "6696f8d207ae1e154a9d066adbc075454acf217c82edc9504e68ffaf2eef3151",
+    "INDI_70_lateral.npz": "7785165bbcae60855faed8362f3896ea4f12d56397d4a495338e037639a32224",
+    "INDI_70_legacy_vertical10_mission.json": "aa0575ac8b02402325ddd4dbed0df4b1a895475e3adf2ee45c1a31ee98b17aca",
+    "INDI_70_legacy_vertical10_mission.npz": "7725dbc42c3f187c4c9fb5340e720f46dec14afde1a78b25861d7d7c3929ded1",
+    "INDI_70_nominal.json": "5f49892ecba50070bd60cebbffa31fe6ff1855afdb25b39ce3e37cb0ae26034f",
+    "INDI_70_nominal.npz": "ac8e962bc2a461532cbf3109d02c33833e2b7eaf99cd326d90058615688a9f67",
+    "INDI_70_vertical.json": "f253811024c1e6971f8b5dd9612891942eaa3598db8935f3744201cb65d164a7",
+    "INDI_70_vertical.npz": "010b15be0be0cf9fb1d5271cc62eb673c2c8703cd9f784a7aa53508b28e7a981",
+    "INDI_80_nominal.json": "8ab9122acaf6313470b83eda3348abceecfc634fc00fafac13066da6e095a2f9",
+    "INDI_80_nominal.npz": "7673b2ccb3b5685bf8e1d3d169933d772689a66b2877c3b48e798c353cf97593",
+    "INDI_80_vertical.json": "982e63257763fd2aad17aecb68ead8d8c220ffdd5036e030ea9fb62910542cf1",
+    "INDI_80_vertical.npz": "136c483069a26d0d8e786078add3799aaf60507b1d80e4891e9cfafda08a9691",
+    "INDI_85_nominal.json": "bc6ccafadd55788259531a073f1f49d69b5c48dc44696f743c91c7904ec77ea4",
+    "INDI_85_nominal.npz": "a2981c17d94bb74d1d7afba5a3e9a2d8b166f1ca9b0901e0d19e826211575e64",
+    "INDI_85_vertical.json": "0adab847eba5e19e64360238800589c0dcf3ebcf7f6b4e019fb5620e6c60952d",
+    "INDI_85_vertical.npz": "53cf025ef209da12153de6cc38d85bf8efd73f4a929be1c7e031d50df35fad8b",
+    "LQR70_70_aero_minus.json": "5e6deb2055f1fcc911bba854acc3577b16de05a6de7a0293dbf8cda014b29f2f",
+    "LQR70_70_aero_minus.npz": "ea98797e38009c965edce2c802e69c1fe18575af5c7af1e4b734447435382c5b",
+    "LQR70_70_aero_plus.json": "4941b5372157b2a5d604716518b0dfd66d1a197057f77dde855a3de8b4f504d4",
+    "LQR70_70_aero_plus.npz": "d6ba53ef64f1a18bbd36f7e3c41e1a12dea287b46a6ffa5a147f759c7987f560",
+    "LQR70_70_lateral.json": "4c400557538e061d3f12f6300ef49e5ece987546bdd1ace72f88c8394fcb6614",
+    "LQR70_70_lateral.npz": "56c77f4f86881a3bdf4a57824b309f6f428892287e29012f042016229d3086af",
+    "LQR70_70_legacy_vertical10_mission.json": "f38efa87efb59b6e95ec37f4bc9c3bd69ed1cd98be4692efbc62f9b7caa358b8",
+    "LQR70_70_legacy_vertical10_mission.npz": "3aa28fcb4382db4dc99dba6d06d3d85d12aa7a420f972dccc1311d781d10d395",
+    "LQR70_70_nominal.json": "77583ee71911d31391e67e36852d32386794f3031042d7a4e80da5a84c14a180",
+    "LQR70_70_nominal.npz": "2e8a77941f45617c18988fe659426c486faf61720ca74a0105f57fb54176c001",
+    "LQR70_70_vertical.json": "0485809f72a256098579eb4885f8f3ffdb2fbdff07a6b449ebe0b28fe6cc675a",
+    "LQR70_70_vertical.npz": "fa4476ebeb4521e59b9a96947728e6a95ea62ec5551315d2153623ccaa7b5ec2",
+    "LQR70_80_nominal.json": "ca17cab4305c3d4c6b55a35d5d5e2ff05ff122c9fd79dd8b6786ad75fe0ecb84",
+    "LQR70_80_nominal.npz": "93005d69cfb55c882b465885821b8efad085fc913d4f87011f400a2936524361",
+    "LQR70_80_vertical.json": "fdf1e7488757a82668c69dd8513dbae2e5aaf7ccb318158dc3e2cf223f4d70aa",
+    "LQR70_80_vertical.npz": "2388f301627ee871f0e39da34bac07a95e37b3acf41796a7737f00f1add34ada",
+    "LQR70_85_nominal.json": "e37527bb7c968c8064442430203001c99c74bfb33903ce448896be12f8e717b3",
+    "LQR70_85_nominal.npz": "410a81bf8dd5f0ee869c40c61e9450c16062d5f75603198e5bcf82255e5867d3",
+    "LQR70_85_vertical.json": "0ef4e45e6a43528fa3467756c89bde666fec82213eb2522fb67456207f322ccc",
+    "LQR70_85_vertical.npz": "16c3d151b29ccffb7714342e57c25c074ce93e80cc5b1e75c77f9f9890a8569b",
+    "mission_trajectories.png": "2ee47ddbcfd6d45fd8e67de8d93aedbce35f27d9082f14ed4aff802c2688014c",
+    "Naive_70_aero_minus.json": "479860e38db5c6bcc0af163fae46e1fd17a4f2f3f0c8a312d90dd6179a9eeeb6",
+    "Naive_70_aero_minus.npz": "ff3eaf2b3d51c5c1527af9d261badee1b66e15fce5f642d928d4dc35e65e942e",
+    "Naive_70_aero_plus.json": "a0114d8ab155724c2aedaaaa1dd3c97dc58aa5011037998d4969ca4ee486ef6f",
+    "Naive_70_aero_plus.npz": "70c302bfb2a15e96bb5ecdb4f62f43ec0429849b2bee462991df407d22665dab",
+    "Naive_70_lateral.json": "96541b7a69e54648b56dbb48b696adbba066a45b09f19e0d663769f543aff4ec",
+    "Naive_70_lateral.npz": "0c3c7f72ec0f0b529c25861ff5c94a41087b6c611770681ad723440170937fa7",
+    "Naive_70_legacy_vertical10_mission.json": "f0205e9abc778bf84a53c87760f426f5481589e5699966c765c6b291c955684e",
+    "Naive_70_legacy_vertical10_mission.npz": "8fffcefd59837fd7a26f1663c20f55cf148169615835ed942fcad8bffc2f4dfd",
+    "Naive_70_nominal.json": "934d5c6c441613ce98ece3890f90703aa0cb3127821724a198b916450fe85e4a",
+    "Naive_70_nominal.npz": "51a157bde7a43e540ad3fac45b051c628173a4fb0bb7f5a695ba3df2bc09f930",
+    "Naive_70_vertical.json": "7fe410882409bcbdf4107790b7df24f497aa1f0d65d584e58b756bfac7754118",
+    "Naive_70_vertical.npz": "289b19574a64bdcad27e3f8917e83034d2a3dbb79ba00de3bd2c5b60bb5af8c7",
+    "Naive_80_nominal.json": "bff856a56007f8a6e2fb083bcebe82abcf6ba7850e65433f0c3718271c62b5cd",
+    "Naive_80_nominal.npz": "a6691e888f9c2b5700eaa32d5797ac61e48804a8307f320802ea470333b503d5",
+    "Naive_80_vertical.json": "00d95918454c49ad947d3c6dee08cd57e45766dd29c830e4df90e5faf8816bec",
+    "Naive_80_vertical.npz": "f43bf522d7bcef609ce798db15d816071e38c829c318ef2c11d418bc59f19480",
+    "Naive_85_nominal.json": "d5824eb91df598ea3e1cd4dc14f52d0a489f5c6ffa5e13fecb02eba70b16506f",
+    "Naive_85_nominal.npz": "67eaa349e0fd9208795e3959e42530789d81e266587d874d713ba4fcf46746c7",
+    "Naive_85_vertical.json": "82df81a1646f38dfc23fa5f352e72b40b7e89d886ea7880c5fee9b30e294f332",
+    "Naive_85_vertical.npz": "56ec83670279161ad4f0ffbad34391970613f86b593fe518bdd4da7f880d7982",
+    "NMPC_70_aero_minus.json": "b34c6ec5be3ca2b27db62087bc89b5c977f5af665852f86a92a576411475efb2",
+    "NMPC_70_aero_minus.npz": "0891a0775b2aa8f30ffb4f396b7c1db62b20af2854099335e5d59452f0fe19e2",
+    "NMPC_70_aero_plus.json": "0a2300feec30cbe8dc8ff568d958097bdc0cf7adc4ad5a37959cd03eff30af90",
+    "NMPC_70_aero_plus.npz": "1810af9369721beac9759a8e905629eaa4bbebce645ed518db4973d4bd786322",
+    "NMPC_70_lateral.json": "3ea128ccead25929da6d8e56650873f36fe9f8cc72e4c73201af687f6edb76c3",
+    "NMPC_70_lateral.npz": "1f4d71fbe92d873a651920c3ff11533275b5e4bbe3696992a8d54832f0f2786f",
+    "NMPC_70_legacy_vertical10_mission.json": "c18945032a7089f7f325958799ebc188045e5055d53e129aee7bdddd9a6e7ae9",
+    "NMPC_70_legacy_vertical10_mission.npz": "5355a68a16728f877d87006c2059280d3f655ff2f8a9b7c08b392d85a725defd",
+    "NMPC_70_nominal.json": "ca3ba4b6985ff0cc2a58b1206e3da46c5f8306c26e5fc46ffb5440b7e265acff",
+    "NMPC_70_nominal.npz": "9dc0146b09e1d6f66375bbef30e57f396f79bd26d0edf5d99f44920261cd4eb2",
+    "NMPC_70_vertical.json": "d418cec83f49ade2f962726e7e46e95481e88717be04fedcf4e6168a7c30ccc9",
+    "NMPC_70_vertical.npz": "e884552167f89f4bcf11b8cdeef8a38547ba466e39c9314bcd5e55c43d2b65dd",
+    "NMPC_80_nominal.json": "b02c27b88a9f29ae2db4fbc40fcb505633158fa0ddeb51b01cc6acda19b56dd5",
+    "NMPC_80_nominal.npz": "5fb35a54be39b764598d6eda42b3e965f5cd335988d7a6607d410400670cf590",
+    "NMPC_80_vertical.json": "da551262fd08f51bdead53e9200703d72804cef417e59f0e820553bb1882730d",
+    "NMPC_80_vertical.npz": "cf7f785e86418c033ba59434959516164c015fc33ecfc24c55a3418c30f555f3",
+    "NMPC_85_nominal.json": "71f7da015d85bf974e3f60fd7256e94f30489a7e723bf39679f8bc96a587af5e",
+    "NMPC_85_nominal.npz": "d2bc6f1baf84572c1548eb3f7624fc1484a1d1b074daf56c12186fc8b393481c",
+    "NMPC_85_vertical.json": "9bb32a8983a1e8d3cb87798cb033ba8a08f174aa790d5d6fe096c56813100502",
+    "NMPC_85_vertical.npz": "513f5f36955c4d07afd725505e11060c3fe8d842f2be30e5cf8e2106dcc6165b",
+    "report.json": "e880217f84f890ec6306e979fdd0ad5670a8affc8e9f299660b8bb215aae6baa",
+    "Split_70_aero_minus.json": "aad7e2d59ffa58e70f309ecf882d8ed7287918a21927c21c274df4909d00d908",
+    "Split_70_aero_minus.npz": "03e7c84e36adb85684f23f0353ae39479342e74cd224646493a39a987e71246f",
+    "Split_70_aero_plus.json": "21cf87ffcdd7dd07b26ff29dee4d2f8811bc2f6d625cfccee47c5ea5f1cd01c5",
+    "Split_70_aero_plus.npz": "3e04232b62f7078b1e7012cb1a9c40de52c335d48ccbcda987c034d90ad17f91",
+    "Split_70_lateral.json": "08b2e432c94aa0d1e282fe7087a2a5d6b1cee0f694f8274d63241ecc1ffc5c8b",
+    "Split_70_lateral.npz": "0f5509e9cb3619533c91a071ab0b498787726751dcd8aa440f36dc1053db32dd",
+    "Split_70_legacy_vertical10_mission.json": "336a5b743720055d2617e5a8194f6bdf82f429a60bfc6fc1152615ae4d007f2a",
+    "Split_70_legacy_vertical10_mission.npz": "1a93e356fdd8a98a468e9c98d7c37f849a2cbc9589602562ca562762009fd201",
+    "Split_70_nominal.json": "82f85aa06a5ac07088974e141cc756492b9d3aeb4513359637db1fbfa41d603e",
+    "Split_70_nominal.npz": "175ca06a87d6496dbfca3c321a4da5b4463c603d6ff395ecb4d74ad67e39a773",
+    "Split_70_vertical.json": "bb5d2c3c6e336db4fb013d05fc68a6242d711cf64cd4317ce4ae16e31943587c",
+    "Split_70_vertical.npz": "6263fbdd9bbf3303c9ca7c95a6bb352c27a1d344dbb21f04894a9fa6798b5207",
+    "Split_80_nominal.json": "291f1bf244e13134b82f5ad0287942824dd73aab615b199cf216e3c4767cd1fe",
+    "Split_80_nominal.npz": "a7794cec710bc47c189c346f2e2188db067c59d3cb82b3dd7667d4258110bb3f",
+    "Split_80_vertical.json": "3eb5990f4bb00d903f38418c4841ae0b8f6c6da0d4c8b3d584ab3980923da759",
+    "Split_80_vertical.npz": "f8ef4c4b086b893046302a67bf4212ee32c6439d81bd0a6c6473a829405c0b10",
+    "Split_85_nominal.json": "b4c0d5fe98c71d095c23cf3134613c52e45b803d390f6eb70af0ed99aa9d8893",
+    "Split_85_nominal.npz": "241297df867d55686d3b7965ada52842507dc2b03e1507bf2ed6675f85ef9f4c",
+    "Split_85_vertical.json": "949cf3ed097c3a88025bc3de469bc2338bf6ee1a8926f803e3f9a0bb4bfae402",
+    "Split_85_vertical.npz": "241297df867d55686d3b7965ada52842507dc2b03e1507bf2ed6675f85ef9f4c",
+    "SUMMARY.md": "0dd8b0947bd770be5fbef36123bf089c01de90332bb2f172cc75b1361d47b87c"
+  },
+  "pilot_replay_checks": [
+    {
+      "case": "GS-LQR_70_lqr_smoke",
+      "maximum_absolute_trace_differences": {
+        "t": 0,
+        "x": 0,
+        "u": 0,
+        "v_ref": 0,
+        "z_ref": 0,
+        "wind": 0
+      }
+    },
+    {
+      "case": "LQR70_70_nominal",
+      "maximum_absolute_trace_differences": {
+        "t": 0,
+        "x": 0,
+        "u": 0,
+        "v_ref": 0,
+        "z_ref": 0,
+        "wind": 0
+      }
+    },
+    {
+      "case": "GS-LQR_70_nominal",
+      "maximum_absolute_trace_differences": {
+        "t": 0,
+        "x": 0,
+        "u": 0,
+        "v_ref": 0,
+        "z_ref": 0,
+        "wind": 0
+      }
+    },
+    {
+      "case": "INDI_70_nominal",
+      "maximum_absolute_trace_differences": {
+        "t": 0,
+        "x": 0,
+        "u": 0,
+        "v_ref": 0,
+        "z_ref": 0,
+        "wind": 0
+      }
+    },
+    {
+      "case": "NMPC_70_nominal",
+      "maximum_absolute_trace_differences": {
+        "t": 0,
+        "x": 0,
+        "u": 0,
+        "v_ref": 0,
+        "z_ref": 0,
+        "wind": 0
+      }
+    },
+    {
+      "case": "Naive_70_nominal",
+      "maximum_absolute_trace_differences": {
+        "t": 0,
+        "x": 0,
+        "u": 0,
+        "v_ref": 0,
+        "z_ref": 0,
+        "wind": 0
+      }
+    },
+    {
+      "case": "Split_70_nominal",
+      "maximum_absolute_trace_differences": {
+        "t": 0,
+        "x": 0,
+        "u": 0,
+        "v_ref": 0,
+        "z_ref": 0,
+        "wind": 0
+      }
+    }
+  ],
+  "published_code_data_sha256": {
+    "control/__init__.py": "0448f8dad13aac955a70724ea443c4e60e5c32d83144e6c662f7bcf6cbfdd766",
+    "control/airframe.py": "52050c1c49d871a33a811ca34ea5678f809c23254251ee3ef190b50e2b9ae4f6",
+    "control/analyze_baseline_log.py": "647c7ddc4f57c66842610f2e10bf3b78718509e11ba3a4928d165fca042a586c",
+    "control/baseline_v2.py": "f67f168869d3e70acb3233a53e77917675a59c4fa05d6236a08efaa9bafd1f24",
+    "control/comparison_nmpc.py": "905afb53d64bbcf7260e73c7a1ccbfdbb314296edd27f4eb7ec2e818f25b5924",
+    "control/controller.py": "8b68f7fe412c02de300caec1370ec97d400f240f55fb0100c4d7c866979ea198",
+    "control/curve_authority.py": "1f2e264893c58aabcdf2e4b2883a429838edee663ce5fd699deac44376899643",
+    "control/dynamics.py": "dd77769f34abf907080d701737868960e6d73b56e7f9b52e62ac160946f6ff09",
+    "control/geometry.py": "95e357d5a759bbc02ca45a3755c7034bc9ec85b086c54168560842a77f4ce547",
+    "control/hybrid_comparison.py": "0baff0974edf865cefa2df9495a1331e239d500a100bf9d802fdc3020d827eb2",
+    "control/light_aero.py": "87914e522aed5e1ef13ad9591dc7a25366b0d970d1ee0cefcb29889b74da66ce",
+    "control/light_rocket_curve.py": "56a6dee55f8960bee6da88ff1770aafde1327741a729259a7c3153b315315303",
+    "control/mission_sim.py": "c275d2cb0edd8d740f8d03a1cb0c614426b59544b8e3b6dfec28148a31bcb9d6",
+    "control/propeller_curve.py": "1e118de4a3713538d067cc3962830cfb7548d04d7045e861d2550f5ac8c2e228",
+    "control/run_baseline_comparison.py": "3f2f550db0cea38526f5a8c84fae1856f89e32b9571565b0820d45cf05c72e87",
+    "control/serialization.py": "cef1131c212c58aa00f1364afbf228d8ab9dc4bbc02c7356011a83d0a14448b6",
+    "control/trim.py": "2c4d21bb245dfed186c92a5707e0ff9a3ba61b2cffc3a9dc494044c75b9dc95b",
+    "control/validate_model.py": "dc50982ea495f0fcb10660615ace02c248be551a7237958f561890339b41ef84",
+    "control/vehicle_params.py": "b57a724b35e82c3046efce4022455160c1dcaa6b03f9de85e5567b624e780757",
+    "data/acceptance_fixtures.json": "90cabba8e5b30d61b7e05b41090de8d5b973d52474c3c6979b7fc8a775082a7f",
+    "data/aircraft_snapshot.json": "338f8203498a77b93093b61febc6d12715e1f5bab5dc55905aaf1d2b3213ab41",
+    "data/apc_curve.json": "83ca7198748adba4b7d7d5a1989e215617bd562ad5a82f7d019fdd13b5b8ee63",
+    "data/apc_reference.json": "cc3c56d34c716811884d371c54efb4bbb12b56884959271c8831d82cf19b31ba",
+    "tests/test_baseline_comparison.py": "28f2025ced0cdece55a5f13dfe6dfa70cbde78b43a6056708afaf092728f1464",
+    "tests/test_fixed_model.py": "4794ddf44e0d8f70904fd3e8309d5a78190f5cf4551eefcd870cfa1c86e8e6fb"
+  }
+}
