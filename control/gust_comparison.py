@@ -154,8 +154,9 @@ def main():
     u_trim = trim['control'].copy()
     x0 = x_trim.copy()
     x0[2] = z_ref
+    alpha_text = '--' if trim['alpha'] is None else f"{np.degrees(trim['alpha']):.1f}"
     print(f"  70 m/s 트림: θ={np.degrees(trim['theta']):.1f}°, "
-          f"α={np.degrees(trim['alpha']):.1f}°, "
+          f"α={alpha_text}°, "
           f"잔차={trim['residual']:.1e}")
 
     # 트림 캐시
