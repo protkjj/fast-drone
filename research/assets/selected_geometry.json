@@ -1,0 +1,34 @@
+{
+  "schema": "selected-display-geometry-v1",
+  "profile_id": "selected-6931",
+  "design_basis": "selected_design.csv",
+  "source_commit": "db793a7039c76c9937597a240efc94f68c5a8af0",
+  "source_csv_sha256": "326342d0e471bbb424eb558e4034f4e2458a7a2b669b19cfc2af59b96e8528ff",
+  "source_stl_sha256": "276045699ee8e9ee03fe5d75d4915d88a0688fbcb12a9e8d1e8f5c0702302e35",
+  "cg_from_nose_m": 0.4282511278030152,
+  "body_radius_m": 0.04356953666699625,
+  "radial_arm_m": 0.16883626552054995,
+  "fin": {
+    "root_le_m": 0.5492354051043412,
+    "root_chord_m": 0.07707507968436321,
+    "tip_chord_m": 0.038537539842181605,
+    "span_m": 0.12585592093660397,
+    "leading_edge_sweep_m": 0.038537539842181605,
+    "thickness_m": 0.009249009562123585
+  },
+  "pod": {
+    "center_from_nose_m": 0.5800654369780865,
+    "diameter_m": 0.03052434254102103,
+    "length_m": 0.1068351988935736
+  },
+  "prop": {
+    "plane_from_nose_m": 0.6434830364248734,
+    "diameter_m": 0.1346799440195245
+  },
+  "limitations": [
+    "Display derivative of the preserved original STL, not a manufacturing CAD or validated aerodynamic surface.",
+    "Fin planform/thickness, pod placement/dimensions, rotor center/radius use the CSV sizing source.",
+    "Blade/hub details and body skin remain illustrative STL geometry; no material, CG or inertia is inferred from them.",
+    "Rendering changes never feed back into the physical plant or controllers."
+  ]
+}

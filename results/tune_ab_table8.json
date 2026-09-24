@@ -1,0 +1,569 @@
+{
+  "penalty": 1000,
+  "results": [
+    {
+      "id": "cpid_before",
+      "controller": "cpid",
+      "score": 2003.302422253697,
+      "mean_rmse_v": 2.5182644339967672,
+      "mean_rmse_z": 0.7841578197001295,
+      "failures": 2,
+      "runs": [
+        {
+          "scenario": "Q01",
+          "failed": false,
+          "rmse_v": 0.6930076018363075,
+          "rmse_z": 0.2029768541625565,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q02",
+          "failed": true,
+          "reason": "Plant became invalid / ground crossing / rate >100 rad/s",
+          "rmse_v": null,
+          "rmse_z": null
+        },
+        {
+          "scenario": "Q03",
+          "failed": false,
+          "rmse_v": 0.7490526792184151,
+          "rmse_z": 0.5509039534869118,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q04",
+          "failed": false,
+          "rmse_v": 2.999782542126132,
+          "rmse_z": 0.6893259744467708,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q05",
+          "failed": false,
+          "rmse_v": 2.922544958177406,
+          "rmse_z": 0.8796037913180057,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q06",
+          "failed": true,
+          "reason": "Plant became invalid / ground crossing / rate >100 rad/s",
+          "rmse_v": null,
+          "rmse_z": null
+        },
+        {
+          "scenario": "Q07",
+          "failed": false,
+          "rmse_v": 3.7967433435143034,
+          "rmse_z": 1.5108362980081957,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q08",
+          "failed": false,
+          "rmse_v": 2.6104557213351187,
+          "rmse_z": 1.2087804514597245,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q09",
+          "failed": false,
+          "rmse_v": 2.4117098673815884,
+          "rmse_z": 0.7311729507788187,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q10",
+          "failed": false,
+          "rmse_v": 2.999782542126132,
+          "rmse_z": 0.6893259744467708,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q11",
+          "failed": false,
+          "rmse_v": 2.999782542126132,
+          "rmse_z": 0.6893259744467708,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q12",
+          "failed": false,
+          "rmse_v": 2.999782542126132,
+          "rmse_z": 0.6893259744467708,
+          "energy_J": null
+        }
+      ]
+    },
+    {
+      "id": "cpid_after",
+      "controller": "cpid",
+      "score": 1.1016138023937028,
+      "mean_rmse_v": 0.7662540445444481,
+      "mean_rmse_z": 0.3353597578492544,
+      "failures": 0,
+      "runs": [
+        {
+          "scenario": "Q01",
+          "failed": false,
+          "rmse_v": 0.15179171012182638,
+          "rmse_z": 0.16114606134551945,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q02",
+          "failed": false,
+          "rmse_v": 1.8128178251178433,
+          "rmse_z": 0.37349912007333513,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q03",
+          "failed": false,
+          "rmse_v": 0.3031049996387799,
+          "rmse_z": 0.2933734576516583,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q04",
+          "failed": false,
+          "rmse_v": 0.552318548305564,
+          "rmse_z": 0.34626519839088504,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q05",
+          "failed": false,
+          "rmse_v": 0.7466766131824973,
+          "rmse_z": 0.3299495002569986,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q06",
+          "failed": false,
+          "rmse_v": 2.2721971979036115,
+          "rmse_z": 0.5440554991563185,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q07",
+          "failed": false,
+          "rmse_v": 0.4334797124334769,
+          "rmse_z": 0.04871799040544023,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q08",
+          "failed": false,
+          "rmse_v": 0.7161707969936328,
+          "rmse_z": 0.5014574920359356,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q09",
+          "failed": false,
+          "rmse_v": 0.549535485919454,
+          "rmse_z": 0.3870571797023074,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q10",
+          "failed": false,
+          "rmse_v": 0.552318548305564,
+          "rmse_z": 0.34626519839088504,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q11",
+          "failed": false,
+          "rmse_v": 0.552318548305564,
+          "rmse_z": 0.34626519839088504,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q12",
+          "failed": false,
+          "rmse_v": 0.552318548305564,
+          "rmse_z": 0.34626519839088504,
+          "energy_J": null
+        }
+      ]
+    },
+    {
+      "id": "gindi_before",
+      "controller": "gindi",
+      "score": 1.7764838331280082,
+      "mean_rmse_v": 1.39121291154642,
+      "mean_rmse_z": 0.38527092158158793,
+      "failures": 0,
+      "runs": [
+        {
+          "scenario": "Q01",
+          "failed": false,
+          "rmse_v": 0.9034019335484907,
+          "rmse_z": 0.22439026971424808,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q02",
+          "failed": false,
+          "rmse_v": 1.134637719162305,
+          "rmse_z": 0.03145869577829556,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q03",
+          "failed": false,
+          "rmse_v": 0.811636114326992,
+          "rmse_z": 0.36579249182377926,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q04",
+          "failed": false,
+          "rmse_v": 1.4447779115075925,
+          "rmse_z": 0.5297263661304962,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q05",
+          "failed": false,
+          "rmse_v": 2.2694190960527574,
+          "rmse_z": 0.5386262797761137,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q06",
+          "failed": false,
+          "rmse_v": 0.7318824924706568,
+          "rmse_z": 0.0505886270947961,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q07",
+          "failed": false,
+          "rmse_v": 1.647753255420662,
+          "rmse_z": 0.12439583027114914,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q08",
+          "failed": false,
+          "rmse_v": 1.786646787457573,
+          "rmse_z": 0.650657911285961,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q09",
+          "failed": false,
+          "rmse_v": 1.5076335691473277,
+          "rmse_z": 0.5227651380907452,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q10",
+          "failed": false,
+          "rmse_v": 1.4447779115075925,
+          "rmse_z": 0.5297263661304962,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q11",
+          "failed": false,
+          "rmse_v": 1.4447779115075925,
+          "rmse_z": 0.5297263661304962,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q12",
+          "failed": false,
+          "rmse_v": 1.567210236447498,
+          "rmse_z": 0.5253967167524786,
+          "energy_J": null
+        }
+      ]
+    },
+    {
+      "id": "gindi_after",
+      "controller": "gindi",
+      "score": 0.3657418296449974,
+      "mean_rmse_v": 0.3117745890462435,
+      "mean_rmse_z": 0.05396724059875387,
+      "failures": 0,
+      "runs": [
+        {
+          "scenario": "Q01",
+          "failed": false,
+          "rmse_v": 0.05929574628680661,
+          "rmse_z": 0.00824316680477269,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q02",
+          "failed": false,
+          "rmse_v": 0.07561512110592604,
+          "rmse_z": 0.017963231604609293,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q03",
+          "failed": false,
+          "rmse_v": 0.1553632600127312,
+          "rmse_z": 0.15038346704758673,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q04",
+          "failed": false,
+          "rmse_v": 0.41768642067302797,
+          "rmse_z": 0.05035680132037564,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q05",
+          "failed": false,
+          "rmse_v": 0.6786881010150798,
+          "rmse_z": 0.05956171373009799,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q06",
+          "failed": false,
+          "rmse_v": 0.02330495061616406,
+          "rmse_z": 0.007312774629351802,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q07",
+          "failed": false,
+          "rmse_v": 0.13335711449114998,
+          "rmse_z": 0.0268114118396743,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q08",
+          "failed": false,
+          "rmse_v": 0.5132067650114456,
+          "rmse_z": 0.13876282190490535,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q09",
+          "failed": false,
+          "rmse_v": 0.40797574165717565,
+          "rmse_z": 0.03873364013169158,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q10",
+          "failed": false,
+          "rmse_v": 0.41768642067302797,
+          "rmse_z": 0.05035680132037564,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q11",
+          "failed": false,
+          "rmse_v": 0.41768642067302797,
+          "rmse_z": 0.05035680132037564,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q12",
+          "failed": false,
+          "rmse_v": 0.44142900633935894,
+          "rmse_z": 0.04876425553122974,
+          "energy_J": null
+        }
+      ]
+    },
+    {
+      "id": "gslqr_before",
+      "controller": "gslqr",
+      "score": 11002.054158210012,
+      "mean_rmse_v": 0.6661227538957635,
+      "mean_rmse_z": 1.3880354561167254,
+      "failures": 11,
+      "runs": [
+        {
+          "scenario": "Q01",
+          "failed": false,
+          "rmse_v": 0.6661227538957635,
+          "rmse_z": 1.3880354561167254,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q02",
+          "failed": true,
+          "reason": "Plant became invalid / ground crossing / rate >100 rad/s",
+          "rmse_v": null,
+          "rmse_z": null
+        },
+        {
+          "scenario": "Q03",
+          "failed": true,
+          "reason": "Plant became invalid / ground crossing / rate >100 rad/s",
+          "rmse_v": null,
+          "rmse_z": null
+        },
+        {
+          "scenario": "Q04",
+          "failed": true,
+          "reason": "Plant became invalid / ground crossing / rate >100 rad/s",
+          "rmse_v": null,
+          "rmse_z": null
+        },
+        {
+          "scenario": "Q05",
+          "failed": true,
+          "reason": "Plant became invalid / ground crossing / rate >100 rad/s",
+          "rmse_v": null,
+          "rmse_z": null
+        },
+        {
+          "scenario": "Q06",
+          "failed": true,
+          "reason": "Plant became invalid / ground crossing / rate >100 rad/s",
+          "rmse_v": null,
+          "rmse_z": null
+        },
+        {
+          "scenario": "Q07",
+          "failed": true,
+          "reason": "Plant became invalid / ground crossing / rate >100 rad/s",
+          "rmse_v": null,
+          "rmse_z": null
+        },
+        {
+          "scenario": "Q08",
+          "failed": true,
+          "reason": "Plant became invalid / ground crossing / rate >100 rad/s",
+          "rmse_v": null,
+          "rmse_z": null
+        },
+        {
+          "scenario": "Q09",
+          "failed": true,
+          "reason": "Plant became invalid / ground crossing / rate >100 rad/s",
+          "rmse_v": null,
+          "rmse_z": null
+        },
+        {
+          "scenario": "Q10",
+          "failed": true,
+          "reason": "Plant became invalid / ground crossing / rate >100 rad/s",
+          "rmse_v": null,
+          "rmse_z": null
+        },
+        {
+          "scenario": "Q11",
+          "failed": true,
+          "reason": "Plant became invalid / ground crossing / rate >100 rad/s",
+          "rmse_v": null,
+          "rmse_z": null
+        },
+        {
+          "scenario": "Q12",
+          "failed": true,
+          "reason": "Plant became invalid / ground crossing / rate >100 rad/s",
+          "rmse_v": null,
+          "rmse_z": null
+        }
+      ]
+    },
+    {
+      "id": "gslqr_after",
+      "controller": "gslqr",
+      "score": 9.319014911422519,
+      "mean_rmse_v": 2.4057525013398116,
+      "mean_rmse_z": 6.91326241008271,
+      "failures": 0,
+      "runs": [
+        {
+          "scenario": "Q01",
+          "failed": false,
+          "rmse_v": 0.33832206661618336,
+          "rmse_z": 1.2212918514797115,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q02",
+          "failed": false,
+          "rmse_v": 2.450579369522288,
+          "rmse_z": 7.991126189248269,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q03",
+          "failed": false,
+          "rmse_v": 0.5604331396452621,
+          "rmse_z": 1.012729507332918,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q04",
+          "failed": false,
+          "rmse_v": 2.7441545229111615,
+          "rmse_z": 7.226853160041961,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q05",
+          "failed": false,
+          "rmse_v": 3.090064763807083,
+          "rmse_z": 5.824679040597831,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q06",
+          "failed": false,
+          "rmse_v": 2.596003971238754,
+          "rmse_z": 7.334928595855211,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q07",
+          "failed": false,
+          "rmse_v": 2.131688723057617,
+          "rmse_z": 7.560300065391671,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q08",
+          "failed": false,
+          "rmse_v": 3.9264145846928984,
+          "rmse_z": 15.57459030545934,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q09",
+          "failed": false,
+          "rmse_v": 2.7989053058530033,
+          "rmse_z": 7.5320907254597405,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q10",
+          "failed": false,
+          "rmse_v": 2.7441545229111615,
+          "rmse_z": 7.226853160041961,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q11",
+          "failed": false,
+          "rmse_v": 2.7441545229111615,
+          "rmse_z": 7.226853160041961,
+          "energy_J": null
+        },
+        {
+          "scenario": "Q12",
+          "failed": false,
+          "rmse_v": 2.7441545229111615,
+          "rmse_z": 7.226853160041961,
+          "energy_J": null
+        }
+      ]
+    }
+  ]
+}

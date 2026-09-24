@@ -37,15 +37,20 @@ pip install -r requirements.txt
 | 3 | `python3 -m control.trim` | 트림 성립 + 최고 트림속도 | 0.3 s ✅ | — |
 | 4 | `python3 -m control.test_plant` | 6-DOF 플랜트 (자유낙하·모멘트 등) | 1.7 s ✅ | — |
 | 5 | `python3 -m control.test_fallback` | Hybrid→LQR 폴백 전환 로직 | 6 s ✅ | — |
-| 6 | `python3 -m control.mission_sim` | 통합 미션 65 s × 제어기 3종 | 수 분 📄 | matplotlib |
-| 7 | `python3 -m control.gust_comparison` | 돌풍 외란 응답 | 수 분 📄 | — |
-| 8 | `python3 -m control.ekf_comparison` | 센서 노이즈 하 제어기 순위 | 수 분 📄 | — |
-| 9 | `python3 -m control.final_config_mission` | 확정 구성(acados) 통합 검증 | 수 분 📄 | **acados** |
-| 10 | `./scripts/sitl_run.sh` | PX4 SITL 이륙·호버 | — | **Ubuntu+PX4** |
+| 6 | `./gz_aero/verify.sh` | 공력 C++ 코어 ↔ 파이썬 (겹1) | 5.5 s ✅ | C++17 컴파일러 |
+| 7 | `python3 gz_aero/tools/selftest_check_gz.py` | 겹2 검증 **도구 자체**의 판별력 | 5 s ✅ | — |
+| 8 | `python3 -m control.mission_sim` | 통합 미션 65 s × 제어기 3종 | 수 분 📄 | matplotlib |
+| 9 | `python3 -m control.gust_comparison` | 돌풍 외란 응답 | 수 분 📄 | — |
+| 10 | `python3 -m control.ekf_comparison` | 센서 노이즈 하 제어기 순위 | 수 분 📄 | — |
+| 11 | `python3 -m control.final_config_mission` | 확정 구성(acados) 통합 검증 | 수 분 📄 | **acados** |
+| 12 | `ctest --test-dir gz_aero/build` | 공력 코어 (CMake 경유) | 0.1 s ✅ | cmake |
+| 13 | `gz sim ... frame_check.world` | 좌표 변환 (겹2a) | — | **Gazebo** |
+| 14 | `gz sim ... accel_check.world` | 힘 적용점 (겹2b) | — | **Gazebo** |
+| 15 | `./scripts/sitl_run.sh` | PX4 SITL 이륙·호버 | — | **Ubuntu+PX4** |
 
 ✅ = 2026-08-27 macOS 에서 실측한 시간  📄 = 코드 주석에 적힌 값, 이 세션에서 미실측
 
-> 1~5 는 **추가 의존성 없이 8초 안에 다 돈다** (합계 실측 8.1 s).
+> 1~7 은 **파이썬 의존성 + C++ 컴파일러만으로 20초 안에 다 돈다** (합계 실측 18.6 s).
 > 저장소를 처음 받았으면 여기까지 먼저 하면 된다.
 
 ---
@@ -147,7 +152,76 @@ python3 -m sizing.measure_noise
 
 ---
 
-## 4. SITL (`ros2_ws/` + `scripts/`)
+## 4. Gazebo 공력 플러그인 (`gz_aero/`)
+
+설계 계약은 `gz_aero/DESIGN.md`, 사용법 상세는 `gz_aero/USAGE.md`.
+
+검증을 **2겹**으로 쪼갰다. 하나로 묶으면 실패했을 때 "수식이 틀렸나 좌표계가
+틀렸나"를 못 가리기 때문이다.
+
+### 겹1 — 수식 이식 (Gazebo 불필요, macOS 에서도 됨)
+
+```
+./gz_aero/verify.sh
+```
+
+표 생성 → 기준값 생성 → C++ 빌드 → 대조까지 한 번에. `146/146 통과` 가 나와야 한다.
+
+- **test A** (격자점 위): C++ 코어가 `control/dynamics.py` 의
+  `_body_aerodynamics()` 와 같은 값을 내는가. 상대오차 1e-9 요구.
+- **test B** (격자칸 중점 전수): 표 격자가 충분히 촘촘한가. 힘 오차로 판정.
+
+CMake 로도 같은 것을 돌릴 수 있다:
+
+```
+cmake -S gz_aero -B gz_aero/build && cmake --build gz_aero/build -j
+ctest --test-dir gz_aero/build --output-on-failure
+```
+
+### 겹2 — 좌표 변환·적용점 (Gazebo 필요)
+
+먼저 **검증 도구 자체**를 태운다 (Gazebo 없이):
+
+```
+python3 gz_aero/tools/selftest_check_gz.py
+```
+
+이걸 안 하면 Ubuntu 에서 실패했을 때 "플러그인이 틀렸나 대조 스크립트가
+틀렸나"를 또 가려야 한다. 특히 겹2b 는 **틀린 구현을 일부러 넣어** 검사가
+그걸 잡는지 확인한다 — 안 잡으면 통과해도 의미가 없다 (측정 판별력 200:1).
+
+Ubuntu 에서:
+
+```
+cmake -S gz_aero -B gz_aero/build && cmake --build gz_aero/build -j$(nproc)
+python3 gz_aero/tools/gen_gz_test_world.py
+mkdir -p /tmp/fast_drone_aero
+export GZ_SIM_SYSTEM_PLUGIN_PATH=$PWD/gz_aero/build:$GZ_SIM_SYSTEM_PLUGIN_PATH
+gz sim -s -r --iterations 2000 gz_aero/test/frame_check.world
+python3 gz_aero/tools/check_gz_frames.py --source sized
+gz sim -s -r --iterations 400 gz_aero/test/accel_check.world
+python3 gz_aero/tools/check_gz_accel.py
+```
+
+`check_gz_frames.py` 는 단계 A~F 로 쪼개 잰다. 실패하면 어느 단계인지 나온다:
+A 입력 변환 / B 각도·동압 / C 표 보간 / D 힘 조립 / E 출력 변환 / F 물리 대조.
+
+### 공력 계수를 CSV 로 갈아끼우기
+
+`gz_aero/data/aero_*.csv` 를 같은 형식으로 덮어쓰면 **코드 수정 없이** 반영된다.
+그게 이 설계의 목적이다. 형식과 필수 조건은 `gz_aero/USAGE.md` §3.
+갈아끼운 뒤에는 반드시 `./gz_aero/verify.sh` 를 다시 돌린다.
+
+**표가 두 벌 있다** — 플러그인은 어느 기체도 정하지 않는다 (§6 참고):
+
+| 표 | 기체 | 소스 | 겹1 |
+|---|---|---|---|
+| `aero_placeholder.csv` | 축대칭 멀티로터 8 kg | `control/vehicle_params.py` | 146/146 ✅ |
+| `aero_sized.csv` | 테일시터 1.661 kg | 팀 `rocket-drone/modules/aero.py` | 146/146 ✅ |
+
+---
+
+## 5. SITL (`ros2_ws/` + `scripts/`)
 
 Ubuntu 24.04 + ROS2 Jazzy + Gazebo Harmonic + PX4 가 필요하다 (`SETUP.md`).
 
@@ -166,9 +240,10 @@ DDS agent → PX4 SITL → offboard 노드를 **순서 기동**하고(각 단계
 `-d` 시간 / `--headless` / `--build`
 
 > ⚠ **Gazebo 기본 물리는 중력 + 로터 추력만 계산한다.** 축대칭 동체의 항력·법선력·
-> 정적안정·감쇠는 아무도 안 넣어준다. 즉 지금 SITL 은 **공기 없는 우주에서 나는
-> 쿼드**다. 저속 호버·전진 검증까지는 쓸 수 있지만 고속 결과는 믿으면 안 된다.
-> 공력 플러그인은 `bulnabi` 브랜치에서 개발 중이다.
+> 정적안정·감쇠는 아무도 안 넣어준다. §4 의 공력 플러그인이 그걸 채우지만,
+> **아직 실제 기체 모델(`fast_missile_base`)에 붙이지 않았다.** 그래서 지금
+> `sitl_run.sh` 로 도는 SITL 은 여전히 공력이 없다. 저속 호버·전진 검증까지는
+> 쓸 수 있지만 고속 결과는 믿으면 안 된다.
 
 > ⚠ `control/vehicle_params.py` 는 `ros2_ws/src/fast_drone_ctrl/fast_drone_ctrl/controllers/`
 > 에도 **동일 사본**이 있다. 질량·관성을 바꾸면 **두 파일 다** 고쳐야
@@ -176,7 +251,7 @@ DDS agent → PX4 SITL → offboard 노드를 **순서 기동**하고(각 단계
 
 ---
 
-## 5. 기체 — 두 형상이 병행 중이다
+## 6. 기체 — 두 형상이 병행 중이다
 
 헷갈리기 쉬운 지점이라 못박아 둔다. **둘 다 축대칭이다.**
 축대칭(*형상*)과 테일시터/멀티로터(*추력축*)는 서로 다른 축의 이야기이고,
@@ -190,6 +265,10 @@ DDS agent → PX4 SITL → offboard 노드를 **순서 기동**하고(각 단계
 | 추력축 | 장축에 **수직** | 장축 **방향** |
 | 300 km/h | ✅ 트림 성립 (잔차 1e-10, 최고 85 m/s) | ✅ 사이징 g1~g9 전부 통과 |
 | 제어기 | ✅ 6종 완성, SITL 호버 성공 | 없음 |
+| 공력 표 | `gz_aero/data/aero_placeholder.csv` | `gz_aero/data/aero_sized.csv` |
+
+**공력 플러그인은 둘 다 지원한다.** 어느 기체를 SITL 에 태울지는 이 저장소가
+아직 정하지 않았다 — CSV 를 갈아끼우면 된다.
 
 ### ⚠ 팀 사이징 값을 이 저장소에 그대로 끼워 넣으면 안 된다
 
@@ -214,7 +293,7 @@ DDS agent → PX4 SITL → offboard 노드를 **순서 기동**하고(각 단계
 
 ---
 
-## 6. 무엇이 검증됐고 무엇이 아직인가
+## 7. 무엇이 검증됐고 무엇이 아직인가
 
 정직하게 적는다. 통과했다고 다 믿을 수 있는 게 아니다.
 
@@ -224,7 +303,12 @@ DDS agent → PX4 SITL → offboard 노드를 **순서 기동**하고(각 단계
 | 제어기 6종 비교·폴백 | ✅ 시뮬에서 검증, SITL 호버 성공 |
 | SafetyGuard | ✅ 단위 테스트 5종 |
 | 중량 수렴(WGHT) | ✅ 단위 테스트. 단 `Ŝ` 추정기 편향은 미해결 |
-| SITL 공력 | ❌ **없음** — Gazebo 기본 물리에 동체 공력이 안 들어간다 (`bulnabi` 브랜치) |
+| 공력 C++ 코어 ↔ 파이썬 (겹1) | ✅ **146/146** (두 표 각각). 격자점 위 상대오차 다수 정확히 0 |
+| 공력 표 보간 품질 | ✅ 힘 오차 최대 0.0249 N = 무게의 0.15% (칸 중점 3320점 전수) |
+| 겹2 검증 **도구** | ✅ 자체 검증 완료 (겹2a 2e-16, 겹2b 판별력 200:1) |
+| 겹2 **실측** (좌표 변환·적용점) | ❌ **미실행** — Gazebo 필요 |
+| gz-sim API 실제 대조 | ❌ **미확인** — macOS 는 스텁 헤더 문법검사만 |
+| 실제 기체에 공력 부착 | ❌ `fast_missile_base/model.sdf` 가 저장소 밖(PX4 트리)에 있다 |
 | 고속(83 m/s) SITL 비행 | ❌ 미도달. 저속 전진까지만 확인 |
 
 ### 알려진 모델 결함
@@ -239,7 +323,7 @@ DDS agent → PX4 SITL → offboard 노드를 **순서 기동**하고(각 단계
 
 ---
 
-## 7. 저장소 구조
+## 8. 저장소 구조
 
 ```
 control/            제어 연구 본체 (플랜트·제어기·추정기·시뮬)
@@ -254,6 +338,7 @@ control/            제어 연구 본체 (플랜트·제어기·추정기·시�
   mission_sim.py      통합 미션 (메인 진입점)
   test_*.py           단위 테스트
 sizing/             중량 산정 (WGHT 모듈)
+gz_aero/            Gazebo 공력 플러그인 + 검증 (DESIGN.md / USAGE.md)
 ros2_ws/            ROS2 패키지 (offboard 노드, SITL)
 scripts/            환경 구축·SITL 런처
 results/            산출물 (플롯·리포트·벤치 로그)
@@ -261,15 +346,15 @@ legacy/             판정 완료된 일회성 실험
 model.sdf           Gazebo 모델 (로터 플러그인만. 동체는 PX4 트리에 있음)
 ```
 
-## 8. 브랜치
+## 9. 브랜치
 
 | 브랜치 | 내용 |
 |---|---|
 | `main` | 통합본 |
-| `control` | 축대칭 멀티로터 제어 연구 (이 브랜치) |
-| `bulnabi` | `control` + Gazebo 공력 플러그인. 두 기체(멀티로터·테일시터) 병행 지원 |
+| `control` | 축대칭 멀티로터 제어 연구 |
+| `bulnabi` | `control` + Gazebo 공력 플러그인 (이 브랜치). 두 기체 병행 지원 |
 
-## 9. 컨벤션
+## 10. 컨벤션
 
 - 실행은 **저장소 루트에서 모듈 형태로**: `python3 -m control.<모듈>`
 - 산출물은 `results/` (사이징은 `sizing/results/`)

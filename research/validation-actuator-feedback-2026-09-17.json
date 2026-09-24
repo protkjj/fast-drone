@@ -1,0 +1,895 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-09-17T02:58:39.298Z",
+  "finished_at": "2026-09-17T03:06:04.643Z",
+  "raw_log_path": "research/generated/actuator-feedback-2026-09-17.json",
+  "raw_log_sha256": "b87b2a151d06496147d8ea16f1e9ccca03614b5af207573d376c09ff07e840fa",
+  "implementation": {
+    "source_sha256": {
+      "model.py": "0cb0a0a239405dd37b81819e247854055e396b73ffc6d87fb9aa69893ce999b5",
+      "nmpc.py": "9286c235a6a53823343eca781836854d4ddb0ba08d768a7367fd57abf47796b2",
+      "eskf.py": "151c3d1144ee4602fdbf820383cf7a72949073fc581a97026a6b7191b9199949",
+      "runtime.js": "d25912530255a7294a3a8eee3a0fd9ce27c57313701221e5f1580128eaf61dfb",
+      "numeric_export.py": "0fd7249c1afa4a47888206779eaac331dd22a7b7eb7606c001aa4409877eedc9",
+      "profiles/selected.json": "0b59a79ce7d36afb3905b0786f51aae57ef0f4e0f34972483c53c291efe3cb72",
+      "../control/dynamics.py": "af37d3e0e0e0e07e1a88fdf5ae6c8648446a4ab0b7509b7c215f9e6ba0ae5944"
+    },
+    "input_sha256": "a3502ed27cb6cfa904c4b79dda4c5ce4a69add2224b1a2cfd977110170128cba",
+    "numeric_backend": "casadi-scalar-js-v1",
+    "numeric_source_sha256": "0cbec2fb43752026d3561fe71cd39cb23a8382c01c2ee2641825fd087e568388"
+  },
+  "post_validation_policy": {
+    "default": "OFF; user chose opt-in after inspecting mixed results",
+    "final_input_sha256": "bd16d7b065aef66d0600af09ccac3c2a4c64c45632db3f43cfab71e7d3d69ccc",
+    "graphs_sha256": "ee29a84c0e00e604b25434fd6159df60e9cb0408fbfee32d543fbf4356370916",
+    "change": "Only runtime default true -> false changed after this batch. Every run explicitly set true/false. Verified the old runtime SHA by reversing that one literal; generated equation/solver/numeric graph hashes are unchanged."
+  },
+  "cases": [
+    {
+      "id": "speed-truth",
+      "feedback": "truth",
+      "scenario": "schedule",
+      "seconds": 1.2,
+      "commands": [
+        {
+          "t": 0,
+          "speed": 0,
+          "altitude": 20
+        },
+        {
+          "t": 0.1,
+          "speed": 6,
+          "altitude": 20
+        }
+      ]
+    },
+    {
+      "id": "speed-eskf",
+      "feedback": "eskf",
+      "scenario": "schedule",
+      "seconds": 1.2,
+      "commands": [
+        {
+          "t": 0,
+          "speed": 0,
+          "altitude": 20
+        },
+        {
+          "t": 0.1,
+          "speed": 6,
+          "altitude": 20
+        }
+      ]
+    },
+    {
+      "id": "descent-truth",
+      "feedback": "truth",
+      "scenario": "schedule",
+      "seconds": 1.2,
+      "commands": [
+        {
+          "t": 0,
+          "speed": 0,
+          "altitude": 20
+        },
+        {
+          "t": 0.1,
+          "speed": 0,
+          "altitude": 16
+        }
+      ]
+    },
+    {
+      "id": "gust-eskf",
+      "feedback": "eskf",
+      "scenario": "gust",
+      "seconds": 3.2,
+      "speed": 3
+    }
+  ],
+  "reports": [
+    {
+      "case_id": "speed-truth",
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "truth",
+        "scenario": "schedule",
+        "seconds": 1.2,
+        "speed": 3,
+        "altitude": 20,
+        "wind_speed": 0,
+        "wind_angle": 90,
+        "seed": 42,
+        "preview": false,
+        "hybrid_actuator_feedback": false,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "commands": [
+          {
+            "t": 0,
+            "speed": 0,
+            "altitude": 20,
+            "wind_speed": 0,
+            "wind_angle": 90
+          },
+          {
+            "t": 0.1,
+            "speed": 6,
+            "altitude": 20,
+            "wind_speed": 0,
+            "wind_angle": 90
+          }
+        ]
+      },
+      "status": "completed",
+      "failure": null,
+      "counts": {
+        "plant": 1200,
+        "imu": 1200,
+        "nmpc": 60,
+        "outer": 60,
+        "indi": 1200,
+        "gps_captured": 12,
+        "gps_fused": 11,
+        "gps_replayed_imu": 220
+      },
+      "metrics": {
+        "velocity_rmse_mps": 5.735891690637858,
+        "altitude_rmse_m": 1.1233887797035305,
+        "position_estimation_rmse_m": 0.03195607952940887,
+        "electrical_energy_J": 1457.3847879861798,
+        "saturation_fraction": 0.5225,
+        "outside_prop_map_fraction": 0.44166666666666665,
+        "max_body_rate_rad_s": 12.69892570774128,
+        "current_limited_fraction": 0.6333333333333333,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.9166666666666666,
+        "coasting_fraction": 0.45666666666666667,
+        "allocation_limited_fraction": 0.5333333333333333,
+        "allocation_thrust_residual_max_N": 0.03862582742739562,
+        "allocation_alpha_residual_max_rad_s2": 100.73946861810919,
+        "virtual_thrust_tracking_rmse_N": 22.7982385171367,
+        "virtual_alpha_tracking_rmse_rad_s2": 76.78014106663299,
+        "actuator_envelope_unavailable": 0,
+        "motor_energy_residual_W": 7.673861546209082e-13,
+        "bus_residual_V": 5.995204332975845e-15,
+        "solver_failures": 19,
+        "solve_ms_p50": 993.6514580000003,
+        "solve_ms_p95": 1945.0092920000025,
+        "solve_ms_max": 2235.315333999999,
+        "deadline_misses_20ms": 60
+      },
+      "final": [
+        3.6026281721488935,
+        0,
+        17.018279409261876,
+        11.491255939187178,
+        0,
+        -7.103430223162268,
+        0,
+        -0.47653295284849845,
+        0,
+        0.879156609967468,
+        0,
+        -12.69892570774128,
+        0,
+        1465.9153307381137,
+        1465.9153307381137,
+        2732.2254251011313,
+        2732.2254251011313,
+        0.9959843999646063
+      ],
+      "envelope_active_solves": 0,
+      "envelope_max_violation_N": 0,
+      "envelope_max_roll_midpoint_error_rad_s2": 0,
+      "failed_status_counts": {
+        "Maximum_Iterations_Exceeded": 19
+      }
+    },
+    {
+      "case_id": "speed-truth",
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "truth",
+        "scenario": "schedule",
+        "seconds": 1.2,
+        "speed": 3,
+        "altitude": 20,
+        "wind_speed": 0,
+        "wind_angle": 90,
+        "seed": 42,
+        "preview": false,
+        "hybrid_actuator_feedback": true,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "commands": [
+          {
+            "t": 0,
+            "speed": 0,
+            "altitude": 20,
+            "wind_speed": 0,
+            "wind_angle": 90
+          },
+          {
+            "t": 0.1,
+            "speed": 6,
+            "altitude": 20,
+            "wind_speed": 0,
+            "wind_angle": 90
+          }
+        ]
+      },
+      "status": "completed",
+      "failure": null,
+      "counts": {
+        "plant": 1200,
+        "imu": 1200,
+        "nmpc": 60,
+        "outer": 60,
+        "indi": 1200,
+        "gps_captured": 12,
+        "gps_fused": 11,
+        "gps_replayed_imu": 220
+      },
+      "metrics": {
+        "velocity_rmse_mps": 5.568239197636581,
+        "altitude_rmse_m": 1.47430007430042,
+        "position_estimation_rmse_m": 0.034445098199479454,
+        "electrical_energy_J": 1087.9445869841654,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0.2125,
+        "max_body_rate_rad_s": 28.739418030340687,
+        "current_limited_fraction": 0.005,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.03333333333333333,
+        "coasting_fraction": 0.03333333333333333,
+        "allocation_limited_fraction": 0,
+        "allocation_thrust_residual_max_N": 1.700180263242146e-7,
+        "allocation_alpha_residual_max_rad_s2": 5.68318782256938e-7,
+        "virtual_thrust_tracking_rmse_N": 0.7808150128514584,
+        "virtual_alpha_tracking_rmse_rad_s2": 6.753958518304623,
+        "actuator_envelope_unavailable": 0,
+        "motor_energy_residual_W": 4.263256414560601e-13,
+        "bus_residual_V": 5.773159728050814e-15,
+        "solver_failures": 22,
+        "solve_ms_p50": 869.5493329999881,
+        "solve_ms_p95": 1574.5371250000026,
+        "solve_ms_max": 1906.4275840000046,
+        "deadline_misses_20ms": 60
+      },
+      "final": [
+        4.069894401472013,
+        0,
+        16.134139298709048,
+        5.795406233174401,
+        0,
+        -8.141840620988221,
+        0,
+        0.9992906147676499,
+        0,
+        -0.03765988897079067,
+        0,
+        -28.739418030340687,
+        0,
+        1367.8840330069158,
+        1367.8840330069158,
+        2110.4259289187994,
+        2110.4259289187994,
+        0.9970846576375193
+      ],
+      "envelope_active_solves": 60,
+      "envelope_max_violation_N": 0.000387740056083441,
+      "envelope_max_roll_midpoint_error_rad_s2": 0.049261772038950616,
+      "failed_status_counts": {
+        "Maximum_Iterations_Exceeded": 21,
+        "Ipopt::IpoptNLP::Eval_Error,": 1
+      }
+    },
+    {
+      "case_id": "speed-eskf",
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "eskf",
+        "scenario": "schedule",
+        "seconds": 1.2,
+        "speed": 3,
+        "altitude": 20,
+        "wind_speed": 0,
+        "wind_angle": 90,
+        "seed": 42,
+        "preview": false,
+        "hybrid_actuator_feedback": false,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "commands": [
+          {
+            "t": 0,
+            "speed": 0,
+            "altitude": 20,
+            "wind_speed": 0,
+            "wind_angle": 90
+          },
+          {
+            "t": 0.1,
+            "speed": 6,
+            "altitude": 20,
+            "wind_speed": 0,
+            "wind_angle": 90
+          }
+        ]
+      },
+      "status": "completed",
+      "failure": null,
+      "counts": {
+        "plant": 1200,
+        "imu": 1200,
+        "nmpc": 60,
+        "outer": 60,
+        "indi": 1200,
+        "gps_captured": 12,
+        "gps_fused": 11,
+        "gps_replayed_imu": 220
+      },
+      "metrics": {
+        "velocity_rmse_mps": 5.945474506746,
+        "altitude_rmse_m": 1.2573642401750902,
+        "position_estimation_rmse_m": 0.031097231509905416,
+        "electrical_energy_J": 1186.9835726343954,
+        "saturation_fraction": 0.8616666666666667,
+        "outside_prop_map_fraction": 0.5525,
+        "max_body_rate_rad_s": 9.252852372833846,
+        "current_limited_fraction": 0.4166666666666667,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.9825,
+        "coasting_fraction": 0.6375,
+        "allocation_limited_fraction": 0.8833333333333333,
+        "allocation_thrust_residual_max_N": 0.06715008275021717,
+        "allocation_alpha_residual_max_rad_s2": 182.2460703806115,
+        "virtual_thrust_tracking_rmse_N": 30.000878231136124,
+        "virtual_alpha_tracking_rmse_rad_s2": 115.00071748351576,
+        "actuator_envelope_unavailable": 0,
+        "motor_energy_residual_W": 9.556799795973347e-13,
+        "bus_residual_V": 6.106226635438361e-15,
+        "solver_failures": 10,
+        "solve_ms_p50": 452.4767920000013,
+        "solve_ms_p95": 1458.7389580000017,
+        "solve_ms_max": 1550.8854169999831,
+        "deadline_misses_20ms": 60
+      },
+      "final": [
+        2.8708941765034472,
+        -0.00020422275802360262,
+        16.527821912474128,
+        5.606952569749902,
+        -0.03609739097145426,
+        -9.171721009832915,
+        0.005226050697429248,
+        0.9907687293719337,
+        0.0008048163832592637,
+        -0.1354598300730565,
+        -0.02484610395776091,
+        5.781203452945626,
+        0.10849863761211523,
+        1521.191622665954,
+        1521.1932887820483,
+        1518.0163355512802,
+        1518.0612641089526,
+        0.996690380910021
+      ],
+      "envelope_active_solves": 0,
+      "envelope_max_violation_N": 0,
+      "envelope_max_roll_midpoint_error_rad_s2": 0,
+      "failed_status_counts": {
+        "Maximum_Iterations_Exceeded": 10
+      }
+    },
+    {
+      "case_id": "speed-eskf",
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "eskf",
+        "scenario": "schedule",
+        "seconds": 1.2,
+        "speed": 3,
+        "altitude": 20,
+        "wind_speed": 0,
+        "wind_angle": 90,
+        "seed": 42,
+        "preview": false,
+        "hybrid_actuator_feedback": true,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "commands": [
+          {
+            "t": 0,
+            "speed": 0,
+            "altitude": 20,
+            "wind_speed": 0,
+            "wind_angle": 90
+          },
+          {
+            "t": 0.1,
+            "speed": 6,
+            "altitude": 20,
+            "wind_speed": 0,
+            "wind_angle": 90
+          }
+        ]
+      },
+      "status": "completed",
+      "failure": null,
+      "counts": {
+        "plant": 1200,
+        "imu": 1200,
+        "nmpc": 60,
+        "outer": 60,
+        "indi": 1200,
+        "gps_captured": 12,
+        "gps_fused": 11,
+        "gps_replayed_imu": 220
+      },
+      "metrics": {
+        "velocity_rmse_mps": 5.5477660561556785,
+        "altitude_rmse_m": 1.347363404267158,
+        "position_estimation_rmse_m": 0.03463998263629486,
+        "electrical_energy_J": 1154.7475781564387,
+        "saturation_fraction": 0.0033333333333333335,
+        "outside_prop_map_fraction": 0.1725,
+        "max_body_rate_rad_s": 14.502296980881576,
+        "current_limited_fraction": 0.29083333333333333,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.6975,
+        "coasting_fraction": 0.6175,
+        "allocation_limited_fraction": 0.0033333333333333335,
+        "allocation_thrust_residual_max_N": 1.509229754503849e-7,
+        "allocation_alpha_residual_max_rad_s2": 1.1709620045041929,
+        "virtual_thrust_tracking_rmse_N": 1.1942890199860694,
+        "virtual_alpha_tracking_rmse_rad_s2": 15.57837097383744,
+        "actuator_envelope_unavailable": 0,
+        "motor_energy_residual_W": 3.979039320256561e-13,
+        "bus_residual_V": 6.106226635438361e-15,
+        "solver_failures": 3,
+        "solve_ms_p50": 868.5186669999966,
+        "solve_ms_p95": 1713.9679579999938,
+        "solve_ms_max": 2777.113416999986,
+        "deadline_misses_20ms": 60
+      },
+      "final": [
+        3.5101909111940555,
+        -0.5144027671002839,
+        16.37321473440256,
+        3.4860564688772984,
+        -0.7036864840432451,
+        -9.674545667266278,
+        0.43749018659497063,
+        -0.6385904055584928,
+        0.25538453469721173,
+        -0.5792955808559445,
+        0.745495426209097,
+        -0.46429224367525057,
+        -11.087967952713857,
+        2648.7228026258113,
+        1641.9869000316955,
+        1097.6995909070763,
+        1426.1800900121448,
+        0.9969040930904102
+      ],
+      "envelope_active_solves": 60,
+      "envelope_max_violation_N": 0.29215499049060334,
+      "envelope_max_roll_midpoint_error_rad_s2": 0.04862621164384842,
+      "failed_status_counts": {
+        "Maximum_Iterations_Exceeded": 3
+      }
+    },
+    {
+      "case_id": "descent-truth",
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "truth",
+        "scenario": "schedule",
+        "seconds": 1.2,
+        "speed": 3,
+        "altitude": 20,
+        "wind_speed": 0,
+        "wind_angle": 90,
+        "seed": 42,
+        "preview": false,
+        "hybrid_actuator_feedback": false,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "commands": [
+          {
+            "t": 0,
+            "speed": 0,
+            "altitude": 20,
+            "wind_speed": 0,
+            "wind_angle": 90
+          },
+          {
+            "t": 0.1,
+            "speed": 0,
+            "altitude": 16,
+            "wind_speed": 0,
+            "wind_angle": 90
+          }
+        ]
+      },
+      "status": "completed",
+      "failure": null,
+      "counts": {
+        "plant": 1200,
+        "imu": 1200,
+        "nmpc": 60,
+        "outer": 60,
+        "indi": 1200,
+        "gps_captured": 12,
+        "gps_fused": 11,
+        "gps_replayed_imu": 220
+      },
+      "metrics": {
+        "velocity_rmse_mps": 2.98179794389659,
+        "altitude_rmse_m": 2.8936734168564002,
+        "position_estimation_rmse_m": 0.026233646283382157,
+        "electrical_energy_J": 621.4306586867834,
+        "saturation_fraction": 0.4666666666666667,
+        "outside_prop_map_fraction": 0.8691666666666666,
+        "max_body_rate_rad_s": 6.479278160751398e-16,
+        "current_limited_fraction": 0.16083333333333333,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.6941666666666667,
+        "coasting_fraction": 0.5333333333333333,
+        "allocation_limited_fraction": 0,
+        "allocation_thrust_residual_max_N": 2.359167226018144e-7,
+        "allocation_alpha_residual_max_rad_s2": 3.4679787296728284e-13,
+        "virtual_thrust_tracking_rmse_N": 9.436119232485128,
+        "virtual_alpha_tracking_rmse_rad_s2": 2.851865573161961e-13,
+        "actuator_envelope_unavailable": 0,
+        "motor_energy_residual_W": 5.684341886080801e-13,
+        "bus_residual_V": 5.856426454897701e-15,
+        "solver_failures": 0,
+        "solve_ms_p50": 263.0653749999765,
+        "solve_ms_p95": 399.6133339999942,
+        "solve_ms_max": 761.7319580000185,
+        "deadline_misses_20ms": 60
+      },
+      "final": [
+        -8.560986165888435e-16,
+        0,
+        17.04220344703013,
+        -1.9997758120186445e-15,
+        0,
+        -2.086493686700905,
+        0,
+        -0.7071067811865476,
+        0,
+        0.7071067811865476,
+        0,
+        -6.479278160751398e-16,
+        0,
+        1806.8949848512082,
+        1806.8949848512082,
+        1806.8949848512082,
+        1806.8949848512082,
+        0.9982965696371767
+      ],
+      "envelope_active_solves": 0,
+      "envelope_max_violation_N": 0,
+      "envelope_max_roll_midpoint_error_rad_s2": 0,
+      "failed_status_counts": {}
+    },
+    {
+      "case_id": "descent-truth",
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "truth",
+        "scenario": "schedule",
+        "seconds": 1.2,
+        "speed": 3,
+        "altitude": 20,
+        "wind_speed": 0,
+        "wind_angle": 90,
+        "seed": 42,
+        "preview": false,
+        "hybrid_actuator_feedback": true,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "commands": [
+          {
+            "t": 0,
+            "speed": 0,
+            "altitude": 20,
+            "wind_speed": 0,
+            "wind_angle": 90
+          },
+          {
+            "t": 0.1,
+            "speed": 0,
+            "altitude": 16,
+            "wind_speed": 0,
+            "wind_angle": 90
+          }
+        ]
+      },
+      "status": "completed",
+      "failure": null,
+      "counts": {
+        "plant": 1200,
+        "imu": 1200,
+        "nmpc": 60,
+        "outer": 60,
+        "indi": 1200,
+        "gps_captured": 12,
+        "gps_fused": 11,
+        "gps_replayed_imu": 220
+      },
+      "metrics": {
+        "velocity_rmse_mps": 3.001726765445235,
+        "altitude_rmse_m": 2.9924847831444654,
+        "position_estimation_rmse_m": 0.027203129141988747,
+        "electrical_energy_J": 609.7850421040164,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0.8591666666666666,
+        "max_body_rate_rad_s": 6.732952143562843e-16,
+        "current_limited_fraction": 0,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0,
+        "coasting_fraction": 0,
+        "allocation_limited_fraction": 0,
+        "allocation_thrust_residual_max_N": 2.3814769889440868e-7,
+        "allocation_alpha_residual_max_rad_s2": 3.4489606011170725e-13,
+        "virtual_thrust_tracking_rmse_N": 2.133037843940123,
+        "virtual_alpha_tracking_rmse_rad_s2": 9.095119289970454e-14,
+        "actuator_envelope_unavailable": 0,
+        "motor_energy_residual_W": 4.547473508864641e-13,
+        "bus_residual_V": 5.528563717938084e-15,
+        "solver_failures": 0,
+        "solve_ms_p50": 322.67949999996927,
+        "solve_ms_p95": 468.4371669999673,
+        "solve_ms_max": 755.4365830000024,
+        "deadline_misses_20ms": 60
+      },
+      "final": [
+        -8.682435062821188e-16,
+        0,
+        17.081653883828043,
+        -1.999772101124498e-15,
+        0,
+        -2.0600675401906487,
+        0,
+        -0.7071067811865476,
+        0,
+        0.7071067811865476,
+        0,
+        -6.732952143562843e-16,
+        0,
+        1931.9320205582444,
+        1931.9320205582444,
+        1931.9320205582444,
+        1931.9320205582444,
+        0.9983478614875877
+      ],
+      "envelope_active_solves": 60,
+      "envelope_max_violation_N": 1.6785936862717676e-7,
+      "envelope_max_roll_midpoint_error_rad_s2": 1.6044097367820705e-8,
+      "failed_status_counts": {}
+    },
+    {
+      "case_id": "gust-eskf",
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "eskf",
+        "scenario": "gust",
+        "seconds": 3.2,
+        "speed": 3,
+        "altitude": 20,
+        "wind_speed": 0,
+        "wind_angle": 90,
+        "seed": 42,
+        "preview": false,
+        "hybrid_actuator_feedback": false,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "status": "completed",
+      "failure": null,
+      "counts": {
+        "plant": 3200,
+        "imu": 3200,
+        "nmpc": 160,
+        "outer": 160,
+        "indi": 3200,
+        "gps_captured": 32,
+        "gps_fused": 31,
+        "gps_replayed_imu": 620
+      },
+      "metrics": {
+        "velocity_rmse_mps": 4.2346484038926455,
+        "altitude_rmse_m": 3.352686459636665,
+        "position_estimation_rmse_m": 0.12921844826302253,
+        "electrical_energy_J": 3083.0407024385777,
+        "saturation_fraction": 0.65125,
+        "outside_prop_map_fraction": 0.3884375,
+        "max_body_rate_rad_s": 9.07724117841387,
+        "current_limited_fraction": 0.34375,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.993125,
+        "coasting_fraction": 0.7009375,
+        "allocation_limited_fraction": 0.6565625,
+        "allocation_thrust_residual_max_N": 0.05669681889368405,
+        "allocation_alpha_residual_max_rad_s2": 185.61265497803012,
+        "virtual_thrust_tracking_rmse_N": 28.548005965232573,
+        "virtual_alpha_tracking_rmse_rad_s2": 116.74056646366351,
+        "actuator_envelope_unavailable": 0,
+        "motor_energy_residual_W": 7.958078640513122e-13,
+        "bus_residual_V": 5.995204332975845e-15,
+        "solver_failures": 10,
+        "solve_ms_p50": 412.0796669999836,
+        "solve_ms_p95": 1477.7533750000293,
+        "solve_ms_max": 1823.7838749999646,
+        "deadline_misses_20ms": 160
+      },
+      "final": [
+        7.493018422753174,
+        -0.6052731430077797,
+        11.547080566225917,
+        6.325524112306179,
+        -2.713021251497588,
+        -2.8854016735081673,
+        0.7541229994035681,
+        -0.14604175306180045,
+        0.04731089139001232,
+        0.6385389476681,
+        1.2098025770326342,
+        1.0196483305307962,
+        -7.093758348837053,
+        2829.5043049266746,
+        2829.6666546088313,
+        2826.9682556520484,
+        2829.6579391100504,
+        0.9914606826931857
+      ],
+      "envelope_active_solves": 0,
+      "envelope_max_violation_N": 0,
+      "envelope_max_roll_midpoint_error_rad_s2": 0,
+      "failed_status_counts": {
+        "Maximum_Iterations_Exceeded": 10
+      }
+    },
+    {
+      "case_id": "gust-eskf",
+      "configuration": {
+        "controller": "hybrid",
+        "feedback": "eskf",
+        "scenario": "gust",
+        "seconds": 3.2,
+        "speed": 3,
+        "altitude": 20,
+        "wind_speed": 0,
+        "wind_angle": 90,
+        "seed": 42,
+        "preview": false,
+        "hybrid_actuator_feedback": true,
+        "log_hz": 50,
+        "scales": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "status": "completed",
+      "failure": null,
+      "counts": {
+        "plant": 3200,
+        "imu": 3200,
+        "nmpc": 160,
+        "outer": 160,
+        "indi": 3200,
+        "gps_captured": 32,
+        "gps_fused": 31,
+        "gps_replayed_imu": 620
+      },
+      "metrics": {
+        "velocity_rmse_mps": 1.0166646720948176,
+        "altitude_rmse_m": 0.2808367677522721,
+        "position_estimation_rmse_m": 0.13599194604174739,
+        "electrical_energy_J": 1696.3827333903314,
+        "saturation_fraction": 0,
+        "outside_prop_map_fraction": 0.09125,
+        "max_body_rate_rad_s": 3.478595381630711,
+        "current_limited_fraction": 0.0428125,
+        "voltage_limited_fraction": 0,
+        "tracking_limited_fraction": 0.770625,
+        "coasting_fraction": 0.76875,
+        "allocation_limited_fraction": 0,
+        "allocation_thrust_residual_max_N": 1.3887588679040164e-7,
+        "allocation_alpha_residual_max_rad_s2": 0.000009992109078012944,
+        "virtual_thrust_tracking_rmse_N": 0.7025490349084379,
+        "virtual_alpha_tracking_rmse_rad_s2": 28.676777633734623,
+        "actuator_envelope_unavailable": 0,
+        "motor_energy_residual_W": 3.126388037344441e-13,
+        "bus_residual_V": 5.717648576819556e-15,
+        "solver_failures": 1,
+        "solve_ms_p50": 423.3178750000079,
+        "solve_ms_p95": 784.8605419999803,
+        "solve_ms_max": 1500.0778329999885,
+        "deadline_misses_20ms": 160
+      },
+      "final": [
+        5.437862746169677,
+        -0.1836772469533279,
+        20.386687156241845,
+        3.2233934736081653,
+        -0.23334845898714335,
+        -0.3149075906018584,
+        0.44141970499742156,
+        -0.5683496125134289,
+        0.3895499321939828,
+        0.5747853619600001,
+        -0.6366629973044137,
+        0.5693584912659475,
+        0.927753495566218,
+        1622.80714313058,
+        1559.8602946773813,
+        1628.085395198494,
+        1488.8901002167213,
+        0.9955227360002155
+      ],
+      "envelope_active_solves": 160,
+      "envelope_max_violation_N": 0.032084436264031346,
+      "envelope_max_roll_midpoint_error_rad_s2": 0.00424900942408175,
+      "failed_status_counts": {
+        "Maximum_Iterations_Exceeded": 1
+      }
+    }
+  ],
+  "limitations": [
+    "Short, single-seed on/off Hybrid ablation, not controller superiority or robustness evidence.",
+    "Nominal local 20 ms endpoint constraints are not full-horizon actuator prediction or a guaranteed nonlinear reachable set.",
+    "The gust has only 0.2 s recovery; no settling-time claim. All failures and off-map samples are retained.",
+    "Wall timings include concurrent development; no hard-real-time or timing ranking claim."
+  ]
+}

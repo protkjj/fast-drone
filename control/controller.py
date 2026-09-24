@@ -413,30 +413,67 @@ class ScheduledLQR:
         self.V_table = np.array(V_table, dtype=float)
 
         # ── 각 속도에서 게인 사전 계산 ──
-        K_r_list, x_trim_list, u_trim_list = [], [], []
-        n_valid = 0
+        #
+        # ★ **트림이 수렴한 속도만 격자에 넣는다.** 예전에는 find_trim 의
+        #   'converged' 를 보지 않고 실패한 점까지 넣었다. _interpolate 가
+        #   np.interp 로 이웃과 선형 보간하므로, 물리적으로 없는 트림점 하나가
+        #   **유효 구간의 게인까지 끌어내린다.**
+        #   실측(선정 프로파일, 기본 격자 0..80): 20 이상 7개 점이 트림 없음인데
+        #   전부 격자에 들어갔고, 로그는 "9/9 유효"라고 찍었다(lqr.valid 는 ARE 가
+        #   풀렸는지만 보지 트림 존재를 보지 않는다). 그 결과 **트림이 멀쩡한
+        #   V=15 에서 게인이 직접 설계 대비 190% 어긋났다**(‖K‖ 1952 vs 799,
+        #   u_trim 682 vs 1004). rocket 프로파일도 70·80 에서 같은 일을 겪고 있었다.
+        #
+        # ★ 연속법(직전 해를 다음 초기값으로)을 쓴다. trim.py 가 "냉시동 fsolve 는
+        #   고속에서 엉뚱한 가지로 빠진다"고 경고하는 그대로다. 실측: rocket 의
+        #   70·80 이 냉시동에선 실패하지만 연속법으론 수렴한다. 기존 점들의 해는
+        #   솔버 허용오차 수준(상태 최대 5.8e-8, 수렴 판정 1e-6 보다 작다)에서 같다.
+        speeds, K_r_list, x_trim_list, u_trim_list = [], [], [], []
+        dropped, guess = [], None
 
         for V in self.V_table:
-            trim = find_trim(params, float(V))
-            x_t, u_t = trim['state'].copy(), trim['control'].copy()
+            trim = find_trim(params, float(V), guess=guess, quiet=True)
+            if not trim['converged']:
+                dropped.append((float(V), trim['why'] or '미수렴'))
+                continue
+            guess = trim['guess']
 
-            lqr = LQRController(params, x_t, u_t, Q, R)
-            if lqr.valid:
-                K_r_list.append(lqr.K_r.flatten())   # 4×14 = 56개 원소
-                n_valid += 1
-            else:
-                K_r_list.append(np.zeros(4 * 14))
+            lqr = LQRController(params, trim['state'], trim['control'], Q, R)
+            if not lqr.valid:
+                dropped.append((float(V), 'ARE 해 없음'))
+                continue
 
-            x_trim_list.append(x_t)
-            u_trim_list.append(u_t)
+            speeds.append(float(V))
+            K_r_list.append(lqr.K_r.flatten())        # 4×14 = 56개 원소
+            x_trim_list.append(trim['state'].copy())
+            u_trim_list.append(trim['control'].copy())
 
-        # 보간용 배열: 각 행이 한 속도점의 값
-        self._K_r_flat = np.array(K_r_list)       # (N_speeds, 56)
-        self._x_trim_arr = np.array(x_trim_list)  # (N_speeds, 17)
-        self._u_trim_arr = np.array(u_trim_list)  # (N_speeds, 4)
+        if len(speeds) < 2:
+            raise ValueError(
+                f"ScheduledLQR: 트림이 잡히는 속도점이 {len(speeds)}개뿐이라 보간할 수 없다. "
+                f"버려진 점: {dropped}. V_table 을 트림이 존재하는 구간으로 좁혀야 한다.")
+
+        # 보간 격자는 **살아남은 속도만** 담는다.
+        self.V_table = np.array(speeds)
+        self.dropped = dropped
+        self._K_r_flat = np.array(K_r_list)       # (N_valid, 56)
+        self._x_trim_arr = np.array(x_trim_list)  # (N_valid, 17)
+        self._u_trim_arr = np.array(u_trim_list)  # (N_valid, 4)
         self._nr = 14  # 축소 상태 차원
 
-        print(f"  ScheduledLQR: {n_valid}/{len(V_table)} 속도점 유효")
+        print(f"  ScheduledLQR: {len(speeds)}/{len(V_table)} 속도점 유효"
+              f" (격자 {speeds[0]:.0f}~{speeds[-1]:.0f} m/s)")
+        if dropped:
+            detail = ', '.join(f"{v:.0f}({why})" for v, why in dropped)
+            print(f"    제외: {detail}")
+        # 요청 격자의 절반 이상이 잘려나갔다면 격자 자체가 이 기체의 트림 구간을
+        # 훨씬 벗어난 것이다. 남은 점들 바깥은 외삽(clip)이라 조용히 틀린 게인이
+        # 쓰인다 — 실측으로 85.6% 오차가 났다. 프로파일과 무관한 일반 안전장치다.
+        if len(dropped) * 2 > len(V_table):
+            print(f"    ⚠ 요청 격자 {len(V_table)}점 중 {len(dropped)}점이 제외됐다. "
+                  f"V_table 이 이 기체의 트림 구간({speeds[0]:.0f}~{speeds[-1]:.0f} m/s)보다 "
+                  f"훨씬 넓다 — 그 바깥은 외삽이라 게인이 크게 어긋난다. "
+                  f"격자를 트림 구간에 맞춰 다시 줄 것.")
 
     def _interpolate(self, V):
         """V에서 K_r(4×14), x_trim(17), u_trim(4) 선형 보간."""

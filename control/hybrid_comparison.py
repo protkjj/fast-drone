@@ -58,8 +58,10 @@ def build_virtual_dynamics(params):
     # 공력 힘 (모멘트는 INDI가 처리하므로 무시)
     F_aero, _ = _body_aerodynamics(v_body, omega, params)
 
-    # 동체 힘 = 공력 + 추력(body -z)
-    F_body = F_aero + ca.vertcat(0, 0, -T_cmd)
+    # 가상 모델도 물리 플랜트와 같은 추력축을 사용해야 한다.
+    thrust = (ca.vertcat(T_cmd, 0, 0) if params.get('thrust_axis', 'z') == 'x'
+              else ca.vertcat(0, 0, -T_cmd))
+    F_body = F_aero + thrust
 
     p_dot = vel
     v_dot = ca.vertcat(0, 0, -params['g']) + (R @ F_body) / params['mass']
@@ -79,16 +81,22 @@ class VirtualNMPC:
     """NMPC with virtual command output [T, ω̇_des]."""
 
     def __init__(self, params, v_ref=None, z_ref=0.0, T_ref=None,
-                 N=20, dt_nmpc=0.05, dt_ctrl=0.02, Q_z=20.0, max_iter=30):
+                 N=20, dt_nmpc=0.05, dt_ctrl=0.02, Q_z=20.0, max_iter=30,
+                 alloc_feedback=False):
         self.p = params
         self.N, self.dt_nmpc, self.dt_ctrl = N, dt_nmpc, dt_ctrl
         self.v_ref = np.array(v_ref) if v_ref is not None else np.zeros(3)
         self.z_ref = z_ref
         self._Q_z = Q_z
         self._max_iter = max_iter   # IPOPT 반복 상한 (SITL 실시간용 축소 가능)
+        # 논문 식(31)-(32): INDI 배분 결과를 다음 솔브의 입력변화량 비용
+        # 기준(v_{-1|k})으로 쓸지 여부. False면 기존과 동일하게 고정 트림값을
+        # 쓴다 — 기본값 False로 기존 호출부(mission_sim 등) 동작을 보존한다.
+        self.alloc_feedback = alloc_feedback
 
         self.T_ref = T_ref if T_ref else params['mass'] * params['g']
         self.u_ref = np.array([self.T_ref, 0, 0, 0])
+        self._prev_input = self.u_ref.copy()
 
         f, x_sym, u_sym = build_virtual_dynamics(params)
 
@@ -117,8 +125,15 @@ class VirtualNMPC:
         self.consec_fail = 0
         self.last_status = 'none'
         self._ever_converged = False
+        self._prev_input = self.u_ref.copy()
         if self._w0_init is not None:
             self.w0 = self._w0_init.copy()
+
+    def set_prev_input(self, v):
+        """INDI 배분 결과(v_alloc)를 다음 솔브의 입력변화량 비용 기준으로 받는다
+        (식31-32). alloc_feedback=False면 무시 — 항상 안전하게 호출 가능."""
+        if self.alloc_feedback:
+            self._prev_input = np.asarray(v, dtype=float)
 
     def _build_nlp(self, params, x_sym, u_sym):
         N, nx, nu = self.N, NX_V, NU_V
@@ -133,16 +148,21 @@ class VirtualNMPC:
         T_max = 4 * params['k_T'] * params['n_max']**2
         nu_max = 100.0  # rad/s²
 
-        p = ca.SX.sym('p', nx + 3 + 1 + nu)
+        # p 레이아웃: [x_init(nx), v_ref(3), z_ref(1), u_ref(nu), u_prev(nu)]
+        # u_ref: 매 단계 정규화 목표(트림) — 항상 고정.
+        # u_prev: 0단계 입력변화량 비용의 기준(식31-32의 v_{-1|k}).
+        #         alloc_feedback=False면 u_ref와 동일값이 매번 들어온다(기존과 동일 동작).
+        p = ca.SX.sym('p', nx + 3 + 1 + nu + nu)
         x_init = p[0:nx]
         v_ref = p[nx:nx+3]
         z_ref = p[nx+3]
         u_ref = p[nx+4:nx+4+nu]
+        u_prev = p[nx+4+nu:nx+4+2*nu]
 
         w, w0, lbw, ubw = [], [], [], []
         g, lbg, ubg = [], [], []
         J_cost = 0.0
-        X_prev, U_prev = x_init, u_ref
+        X_prev, U_prev = x_init, u_prev
 
         for k in range(N):
             U_k = ca.SX.sym(f'U_{k}', nu)
@@ -155,7 +175,9 @@ class VirtualNMPC:
             w.append(X_k)
             lbw += [-1e6]*nx; ubw += [1e6]*nx
             _xg = [0.0]*nx
-            _xg[6:10] = [1.0, 0.0, 0.0, 0.0]   # 유효 단위 쿼터니언(호버) 초기추측
+            _xg[6:10] = ([0.0, -np.sqrt(0.5), 0.0, np.sqrt(0.5)]
+                         if params.get('thrust_axis', 'z') == 'x'
+                         else [1.0, 0.0, 0.0, 0.0])   # 유효 단위 쿼터니언(호버) 초기추측
             w0 += _xg                          # (nmpc.py와 동일 픽스 — cold 솔브 개선)
 
             g.append(X_k - self.F(X_prev, U_k))
@@ -195,7 +217,8 @@ class VirtualNMPC:
         return self._u_current
 
     def _solve(self, x13):
-        p_val = np.concatenate([x13, self.v_ref, [self.z_ref], self.u_ref])
+        p_val = np.concatenate([x13, self.v_ref, [self.z_ref], self.u_ref,
+                                 self._prev_input])
         sol = self.solver(x0=self.w0, lbx=self.lbw, ubx=self.ubw,
                           lbg=self.lbg, ubg=self.ubg, p=p_val)
 
@@ -219,6 +242,74 @@ class VirtualNMPC:
         return u_opt
 
 
+def constrained_allocation(G, dT_target, domega_target, n_actual, n_min, n_max,
+                            max_iter=4):
+    """
+    총추력 등식 제약 하 각가속도 잔차 최소 배분 — 논문 식(28)-(29)/부록A.2-A.3의
+    증분(Δn) 공간 국소 해.
+
+    G(4x4)는 현재 동작점의 선형 입력효과 행렬(0행=∂T/∂n, 1-3행=∂ω̇/∂n,
+    ProperHybrid._compute_G와 동일). dT_target·domega_target은 INDI 증분
+    목표(요구-측정, 식24의 소신호 가정). 반환하는 Δn은:
+      Σ G[0,i]·Δn_i = dT_target  을 (포화가 없는 한) 정확히 만족시키고,
+    그 부분공간 안에서 ||G[1:4]·Δn - domega_target||²를 최소화한다.
+
+    포화(n_min/n_max 도달)는 활성집합법으로 처리한다 — 로터가 4개뿐이라
+    매 반복 자유변수가 최소 1개 줄어들면 최대 4회 안에 반드시 끝난다
+    (부록A.3의 KKT 시스템을 그대로 씀, 하한·자유·상한 조합을 전수 열거하지
+    않고 위반한 변수만 순차로 고정 — 동일한 수렴 성질을 훨씬 싸게 얻는다).
+
+    논문 본문이 별도로 쓰는 외곽 비선형 재선형화 + 감쇠 후보(1,1/2,1/4,1/8)
+    루프는 적용하지 않는다 — INDI 증분은 이미 1ms마다 재선형화되는 소신호
+    영역이라(식24) 1회 선형화로 충분하다고 판단했다. 필요해지면 이 함수를
+    감싸는 바깥 루프를 추가하면 된다(이 함수 경계는 그러도록 분리해 뒀다).
+
+    Returns
+    -------
+    dn : array(4)
+    """
+    free = np.ones(4, dtype=bool)
+    dn = np.zeros(4)
+    for _ in range(max_iter):
+        idx = np.where(free)[0]
+        if idx.size == 0:
+            break
+        fixed = ~free
+        Gw = G[1:4, idx]                          # (3, |F|)
+        g0 = G[0, idx]                             # (|F|,)
+        dT_rem = dT_target - G[0, fixed] @ dn[fixed]
+        dw_rem = domega_target - G[1:4, fixed] @ dn[fixed]
+
+        k = idx.size
+        KKT = np.zeros((k + 1, k + 1))
+        KKT[:k, :k] = Gw.T @ Gw
+        KKT[:k, k] = g0
+        KKT[k, :k] = g0
+        rhs = np.concatenate([Gw.T @ dw_rem, [dT_rem]])
+        try:
+            sol = np.linalg.solve(KKT, rhs)
+        except np.linalg.LinAlgError:
+            sol, *_ = np.linalg.lstsq(KKT, rhs, rcond=None)
+        dn_free = sol[:k]
+        dn[idx] = dn_free
+
+        n_new = n_actual[idx] + dn_free
+        lo_bad = n_new < n_min
+        hi_bad = n_new > n_max
+        if not (lo_bad.any() or hi_bad.any()):
+            break
+        for j, gi in zip(range(k), idx):
+            if lo_bad[j]:
+                dn[gi] = n_min - n_actual[gi]
+                free[gi] = False
+            elif hi_bad[j]:
+                dn[gi] = n_max - n_actual[gi]
+                free[gi] = False
+        # 4회 반복을 다 써도 못 끝나면(모든 로터가 포화 직전) 마지막 추정치를
+        # 그대로 쓴다 — 논문도 4회 상한을 명시하며 전역 최적성을 주장하지 않는다.
+    return dn
+
+
 # ══════════════════════════════════════════════════
 # 3. ProperHybrid (인터페이스 분리)
 # ══════════════════════════════════════════════════
@@ -233,7 +324,14 @@ class ProperHybrid:
     이중 보정 없음: NMPC는 모터를 모르고, INDI만 모터를 제어.
     """
 
-    def __init__(self, virtual_nmpc, params, dt=0.001, f_cut=50.0):
+    def __init__(self, virtual_nmpc, params, dt=0.001, f_cut=50.0,
+                 alloc_mode='A0'):
+        """
+        alloc_mode : {'A0','A1'}
+            'A0' (기본값, 기존 동작 보존) — 비제약 최소자승 + 사후 clip.
+            'A1' — 논문 식(28)-(29) 총추력 등식 배분(constrained_allocation).
+            논문 표6의 A0↔A1 제거실험이 바로 이 플래그다.
+        """
         self.nmpc = virtual_nmpc
         self.p = params
         self.dt = dt
@@ -243,6 +341,8 @@ class ProperHybrid:
         self._omega_dot_filt = np.zeros(3)
         self._prev_t = None                   # 실제 Δt 측정용 (SITL 루프율 가변/100Hz미만)
         self._initialized = False
+        self.alloc_mode = alloc_mode
+        self.last_alloc = None                 # 식(31)-(32) 배분 결과 (보고·피드백용)
         _, self._TM_to_f = compute_allocation_matrix(params)
 
     def reset(self):
@@ -288,7 +388,8 @@ class ProperHybrid:
         q = x[6:10]
         R = Rotation.from_quat(q).as_matrix()
         v_body = R.T @ x[3:6]
-        V_axial = max(-v_body[2], 0.0)
+        V_axial = max(v_body[0] if self.p.get('thrust_axis', 'z') == 'x'
+                      else -v_body[2], 0.0)
 
         # 전진비 보정된 추력 측정
         T_meas = 0.0
@@ -305,12 +406,40 @@ class ProperHybrid:
                        omega_dot_des[2] - self._omega_dot_filt[2]])
 
         G = self._compute_G(n_actual, v_body)
+
+        if self.alloc_mode == 'A1':
+            f_max = self._rotor_thrust_cap(V_axial)
+            T_c = float(np.clip(T_cmd, 0.0, np.sum(f_max)))
+            dT_target = T_c - T_meas
+            dn = constrained_allocation(G, dT_target, dv[1:4], n_actual,
+                                         self.p['n_min'], self.p['n_max'])
+            n_cmd = np.clip(n_actual + dn, self.p['n_min'], self.p['n_max'])
+
+            # 식(31)-(32): 명목 배분 결과를 가상입력 공간으로 되돌려 저장.
+            T_alloc = T_meas + G[0] @ dn
+            omega_alloc = self._omega_dot_filt + G[1:4] @ dn
+            self.last_alloc = np.concatenate([[T_alloc], omega_alloc])
+            # nmpc 쪽의 alloc_feedback 플래그가 실제 사용 여부를 결정한다
+            # (VirtualNMPC.set_prev_input 참조) — 여기선 항상 통지만 한다.
+            if hasattr(self.nmpc, 'set_prev_input'):
+                self.nmpc.set_prev_input(self.last_alloc)
+            return n_cmd
+
+        # A0 (기존 동작 그대로 — 회귀 가드 겸 표6의 A0 비교항)
         try:
             dn = np.linalg.solve(G, dv)
         except np.linalg.LinAlgError:
             return self._fallback(T_cmd, omega_dot_des)
 
         return np.clip(n_actual + dn, self.p['n_min'], self.p['n_max'])
+
+    def _rotor_thrust_cap(self, V_axial):
+        """현재 유속·명목 최대 회전수에서 로터별 추력 상한 f_max,i (식28)."""
+        n_i = self.p['n_max']
+        n_rps = n_i / (2 * np.pi)
+        J = V_axial / (n_rps * self.p['D_prop'] + 1e-8)
+        fac = max(1.0 - J / self.p['J_max'], 0.0)
+        return np.full(4, self.p['k_T'] * n_i**2 * fac)
 
     def _compute_G(self, n, v_body=None):
         return compute_control_effectiveness(self.p, n, v_body)
@@ -330,60 +459,32 @@ class ProperHybrid:
 # ══════════════════════════════════════════════════
 
 def compute_control_effectiveness(params, n_actual, v_body=None):
+    """추진 wrench의 국소 미분 ∂[T, M/I]/∂n (각속도 0 기준).
+
+    플랜트의 EPS와 영추력 분기를 그대로 미분한다. n=0에 가짜 제어 효과를
+    넣지 않는다. 랭크가 부족하면 할당기가 처리해야지 G를 왜곡하면 안 된다.
+    회전 중 로터 자이로의 미분은 이 기존 인터페이스에 포함하지 않는다.
+
+    구 버전은 모멘트팔을 pos[i,0]/pos[i,1]로 직접 손계산했는데(로터가 동체
+    xy평면에 있다는 전제), thrust_axis='x'에선 로터가 yz평면에 있어 그 전제가
+    깨진다. compute_allocation_matrix가 이미 축을 아는 모멘트팔/반토크 구조를
+    만드니 그걸 재사용한다 — z축 기본값에서는 이전 손계산과 수학적으로 동일하다
+    (T=k_T*n^2*fac(n)의 곱미분이 정확히 dT/dn=k_T*n*(1+fac); Q=k*T가 항상
+    성립해 반토크 행에 dT/dn을 곱해도 dQ/dn이 그대로 나온다).
     """
-    제어 효과 행렬 G(4×4): ∂[T, ω̇]/∂n.
-
-    전진비(advance ratio) 반영:
-      동역학에서 T = k_T * n^2 * fac,  fac = max(1 - J/J_max, 0)
-      → dT/dn = k_T * n * (1 + fac)
-
-      fac = 1 (호버): dT/dn = 2*k_T*n (기존과 동일)
-      fac < 1 (전진비 큼): dT/dn 감소 → INDI가 추력 변화를 정확히 계산
-
-    왜 중요한가:
-      감속 중 드론이 30도 틸트 → V_axial ≈ 25 m/s → fac ≈ 0.63
-      기존: dT/dn을 38% 과대평가 → 모터 under-command → 고도 추락
-      수정: 정확한 dT/dn → 모터 정확 제어 → 고도 안정
-
-    Parameters
-    ----------
-    v_body : array(3) or None
-        동체 프레임 속도. None이면 fac=1 (호버 가정).
-    """
-    G = np.zeros((4, 4))
-    pos, dirs = params['rotor_positions'], params['rotor_directions']
-    k_T, k_Q = params['k_T'], params['k_Q']
-    Jx, Jy, Jz = params['Ixx'], params['Iyy'], params['Izz']
-    D = params['D_prop']
-    J_max = params['J_max']
-
-    # V_axial: 로터 추력축(body -z) 방향 유입 속도
-    if v_body is not None:
-        V_axial = max(-v_body[2], 0.0)
-    else:
-        V_axial = 0.0
-
-    for i in range(4):
-        ni = max(n_actual[i], 1.0)
-
-        # 전진비 → 추력 감소 팩터
-        if V_axial > 0:
-            n_rps = ni / (2 * np.pi)
-            J = V_axial / (n_rps * D + 1e-8)
-            fac = max(1.0 - J / J_max, 0.0)
-        else:
-            fac = 1.0
-
-        # dT/dn = k_T * n * (1 + fac)  (해석적 미분)
-        # fac=1: 2*k_T*n (기존), fac=0.63: 1.63*k_T*n (감소)
-        dT = k_T * ni * (1.0 + fac)
-        dQ = k_Q * ni * (1.0 + fac)
-
-        G[0, i] = dT
-        G[1, i] = -pos[i, 1] * dT / Jx
-        G[2, i] = pos[i, 0] * dT / Jy
-        G[3, i] = dirs[i] * dQ / Jz
-
+    n = np.asarray(n_actual, dtype=float)
+    axial = 0.0 if v_body is None else max(
+        v_body[0] if params.get('thrust_axis', 'z') == 'x' else -v_body[2], 0.0)
+    b = params['D_prop'] / (2 * np.pi)
+    denominator = b * n + EPS
+    c = axial / params['J_max']
+    factor = 1.0 - c / denominator
+    derivative = np.where(factor > 0.0,
+                          params['k_T'] * (2 * n * factor + n**2 * c * b / denominator**2),
+                          0.0)
+    allocation, _ = compute_allocation_matrix(params)
+    G = allocation * derivative[np.newaxis, :]
+    G[1:4] /= np.array([params['Ixx'], params['Iyy'], params['Izz']])[:, None]
     return G
 
 
