@@ -74,23 +74,26 @@ class RotorThrustNMPC13:
     → 제어값, reset(), consec_fail/last_status)이되 출력이 로터별 추력 f∈R⁴."""
 
     def __init__(self, params, v_ref=None, z_ref=0.0, f_hover_total=None,
-                 N=20, dt_nmpc=0.05, dt_ctrl=0.02, Q_z=20.0, max_iter=30):
+                 N=20, dt_nmpc=0.05, dt_ctrl=0.02, Q_z=20.0, max_iter=30,
+                 cost_spec='paper', ref_fn=None):
         self.p = params
         self.N, self.dt_nmpc, self.dt_ctrl = N, dt_nmpc, dt_ctrl
         self.v_ref = np.array(v_ref) if v_ref is not None else np.zeros(3)
         self.z_ref = z_ref
         self._Q_z = Q_z
-        # ⚠ 이 제어기의 비용함수는 아직 **legacy** 다 — 논문 v5.3 식(14)-(18)과
-        #   다르다: 속도가중이 diag(5,5,10)(논문은 5·I₃), 종말비용에 ω가 빠졌고
-        #   (논문 식16은 stage 전체에 10배), 입력 가중에 Dν 정규화(식15)가 없어
-        #   척도가 어긋나고, 참조가 상수 하나라 노드별 r_{j|k}(식14)가 아니다.
-        #
-        #   2026-09-24에 VirtualNMPC(V13) 기본값만 cost_spec='paper'로 뒤집었다.
-        #   **표5·표6 비교를 이 상태로 돌리면 불공정하다** — V13 이 올바른 비용을
-        #   받아서 이기는 결과가 나온다. 논문 §5.3 의 "원인 분석 모드에서는 …
-        #   한 요소씩 바꾼다"를 지키려면 비교군 전체가 같은 비용을 써야 한다.
-        #   비교 스크립트는 모든 제어기의 cost_spec 이 같은지 확인할 것.
-        self.cost_spec = 'legacy'
+        # cost_spec : {'paper','legacy'}  (2026-09-25 밤, 야간지시 3-a)
+        #   'paper' (기본값) — 논문 식(14)-(18). F13(부분분리, 로터추력 입력)의
+        #   Dν 정규화는 research/nmpc.py 의 kind="f13" 척도(scaling=[mg/4]*4,
+        #   hover=[mg/4]*4)를 따른다 — M17 은 [[nmpc.py 의 max_n 척도]]와 다르고
+        #   V13 은 [mg,100,100,100] 과 또 다르다. 표5 kind마다 "자기 단위의
+        #   한계"로 무차원화한다는 원칙(식15)은 같다.
+        #   'legacy' — 이 클래스가 원래 쓰던 비용. 옛 결과 재현용으로만 남긴다.
+        if cost_spec not in ('paper', 'legacy'):
+            raise ValueError(f"cost_spec must be 'paper' or 'legacy', got {cost_spec!r}")
+        if ref_fn is not None and cost_spec != 'paper':
+            raise ValueError("ref_fn은 cost_spec='paper'에서만 쓸 수 있다.")
+        self.cost_spec = cost_spec
+        self.ref_fn = ref_fn
         self._max_iter = max_iter
 
         T_hover = f_hover_total if f_hover_total else params['mass'] * params['g']
@@ -100,20 +103,113 @@ class RotorThrustNMPC13:
         self.f_max = float(params['k_T'] * params['n_max']**2)
 
         f13, x_sym, u_sym = build_f13_dynamics(params)
-        dt = dt_nmpc
-        k1 = f13(x_sym, u_sym)
-        k2 = f13(x_sym + dt/2*k1, u_sym)
-        k3 = f13(x_sym + dt/2*k2, u_sym)
-        k4 = f13(x_sym + dt*k3, u_sym)
-        self.F = ca.Function('F_f13', [x_sym, u_sym],
-                             [x_sym + dt/6*(k1 + 2*k2 + 2*k3 + k4)])
-
-        self._build_nlp(params, x_sym, u_sym)
+        if cost_spec == 'paper':
+            self.F = self._build_rk4_substeps(f13, x_sym, u_sym, substeps=5)
+            self._build_nlp_paper(params, x_sym, u_sym)
+        else:
+            dt = dt_nmpc
+            k1 = f13(x_sym, u_sym)
+            k2 = f13(x_sym + dt/2*k1, u_sym)
+            k3 = f13(x_sym + dt/2*k2, u_sym)
+            k4 = f13(x_sym + dt*k3, u_sym)
+            self.F = ca.Function('F_f13', [x_sym, u_sym],
+                                 [x_sym + dt/6*(k1 + 2*k2 + 2*k3 + k4)])
+            self._build_nlp(params, x_sym, u_sym)
         self._last_t = -np.inf
+        self._t_now = 0.0
         self._u_current = self.f_ref.copy()
         self.consec_fail = 0
         self.last_status = 'none'
         self._ever_converged = False
+
+    def _build_rk4_substeps(self, f, x_sym, u_sym, substeps=5):
+        """논문 4.2절 — control.hybrid_comparison.VirtualNMPC 와 같은 패턴.
+        F13 은 13상태라 쿼터니언이 x[6:10]인 것은 V13/M17과 같다."""
+        h = self.dt_nmpc / substeps
+        st = x_sym
+        for _ in range(substeps):
+            k1 = f(st, u_sym)
+            k2 = f(st + h/2*k1, u_sym)
+            k3 = f(st + h/2*k2, u_sym)
+            k4 = f(st + h*k3, u_sym)
+            st = st + h/6*(k1 + 2*k2 + 2*k3 + k4)
+            st = ca.vertcat(st[0:6], st[6:10]/ca.norm_2(st[6:10]), st[10:13])
+        return ca.Function('F13_paper', [x_sym, u_sym], [st])
+
+    def _reference_horizon(self):
+        if self.ref_fn is None:
+            one = np.concatenate([self.v_ref, [self.z_ref]])
+            return np.tile(one[:, None], (1, self.N + 1))
+        cols = [np.asarray(self.ref_fn(self._t_now + k*self.dt_nmpc), dtype=float)
+               for k in range(self.N + 1)]
+        return np.stack(cols, axis=1)
+
+    def _build_nlp_paper(self, params, x_sym, u_sym):
+        """논문 식(14)-(18) 직접 전사 — F13(부분분리, 로터추력 입력).
+
+        VirtualNMPC._build_nlp_paper 와 나란히 읽을 수 있게 같은 구조.
+        Dν 스케일은 research kind="f13" 과 같은 mg/4(로터 하나 몫의 호버추력).
+        """
+        N, nx, nu = self.N, NX_V, NU_F
+        D_nu = float(params['mass']*params['g']/4.0)   # 로터 1개 호버추력
+        f_hover = np.full(nu, D_nu)
+
+        w, w0, lbw, ubw = [], [], [], []
+        g, lbg, ubg = [], [], []
+        J_cost = 0.0
+
+        p = ca.SX.sym('p', nx + 4*(N+1))
+        x_meas = p[0:nx]
+        refs = ca.reshape(p[nx:nx + 4*(N+1)], 4, N+1)
+
+        _q_hover = ([0.0, -np.sqrt(0.5), 0.0, np.sqrt(0.5)]
+                    if params.get('thrust_axis', 'z') == 'x' else [1.0, 0.0, 0.0, 0.0])
+
+        def new_state(k):
+            X = ca.SX.sym(f'Xf_{k}', nx)
+            w.append(X)
+            lbw.extend([-1e6]*nx); ubw.extend([1e6]*nx)
+            guess = [0.0]*nx
+            guess[6:10] = _q_hover
+            w0.extend(guess)
+            return X
+
+        X_k = new_state(0)
+        g.append(X_k - x_meas)
+        lbg.extend([0.0]*nx); ubg.extend([0.0]*nx)
+
+        U_prev = ca.DM(f_hover)
+        for k in range(N):
+            e_v = X_k[3:6] - refs[0:3, k]
+            e_z = X_k[2] - refs[3, k]
+            J_cost += 5.0*ca.sumsqr(e_v) + self._Q_z*e_z**2 + ca.sumsqr(X_k[10:13])
+
+            U_k = ca.SX.sym(f'Uf_{k}', nu)
+            w.append(U_k)
+            lbw.extend([0.0]*nu); ubw.extend([self.f_max]*nu)
+            w0.extend(list(f_hover))
+
+            J_cost += 0.02*ca.sumsqr((U_k - D_nu)/D_nu)
+            J_cost += 0.10*ca.sumsqr((U_k - U_prev)/D_nu)
+
+            X_next = new_state(k+1)
+            g.append(X_next - self.F(X_k, U_k))
+            lbg.extend([0.0]*nx); ubg.extend([0.0]*nx)
+            X_k, U_prev = X_next, U_k
+
+        e_v = X_k[3:6] - refs[0:3, N]
+        e_z = X_k[2] - refs[3, N]
+        J_cost += 10.0*(5.0*ca.sumsqr(e_v) + self._Q_z*e_z**2 + ca.sumsqr(X_k[10:13]))
+
+        nlp = {'f': J_cost, 'x': ca.vertcat(*w), 'g': ca.vertcat(*g), 'p': p}
+        self.solver = ca.nlpsol('f13nmpc_paper', 'ipopt', nlp, {
+            'ipopt.print_level': 0, 'ipopt.sb': 'yes', 'print_time': 0,
+            'ipopt.max_iter': self._max_iter, 'ipopt.warm_start_init_point': 'yes',
+            'ipopt.tol': 1e-4})
+        self.lbw, self.ubw = np.array(lbw), np.array(ubw)
+        self.lbg, self.ubg = np.array(lbg), np.array(ubg)
+        self.w0 = np.array(w0)
+        self._w0_init = self.w0.copy()
 
     def reset(self):
         self._last_t = -np.inf
@@ -190,12 +286,16 @@ class RotorThrustNMPC13:
     def __call__(self, t, x_full):
         if t - self._last_t >= self.dt_ctrl - 1e-8:
             x13 = np.concatenate([x_full[0:10], x_full[10:13]])
+            self._t_now = t
             self._u_current = self._solve(x13)
             self._last_t = t
         return self._u_current
 
     def _solve(self, x13):
-        p_val = np.concatenate([x13, self.v_ref, [self.z_ref], self.f_ref])
+        if self.cost_spec == 'paper':
+            p_val = np.concatenate([x13, self._reference_horizon().ravel(order='F')])
+        else:
+            p_val = np.concatenate([x13, self.v_ref, [self.z_ref], self.f_ref])
         sol = self.solver(x0=self.w0, lbx=self.lbw, ubx=self.ubw,
                           lbg=self.lbg, ubg=self.ubg, p=p_val)
         status = self.solver.stats().get('return_status', 'unknown')
@@ -207,9 +307,14 @@ class RotorThrustNMPC13:
         self.last_status = status
 
         w_opt = np.array(sol['x']).flatten()
-        u_opt = w_opt[0:NU_F]
         stride = NU_F + NX_V
-        self.w0 = np.concatenate([w_opt[stride:], w_opt[-stride:]])
+        if self.cost_spec == 'paper':
+            u_opt = w_opt[NX_V:NX_V + NU_F]
+            self.w0 = np.concatenate([w_opt[stride:], w_opt[-stride:-NX_V],
+                                      w_opt[-NX_V:]])
+        else:
+            u_opt = w_opt[0:NU_F]
+            self.w0 = np.concatenate([w_opt[stride:], w_opt[-stride:]])
         return u_opt
 
 

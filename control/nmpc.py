@@ -33,7 +33,8 @@ class NMPCController:
 
     def __init__(self, params, v_ref=None, z_ref=0.0, u_ref=None,
                  N=20, dt_nmpc=0.05, dt_ctrl=0.02, Q_z=20.0,
-                 electrical_constraints=False, V_b=None):
+                 electrical_constraints=False, V_b=None,
+                 cost_spec='paper', ref_fn=None):
         """
         Parameters
         ----------
@@ -65,17 +66,26 @@ class NMPCController:
         self.v_ref = np.array(v_ref) if v_ref is not None else np.zeros(3)
         self.z_ref = z_ref
         self._Q_z = Q_z
-        # ⚠ 이 제어기의 비용함수는 아직 **legacy** 다 — 논문 v5.3 식(14)-(18)과
-        #   다르다: 속도가중이 diag(5,5,10)(논문은 5·I₃), 종말비용에 ω가 빠졌고
-        #   (논문 식16은 stage 전체에 10배), 입력 가중에 Dν 정규화(식15)가 없어
-        #   척도가 어긋나고, 참조가 상수 하나라 노드별 r_{j|k}(식14)가 아니다.
+        # cost_spec : {'paper','legacy'}  (2026-09-25 밤, 야간지시 3-a)
+        #   'paper' (기본값) — 논문 v5.3 식(14)-(18)의 정확한 전사. M17(비분리)의
+        #   입력은 로터 속도 자체이므로 Dν 정규화는 research/nmpc.py 가 kind="nmpc"
+        #   에 쓰는 척도(max_n)를 그대로 따른다 — V13 의 [mg,100,100,100] 과는
+        #   다른 척도지만 같은 원칙(식15: 물리량마다 자기 한계로 무차원화)이다.
+        #   'legacy' — 이 클래스가 원래 쓰던 비용. 옛 결과 재현용으로만 남긴다.
         #
-        #   2026-09-24에 VirtualNMPC(V13) 기본값만 cost_spec='paper'로 뒤집었다.
-        #   **표5·표6 비교를 이 상태로 돌리면 불공정하다** — V13 이 올바른 비용을
-        #   받아서 이기는 결과가 나온다. 논문 §5.3 의 "원인 분석 모드에서는 …
-        #   한 요소씩 바꾼다"를 지키려면 비교군 전체가 같은 비용을 써야 한다.
-        #   비교 스크립트는 모든 제어기의 cost_spec 이 같은지 확인할 것.
-        self.cost_spec = 'legacy'
+        #   2026-09-24에 V13 만 'paper' 로 기본값을 뒤집어 M17·F13 과 비대칭이
+        #   됐었다 — 이 파일이 그 비대칭을 없앤다. 차이(legacy 기준):
+        #     속도가중    5·I₃(식14)              diag(5,5,10)      vz만 2배
+        #     입력편차    0.02/max_n²             1e-4              척도 자체가 다름
+        #     입력변화    0.1/max_n²              1e-3              척도 자체가 다름
+        #     종말가중    stage 전체×10(식16)      v·z만×10          ω 누락
+        #     참조        노드별 r_{j|k}(식14)     상수 1개          ref_fn 없으면 동일
+        if cost_spec not in ('paper', 'legacy'):
+            raise ValueError(f"cost_spec must be 'paper' or 'legacy', got {cost_spec!r}")
+        if ref_fn is not None and cost_spec != 'paper':
+            raise ValueError("ref_fn은 cost_spec='paper'에서만 쓸 수 있다.")
+        self.cost_spec = cost_spec
+        self.ref_fn = ref_fn
         self._solve_log = []
         if u_ref is not None:
             self.u_ref = np.array(u_ref)
@@ -85,13 +95,16 @@ class NMPCController:
 
         # RK4 적분기 (예측용)
         f, x_sym, u_sym = build_dynamics(params)
-        self._build_rk4(f, x_sym, u_sym)
-
-        # NLP 구성
-        self._build_nlp(params)
+        if self.cost_spec == 'paper':
+            self.F = self._build_rk4_substeps(f, x_sym, u_sym, substeps=5)
+            self._build_nlp_paper(params)
+        else:
+            self._build_rk4(f, x_sym, u_sym)
+            self._build_nlp(params)
 
         # 상태
         self._last_t = -np.inf
+        self._t_now = 0.0
         self._u_current = self.u_ref.copy()
         # _w0_init는 _build_nlp()에서 설정됨
 
@@ -111,6 +124,99 @@ class NMPCController:
         k4 = f(x_sym + dt * k3, u_sym)
         x_next = x_sym + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
         self.F = ca.Function('F_rk4', [x_sym, u_sym], [x_next])
+
+    def _build_rk4_substeps(self, f, x_sym, u_sym, substeps=5):
+        """논문 4.2절: 예측 격자당 RK4 5회 세부적분 + 쿼터니언 정규화.
+
+        control/hybrid_comparison.py::VirtualNMPC._make_substep_integrator 와
+        같은 패턴(그쪽 주석 참고 — 실효 스텝을 줄여 빠른 자세 변화의 적분
+        오차를 줄이고, 정규화 없이 RK4 만 쓰면 쿼터니언 노름이 서서히 벌어진다).
+        """
+        h = self.dt_nmpc / substeps
+        st = x_sym
+        for _ in range(substeps):
+            k1 = f(st, u_sym)
+            k2 = f(st + h/2*k1, u_sym)
+            k3 = f(st + h/2*k2, u_sym)
+            k4 = f(st + h*k3, u_sym)
+            st = st + h/6*(k1 + 2*k2 + 2*k3 + k4)
+            st = ca.vertcat(st[0:6], st[6:10]/ca.norm_2(st[6:10]), st[10:17])
+        return ca.Function('F_paper', [x_sym, u_sym], [st])
+
+    def _build_nlp_paper(self, params):
+        """논문 v5.3 식(14)-(18)의 직접 전사 — M17(비분리, 로터속도 입력).
+
+        VirtualNMPC._build_nlp_paper 와 나란히 읽을 수 있게 같은 구조로 쓴다.
+        차이는 상태가 17D(로터 4개 포함)이고 입력이 로터 속도 자체라는 것뿐 —
+        Dν 정규화 척도가 research/nmpc.py 의 kind="nmpc" 와 같은 max_n 하나다
+        (표5 kind별 척도: nmpc→max_n, f13→mg/4, hybrid→[mg,100,100,100]).
+        """
+        N, nx, nu = self.N, self.nx, self.nu
+        n_max = params['n_max']
+        n_hov = self.u_ref[0]   # __init__ 에서 이미 트림/명시값으로 계산됨
+
+        w, w0, lbw, ubw = [], [], [], []
+        g, lbg, ubg = [], [], []
+        J_cost = 0.0
+
+        # p 레이아웃: [x_meas(17), refs(4·(N+1))]  — refs 는 노드별 (vx,vy,vz,z).
+        p = ca.SX.sym('p', nx + 4*(N+1))
+        x_meas = p[0:nx]
+        refs = ca.reshape(p[nx:nx + 4*(N+1)], 4, N+1)
+
+        def new_state(k):
+            X = ca.SX.sym(f'X_{k}', nx)
+            w.append(X)
+            lbw.extend([-1e6]*nx); ubw.extend([1e6]*nx)
+            guess = [0.0]*nx
+            guess[6:10] = [1.0, 0.0, 0.0, 0.0]
+            guess[13:17] = [float(n_hov)]*4
+            w0.extend(guess)
+            return X
+
+        X_k = new_state(0)
+        g.append(X_k - x_meas)
+        lbg.extend([0.0]*nx); ubg.extend([0.0]*nx)
+
+        U_prev = ca.DM(np.full(nu, n_hov))
+        for k in range(N):
+            e_v = X_k[3:6] - refs[0:3, k]
+            e_z = X_k[2] - refs[3, k]
+            J_cost += 5.0*ca.sumsqr(e_v) + self._Q_z*e_z**2 + ca.sumsqr(X_k[10:13])
+
+            U_k = ca.SX.sym(f'U_{k}', nu)
+            w.append(U_k)
+            lbw.extend([params['n_min']]*nu); ubw.extend([n_max]*nu)
+            w0.extend([float(n_hov)]*nu)
+
+            J_cost += 0.02*ca.sumsqr((U_k - n_hov)/n_max)
+            J_cost += 0.10*ca.sumsqr((U_k - U_prev)/n_max)
+
+            X_next = new_state(k+1)
+            g.append(X_next - self.F(X_k, U_k))
+            lbg.extend([0.0]*nx); ubg.extend([0.0]*nx)
+            X_k, U_prev = X_next, U_k
+
+        e_v = X_k[3:6] - refs[0:3, N]
+        e_z = X_k[2] - refs[3, N]
+        J_cost += 10.0*(5.0*ca.sumsqr(e_v) + self._Q_z*e_z**2 + ca.sumsqr(X_k[10:13]))
+
+        nlp = {'f': J_cost, 'x': ca.vertcat(*w), 'g': ca.vertcat(*g), 'p': p}
+        self.solver = ca.nlpsol('nmpc_paper', 'ipopt', nlp, {
+            'ipopt.print_level': 0, 'ipopt.sb': 'yes', 'print_time': 0,
+            'ipopt.max_iter': 30, 'ipopt.warm_start_init_point': 'yes',
+            'ipopt.tol': 1e-4})
+        self.lbw = np.array(lbw); self.ubw = np.array(ubw)
+        self.lbg = np.array(lbg); self.ubg = np.array(ubg)
+        self.w0 = np.array(w0); self._w0_init = self.w0.copy()
+
+    def _reference_horizon(self):
+        if self.ref_fn is None:
+            one = np.concatenate([self.v_ref, [self.z_ref]])
+            return np.tile(one[:, None], (1, self.N + 1))
+        cols = [np.asarray(self.ref_fn(self._t_now + k*self.dt_nmpc), dtype=float)
+               for k in range(self.N + 1)]
+        return np.stack(cols, axis=1)
 
     def _build_nlp(self, params):
         """Multiple shooting NLP 구성."""
@@ -229,14 +335,18 @@ class NMPCController:
     def __call__(self, t, x):
         """dt_ctrl 주기마다 NLP를 풀고 첫 제어 반환."""
         if t - self._last_t >= self.dt_ctrl - 1e-8:
+            self._t_now = t
             self._u_current = self._solve(x)
             self._last_t = t
         return self._u_current
 
     def _solve(self, x_current):
         """NLP 풀이 → 첫 제어 추출."""
-        p_val = np.concatenate([x_current, self.v_ref, [self.z_ref], self.u_ref,
-                                 [self.V_b]])
+        if self.cost_spec == 'paper':
+            p_val = np.concatenate([x_current, self._reference_horizon().ravel(order='F')])
+        else:
+            p_val = np.concatenate([x_current, self.v_ref, [self.z_ref], self.u_ref,
+                                     [self.V_b]])
 
         sol = self.solver(
             x0=self.w0, lbx=self.lbw, ubx=self.ubw,
@@ -244,14 +354,17 @@ class NMPCController:
 
         self._solve_log.append(self.solver.stats().get('return_status', 'unknown'))
         w_opt = np.array(sol['x']).flatten()
-
-        # 첫 제어 추출 (w = [U_0(4), X_1(17), U_1(4), X_2(17), ...])
-        u_opt = w_opt[0:self.nu]
-
-        # Warm start: 이전 해를 한 스텝 시프트
         stride = self.nu + self.nx   # 21
-        shifted = np.concatenate([w_opt[stride:], w_opt[-stride:]])
-        self.w0 = shifted
+
+        if self.cost_spec == 'paper':
+            # 배치: X_0, U_0, X_1, U_1, …, X_{N-1}, U_{N-1}, X_N (x0 가 결정변수)
+            u_opt = w_opt[self.nx:self.nx + self.nu]
+            self.w0 = np.concatenate([w_opt[stride:], w_opt[-stride:-self.nx],
+                                      w_opt[-self.nx:]])
+        else:
+            # 배치: U_0, X_0, U_1, X_1, … (legacy)
+            u_opt = w_opt[0:self.nu]
+            self.w0 = np.concatenate([w_opt[stride:], w_opt[-stride:]])
 
         return np.clip(u_opt, self.p['n_min'], self.p['n_max'])
 

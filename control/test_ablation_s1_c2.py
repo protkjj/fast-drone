@@ -330,9 +330,10 @@ def test_every_comparison_controller_declares_its_cost_spec():
     그 '일치시킬 것'에 들어간다 — 한쪽만 논문식이면 그 차이가 구조 차이로
     오인된다.
 
-    이 테스트는 **일치를 요구하지 않는다**(지금 일치하지 않는다). 각 제어기가
-    자기 비용을 선언하게 만들어, 비교 스크립트가 섞인 상태를 감지할 수 있게
-    하는 것이 목적이다. M17·F13 정렬이 끝나면 아래 기대값을 'paper'로 바꾼다.
+    2026-09-25 밤(야간지시 3-a): M17·F13에도 cost_spec='paper'를 추가하고
+    기본값을 뒤집어 V13과 맞췄다 — 이제 비교군 전체가 일치를 **요구**한다.
+    (acados 경로 AcadosVirtualNMPC는 여전히 legacy다 — 별도 클래스라 이
+    전환을 따라오지 못했다. control/vnmpc_acados.py의 경고 주석 참고.)
     """
     from control.nmpc import NMPCController
     from control.nmpc_f13 import RotorThrustNMPC13
@@ -342,9 +343,6 @@ def test_every_comparison_controller_declares_its_cost_spec():
         'M17': NMPCController(P).cost_spec,
         'F13': RotorThrustNMPC13(P).cost_spec,
     }
-    assert all(v in ('paper', 'legacy') for v in declared.values()), declared
-    # 현재 상태를 명시적으로 고정한다 — M17·F13 을 정렬하면 여기가 깨지고,
-    # 그때 이 테스트가 "비교군 전체가 paper 다"로 바뀌어야 한다.
-    assert declared == {'V13': 'paper', 'M17': 'legacy', 'F13': 'legacy'}, (
-        f"비교군 비용함수 상태가 바뀌었다: {declared}. "
-        "전부 'paper'가 되었다면 이 테스트를 일치 요구로 바꿀 것.")
+    assert declared == {'V13': 'paper', 'M17': 'paper', 'F13': 'paper'}, (
+        f"비교군 비용함수가 다시 갈라졌다: {declared}. 표5·표6 비교 전에는 "
+        "반드시 전부 일치해야 한다.")

@@ -92,7 +92,27 @@ VL=8(저속가지)은 그대로 유효하다. VH와 "형상팀 필요" 결론만
 고속가지를 VH로 쓰면 이 문제 자체가 사라질 수 있다(측풍/순항 비율이 훨씬
 작아진다).
 
-### 2-b. 🔴 비교군 비용함수 비대칭 — **신규 발견, 표5·표6 실행 전 처리 필요**
+### 2-b. ✅ 비교군 비용함수 비대칭 — **해결 (2026-09-25 밤, 야간지시 3-a)**
+
+`control/nmpc.py`(M17)와 `control/nmpc_f13.py`(F13)에 `cost_spec='paper'`를
+추가하고 기본값을 `'paper'`로 뒤집었다 — V13과 같은 `_build_nlp_paper` 패턴
+(x0를 결정변수에, RK4 5회+쿼터니언 정규화, 노드별 참조 `ref_fn`, 종말비용에
+ω 포함). 검증: 비용함수를 손계산과 대조해 **상대오차 0 / 1.63e-16**(기계정밀도),
+결정변수 수가 논문 식(31) 값과 정확히 일치(M17 437, F13 353), 양쪽 축(z·x)
+호버에서 트림 회전수/추력과 1e-3 이내 일치. `test_cost_spec_m17_f13.py` 10개
+통과. `test_every_comparison_controller_declares_its_cost_spec`을 "비교군
+전체가 paper" 요구로 갱신 — 이제 하나라도 갈라지면 즉시 실패한다.
+
+`legacy`는 옛 결과 재현용으로 남겼다. **주의**: `bench_compute.py`·
+`ekf_comparison.py`·`gust_comparison.py`·`mission_sim.py`가 명시적
+`cost_spec` 없이 이 생성자를 부르므로, 이 스크립트들을 다시 돌리면 이제
+`paper` 비용으로 결과가 달라진다 — V13 때와 같은 패턴(2026-09-24 커밋 참고).
+acados 경로(`AcadosVirtualNMPC`)는 여전히 `legacy`다(별도 클래스라 전환이
+안 됨) — 논문 결과를 acados로 낼 계획이면 별도 정렬이 필요하다.
+
+<details><summary>기존 발견 기록(해결 전, 참고용)</summary>
+
+~~비교군 비용함수 비대칭 — 신규 발견, 표5·표6 실행 전 처리 필요~~
 
 `cost_spec` 기본값을 V13만 뒤집은 결과 **비교군끼리 다른 비용을 푼다.**
 `control/nmpc.py`(M17)와 `control/nmpc_f13.py`(F13)도 V13 legacy와 똑같은
@@ -118,7 +138,9 @@ VL=8(저속가지)은 그대로 유효하다. VH와 "형상팀 필요" 결론만
 해야 할 일: M17·F13에도 `cost_spec='paper'` 빌더를 넣는다(V13의
 `_build_nlp_paper`와 같은 패턴). 논문 기준값은 `research/nmpc.py`의
 `build_problem(kind='nmpc'|'f13')`에 그대로 있다 — `scaling`이 M17은 `[max_n]*4`,
-F13은 `[mg/4]*4`다. 다음 세션 프롬프트에 포함했다.
+F13은 `[mg/4]*4`다.
+
+</details>
 
 ### 2-c. 🔴 CPID 가 논문 기체에서 못 돈다 — **신규 발견, 최우선**
 
