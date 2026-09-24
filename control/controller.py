@@ -50,6 +50,7 @@ class CascadedPID:
         self.Kd_att = np.array([20, 50, 50])
 
         self.max_tilt = np.radians(35)
+        self.axis = params.get('thrust_axis', 'z')
 
         from control.dynamics import compute_allocation_matrix
         self.f_to_TM, self.TM_to_f = compute_allocation_matrix(params)
@@ -94,33 +95,58 @@ class CascadedPID:
         return self._allocate(T_cmd, M_cmd)
 
     def _force_to_attitude(self, F_des):
-        """F_des → (T_cmd, R_des)."""
+        """F_des → (T_cmd, R_des).
+
+        2026-09-25 밤(야간지시 3-e): 로켓형(thrust_axis='x')에서는 추력이
+        동체 +x다. 틸트 제한은 "F_des가 세계 수직에서 얼마나 기우는가"라는
+        물리량이라 축과 무관하게 그대로 쓴다 — F_hat(= F_des 방향, 예전
+        b3_des=-F_hat과 부호만 다르다)의 세계 z성분으로 잰다. 축마다 달라지는
+        건 그 다음, F_hat을 **어느 동체축에 정렬시키는가**뿐이다:
+          z축: 3번째 열(body z)을 -F_hat에 (추력이 body -z)
+          x축: 1번째 열(body x)을 +F_hat에 (추력이 body +x)
+        control/gindi.py::GeometricGuidance._desired_attitude와 같은 축
+        분기를 쓴다 — GINDI의 기하 외부루프와 CPID가 원래 같은 구성이어야
+        한다는 논문 306행 서술과도 맞다. 요(heading)만 CPID 고유 자유도
+        (self.heading, 임의 목표 방위)라 GINDI의 고정 heading 대신 그걸 쓴다.
+        """
         F_norm = max(np.linalg.norm(F_des), 1e-6)
         T_cmd = F_norm
+        F_hat = F_des / F_norm
 
-        b3_des = -F_des / F_norm
-
-        # 틸트 제한
-        cos_tilt = -b3_des[2]
-        cos_max  = np.cos(self.max_tilt)
+        # 틸트 제한 — 세계 수직(+z)에서 F_hat이 벗어난 각도를 제한한다.
+        cos_tilt = F_hat[2]
+        cos_max = np.cos(self.max_tilt)
         if cos_tilt < cos_max:
-            b3_hor = b3_des.copy(); b3_hor[2] = 0
-            hn = np.linalg.norm(b3_hor)
+            f_hor = F_hat.copy(); f_hor[2] = 0
+            hn = np.linalg.norm(f_hor)
             if hn > 1e-8:
                 s = np.sqrt(1 - cos_max**2) / hn
-                b3_des = np.array([b3_hor[0]*s, b3_hor[1]*s, -cos_max])
+                F_hat = np.array([f_hor[0]*s, f_hor[1]*s, cos_max])
             else:
-                b3_des = np.array([0, 0, -1])
+                F_hat = np.array([0.0, 0.0, 1.0])
 
         c1 = np.array([np.cos(self.heading), np.sin(self.heading), 0])
-        b2_raw = np.cross(b3_des, c1)
-        bn = np.linalg.norm(b2_raw)
-        if bn < 1e-6:
-            b2_raw = np.cross(b3_des, np.array([0, 1, 0]))
+
+        if self.axis == 'x':
+            b1 = F_hat
+            b2_raw = np.cross(b1, c1)          # heading 을 body-x에 수직 평면으로 투영
             bn = np.linalg.norm(b2_raw)
-        b2 = b2_raw / bn
-        b1 = np.cross(b2, b3_des)
-        R_des = np.column_stack([b1, b2, b3_des])
+            if bn < 1e-6:
+                b2_raw = np.cross(b1, np.array([0, 0, 1.0]))
+                bn = np.linalg.norm(b2_raw)
+            b2 = b2_raw / bn
+            b3 = np.cross(b1, b2)
+            R_des = np.column_stack([b1, b2, b3])
+        else:
+            b3 = -F_hat
+            b2_raw = np.cross(b3, c1)
+            bn = np.linalg.norm(b2_raw)
+            if bn < 1e-6:
+                b2_raw = np.cross(b3, np.array([0, 1, 0]))
+                bn = np.linalg.norm(b2_raw)
+            b2 = b2_raw / bn
+            b1 = np.cross(b2, b3)
+            R_des = np.column_stack([b1, b2, b3])
         return T_cmd, R_des
 
     def _allocate(self, T_cmd, M_cmd):

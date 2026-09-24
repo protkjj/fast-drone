@@ -2,6 +2,20 @@
 AcadosVirtualNMPC — VirtualNMPC(13D)의 acados SQP-RTI 이식
 ==========================================================
 
+⚠ 2026-09-25 밤(야간지시 3-d): **이 경로는 계산 시간 측정 전용이다.**
+논문 표5·표6·표8의 결과(추종 성능·실패율)는 항상 IPOPT(CasADi, VirtualNMPC)
+경로로 낸다 — 이 파일은 "acados로 실시간 예산(20ms) 안에 들어가는가"만
+잰다. 이유: cost_spec 이 아직 'legacy' 다(아래 self.cost_spec 참고) — V13·
+M17·F13 이 전부 'paper'로 정렬된 지금, acados만 다른 비용을 풀면 그 결과를
+표5에 섞는 순간 "무엇을 비교했는지"가 불분명해진다. paper 비용을 acados 의
+NONLINEAR_LS 형태로 옮기려면 노드별 참조와 Dν 정규화를 목적함수 구조 자체에
+넣어야 해서 단순 치환이 아니다(아직 안 함).
+
+가드: `control/fair_compare.py::_build()`는 이 클래스를 등록하지 않는다 —
+공정 비교 하네스로 acados 결과가 들어올 길이 없다. 계산 시간 벤치마크는
+`control/bench_acados.py`처럼 별도로 돌릴 것.
+==========================================================
+
 왜 acados인가 (2026-08-04 실측, results/bench_*.txt):
   - IPOPT: warm 20.6ms / 미션 p95 39ms → 실기 20ms 예산 불가. jit 후에도 최악 58.5ms
   - CasADi sqpmethod 1-iter "가난한 RTI"는 실패 (exact Hessian 부정정칙)
@@ -120,6 +134,8 @@ class AcadosVirtualNMPC:
         # 비용을 쓰는지 프로그램적으로 확인할 수 있게 한다. 이 클래스는 아직
         # legacy 비용만 구현한다(_build_solver 의 base_W 주석 참조).
         self.cost_spec = 'legacy'
+        # 결과용이 아니라 계산시간 측정 전용 — 모듈 독스트링 참조(야간지시 3-d).
+        self.is_timing_only = True
         self.nx_solver = NX_V + (NU_V if self.rate_aug else 0)
         self._u_state = self.u_ref.copy()      # rate_aug: 적분된 현재 명령
         T_max = 4 * params['k_T'] * params['n_max']**2
