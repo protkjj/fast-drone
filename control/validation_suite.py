@@ -8,6 +8,7 @@ import argparse
 from copy import deepcopy
 from dataclasses import asdict
 from datetime import datetime, timezone
+import gc
 import hashlib
 import json
 from pathlib import Path
@@ -84,6 +85,10 @@ def run_trial(factory, label, profile, case, limits):
     factory does: its controllers need the whole reference profile and the
     time). Otherwise the team Factory protocol make/update is used unchanged.
     """
+    # 이전 시행의 제어기(NLP 포함)를 새 NLP를 짓기 전에 확실히 치운다. 순환 참조에 걸린
+    # CasADi 객체는 파이썬 GC가 메모리 크기를 몰라 늦게 풀린다(2026-09-26 실측: 튜닝
+    # 프로세스가 6~10 GB). 계산에는 영향이 없다.
+    gc.collect()
     nominal_hash = parameter_hash(factory.p)
     truth = perturb_params(factory.p, case['factors'])
     initial_v, initial_z, _ = profile.get_ref(0.)

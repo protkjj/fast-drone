@@ -27,6 +27,7 @@
 from copy import deepcopy
 import json
 from pathlib import Path
+import weakref
 
 import numpy as np
 from scipy.spatial.transform import Rotation
@@ -79,14 +80,20 @@ class SolverMonitor:
     ACCEPTED = ('Solve_Succeeded', 'Solved_To_Acceptable_Level')
 
     def __init__(self, nmpc):
-        self.nmpc = nmpc
+        # NMPC는 **약한 참조**로 잡는다. 감싼 _solve를 NMPC 인스턴스에 달기 때문에, 강한 참조로
+        # 잡으면 NMPC → 감싼 함수 → 모니터 → NMPC 순환이 생긴다. 그러면 NLP(M17은 1 GB 넘음)가
+        # 참조 카운트로 풀리지 않고 순환 GC를 기다리며 쌓인다. 실측: 튜닝 프로세스가 평가 1~2회 만에
+        # 6~10 GB까지 불었다(2026-09-26). 계산 경로는 그대로라 결과는 비트 단위로 같다.
+        self._nmpc = weakref.ref(nmpc)
         self.solve_log = []
         self.consec_fail = 0
         self._ever_converged = False
-        original = nmpc._solve
+        solve = type(nmpc)._solve          # 묶인 메서드(= NMPC 강한 참조)가 아니라 함수로 잡는다
+        target = self._nmpc
 
         def monitored(x):
-            u = original(x)
+            nmpc = target()
+            u = solve(nmpc, x)
             stats = nmpc.solver.stats()
             status = stats.get('return_status', 'unknown')
             accepted = status in self.ACCEPTED
@@ -101,6 +108,10 @@ class SolverMonitor:
             return u
 
         nmpc._solve = monitored
+
+    @property
+    def nmpc(self):
+        return self._nmpc()
 
 
 def trim_warm_start(nmpc, x_meas, u_trim):
