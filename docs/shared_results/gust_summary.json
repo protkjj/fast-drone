@@ -1,0 +1,980 @@
+[
+  {
+    "case": {
+      "case_id": "control",
+      "factors": {},
+      "gust_peak": 0.0
+    },
+    "controller": "GS-LQR",
+    "phases": [
+      [
+        "순항",
+        0.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "돌풍",
+        1.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "회복",
+        2.0,
+        2.5,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ]
+    ],
+    "metrics": {
+      "rmse_z": 0.0,
+      "rmse_vx": 0.0,
+      "rmse_velocity": 2.113959552086405e-14,
+      "max_z_error": 0.0,
+      "max_velocity_error": 3.778878153683739e-14,
+      "max_omega": 6.679705213687043e-14,
+      "omega_sustained_seconds": 0.0,
+      "simulated_seconds": 4.5,
+      "phases": [
+        {
+          "name": "순항",
+          "samples": 500,
+          "rmse_z": 0.0,
+          "rmse_velocity": 8.580646288855122e-15
+        },
+        {
+          "name": "돌풍",
+          "samples": 500,
+          "rmse_z": 0.0,
+          "rmse_velocity": 2.3444682219102713e-14
+        },
+        {
+          "name": "회복",
+          "samples": 1251,
+          "rmse_z": 0.0,
+          "rmse_velocity": 2.3558220772480226e-14
+        }
+      ],
+      "motor_saturation_fraction": 0.0,
+      "pre_gust_ready": true,
+      "recovered": true,
+      "recovery_seconds": 0.0,
+      "gust_max_z_error": 0.0,
+      "gust_max_velocity_error": 3.778878153683739e-14,
+      "passed": true,
+      "failure_reasons": [],
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "stop_reason": null,
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807"
+    },
+    "analysis": {
+      "settling_seconds": {
+        "순항": 0.0,
+        "돌풍": 0.0,
+        "회복": 0.0
+      },
+      "domain": {
+        "minimum_axial_air_speed": 68.85325452677333,
+        "minimum_rotor_rpm": 23275.501901273234,
+        "rpm_below_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "advance_ratio_above_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "reverse_flow": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        }
+      }
+    }
+  },
+  {
+    "case": {
+      "case_id": "control",
+      "factors": {},
+      "gust_peak": 0.0
+    },
+    "controller": "NMPC",
+    "phases": [
+      [
+        "순항",
+        0.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "돌풍",
+        1.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "회복",
+        2.0,
+        2.5,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ]
+    ],
+    "metrics": {
+      "rmse_z": 1.6667958970615822e-10,
+      "rmse_vx": 1.5606993738670955e-09,
+      "rmse_velocity": 1.5626026997275306e-09,
+      "max_z_error": 1.9661428041217732e-10,
+      "max_velocity_error": 1.5997888162343527e-09,
+      "max_omega": 1.1572704201171607e-09,
+      "omega_sustained_seconds": 0.0,
+      "simulated_seconds": 4.5,
+      "phases": [
+        {
+          "name": "순항",
+          "samples": 500,
+          "rmse_z": 7.437212629421662e-11,
+          "rmse_velocity": 1.4996155263517968e-09
+        },
+        {
+          "name": "돌풍",
+          "samples": 500,
+          "rmse_z": 1.5993494146750717e-10,
+          "rmse_velocity": 1.580801547832146e-09
+        },
+        {
+          "name": "회복",
+          "samples": 1251,
+          "rmse_z": 1.9379312604823106e-10,
+          "rmse_velocity": 1.5798586866339652e-09
+        }
+      ],
+      "motor_saturation_fraction": 0.0,
+      "pre_gust_ready": true,
+      "recovered": true,
+      "recovery_seconds": 0.0,
+      "gust_max_z_error": 1.9661428041217732e-10,
+      "gust_max_velocity_error": 1.5824736315305328e-09,
+      "passed": true,
+      "failure_reasons": [],
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 113,
+      "optimizer_failures": 0,
+      "stop_reason": null,
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807"
+    },
+    "analysis": {
+      "settling_seconds": {
+        "순항": 0.0,
+        "돌풍": 0.0,
+        "회복": 0.0
+      },
+      "domain": {
+        "minimum_axial_air_speed": 68.8532545247591,
+        "minimum_rotor_rpm": 23275.501896830672,
+        "rpm_below_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "advance_ratio_above_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "reverse_flow": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        }
+      }
+    }
+  },
+  {
+    "case": {
+      "case_id": "control",
+      "factors": {},
+      "gust_peak": 0.0
+    },
+    "controller": "Split",
+    "phases": [
+      [
+        "순항",
+        0.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "돌풍",
+        1.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "회복",
+        2.0,
+        2.5,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ]
+    ],
+    "metrics": {
+      "rmse_z": 1.5757391697389864e-10,
+      "rmse_vx": 1.4477815990304015e-10,
+      "rmse_velocity": 1.6132217210965882e-10,
+      "max_z_error": 1.8814461100191693e-10,
+      "max_velocity_error": 2.8066018127565335e-10,
+      "max_omega": 5.067133650021816e-10,
+      "omega_sustained_seconds": 0.0,
+      "simulated_seconds": 4.5,
+      "phases": [
+        {
+          "name": "순항",
+          "samples": 500,
+          "rmse_z": 7.347526124518305e-11,
+          "rmse_velocity": 1.9109901698192366e-10
+        },
+        {
+          "name": "돌풍",
+          "samples": 500,
+          "rmse_z": 1.5122411140408752e-10,
+          "rmse_velocity": 1.5736939963593686e-10
+        },
+        {
+          "name": "회복",
+          "samples": 1251,
+          "rmse_z": 1.827002805753834e-10,
+          "rmse_velocity": 1.4944592834333298e-10
+        }
+      ],
+      "motor_saturation_fraction": 0.0,
+      "pre_gust_ready": true,
+      "recovered": true,
+      "recovery_seconds": 0.0,
+      "gust_max_z_error": 1.8814461100191693e-10,
+      "gust_max_velocity_error": 1.945726901304244e-10,
+      "passed": true,
+      "failure_reasons": [],
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 113,
+      "optimizer_failures": 0,
+      "stop_reason": null,
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807"
+    },
+    "analysis": {
+      "settling_seconds": {
+        "순항": 0.0,
+        "돌풍": 0.0,
+        "회복": 0.0
+      },
+      "domain": {
+        "minimum_axial_air_speed": 68.85325452629203,
+        "minimum_rotor_rpm": 23275.501900796487,
+        "rpm_below_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "advance_ratio_above_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "reverse_flow": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        }
+      }
+    }
+  },
+  {
+    "case": {
+      "case_id": "gust_vertical",
+      "factors": {},
+      "gust_direction": "vertical",
+      "gust_peak": 2.0
+    },
+    "controller": "GS-LQR",
+    "phases": [
+      [
+        "순항",
+        0.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "돌풍",
+        1.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "회복",
+        2.0,
+        2.5,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ]
+    ],
+    "metrics": {
+      "rmse_z": 0.04697278849097946,
+      "rmse_vx": 0.002736358514391806,
+      "rmse_velocity": 0.11522066321165306,
+      "max_z_error": 0.13901472289927597,
+      "max_velocity_error": 0.3277765763933592,
+      "max_omega": 0.12219258469423926,
+      "omega_sustained_seconds": 0.0,
+      "simulated_seconds": 4.5,
+      "phases": [
+        {
+          "name": "순항",
+          "samples": 500,
+          "rmse_z": 0.0,
+          "rmse_velocity": 8.580646288855122e-15
+        },
+        {
+          "name": "돌풍",
+          "samples": 500,
+          "rmse_z": 0.08454041240512518,
+          "rmse_velocity": 0.19129381731375297
+        },
+        {
+          "name": "회복",
+          "samples": 1251,
+          "rmse_z": 0.03337122797954661,
+          "rmse_velocity": 0.0962409641531742
+        }
+      ],
+      "motor_saturation_fraction": 0.0,
+      "pre_gust_ready": true,
+      "recovered": true,
+      "recovery_seconds": 0.0,
+      "gust_max_z_error": 0.13901472289927597,
+      "gust_max_velocity_error": 0.3277765763933592,
+      "passed": true,
+      "failure_reasons": [],
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "stop_reason": null,
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807"
+    },
+    "analysis": {
+      "settling_seconds": {
+        "순항": 0.0,
+        "돌풍": null,
+        "회복": 0.5100000000000002
+      },
+      "domain": {
+        "minimum_axial_air_speed": 68.65584361574466,
+        "minimum_rotor_rpm": 23180.747745121447,
+        "rpm_below_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "advance_ratio_above_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "reverse_flow": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        }
+      }
+    }
+  },
+  {
+    "case": {
+      "case_id": "gust_vertical",
+      "factors": {},
+      "gust_direction": "vertical",
+      "gust_peak": 2.0
+    },
+    "controller": "NMPC",
+    "phases": [
+      [
+        "순항",
+        0.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "돌풍",
+        1.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "회복",
+        2.0,
+        2.5,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ]
+    ],
+    "metrics": {
+      "rmse_z": 0.05756794066447499,
+      "rmse_vx": 0.021442292469957606,
+      "rmse_velocity": 0.10377336413523046,
+      "max_z_error": 0.1422133615550507,
+      "max_velocity_error": 0.328063759470432,
+      "max_omega": 0.11314547499391653,
+      "omega_sustained_seconds": 0.0,
+      "simulated_seconds": 4.5,
+      "phases": [
+        {
+          "name": "순항",
+          "samples": 500,
+          "rmse_z": 7.437212629421662e-11,
+          "rmse_velocity": 1.4996155263517968e-09
+        },
+        {
+          "name": "돌풍",
+          "samples": 500,
+          "rmse_z": 0.08647071656525726,
+          "rmse_velocity": 0.19314090927579625
+        },
+        {
+          "name": "회복",
+          "samples": 1251,
+          "rmse_z": 0.054540989865212365,
+          "rmse_velocity": 0.06684098000733965
+        }
+      ],
+      "motor_saturation_fraction": 0.0,
+      "pre_gust_ready": true,
+      "recovered": true,
+      "recovery_seconds": 0.0,
+      "gust_max_z_error": 0.1422133615550507,
+      "gust_max_velocity_error": 0.328063759470432,
+      "passed": true,
+      "failure_reasons": [],
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 113,
+      "optimizer_failures": 0,
+      "stop_reason": null,
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807"
+    },
+    "analysis": {
+      "settling_seconds": {
+        "순항": 0.0,
+        "돌풍": null,
+        "회복": 0.8040000000000003
+      },
+      "domain": {
+        "minimum_axial_air_speed": 68.61719071519298,
+        "minimum_rotor_rpm": 23096.141879569168,
+        "rpm_below_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "advance_ratio_above_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "reverse_flow": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        }
+      }
+    }
+  },
+  {
+    "case": {
+      "case_id": "gust_vertical",
+      "factors": {},
+      "gust_direction": "vertical",
+      "gust_peak": 2.0
+    },
+    "controller": "Split",
+    "phases": [
+      [
+        "순항",
+        0.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "돌풍",
+        1.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "회복",
+        2.0,
+        2.5,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ]
+    ],
+    "metrics": {
+      "rmse_z": 0.041276661261873494,
+      "rmse_vx": 0.009049972709776385,
+      "rmse_velocity": 0.07098405169351026,
+      "max_z_error": 0.09932041148049109,
+      "max_velocity_error": 0.2224310369391762,
+      "max_omega": 0.10400926085264763,
+      "omega_sustained_seconds": 0.0,
+      "simulated_seconds": 4.5,
+      "phases": [
+        {
+          "name": "순항",
+          "samples": 500,
+          "rmse_z": 7.347526124518305e-11,
+          "rmse_velocity": 1.9109901698192366e-10
+        },
+        {
+          "name": "돌풍",
+          "samples": 500,
+          "rmse_z": 0.0622369345817538,
+          "rmse_velocity": 0.13237974816838483
+        },
+        {
+          "name": "회복",
+          "samples": 1251,
+          "rmse_z": 0.038955712528422184,
+          "rmse_velocity": 0.04541306081118692
+        }
+      ],
+      "motor_saturation_fraction": 0.0,
+      "pre_gust_ready": true,
+      "recovered": true,
+      "recovery_seconds": 0.0,
+      "gust_max_z_error": 0.09932041148049109,
+      "gust_max_velocity_error": 0.2224310369391762,
+      "passed": true,
+      "failure_reasons": [],
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 113,
+      "optimizer_failures": 0,
+      "stop_reason": null,
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807"
+    },
+    "analysis": {
+      "settling_seconds": {
+        "순항": 0.0,
+        "돌풍": null,
+        "회복": 0.544
+      },
+      "domain": {
+        "minimum_axial_air_speed": 68.70117705933397,
+        "minimum_rotor_rpm": 23189.692664308197,
+        "rpm_below_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "advance_ratio_above_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "reverse_flow": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        }
+      }
+    }
+  },
+  {
+    "case": {
+      "case_id": "gust_lateral",
+      "factors": {},
+      "gust_direction": "lateral",
+      "gust_peak": 2.0
+    },
+    "controller": "GS-LQR",
+    "phases": [
+      [
+        "순항",
+        0.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "돌풍",
+        1.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "회복",
+        2.0,
+        2.5,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ]
+    ],
+    "metrics": {
+      "rmse_z": 0.00010773205819006525,
+      "rmse_vx": 0.00017480098208961866,
+      "rmse_velocity": 0.18498120529264947,
+      "max_z_error": 0.0004138531657460476,
+      "max_velocity_error": 0.5851030805527442,
+      "max_omega": 0.07843960930644929,
+      "omega_sustained_seconds": 0.0,
+      "simulated_seconds": 4.5,
+      "phases": [
+        {
+          "name": "순항",
+          "samples": 500,
+          "rmse_z": 0.0,
+          "rmse_velocity": 8.580646288855122e-15
+        },
+        {
+          "name": "돌풍",
+          "samples": 500,
+          "rmse_z": 0.00022335365868662185,
+          "rmse_velocity": 0.38015333794107997
+        },
+        {
+          "name": "회복",
+          "samples": 1251,
+          "rmse_z": 3.07398717823846e-05,
+          "rmse_velocity": 0.061726700140874204
+        }
+      ],
+      "motor_saturation_fraction": 0.0,
+      "pre_gust_ready": true,
+      "recovered": true,
+      "recovery_seconds": 0.0,
+      "gust_max_z_error": 0.0004138531657460476,
+      "gust_max_velocity_error": 0.5851030805527442,
+      "passed": true,
+      "failure_reasons": [],
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "stop_reason": null,
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807"
+    },
+    "analysis": {
+      "settling_seconds": {
+        "순항": 0.0,
+        "돌풍": null,
+        "회복": 0.2200000000000002
+      },
+      "domain": {
+        "minimum_axial_air_speed": 68.83338490812346,
+        "minimum_rotor_rpm": 23132.52941424429,
+        "rpm_below_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "advance_ratio_above_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "reverse_flow": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        }
+      }
+    }
+  },
+  {
+    "case": {
+      "case_id": "gust_lateral",
+      "factors": {},
+      "gust_direction": "lateral",
+      "gust_peak": 2.0
+    },
+    "controller": "NMPC",
+    "phases": [
+      [
+        "순항",
+        0.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "돌풍",
+        1.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "회복",
+        2.0,
+        2.5,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ]
+    ],
+    "metrics": {
+      "rmse_z": 0.00023003169074522242,
+      "rmse_vx": 0.0011476628825422997,
+      "rmse_velocity": 0.14989372375705434,
+      "max_z_error": 0.0006582698788122343,
+      "max_velocity_error": 0.511951116368431,
+      "max_omega": 0.12033933886954323,
+      "omega_sustained_seconds": 0.0,
+      "simulated_seconds": 4.5,
+      "phases": [
+        {
+          "name": "순항",
+          "samples": 500,
+          "rmse_z": 7.437212629421662e-11,
+          "rmse_velocity": 1.4996155263517968e-09
+        },
+        {
+          "name": "돌풍",
+          "samples": 500,
+          "rmse_z": 0.00017412640870136732,
+          "rmse_velocity": 0.31747376264688826
+        },
+        {
+          "name": "회복",
+          "samples": 1251,
+          "rmse_z": 0.00028826046494164387,
+          "rmse_velocity": 0.01202721709575691
+        }
+      ],
+      "motor_saturation_fraction": 0.0,
+      "pre_gust_ready": true,
+      "recovered": true,
+      "recovery_seconds": 0.0,
+      "gust_max_z_error": 0.0006582698788122343,
+      "gust_max_velocity_error": 0.511951116368431,
+      "passed": true,
+      "failure_reasons": [],
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 113,
+      "optimizer_failures": 0,
+      "stop_reason": null,
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807"
+    },
+    "analysis": {
+      "settling_seconds": {
+        "순항": 0.0,
+        "돌풍": null,
+        "회복": 0.18999999999999995
+      },
+      "domain": {
+        "minimum_axial_air_speed": 68.8336530734828,
+        "minimum_rotor_rpm": 23126.105444817546,
+        "rpm_below_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "advance_ratio_above_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "reverse_flow": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        }
+      }
+    }
+  },
+  {
+    "case": {
+      "case_id": "gust_lateral",
+      "factors": {},
+      "gust_direction": "lateral",
+      "gust_peak": 2.0
+    },
+    "controller": "Split",
+    "phases": [
+      [
+        "순항",
+        0.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "돌풍",
+        1.0,
+        1.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "회복",
+        2.0,
+        2.5,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ]
+    ],
+    "metrics": {
+      "rmse_z": 0.00015691783145467458,
+      "rmse_vx": 0.0010325090537487292,
+      "rmse_velocity": 0.07714291019929274,
+      "max_z_error": 0.00041175023420692014,
+      "max_velocity_error": 0.25857464777546696,
+      "max_omega": 0.10394720786824517,
+      "omega_sustained_seconds": 0.0,
+      "simulated_seconds": 4.5,
+      "phases": [
+        {
+          "name": "순항",
+          "samples": 500,
+          "rmse_z": 7.347526124518305e-11,
+          "rmse_velocity": 1.9109901698192366e-10
+        },
+        {
+          "name": "돌풍",
+          "samples": 500,
+          "rmse_z": 0.00017862922538270488,
+          "rmse_velocity": 0.16344733923955534
+        },
+        {
+          "name": "회복",
+          "samples": 1251,
+          "rmse_z": 0.0001776312661052659,
+          "rmse_velocity": 0.005529443960087895
+        }
+      ],
+      "motor_saturation_fraction": 0.0,
+      "pre_gust_ready": true,
+      "recovered": true,
+      "recovery_seconds": 0.0,
+      "gust_max_z_error": 0.00041175023420692014,
+      "gust_max_velocity_error": 0.25857464777546696,
+      "passed": true,
+      "failure_reasons": [],
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 113,
+      "optimizer_failures": 0,
+      "stop_reason": null,
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807"
+    },
+    "analysis": {
+      "settling_seconds": {
+        "순항": 0.0,
+        "돌풍": null,
+        "회복": 0.04800000000000004
+      },
+      "domain": {
+        "minimum_axial_air_speed": 68.84316541868829,
+        "minimum_rotor_rpm": 23185.11008294016,
+        "rpm_below_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "advance_ratio_above_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "reverse_flow": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        }
+      }
+    }
+  }
+]

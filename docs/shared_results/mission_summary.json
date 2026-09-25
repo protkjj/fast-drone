@@ -1,0 +1,410 @@
+[
+  {
+    "case": {
+      "case_id": "mission",
+      "factors": {}
+    },
+    "controller": "Split",
+    "phases": [
+      [
+        "초기호버",
+        0.0,
+        1.0,
+        0,
+        0,
+        50.0,
+        50.0
+      ],
+      [
+        "가속",
+        1.0,
+        8.0,
+        0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "순항",
+        9.0,
+        3.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "감속",
+        12.0,
+        25.0,
+        70.0,
+        0,
+        50.0,
+        50.0
+      ],
+      [
+        "호버링",
+        37.0,
+        3.0,
+        0,
+        0,
+        50.0,
+        50.0
+      ]
+    ],
+    "metrics": {
+      "rmse_z": 0.10359110598648336,
+      "rmse_vx": 1.1719720797666058,
+      "rmse_velocity": 1.1734594989687668,
+      "max_z_error": 0.41101159336457727,
+      "max_velocity_error": 2.9425974916146194,
+      "max_omega": 0.5494331058326788,
+      "omega_sustained_seconds": 0.0,
+      "simulated_seconds": 40.0,
+      "phases": [
+        {
+          "name": "초기호버",
+          "samples": 500,
+          "rmse_z": 5.507955009010541e-11,
+          "rmse_velocity": 9.440627972737281e-11
+        },
+        {
+          "name": "가속",
+          "samples": 4000,
+          "rmse_z": 0.21420859479555943,
+          "rmse_velocity": 2.1605725906949624
+        },
+        {
+          "name": "순항",
+          "samples": 1500,
+          "rmse_z": 0.002134699376854979,
+          "rmse_velocity": 0.02434783590636253
+        },
+        {
+          "name": "감속",
+          "samples": 12500,
+          "rmse_z": 0.04986451428497773,
+          "rmse_velocity": 0.8422943101878244
+        },
+        {
+          "name": "호버링",
+          "samples": 1501,
+          "rmse_z": 0.0016486618723107577,
+          "rmse_velocity": 0.00773068899939981
+        }
+      ],
+      "motor_saturation_fraction": 0.0,
+      "final_settled": true,
+      "passed": false,
+      "failure_reasons": [
+        "propulsion_model_domain"
+      ],
+      "tracking_pass": true,
+      "model_domain_valid": false,
+      "prop_domain_outside_fraction": 0.31225,
+      "optimizer_calls": 1000,
+      "optimizer_failures": 0,
+      "stop_reason": null,
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807"
+    },
+    "analysis": {
+      "settling_seconds": {
+        "초기호버": 0.0,
+        "순항": 0.06600000000000072,
+        "호버링": 0.19400000000000261
+      },
+      "domain": {
+        "minimum_axial_air_speed": -1.4313832198723289,
+        "minimum_rotor_rpm": 9712.935137720004,
+        "rpm_below_data": {
+          "fraction": 0.04975,
+          "first": 25.412,
+          "last": 27.400000000000002
+        },
+        "advance_ratio_above_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "reverse_flow": {
+          "fraction": 0.2625,
+          "first": 1.048,
+          "last": 40.0
+        }
+      }
+    }
+  },
+  {
+    "case": {
+      "case_id": "mission",
+      "factors": {}
+    },
+    "controller": "GS-LQR",
+    "phases": [
+      [
+        "초기호버",
+        0.0,
+        1.0,
+        0,
+        0,
+        50.0,
+        50.0
+      ],
+      [
+        "가속",
+        1.0,
+        8.0,
+        0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "순항",
+        9.0,
+        3.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "감속",
+        12.0,
+        25.0,
+        70.0,
+        0,
+        50.0,
+        50.0
+      ],
+      [
+        "호버링",
+        37.0,
+        3.0,
+        0,
+        0,
+        50.0,
+        50.0
+      ]
+    ],
+    "metrics": {
+      "rmse_z": 0.12909683257966106,
+      "rmse_vx": 2.9561745955275334,
+      "rmse_velocity": 2.9596093827059557,
+      "max_z_error": 0.629221058137091,
+      "max_velocity_error": 8.864299896303823,
+      "max_omega": 0.5870480330335318,
+      "omega_sustained_seconds": 0.0,
+      "simulated_seconds": 40.0,
+      "phases": [
+        {
+          "name": "초기호버",
+          "samples": 500,
+          "rmse_z": 0.0,
+          "rmse_velocity": 2.5002325330523272e-15
+        },
+        {
+          "name": "가속",
+          "samples": 4000,
+          "rmse_z": 0.2379463985429007,
+          "rmse_velocity": 5.476336726135551
+        },
+        {
+          "name": "순항",
+          "samples": 1500,
+          "rmse_z": 0.003999126145712255,
+          "rmse_velocity": 0.14460252532699808
+        },
+        {
+          "name": "감속",
+          "samples": 12500,
+          "rmse_z": 0.09243952691728684,
+          "rmse_velocity": 2.100759708905654
+        },
+        {
+          "name": "호버링",
+          "samples": 1501,
+          "rmse_z": 0.004100591637148706,
+          "rmse_velocity": 0.15742923946460652
+        }
+      ],
+      "motor_saturation_fraction": 0.0,
+      "final_settled": true,
+      "passed": false,
+      "failure_reasons": [
+        "propulsion_model_domain"
+      ],
+      "tracking_pass": true,
+      "model_domain_valid": false,
+      "prop_domain_outside_fraction": 0.24195,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "stop_reason": null,
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807"
+    },
+    "analysis": {
+      "settling_seconds": {
+        "초기호버": 0.0,
+        "순항": 0.6020000000000003,
+        "호버링": 1.1379999999999981
+      },
+      "domain": {
+        "minimum_axial_air_speed": -1.3530925140146908,
+        "minimum_rotor_rpm": 9456.348429403757,
+        "rpm_below_data": {
+          "fraction": 0.0438,
+          "first": 26.46,
+          "last": 28.21
+        },
+        "advance_ratio_above_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "reverse_flow": {
+          "fraction": 0.19815,
+          "first": 1.016,
+          "last": 40.0
+        }
+      }
+    }
+  },
+  {
+    "case": {
+      "case_id": "mission",
+      "factors": {}
+    },
+    "controller": "NMPC",
+    "phases": [
+      [
+        "초기호버",
+        0.0,
+        1.0,
+        0,
+        0,
+        50.0,
+        50.0
+      ],
+      [
+        "가속",
+        1.0,
+        8.0,
+        0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "순항",
+        9.0,
+        3.0,
+        70.0,
+        70.0,
+        50.0,
+        50.0
+      ],
+      [
+        "감속",
+        12.0,
+        25.0,
+        70.0,
+        0,
+        50.0,
+        50.0
+      ],
+      [
+        "호버링",
+        37.0,
+        3.0,
+        0,
+        0,
+        50.0,
+        50.0
+      ]
+    ],
+    "metrics": {
+      "rmse_z": 0.16628290948755592,
+      "rmse_vx": 1.0234116200085044,
+      "rmse_velocity": 1.02659466567971,
+      "max_z_error": 0.4534029880216295,
+      "max_velocity_error": 2.631783917790118,
+      "max_omega": 0.5545730154506835,
+      "omega_sustained_seconds": 0.0,
+      "simulated_seconds": 21.240000000000002,
+      "phases": [
+        {
+          "name": "초기호버",
+          "samples": 500,
+          "rmse_z": 2.631699721796481e-11,
+          "rmse_velocity": 4.531667760112713e-11
+        },
+        {
+          "name": "가속",
+          "samples": 4000,
+          "rmse_z": 0.2688420845985846,
+          "rmse_velocity": 1.6423697215150732
+        },
+        {
+          "name": "순항",
+          "samples": 1500,
+          "rmse_z": 0.019586271164455698,
+          "rmse_velocity": 0.024271736400751722
+        },
+        {
+          "name": "감속",
+          "samples": 4621,
+          "rmse_z": 0.02938824710340713,
+          "rmse_velocity": 0.2953286253684056
+        },
+        {
+          "name": "호버링",
+          "samples": 0,
+          "rmse_z": null,
+          "rmse_velocity": null
+        }
+      ],
+      "motor_saturation_fraction": 0.0,
+      "final_settled": false,
+      "passed": false,
+      "failure_reasons": [
+        "incomplete",
+        "simulation_error",
+        "final_hover_not_settled",
+        "propulsion_model_domain"
+      ],
+      "tracking_pass": false,
+      "model_domain_valid": false,
+      "prop_domain_outside_fraction": 0.011958568738229754,
+      "optimizer_calls": 532,
+      "optimizer_failures": 10,
+      "stop_reason": "5 consecutive optimizer failures",
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807"
+    },
+    "analysis": {
+      "settling_seconds": {
+        "초기호버": 0.0,
+        "순항": 0.05400000000000027,
+        "호버링": null
+      },
+      "domain": {
+        "minimum_axial_air_speed": -5.5155417549216594e-05,
+        "minimum_rotor_rpm": 12392.769397417096,
+        "rpm_below_data": {
+          "fraction": 0.0,
+          "first": null,
+          "last": null
+        },
+        "advance_ratio_above_data": {
+          "fraction": 0.0011299435028248588,
+          "first": 21.080000000000002,
+          "last": 21.102
+        },
+        "reverse_flow": {
+          "fraction": 0.010828625235404897,
+          "first": 1.048,
+          "last": 1.276
+        }
+      }
+    }
+  }
+]

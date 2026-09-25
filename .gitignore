@@ -30,6 +30,12 @@ Thumbs.db
 
 # Python venv
 .venv/
+.pytest_cache/
+
+# Validation campaigns (timestamped, never overwrite archived figures)
+results/validation/
+models/team_light/results/baseline_v2/run_*/
+!models/team_light/results/baseline_v2/run_20260924T161648152853Z/
 
 # SITL 실행 로그/아티팩트 (scripts/sitl_run.sh 출력)
 results/sitl_runs/

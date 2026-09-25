@@ -1,5 +1,8 @@
 """
-돌풍 외란 비교 — 70 m/s 순항 + 1-cosine 돌풍
+독립 돌풍 시험 진입점 — 새 팀원 기체, 크루즈 트림에서 시작
+
+기본 실행: control.validation_suite의 gust 시나리오.
+아래 legacy_main은 과거 8 kg 비교 실험 재현용이다.
 =============================================
 
 시나리오:
@@ -130,7 +133,7 @@ class _FixedLQR:
 # 메인
 # ══════════════════════════════════════════════════
 
-def main():
+def legacy_main():
     plant = AxialDronePlant(P, dt=0.001)
     dt = plant.dt
 
@@ -142,7 +145,7 @@ def main():
     T_sim = 8.0         # 총 시뮬 (2s 정착 + 1s 돌풍 + 5s 회복)
 
     print("\n" + "=" * 90)
-    print("  [3] 돌풍 외란 비교 — 70 m/s 순항 + 1-cosine 돌풍")
+    print("  [3] Legacy cruise gust comparison")
     print("=" * 90)
     print(f"  순항 속도: {V_cruise} m/s,  돌풍: {W_max} m/s 1-cosine,  "
           f"t={t_gust}s~{t_gust+T_gust}s")
@@ -316,6 +319,12 @@ def main():
     print(f"  - 빠른 외란 억제가 목표면 → INDI(센서 기반 증분 제어) 필요")
     print(f"  - NMPC의 진짜 강점은 '예측 가능한' 상황 (자세천이, 가속, 제약)")
     print(f"{'=' * 90}")
+
+
+def main():
+    import sys
+    from control.validation_suite import main as validation_main
+    validation_main(['--scenario', 'gust', *sys.argv[1:]])
 
 
 if __name__ == '__main__':

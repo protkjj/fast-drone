@@ -19,7 +19,7 @@ from control.vehicle_params import vehicle_params as P
 from control.dynamics import AxialDronePlant
 from control.hybrid_comparison import ProperHybrid
 from control.vnmpc_acados import AcadosVirtualNMPC
-from control.mission_sim import (MissionProfile, MissionController, run_mission,
+from control.mission_sim import (LegacyMissionProfile as MissionProfile, MissionController, run_mission,
                          compute_overall)
 from control.gust_comparison import make_gust_fn
 from control.acados_fallback_mc import omega_metrics   # |ω| 실기판정 (기준: MEMORY 주의 6)

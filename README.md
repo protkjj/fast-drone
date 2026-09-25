@@ -1,5 +1,15 @@
 # fast-drone — 고속 ISR 드론 제어 연구
 
+> **팀 공유 저장소:** [kms301111/fast-drone-control](https://github.com/kms301111/fast-drone-control)
+> · [이번 변경 요약과 빠른 실행](docs/TEAM_GUIDE.md)
+> · [현재 세 제어기 응답](docs/shared_results/mission.png)
+> 원본 `protkjj/fast-drone`의 `control` 브랜치에서 출발한 독립 저장소다.
+
+> **새 검증 진입점:** `python -m control.mission_sim`은 팀원 기체
+> `light_rocket_v2_pack_forward`(1.17407572 kg)로 기본 성능만 시험한다.
+> 돌풍·스윕·몬테카를로는 별도 실행한다. [실행 및 판정 안내](docs/VALIDATION.md).
+> 아래 과거 8 kg 기체·acados·SITL 기록은 새 기체의 검증 결과가 아니다.
+
 축대칭 미사일형 동체 + 쿼드 추진, 목표 순항 **300 km/h (83.3 m/s)**.
 최종 목표는 실기 비행이고, 경로는 `파이썬 시뮬 → PX4 SITL/Gazebo → 실기`다.
 
@@ -11,8 +21,8 @@
 ## 0. 설치
 
 ```
-git clone https://github.com/protkjj/fast-drone.git
-cd fast-drone
+git clone https://github.com/kms301111/fast-drone-control.git
+cd fast-drone-control
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -37,10 +47,10 @@ pip install -r requirements.txt
 | 3 | `python3 -m control.trim` | 트림 성립 + 최고 트림속도 | 0.3 s ✅ | — |
 | 4 | `python3 -m control.test_plant` | 6-DOF 플랜트 (자유낙하·모멘트 등) | 1.7 s ✅ | — |
 | 5 | `python3 -m control.test_fallback` | Hybrid→LQR 폴백 전환 로직 | 6 s ✅ | — |
-| 6 | `python3 -m control.mission_sim` | 통합 미션 65 s × 제어기 3종 | 수 분 📄 | matplotlib |
+| 6 | `python3 -m control.mission_sim` | 기본 미션 40 s × GS-LQR / Split | 수 분 📄 | matplotlib |
 | 7 | `python3 -m control.gust_comparison` | 돌풍 외란 응답 | 수 분 📄 | — |
 | 8 | `python3 -m control.ekf_comparison` | 센서 노이즈 하 제어기 순위 | 수 분 📄 | — |
-| 9 | `python3 -m control.final_config_mission` | 확정 구성(acados) 통합 검증 | 수 분 📄 | **acados** |
+| 9 | `python3 -m control.final_config_mission` | 과거 기체 확정 구성(acados) 재현 | 수 분 📄 | **acados** |
 | 10 | `./scripts/sitl_run.sh` | PX4 SITL 이륙·호버 | — | **Ubuntu+PX4** |
 
 ✅ = 2026-08-27 macOS 에서 실측한 시간  📄 = 코드 주석에 적힌 값, 이 세션에서 미실측
@@ -89,14 +99,22 @@ python3 -m control.trim
 python3 -m control.mission_sim
 ```
 
-이륙(0~10s) → 안정화 → 가속(13~28s) → 순항(28~43s, t=35s 돌풍) → 감속 → 호버,
-총 65초를 LQR / Hybrid / NMPC 세 제어기로 돌려 RMSE 표를 낸다.
+새 팀원 기체의 평형 호버에서 시작한다. 초기 호버(0~1s) → 가속(1~9s)
+→ 순항(9~12s) → 감속(12~37s) → 최종 호버(37~40s), 총 40초다.
+시간 선정 근거와 탐색 결과는 [TIMING_OPTIMIZATION.md](docs/TIMING_OPTIMIZATION.md)에 있다.
+이륙과 돌풍은 없으며, EKF/MC도 자동으로 실행하지 않는다.
 
-⚠ **`results/mission_plot.png` 와 `results/mission_ekf_plot.png` 를 덮어쓴다.**
-둘 다 git 추적 대상이라 실행하면 작업트리가 더러워진다. 비교 목적이면
-그대로 두고, 아니면 `git checkout -- results/mission_plot.png` 로 되돌린다.
+```sh
+python -m control.mission_sim --scenario baseline
+python -m control.mission_sim --scenario gust
+python -m control.mission_sim --scenario sweep --ranges configs/uncertainty.example.json
+python -m control.mission_sim --scenario mc --trials 100 --seed 42 --ranges configs/uncertainty.example.json
+```
 
-속도 감(코드 주석 기준): LQR ~5초/회, Hybrid ~50초/회. NMPC 는 더 느리다.
+기본 비교군은 `GS-LQR`, `Split`(비선형 가상입력 NMPC + INDI)이다.
+`--controllers`로 선택할 수 있다. 결과는 매번 `results/validation/run_시각/`에
+저장하며 기존 결과 그림을 덮어쓰지 않는다. 조건·판정 기준·원본 모델 출처와
+불확실성 계수의 의미는 [docs/VALIDATION.md](docs/VALIDATION.md)를 확인한다.
 
 ### 2.4 개별 비교 실험
 
@@ -106,7 +124,8 @@ python3 -m control.ekf_comparison
 python3 -m control.hybrid_comparison
 ```
 
-- `gust_comparison` — 70 m/s 순항 중 측풍/수직돌풍 주입. 요·롤 응답과 받음각 급변.
+- `gust_comparison` — 새 기체의 독립 돌풍 시험(`--scenario gust`와 동일).
+  크루즈 안정화 1초 + 돌풍 1초 + 회복 2.5초; 무돌풍 대조군도 함께 저장.
 - `ekf_comparison` — 센서 노이즈를 넣었을 때 제어기 **순위가 뒤바뀌는지**.
   무노이즈 시뮬만 믿으면 안 된다는 것을 보이는 실험이다.
 - `hybrid_comparison` — 나이브 하이브리드 vs 인터페이스 분리. 왜 분리해야 하는지의 근거.
@@ -176,7 +195,7 @@ DDS agent → PX4 SITL → offboard 노드를 **순서 기동**하고(각 단계
 
 ---
 
-## 5. 기체 — 두 형상이 병행 중이다
+## 5. 과거 기체 기록 — 새 기본 검증에는 사용하지 않는다
 
 헷갈리기 쉬운 지점이라 못박아 둔다. **둘 다 축대칭이다.**
 축대칭(*형상*)과 테일시터/멀티로터(*추력축*)는 서로 다른 축의 이야기이고,
@@ -251,8 +270,11 @@ control/            제어 연구 본체 (플랜트·제어기·추정기·시�
   hybrid_comparison.py ProperHybrid (확정 제어기)
   fallback_controller.py  Hybrid + LQR 폴백
   trim.py             트림 탐색
-  mission_sim.py      통합 미션 (메인 진입점)
+  mission_sim.py      4단계 검증 진입점 (기본은 무외란 미션)
+  validation_suite.py 시험 실행·조건 저장·성공/실패 집계
+  mission_profiles.py 기본 미션 / 독립 돌풍 궤적
   test_*.py           단위 테스트
+models/team_light/    팀원 고정 기체·동역학·제어 어댑터·이식 검증
 sizing/             중량 산정 (WGHT 모듈)
 ros2_ws/            ROS2 패키지 (offboard 노드, SITL)
 scripts/            환경 구축·SITL 런처

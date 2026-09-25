@@ -29,7 +29,7 @@ from control.trim import find_trim
 from control.controller import ScheduledLQR
 from control.hybrid_comparison import VirtualNMPC, ProperHybrid
 from control.gust_comparison import make_gust_fn
-from control.mission_sim import MissionProfile, MissionController, run_mission
+from control.mission_sim import LegacyMissionProfile as MissionProfile, MissionController, run_mission
 from control.fallback_controller import HybridWithFallback
 from control.flight_envelope import scaled_params
 

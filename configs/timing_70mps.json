@@ -1,0 +1,27 @@
+{
+  "purpose": "Short nominal numerical performance test, not a robustness or model-domain certification",
+  "speed_m_s": 70.0,
+  "altitude_m": 50.0,
+  "primary_controller": "Split (NMPC-INDI)",
+  "comparators": ["GS-LQR", "NMPC"],
+  "mission_durations_s": [1.0, 8.0, 3.0, 25.0, 3.0],
+  "gust_durations_s": [1.0, 1.0, 2.5],
+  "gust_peak_m_s": 2.0,
+  "ramp_screen": {
+    "max_z_error_m": 0.5,
+    "max_velocity_error_m_s": 3.5,
+    "optimizer_failures": 0,
+    "motor_saturation_fraction": 0.0
+  },
+  "settling_band": {
+    "z_error_m": 0.05,
+    "velocity_error_m_s": 0.1,
+    "body_rate_rad_s": 0.05,
+    "minimum_stable_hold_s": 1.0
+  },
+  "candidates_s": {
+    "acceleration": [6.0, 8.0, 12.0],
+    "deceleration": [20.0, 25.0, 30.0, 45.0]
+  },
+  "physical_domain_status": "unresolved: nominal mission includes reverse-flow and below-data-RPM intervals"
+}

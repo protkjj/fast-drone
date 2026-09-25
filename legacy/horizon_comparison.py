@@ -20,7 +20,7 @@ import numpy as np
 from control.vehicle_params import vehicle_params as P
 from control.dynamics import AxialDronePlant
 from control.hybrid_comparison import VirtualNMPC, ProperHybrid
-from control.mission_sim import (MissionProfile, MissionController, run_mission,
+from control.mission_sim import (LegacyMissionProfile as MissionProfile, MissionController, run_mission,
                          compute_phase_metrics, compute_overall)
 from control.gust_comparison import make_gust_fn
 
