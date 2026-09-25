@@ -155,6 +155,10 @@ def run_trial(factory, label, profile, case, limits):
                    trajectory_sha256=trajectory_sha256(result))
     if hasattr(factory, 'controller_model_sha256'):
         metrics['controller_model_sha256'] = factory.controller_model_sha256
+    integrator_report = getattr(ctrl, 'integrator_report', None)
+    if integrator_report is not None:
+        # 적분기 한계 도달·정지 스텝(GSLQR·CPID, 같은 형식). NMPC 계열은 None.
+        metrics['integrators'] = integrator_report()
     if outside:
         metrics['passed'] = False
         metrics['failure_reasons'].append('propulsion_model_domain')
@@ -337,7 +341,7 @@ ARENA_REFERENCE_FIELDS = (
     'window_rmse_velocity', 'window_rmse_z', 'window_max_velocity_error', 'window_max_z_error',
     'window_p95_velocity_error', 'window_p95_z_error', 'window_max_omega',
     'command_total_variation', 'flow_angle_deg', 'factors', 'trajectory_sha256',
-    'truth_parameter_sha256', 'controller_model_sha256')
+    'truth_parameter_sha256', 'controller_model_sha256', 'integrators')
 
 
 def environment_fingerprint():
@@ -377,6 +381,7 @@ def source_hashes():
 
 
 def write_arena_report(out, manifest, rows):
+    from control.arena import integrator_limit_flags
     lines = [f'# Arena {manifest["label"]} run', '',
              f'**{manifest["label"]}** — pipeline check, not a performance result. '
              'No superiority or inferiority conclusion is drawn from these numbers.', '',
@@ -384,24 +389,36 @@ def write_arena_report(out, manifest, rows):
              f'git `{manifest["git_revision"]}` dirty={manifest["git_dirty"]}.', '',
              'Suite pass = tracking/safety (Acceptance) AND propulsion-model domain. '
              'Paper = section 5.10 flags (stricter, reported alongside). '
-             'Window RMSE = section 5.8 evaluation window.', '']
+             'Window RMSE = section 5.8 evaluation window. '
+             'Integ limit / frozen = share of steps with an integrator at its limit / frozen by '
+             'saturation (GSLQR and CPID, same format; NMPC family has no integrators).', '']
     for scenario in manifest['scenarios']:
         lines += [f'## {scenario["id"]} ({scenario["type"]})', '',
                   '| Controller | Sim s | Suite pass | Tracking | Domain | Paper fail | '
-                  'Window RMSE v | Window RMSE z | max |ω| | Stop / reasons |',
-                  '|---|---:|---|---|---|---|---:|---:|---:|---|']
+                  'Window RMSE v | Window RMSE z | max |ω| | Integ limit % | Integ frozen % | '
+                  'Stop / reasons |',
+                  '|---|---:|---|---|---|---|---:|---:|---:|---:|---:|---|']
         for r in (r for r in rows if r['scenario_id'] == scenario['id']):
             def fmt(key, r=r):
                 value = r.get(key)
                 return '—' if value is None else f'{value:.4g}'
+            integ = r.get('integrators') or {}
+            limit = f'{100*integ["at_limit_fraction"]:.2f}' if integ else '—'
+            frozen = f'{100*integ["frozen_fraction"]:.2f}' if integ else '—'
             reasons = ', '.join(r.get('failure_reasons', []) + r.get('paper_reasons', []))
             stop = r.get('stop_reason') or ''
             lines.append(f'| {r["controller"]} | {r.get("simulated_seconds", 0):.3f} | '
                          f'{r.get("passed")} | {r.get("tracking_pass")} | '
                          f'{r.get("model_domain_valid")} | {r.get("paper_failed")} | '
                          f'{fmt("window_rmse_velocity")} | {fmt("window_rmse_z")} | '
-                         f'{fmt("max_omega")} | {stop} {reasons} |')
+                         f'{fmt("max_omega")} | {limit} | {frozen} | {stop} {reasons} |')
         lines.append('')
+    threshold, flags = integrator_limit_flags(rows, manifest['config'])
+    lines += [f'## Integrator limit > {100*threshold:g}% of the trial (kj rule 2026-09-26)', '',
+              'Any row listed here goes to "decision needed" in the status report.', '']
+    lines += ([f'- {f["controller"]} / {f["case"]}: {100*f["at_limit_fraction"]:.2f}% '
+               f'(steps at limit per channel {f["channels"]})' for f in flags] or ['- none'])
+    lines.append('')
     (out/'REPORT.md').write_text('\n'.join(lines), encoding='utf-8')
 
 

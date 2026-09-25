@@ -14,10 +14,15 @@
                     구현**으로 똑같이 건다. M17은 원래 이 추적이 없었다. (I-3)
   trim_warm_start   세 NMPC의 첫 웜스타트를 같은 규칙으로 채운다:
                     X = 실측 초기상태, U = 명목 제어기 모델의 트림 입력.
+                    같은 트림 정보를 CPID는 적분기 출발값으로 받는다(적분기로만
+                    트림을 유지하는 구조라, 0에서 출발하면 CPID만 트림 정보 없이
+                    뛰게 된다). GSLQR은 트림 피드포워드가 그 역할을 한다.
+  IntegratorLog     GSLQR·CPID 적분기의 한계 도달·적분 정지 스텝을 같은 형식으로 센다.
   ControllerModel   명목 제어기 모델(집중정수 적합) 하나를 5종이 공유한다.
-                    플랜트와 우리 트림의 자세 규약이 추력축 둘레 180° 다른 것을
-                    여기서 한 번 변환한다 — GSLQR·CPID가 가짜 180° 롤 오차를
-                    보지 않게. (NMPC 계열은 쿼터니언을 비용에 안 써서 무관)
+                    제어기 파라미터가 기체의 호버 자세 규약('hover_quat')을 들고
+                    있어, 트림이 처음부터 플랜트 규약으로 나온다 — 우리 기본값과
+                    추력축 둘레 180° 달라서, 맞추지 않으면 GSLQR·CPID가 가짜 180°
+                    롤 오차를 본다. (NMPC 계열은 쿼터니언을 비용에 안 써서 무관)
 """
 from copy import deepcopy
 import json
@@ -118,6 +123,45 @@ def trim_warm_start(nmpc, x_meas, u_trim):
     nmpc._cold_start = False
 
 
+class IntegratorLog:
+    """적분기 '한계 도달'·'적분 정지' 스텝을 센다. GSLQR과 CPID에 같은 형식을 쓴다
+    (kj 결정 2026-09-26).
+
+    한 스텝에 어느 채널이든 한계에 닿아 있으면 한계 도달 스텝으로 세고, 조건부
+    적분이 멈췄으면 적분 정지 스텝으로 센다. 한계 도달이 시행 시간의 1%를 넘는
+    제어기가 튜닝이나 스모크에 하나라도 있으면 보고서 '결정 필요'에 올린다
+    (설정 reporting.integrator_at_limit_fraction). 제어기 상태를 읽기만 하므로
+    결과에 영향이 없다.
+    """
+    TOL = 1e-9
+
+    def __init__(self):
+        self.steps = 0
+        self.at_limit_steps = 0
+        self.frozen_steps = 0
+        self.channels = {}
+
+    def observe(self, status):
+        self.steps += 1
+        any_limit = False
+        for name, (value, limit) in status['channels'].items():
+            ch = self.channels.setdefault(name, dict(limit=limit, at_limit_steps=0,
+                                                     peak_fraction=0.0))
+            fraction = value/limit if limit > 0 else 0.0
+            ch['peak_fraction'] = max(ch['peak_fraction'], fraction)
+            if fraction >= 1.0 - self.TOL:
+                ch['at_limit_steps'] += 1
+                any_limit = True
+        self.at_limit_steps += any_limit
+        self.frozen_steps += bool(status['frozen'])
+
+    def report(self):
+        n = max(self.steps, 1)
+        return dict(steps=self.steps, at_limit_steps=self.at_limit_steps,
+                    at_limit_fraction=self.at_limit_steps/n, frozen_steps=self.frozen_steps,
+                    frozen_fraction=self.frozen_steps/n, channels=deepcopy(self.channels))
+
+
 class ArenaController:
     """스위트가 부르는 겉포장. 5종 모두 같은 모양으로 불린다: ctrl(t, x17)."""
 
@@ -132,6 +176,8 @@ class ArenaController:
         self.settings = settings or {}
         self._warm_start = warm_start
         self._started = False
+        # 적분기가 있는 제어기(GSLQR·CPID)만 계측한다. NMPC 계열은 적분기가 없다.
+        self.integrators = IntegratorLog() if hasattr(inner, 'integrator_status') else None
 
     def observation_spec(self):
         return dict(keys=self.OBSERVATION_KEYS, preview_horizon_s=self.window.horizon_s,
@@ -142,7 +188,14 @@ class ArenaController:
             if self._warm_start is not None:
                 self._warm_start(np.asarray(x, dtype=float))
             self._started = True
-        return self.inner(t, x)
+        u = self.inner(t, x)
+        if self.integrators is not None:
+            self.integrators.observe(self.inner.integrator_status())
+        return u
+
+    def integrator_report(self):
+        """적분기 계측 요약(없으면 None) — 스위트가 시행 행에 'integrators'로 넣는다."""
+        return None if self.integrators is None else self.integrators.report()
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -150,7 +203,11 @@ class ArenaController:
 # ══════════════════════════════════════════════════════════════════
 
 def convention_map(cp, plant_hover_quat):
-    """우리 트림 규약 → 플랜트 규약. (동체 상대회전 R_rel, 로터 치환 perm)
+    """(교차검증용) 우리 기본 규약 트림 → 플랜트 규약. (동체 상대회전 R_rel, 로터 치환 perm)
+
+    경기장은 이제 제어기 파라미터의 'hover_quat'으로 트림을 **직접** 플랜트 규약에서
+    구한다(control/trim.py). 이 함수는 그 결과를 독립적으로 확인하는 데만 쓴다 —
+    cp는 'hover_quat'이 **없는** 기본 규약 파라미터여야 한다.
 
     두 호버 자세는 모두 추력축(동체 +x)을 세계 +z로 향하지만, 동체 y·z축이
     가리키는 방향이 반대다(실측: 모든 속도에서 추력축 둘레 정확히 180°).
@@ -184,7 +241,7 @@ class ControllerModel:
     """
 
     def __init__(self, native):
-        from control.kh_adapter import build_controller_params
+        from control.kh_adapter import build_controller_params, fit_cp_schedule
         from models.team_light.control.baseline_v2 import parameter_hash
         from models.team_light.control.geometry import hover_quaternion
         # 얕은 복사면 제어기가 중첩 배열을 고칠 때 플랜트 원본까지 바뀐다 —
@@ -192,36 +249,50 @@ class ControllerModel:
         self.cp = build_controller_params(deepcopy(native))
         self.sha256 = parameter_hash(self.cp)
         self.plant_hover_quat = np.asarray(hover_quaternion(), dtype=float)
-        self.R_rel, self.perm = convention_map(self.cp, self.plant_hover_quat)
-        self._trims = {}          # 1 m/s 격자 → 우리 규약 트림(연속법)
-
-    def _our_trim(self, V):
-        """우리 규약 트림을 0에서부터 1 m/s 연속법으로 구한다(캐시)."""
-        from control.trim import find_trim
-        key = round(float(V), 6)
-        if key in self._trims:
-            return self._trims[key]
-        grid = [v for v in np.arange(0.0, key, 1.0)] + [key]
-        guess = None
-        for v in grid:
-            k = round(float(v), 6)
-            if k not in self._trims:
-                tr = find_trim(self.cp, float(v), guess=guess, quiet=True)
-                if not tr['converged']:
-                    raise ValueError(f'controller-model trim continuation broke at {v} m/s: {tr["why"]}')
-                self._trims[k] = tr
-            guess = self._trims[k]['guess']
-        return self._trims[key]
+        # 제어기 모델의 호버 규약이 플랜트와 같아야 GSLQR·CPID의 자세 기준이 맞는다.
+        if not np.allclose(self.cp['hover_quat'], self.plant_hover_quat, atol=1e-12):
+            raise ValueError('controller-model hover convention differs from the plant')
+        aero = {k: self.cp[k] for k in ('C_Na', 'C_dc', 'C_A0', 'C_Aa2', 'x_cp', 'C_lp', 'C_mq')}
+        _, self.cp_schedule_report = fit_cp_schedule(native, aero)
+        self._trims = {}          # 1 m/s 격자 → 명목 모델 트림(플랜트 규약, 연속법)
 
     def trim(self, V):
-        """플랜트 규약으로 옮긴 명목 모델 트림: dict(state, control, converged, guess)."""
-        tr = self._our_trim(V)
-        x = tr['state'].copy()
-        x[6:10] = (Rotation.from_quat(x[6:10]) * self.R_rel).as_quat()
-        x[10:13] = self.R_rel.inv().apply(x[10:13])
-        x[13:17] = tr['state'][13:17][self.perm]
-        return dict(state=x, control=x[13:17].copy(), converged=True, guess=tr['guess'],
-                    speed=float(V))
+        """명목 제어기 모델의 트림(플랜트 호버 규약). 0에서 1 m/s 연속법(캐시).
+
+        냉시동 fsolve는 이 기체에서 25 m/s 위로 못 간다(실측) — 연속법으로는 0~85가
+        전부 풀린다. 반환: find_trim dict + speed.
+        """
+        from control.trim import find_trim
+        key = round(float(V), 6)
+        if key not in self._trims:
+            grid = [v for v in np.arange(0.0, key, 1.0)] + [key]
+            guess = None
+            for v in grid:
+                k = round(float(v), 6)
+                if k not in self._trims:
+                    tr = find_trim(self.cp, float(v), guess=guess, quiet=True)
+                    if not tr['converged']:
+                        raise ValueError(f'controller-model trim continuation broke at {v} m/s: '
+                                         f'{tr["why"]}')
+                    self._trims[k] = dict(tr, speed=float(v))
+                guess = self._trims[k]['guess']
+        return self._trims[key]
+
+    def trim_acceleration(self, V):
+        """명목 모델 트림에서 로터 추력 벡터가 내는 가속도 [m/s², 세계 좌표]. 중력은 뺀다.
+
+        CPID의 외부 루프는 F_des = m(a_des + g·e_z)를 추력 벡터로 삼는다. 그래서
+        트림을 유지하려면 a_des가 a = F_rotor/m − g·e_z여야 한다. 공력이 받치는 몫
+        (수평은 항력, 수직은 양력)이 여기에 들어 있다. CPID 적분기의 출발값으로 쓴다
+        (NMPC 웜스타트가 쓰는 것과 같은 명목 트림).
+        """
+        tr = self.trim(V)
+        x, u = tr['state'], tr['control']
+        thrust_dir = (np.array([1.0, 0.0, 0.0]) if self.cp.get('thrust_axis', 'z') == 'x'
+                      else np.array([0.0, 0.0, -1.0]))          # 동체 좌표 추력 방향
+        R = Rotation.from_quat(x[6:10]).as_matrix()
+        F = R @ thrust_dir * float(np.sum(self.rotor_thrusts(u, x)))
+        return F/self.cp['mass'] - np.array([0.0, 0.0, self.cp['g']])
 
     def rotor_thrusts(self, n, x):
         """명목 모델의 로터별 추력 [N] — control.dynamics와 같은 분기를 따른다.
@@ -243,16 +314,19 @@ class ControllerModel:
         return self.cp['k_T']*n**2*np.maximum(1.0 - J/self.cp['J_max'], 0.0)
 
 
-def cpid_heading_for_plant(cp, plant_hover_quat):
-    """CPID의 목표 방위 heading을 플랜트 호버 규약에 맞춘다.
+def cpid_heading_for_plant(cp, hover_quat=None):
+    """CPID의 목표 방위 heading을 기체의 호버 규약(cp['hover_quat'])에 맞춘다.
 
     x축 기체에서 CascadedPID는 동체 y축을 b2 = normalize(b1 × c1),
     c1 = [cos h, sin h, 0]으로 만든다. 호버(b1 = 세계 +z)에서 b2 = [-sin h, cos h, 0]
-    이므로, 플랜트 호버의 동체 y축(세계 좌표)과 같아지는 h를 고른다. 팀 규약에서는
+    이므로, 호버의 동체 y축(세계 좌표)과 같아지는 h를 고른다. 팀 규약에서는
     동체 y가 세계 -y라 h = π다 — 기본값 0을 그대로 쓰면 첫 스텝부터 180° 자세
     오차의 특이점(오차 벡터가 0이 되는 불안정 평형) 위에서 출발한다.
+    hover_quat을 주면 그것을, 아니면 cp의 규약(없으면 기본 호버 자세)을 쓴다.
     """
-    y_world = Rotation.from_quat(plant_hover_quat).as_matrix()[:, 1]
+    from control.dynamics import AxialDronePlant
+    q = hover_quat if hover_quat is not None else AxialDronePlant.hover_state(cp)[6:10]
+    y_world = Rotation.from_quat(np.asarray(q, dtype=float)).as_matrix()[:, 1]
     return float(np.arctan2(-y_world[0], y_world[1]))
 
 
@@ -425,16 +499,29 @@ class ArenaFactory:
     def _build_cpid(self, window, v0, z0):
         from control.controller import CascadedPID
         g = self.gains['CPID']
-        heading = cpid_heading_for_plant(self.cp, self.model.plant_hover_quat)
+        spec = self.config['controllers']['CPID']
+        heading = cpid_heading_for_plant(self.cp)      # 제어기 모델의 호버 규약(= 플랜트)
         ctrl = CascadedPID(self.cp, v_ref=v0, z_ref=z0, heading=heading, dt=self.dt)
-        for key in ('Kp_vel', 'Kp_z', 'Kd_z', 'Ki_z', 'int_z_max'):
+        for key in ('Kp_vel', 'Ki_vel', 'a_int_max', 'Kp_z', 'Kd_z', 'Ki_z', 'int_z_max'):
             setattr(ctrl, key, float(g[key]))
+        # 고도 적분 경기장 방식(가속도 권한 + 조건부). 게인 파일에 없으면 기존 방식.
+        ctrl.a_int_z_max = None if g.get('a_int_z_max') is None else float(g['a_int_z_max'])
         ctrl.Kp_att = np.asarray(g['Kp_att'], dtype=float)
         ctrl.Kd_att = np.asarray(g['Kd_att'], dtype=float)
         ctrl.max_tilt = np.radians(float(g['max_tilt_deg']))
         ctrl.reset()
+        # 출발 규칙: NMPC 웜스타트와 같은 정보(시작 참조속도의 명목 모델 트림)로 적분기를
+        # 채운다. 설정이 켤 때만(kj 결정 2026-09-26: 경기장 설정에서만 켠다).
+        preload = spec.get('integrator_preload')
+        if preload not in (None, 'controller_model_trim'):
+            raise ValueError(f'unknown CPID integrator_preload {preload!r}')
+        a_ff = self.model.trim_acceleration(float(v0[0])) if preload else None
         settings = dict(kind='CPID', heading_rad=heading,
-                        **{k: g[k] for k in ('Kp_vel', 'Kp_z', 'Kd_z', 'Ki_z', 'int_z_max',
+                        **{k: g[k] for k in ('Kp_vel', 'Ki_vel', 'a_int_max', 'Kp_z', 'Kd_z', 'Ki_z', 'int_z_max',
                                               'Kp_att', 'Kd_att', 'max_tilt_deg')},
+                        a_int_z_max=ctrl.a_int_z_max, integrator_preload=preload,
+                        preload_acceleration=None if a_ff is None else a_ff.tolist(),
                         preview=False)
-        return ArenaController('CPID', ctrl, window, settings=settings)
+        return ArenaController('CPID', ctrl, window, settings=settings,
+                               warm_start=None if a_ff is None
+                               else (lambda x: ctrl.preload_integrators(a_ff)))

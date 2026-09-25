@@ -19,6 +19,19 @@ from control.vehicle_params import vehicle_params
 from control.dynamics import AxialDronePlant, NX
 
 
+def _hover_rotation(params):
+    """호버 자세(동체→관성). `dynamics.AxialDronePlant.hover_state`와 같은 규칙.
+
+    params에 'hover_quat'이 있으면 그것(기체가 스스로 정한 규약 — 팀원 기체는 우리
+    x축 기본값과 추력축 둘레 180° 다르다), 없으면 축별 기본값이다.
+    """
+    if 'hover_quat' in params:
+        return Rotation.from_quat(np.asarray(params['hover_quat'], dtype=float))
+    if params.get('thrust_axis', 'z') == 'x':
+        return Rotation.from_quat([0.0, -np.sqrt(0.5), 0.0, np.sqrt(0.5)])
+    return Rotation.from_quat([1, 0, 0, 0])
+
+
 def find_trim(params, V_cruise, guess=None, quiet=False):
     """
     수평 순항 트림 조건 탐색.
@@ -64,10 +77,7 @@ def find_trim(params, V_cruise, guess=None, quiet=False):
         우연히 같다**(좌표로 검산함). 쌍 안에서 나머지 축 오프셋과 회전방향이
         상쇄되므로 롤·요 모멘트는 배분과 무관하게 0 이다.
         """
-        if params.get('thrust_axis', 'z') == 'x':
-            R_hover = Rotation.from_quat([0.0, -np.sqrt(0.5), 0.0, np.sqrt(0.5)])
-        else:
-            R_hover = Rotation.from_quat([1, 0, 0, 0])
+        R_hover = _hover_rotation(params)
         R_pitch = Rotation.from_euler('y', theta)
         R_total = R_hover * R_pitch
         q = R_total.as_quat()
@@ -101,7 +111,15 @@ def find_trim(params, V_cruise, guess=None, quiet=False):
     # 부호를 반대로 주면 fsolve 가 반대쪽 가지로 걸어가 기수가 뒤를 보는
     # 가짜 해로 '수렴' 한다 — 그러면 항력이 추진력으로 둔갑한다.
     if guess is None:
-        lean = 0.05 if params.get('thrust_axis', 'z') == 'x' else -0.05
+        if 'hover_quat' in params:
+            # 호버 자세가 바뀌면 '동체 y축 둘레 +θ'가 가리키는 방향도 바뀐다.
+            # 작은 θ에서 추력축(동체 x)의 세계 x 성분 변화 = -θ·(R_hover e_z)_x 이므로
+            # 전방으로 눕는 θ의 부호 = -sign((R_hover e_z)_x). 우리 기본 x축 규약이면
+            # +1(기존 +0.05), 팀원 규약(추력축 둘레 180°)이면 -1이다.
+            forward = -np.sign(_hover_rotation(params).apply([0.0, 0.0, 1.0])[0]) or 1.0
+            lean = 0.05*forward
+        else:
+            lean = 0.05 if params.get('thrust_axis', 'z') == 'x' else -0.05
         x0_guess = [lean, n_hov * 1.01, 0.0]
     else:
         x0_guess = list(guess)

@@ -1,15 +1,28 @@
 {
   "controller": "CPID",
   "status": "prior - class defaults, NOT tuned on light_rocket_v2_pack_forward",
-  "provenance": "control/controller.py CascadedPID attribute defaults (z-axis multirotor era).",
+  "provenance": "control/controller.py CascadedPID attribute defaults (z-axis multirotor era). Ki_vel prior 0.15 = research/tune_gains.py CPID_BASE kiV_h (different CPID structure, prior only); added 2026-09-25 by kj decision (conditional velocity integral, paper sec 5.3).",
   "Kp_vel": 1.0,
+  "Ki_vel": 0.15,
+  "a_int_max": 9.81,
   "Kp_z": 2.0,
   "Kd_z": 2.0,
   "Ki_z": 0.5,
   "int_z_max": 5.0,
-  "Kp_att": [200, 500, 500],
-  "Kd_att": [20, 50, 50],
+  "a_int_z_max": 9.81,
+  "Kp_att": [
+    200,
+    500,
+    500
+  ],
+  "Kd_att": [
+    20,
+    50,
+    50
+  ],
   "max_tilt_deg": 35.0,
   "heading": "from_plant_hover_convention",
-  "design_note": "Tilt limit is measured from world vertical; on this aircraft the trim thrust axis is 34.1 deg from vertical at 20 m/s, so the class cannot hold trim much above ~20 m/s. No aero feed-forward and no velocity integrator. The work order limits CPID to hover and low-speed cruise."
+  "design_note": "Tilt limit is measured from world vertical; on this aircraft the trim thrust axis is 34.1 deg from vertical at 20 m/s, so the class cannot hold trim much above ~20 m/s. No aero feed-forward: the integrators carry the aerodynamic share of the trim (20 m/s: 4.63 m/s^2 horizontal, 2.85 m/s^2 vertical), so the arena preloads them from the controller-model trim (configs/arena.json controllers.CPID.integrator_preload). The work order limits CPID to hover and low-speed cruise.",
+  "integrator_note": "Both integrators (horizontal velocity, altitude) are limited as ACCELERATION AUTHORITY in m/s^2 (1 g, as in PX4 PositionControl), independent of Ki, and are frozen while the command is tilt- or rotor-limited (paper sec 5.3 conditional integration). a_int_z_max=null restores the legacy altitude integrator (unconditional, state limit int_z_max in m*s = 2.5 m/s^2 at Ki_z 0.5).",
+  "change_record": "2026-09-26 kj decision: velocity integral limit 5 -> 9.81 m/s^2, altitude integral legacy -> 9.81 m/s^2 conditional, plus integrator preload. Made AFTER seeing the design-check result, OUTSIDE the tuning budget, in CPID's FAVOUR (baseline-strengthening direction). Recorded in the fairness table of results/ARENA_STATUS."
 }

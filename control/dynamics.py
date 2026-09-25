@@ -88,7 +88,16 @@ def _body_aerodynamics(v_body, omega, p):
     F_aero = ca.vertcat(Fx, Fy, Fz)
 
     # 정적 모멘트: r_cp × F_N
-    xcp = p['x_cp']
+    # 압력중심은 상수(기본, 논문 식9) 또는 속도 다항식 x_cp(V) — 팀원 분산 공력은
+    # 트림곡선에서 압력중심이 -0.02 m(5 m/s) → +0.032 m(85 m/s)로 움직여 상수로는
+    # 트림 각가속도가 20~35 rad/s² 어긋났다(kj 결정 2026-09-25, 불변식 I-10).
+    # x_cp_poly는 오름차순 계수 [c0, c1, …]; 없으면 기존과 비트 단위로 같다.
+    if 'x_cp_poly' in p:
+        xcp = 0.0
+        for c in reversed(p['x_cp_poly']):      # Horner
+            xcp = xcp * V + float(c)
+    else:
+        xcp = p['x_cp']
     M_static = ca.vertcat(0.0, -xcp * Fz, xcp * Fy)
 
     # 감쇠 모멘트: 0.25·ρ·V·S·d²·C_damp·ω
@@ -458,7 +467,11 @@ class AxialDronePlant:
         """추력축을 관성 +z로 향하게 한 정지 호버 상태 (scalar-last q)."""
         n_hov = np.sqrt(params['mass'] * params['g'] / (4 * params['k_T']))
         x0 = np.zeros(NX)
-        if params.get('thrust_axis', 'z') == 'x':
+        if 'hover_quat' in params:
+            # 기체가 자기 호버 자세 규약을 들고 있으면 그것을 쓴다 — 팀원 기체는
+            # 추력축 둘레로 우리 기본값과 180° 다른 자세를 호버로 쓴다(control/trim.py 참고).
+            x0[6:10] = np.asarray(params['hover_quat'], dtype=float)
+        elif params.get('thrust_axis', 'z') == 'x':
             # Ry(-pi/2) maps body +x to inertial +z.
             x0[6:10] = [0.0, -np.sqrt(0.5), 0.0, np.sqrt(0.5)]
         else:

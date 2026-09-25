@@ -28,7 +28,8 @@ from pathlib import Path
 
 import numpy as np
 
-from control.arena import load_config, config_sha256, build_scenarios, DEFAULT_CONFIG, ROOT
+from control.arena import (load_config, config_sha256, build_scenarios, integrator_limit_flags,
+                           DEFAULT_CONFIG, ROOT)
 from control.arena_factory import ArenaFactory, ControllerModel, ARENA_LABELS, NMPC_LABELS
 from control.nmpc_common import PAPER_COST_WEIGHTS
 from control.validation_metrics import Acceptance, PaperCriteria, paper_evaluate
@@ -71,13 +72,13 @@ def parameter_space(config, label, factory_gains):
                 R_scale=v['r'], Q_integral=[v['q_iz'], v['q_ivx']])}
     else:
         g = factory_gains['CPID']
-        prior = dict(Kp_vel=g['Kp_vel'], Kp_z=g['Kp_z'], Kd_z=g['Kd_z'], Ki_z=g['Ki_z'],
-                     Kp_att=1.0, Kd_att=1.0)   # 벡터 게인은 사전값 전체에 곱하는 배수
+        prior = dict(Kp_vel=g['Kp_vel'], Ki_vel=g['Ki_vel'], Kp_z=g['Kp_z'], Kd_z=g['Kd_z'],
+                     Ki_z=g['Ki_z'], Kp_att=1.0, Kd_att=1.0)   # 벡터 게인은 사전값 전체에 곱하는 배수
 
         def apply(values):
             v = values
-            return {'CPID': dict(Kp_vel=v['Kp_vel'], Kp_z=v['Kp_z'], Kd_z=v['Kd_z'],
-                                 Ki_z=v['Ki_z'],
+            return {'CPID': dict(Kp_vel=v['Kp_vel'], Ki_vel=v['Ki_vel'], Kp_z=v['Kp_z'],
+                                 Kd_z=v['Kd_z'], Ki_z=v['Ki_z'],
                                  Kp_att=[v['Kp_att']*a for a in g['Kp_att']],
                                  Kd_att=[v['Kd_att']*a for a in g['Kd_att']])}
     missing = [n for n in names if n not in prior]
@@ -116,7 +117,8 @@ class Evaluator:
                 entry.update(stop_reason=row['stop_reason'], paper_reasons=paper['paper_reasons'],
                              window_rmse_velocity=paper['window_rmse_velocity'],
                              window_rmse_z=paper['window_rmse_z'], max_omega=row['max_omega'],
-                             trajectory_sha256=row['trajectory_sha256'])
+                             trajectory_sha256=row['trajectory_sha256'],
+                             integrators=row.get('integrators'))
             except (ValueError, RuntimeError, np.linalg.LinAlgError) as exc:
                 failed = True
                 entry.update(stop_reason=f'{type(exc).__name__}: {exc}')
@@ -275,6 +277,21 @@ def check_tuning_records(records, config):
     return bad
 
 
+def _evaluation_entries(run_dir):
+    """튜닝 로그(<label>.jsonl)의 시나리오별 항목을 평평하게 모은다(적분기 1% 규칙 검사용).
+    캐시 적중 평가는 새로 돌리지 않았으므로 항목이 없다."""
+    entries = []
+    for path in sorted(Path(run_dir).glob('*.jsonl')):
+        controller = path.stem
+        for line in path.read_text(encoding='utf-8').splitlines():
+            if not line:
+                continue
+            evaluation = json.loads(line)
+            for score in evaluation.get('scenarios') or []:
+                entries.append(dict(score, controller=controller, evaluation=evaluation['index']))
+    return entries
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -290,7 +307,9 @@ def main(argv=None):
         records = [json.loads(p.read_text(encoding='utf-8'))
                    for p in sorted(args.run_dir.glob('*.record.json'))]
         violations = check_tuning_records(records, config)
+        threshold, flags = integrator_limit_flags(_evaluation_entries(args.run_dir), config)
         summary = dict(label=LABEL, run_dir=str(args.run_dir), i4_violations=violations,
+                       integrator_limit=dict(threshold=threshold, flagged=len(flags), flags=flags),
                        controllers={r['controller']: dict(
                            budget=r['budget'], spent=r['spent'], status=r['status'],
                            prior_objective=r.get('prior_objective'),

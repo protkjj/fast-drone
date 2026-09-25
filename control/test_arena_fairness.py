@@ -15,6 +15,11 @@
   I-8  (kj 추가) 운용 범위에서 모든 제어기 경로의 추진 모델이 플랜트와 ±5%
   I-9  (추가) 모든 제어기가 플랜트의 정확한 트림에서 출발하면 뒤집히거나
        발산하지 않는다 — 자세 규약 불일치(추력축 180°) 검출용
+  I-10 (kj 추가) 제어기 내부 모델의 가속도가 같은 상태·입력에서 플랜트와 일치한다
+       (병진 ≤ 0.05 g, 트림 각가속도 ≤ 2 rad/s², 명목 트림 = 플랜트 트림)
+  I-11 (kj 결정 2026-09-26) 적분기 기준. CPID 두 적분기는 가속도 권한 ±1 g·포화 시
+       조건부이고, 출발 때 명목 트림값으로 채운다(NMPC 웜스타트와 같은 정보).
+       GSLQR·CPID는 한계 도달·적분 정지 스텝을 같은 형식으로 기록한다
 
 무거운 폐루프 사례는 ARENA_QUICK=1이면 건너뛴다(scripts/verify_arena.py --quick).
 """
@@ -377,6 +382,9 @@ def test_i8_f13_reaction_torque_follows_curve(config, native, factory):
 #   정상 제어기 최대 — 자세 변화 27°(CPID, 20 m/s: 공력 피드포워드 없음),
 #   |ω| 5.7, |Δz| 0.69, |Δv| 3.6. 그래서 45°·10 rad/s·2 m·5 m/s로 둔다.
 #   F13 어댑터 결함(공력 모멘트 누락)은 이 검사가 85 m/s에서 |ω| 21.8로 잡았다.
+#   2026-09-26: 그 27°는 CPID 적분기 냉시동 과도였다. 사전 채움(I-11) 뒤 GSLQR·CPID
+#   최대는 자세 0.37°, |ω| 0.042, |Δz| 0.034, |Δv| 0.025. 허용치는 판별에 충분해서
+#   (음성 대조군 > 90°) 그대로 둔다.
 I9_LIMITS = dict(attitude_deg=45.0, omega=10.0, dz=2.0, dv=5.0)
 
 
@@ -401,10 +409,18 @@ def _assert_holds(row, attitude, where):
     assert row['max_z_error'] < I9_LIMITS['dz'] and row['max_velocity_error'] < I9_LIMITS['dv'], where
 
 
+CPID_OUT_OF_REGION = pytest.mark.xfail(
+    strict=True,
+    reason='CPID 설계 영역 밖(85 m/s): 기울기 한계 35°(트림 추력축은 수직에서 ~83°)라 '
+           '적분기를 트림값으로 채워도(±1 g에서 잘림) 트림 자세를 못 만든다. 작업지시서가 '
+           'CPID는 호버·저속만 요구한다. strict — 예상과 달리 통과하면 알린다.')
+
+
 @pytest.mark.parametrize('label, speed', [('GSLQR', 0.0), ('GSLQR', 20.0), ('GSLQR', 85.0),
-                                          ('CPID', 0.0), ('CPID', 20.0)])
+                                          ('CPID', 0.0), ('CPID', 20.0),
+                                          pytest.param('CPID', 85.0, marks=CPID_OUT_OF_REGION)])
 def test_i9_baselines_hold_the_plant_trim(factory, label, speed):
-    """CPID는 설계 영역(0~20 m/s)에서만 — 기울기 한계 35°라 그 위는 영역 밖이다."""
+    """전 제어기 × 0·20·85 m/s(kj). CPID 85 m/s는 설계 영역 밖이라 실패가 예상이다."""
     _assert_holds(*_trim_hold(factory, label, speed), f'{label}@{speed}')
 
 
@@ -415,13 +431,26 @@ def test_i9_nmpc_family_holds_the_plant_trim(factory, label, speed):
     _assert_holds(*_trim_hold(factory, label, speed), f'{label}@{speed}')
 
 
+def _default_convention_trims(cp, speeds):
+    """'hover_quat'을 뺀(우리 기본 규약) 제어기 모델의 트림 — 1 m/s 연속법."""
+    from control.trim import find_trim
+    cp_default = {k: v for k, v in cp.items() if k != 'hover_quat'}
+    out, guess = {}, None
+    for V in np.arange(0.0, max(speeds) + 0.5, 1.0):
+        tr = find_trim(cp_default, float(V), guess=guess, quiet=True)
+        assert tr['converged'], V
+        guess = tr['guess']
+        out[float(V)] = tr
+    return cp_default, [out[float(v)] for v in speeds]
+
+
 def test_i9_negative_control_unconverted_trims_flip_gslqr(factory, config):
-    """판별력: 플랜트 규약으로 옮기지 않은 트림을 쓰면 GSLQR이 2초 안에 크게 돈다."""
+    """판별력: 플랜트 규약이 아닌(우리 기본 규약) 트림을 쓰면 GSLQR이 2초 안에 크게 돈다."""
     from control.arena_factory import ArenaController
     from control.controller import ScheduledLQR
     g = factory.gains['GSLQR']
     V_table = [float(v) for v in config['controllers']['GSLQR']['V_table_m_s']]
-    raw = [factory.model._our_trim(v) for v in V_table]
+    _, raw = _default_convention_trims(factory.cp, V_table)
     bad = ScheduledLQR(factory.cp, v_ref=[0, 0, 0], z_ref=0.0, V_table=V_table,
                        Q=np.diag(g['Q_diag']), R=np.eye(4)*g['R_scale'],
                        integral_states=tuple(g['integral_states']), Q_integral=g['Q_integral'],
@@ -445,25 +474,217 @@ def test_i9_cpid_attitude_target_matches_plant_hover(factory):
     """CPID 규약은 트림 유지로 안 드러난다(180°에서 자세오차 벡터가 0인 특이점).
     그래서 목표자세를 직접 대조한다: 호버 추력에서 R_des = 플랜트 호버 자세."""
     from control.controller import CascadedPID
-    heading = cpid_heading_for_plant(factory.cp, factory.model.plant_hover_quat)
+    heading = cpid_heading_for_plant(factory.cp)
     cpid = CascadedPID(factory.cp, v_ref=[0, 0, 0], z_ref=20.0, heading=heading)
     _, R_des = cpid._force_to_attitude(np.array([0.0, 0.0, factory.cp['mass']*factory.cp['g']]))
     np.testing.assert_allclose(R_des, Rotation.from_quat(factory.model.plant_hover_quat).as_matrix(),
                                atol=1e-12)
 
 
-def test_i9_converted_controller_trims_are_exact_equilibria(factory, native):
-    """규약 변환(추력축 180° + 로터 치환)이 우리 모델의 평형을 보존하는지."""
+def test_i9_hover_quat_trims_are_equilibria_in_the_plant_convention(factory, native):
+    """hover_quat으로 직접 푼 트림이 (1) 우리 모델의 정확한 평형이고, (2) 기본 규약 트림을
+    독립적으로 옮긴 것(추력축 180° + 로터 치환, convention_map)과 같고, (3) 플랜트 트림
+    자세와 가깝다 — 규약 정렬을 두 경로로 교차검증한다."""
+    from control.arena_factory import convention_map
     from control.dynamics import AxialDronePlant
     plant = AxialDronePlant(factory.cp)
-    for V in (0.0, 20.0, 85.0):
+    speeds = (0.0, 20.0, 85.0)
+    cp_default, defaults = _default_convention_trims(factory.cp, speeds)
+    R_rel, perm = convention_map(cp_default, factory.cp['hover_quat'])
+    for V, other in zip(speeds, defaults):
         tr = factory.model.trim(V)
         xdot = plant.evaluate_xdot(tr['state'], tr['control'])
         assert np.linalg.norm(xdot[3:13]) < 1e-6, V
+        moved = (Rotation.from_quat(other['state'][6:10])*R_rel)
+        gap = np.degrees(np.linalg.norm((moved.inv()*Rotation.from_quat(tr['state'][6:10])).as_rotvec()))
+        assert gap < 1e-4, f'V={V}: direct vs converted trim attitude differ by {gap:.2e} deg'
+        np.testing.assert_allclose(tr['control'], other['control'][perm], rtol=1e-6)
         ref = plant_trim(native, V)['state']
         angle = np.degrees(np.linalg.norm(
             (Rotation.from_quat(ref[6:10]).inv()*Rotation.from_quat(tr['state'][6:10])).as_rotvec()))
         assert angle < 5.0, f'V={V}: model trim attitude {angle:.2f} deg away from plant trim'
+
+
+# ── I-10 ────────────────────────────────────────────────────────────
+# 제어기 내부 모델 대 플랜트 가속도(kj 추가, 2026-09-25). 같은 상태·같은 로터 입력에서
+# 각 제어기의 예측/선형화 모델이 내는 가속도를 플랜트와 비교한다.
+#   M17·GSLQR  17상태 모델(control.dynamics) — M17 예측, GSLQR 트림·선형화
+#   F13        로터추력 입력 13상태 모델 — 입력은 플랜트의 실제 로터 추력, γ는 측정값
+#   V13        가상입력 모델 — T = 플랜트 총추력(각가속도는 입력 ν라 비교 대상 아님)
+# 관문(kj 결정): 병진 ≤ 0.05 g(트림+섭동), 트림 각가속도 ≤ 2 rad/s², 트림 일치.
+# 트림 밖(자세 ±10°) 각가속도 불일치는 관문이 아니라 보고 대상이다(집중정수 한계).
+I10_TRANS = 0.05*9.81
+I10_ANG_TRIM = 2.0
+
+
+def _model_accelerations(factory, x):
+    import casadi as ca
+    from control.dynamics import AxialDronePlant, reaction_torque_ratio, axial_airspeed
+    from control.hybrid_comparison import build_virtual_dynamics
+    from control.nmpc_f13 import build_f13_dynamics
+    from models.team_light.control.dynamics import AxialDronePlant as TeamPlant
+    from models.team_light.control.geometry import rotor_thrusts
+    cache = factory.__dict__.setdefault('_i10_cache', {})
+    if not cache:
+        cache['ours'] = AxialDronePlant(factory.cp)
+        cache['plant'] = TeamPlant(factory.p)
+        cache['v13'] = build_virtual_dynamics(factory.cp)[0]
+        cache['f13'] = build_f13_dynamics(factory.cp, torque_ratio=ca.SX.sym('g', 4))[0]
+    u = x[13:17]
+    plant = cache['plant'].evaluate_xdot(x, u)
+    ours = cache['ours'].evaluate_xdot(x, u)
+    v_body = Rotation.from_quat(x[6:10]).as_matrix().T @ x[3:6]
+    T = rotor_thrusts(factory.p, u, v_body)
+    x13 = np.concatenate([x[0:10], x[10:13]])
+    gamma = reaction_torque_ratio(factory.cp, u, axial_airspeed(factory.cp, x))
+    f13 = np.array(cache['f13'](x13, T, gamma)).ravel()
+    v13 = np.array(cache['v13'](x13, np.r_[T.sum(), plant[10:13]])).ravel()
+    return plant, {'M17/GSLQR': (ours[3:6], ours[10:13]), 'F13': (f13[3:6], f13[10:13]),
+                   'V13': (v13[3:6], None)}
+
+
+def _perturbed_states(native, speed):
+    """트림 + 결정적 섭동 6개(난수 없음): 자세 ±5°, 각속도 0.5 rad/s, 로터 ±5%, 속도 ±5 m/s."""
+    x0 = plant_trim(native, speed)['state'].copy()
+    x0[2] = 20.0
+    yield x0
+    for axis, sign in (('y', 1), ('y', -1), ('z', 1)):
+        x = x0.copy()
+        x[6:10] = (Rotation.from_quat(x0[6:10])*Rotation.from_euler(axis, sign*5, degrees=True)).as_quat()
+        yield x
+    x = x0.copy(); x[10:13] = [0.5, -0.5, 0.5]; yield x
+    x = x0.copy(); x[13:17] *= [1.05, 0.95, 1.05, 0.95]; yield x
+    if speed > 0:
+        x = x0.copy(); x[3:6] += [5.0, 0.0, -5.0]; yield x
+
+
+@pytest.mark.parametrize('speed', [0.0, 20.0, 40.0, 60.0, 85.0])
+def test_i10_translational_acceleration_matches_plant(factory, native, speed):
+    for k, x in enumerate(_perturbed_states(native, speed)):
+        plant, models = _model_accelerations(factory, x)
+        for name, (a, _) in models.items():
+            err = np.abs(a - plant[3:6]).max()
+            assert err <= I10_TRANS, f'{name} @ {speed} m/s state {k}: |Δa| {err:.3f} m/s²'
+
+
+@pytest.mark.parametrize('speed', list(np.arange(0.0, 85.1, 5.0)))
+def test_i10_angular_acceleration_matches_plant_at_trim(factory, native, speed):
+    x = next(_perturbed_states(native, float(speed)))
+    plant, models = _model_accelerations(factory, x)
+    for name, (_, w) in models.items():
+        if w is not None:
+            err = np.abs(w - plant[10:13]).max()
+            assert err <= I10_ANG_TRIM, f'{name} @ {speed} m/s: |Δω̇| {err:.3f} rad/s²'
+
+
+@pytest.mark.parametrize('speed', [0.0, 20.0, 40.0, 60.0, 85.0])
+def test_i10_controller_model_trim_matches_plant_trim(factory, native, speed):
+    """GSLQR이 스케줄하는 명목 트림이 플랜트 트림과 같은 자리에 있어야 한다.
+    허용치 근거(실측): 로터 회전수 최대 0.5%, 자세 최대 0.64°(20 m/s) → 2%·2°."""
+    tr = factory.model.trim(speed)
+    ref = plant_trim(native, speed)
+    np.testing.assert_allclose(tr['control'], ref['control'], rtol=0.02)
+    gap = np.degrees(np.linalg.norm(
+        (Rotation.from_quat(ref['state'][6:10]).inv()*Rotation.from_quat(tr['state'][6:10])).as_rotvec()))
+    assert gap < 2.0, f'{speed} m/s: model trim attitude {gap:.2f} deg from the plant trim'
+
+
+def test_i10_constant_pressure_centre_would_fail_the_trim_gate(factory, native):
+    """판별력: 압력중심을 상수(논문 식9 그대로)로 두면 85 m/s 트림에서 관문을 크게 넘는다."""
+    from control.dynamics import AxialDronePlant
+    from models.team_light.control.dynamics import AxialDronePlant as TeamPlant
+    constant = {k: v for k, v in factory.cp.items() if k != 'x_cp_poly'}
+    x = next(_perturbed_states(native, 85.0))
+    d = AxialDronePlant(constant).evaluate_xdot(x, x[13:17]) - \
+        TeamPlant(factory.p).evaluate_xdot(x, x[13:17])
+    assert np.abs(d[10:13]).max() > 5*I10_ANG_TRIM
+
+
+# ── I-11 ────────────────────────────────────────────────────────────
+# 적분기 기준(kj 결정 2026-09-26). 근거 실측(설계점검, PILOT):
+#   - CPID 속도 적분을 상태 크기 5 m로 자르면 Ki 0.15에서 0.75 m/s²뿐이라 10·20 m/s
+#     시행의 59~86% 동안 한계에 붙었다. 가속도 권한으로 바꾸면 한계에 한 번도 안 닿는다.
+#   - CPID 고도 적분(기존 방식, 2.5 m/s²)은 20 m/s 트림 유지에 필요한 2.85 m/s²를 막아
+#     60초 유지에서 고도 오차 +0.175 m를 남겼다.
+#   - CPID만 트림 정보 없이(적분기 0) 출발해서 20 m/s에서 채워지는 데 ~30초가 걸렸다.
+#     명목 트림값으로 채우자 설계점검 3/6 → 6/6 정착.
+#   - GSLQR LQI 한계(상태 크기 ±5)의 가속도 환산 권한은 x 10.6~20.9, z 13.6~70.6 m/s²이고
+#     설계점검 10/10에서 한 번도 안 닿았다(한계 ∞와 비트 동일). 그대로 두고 계측만 한다.
+
+def test_i11_arena_cpid_uses_acceleration_authority_and_preload(factory, config):
+    ctrl = factory.make_for_profile('CPID', GustProfile(20.0, 20.0, 1.0, 1.0, 1.0))
+    pid = ctrl.inner
+    assert pid.a_int_max == pytest.approx(9.81) and pid.a_int_z_max == pytest.approx(9.81)
+    assert config['controllers']['CPID']['integrator_preload'] == 'controller_model_trim'
+    assert ctrl.settings['integrator_preload'] == 'controller_model_trim'
+    # 권한은 Ki와 무관하다: Ki를 바꿔도 계측이 보고하는 한계(m/s²)는 그대로다
+    limits = {name: lim for name, (_, lim) in pid.integrator_status()['channels'].items()}
+    pid.Ki_vel, pid.Ki_z = 4*pid.Ki_vel, 0.25*pid.Ki_z
+    assert limits == {name: lim for name, (_, lim) in pid.integrator_status()['channels'].items()}
+
+
+@pytest.mark.parametrize('speed', [0.0, 10.0, 20.0])
+def test_i11_cpid_preload_reproduces_the_trim_thrust_vector(factory, speed):
+    """출발값을 채운 CPID는 명목 트림 상태에서 트림과 같은 추력 벡터를 요구하고,
+    자세 목표도 트림 자세와 같다(적분 채널이 트림의 공력 몫을 이미 내고 있다)."""
+    ctrl = factory.make_for_profile('CPID', GustProfile(speed, 20.0, 1.0, 1.0, 1.0))
+    tr = factory.model.trim(speed)
+    x = tr['state'].copy()
+    x[2] = 20.0
+    ctrl._warm_start(x)
+    pid = ctrl.inner
+    a_des = np.concatenate([-pid.Ki_vel*pid._int_ev, [-pid.Ki_z*pid._int_ez]])
+    np.testing.assert_allclose(a_des, factory.model.trim_acceleration(speed), atol=1e-12)
+    T, R_des = pid._force_to_attitude(pid.m*(a_des + np.array([0.0, 0.0, pid.g])))
+    assert T == pytest.approx(float(np.sum(factory.model.rotor_thrusts(tr['control'], x))), rel=1e-9)
+    gap = np.degrees(np.linalg.norm(
+        (Rotation.from_matrix(R_des).inv()*Rotation.from_quat(x[6:10])).as_rotvec()))
+    assert gap < 0.1, f'{speed} m/s: CPID target attitude {gap:.3f} deg from the trim attitude'
+
+
+def test_i11_cpid_integrators_freeze_while_saturated(factory):
+    """포화(여기서는 기울기 한계) 스텝에서 경기장 방식은 두 적분기를 모두 멈춘다.
+    기존 방식(a_int_z_max=None)의 고도 적분은 포화와 상관없이 쌓인다(비트 동일 기본값)."""
+    from control.controller import CascadedPID
+    x = factory.model.trim(0.0)['state'].copy()
+    x[2] = 19.0                                       # 고도 오차 −1 m
+    heading = cpid_heading_for_plant(factory.cp)
+    for a_int_z_max, z_frozen in ((9.81, True), (None, False)):
+        pid = CascadedPID(factory.cp, v_ref=[30.0, 0, 0], z_ref=20.0, heading=heading, dt=0.002)
+        pid.Ki_vel, pid.a_int_z_max = 0.15, a_int_z_max
+        before_v, before_z = pid._int_ev.copy(), pid._int_ez
+        pid(0.0, x)
+        assert pid._saturated                         # 수평 30 m/s² 요구 → 기울기 35° 한계
+        np.testing.assert_array_equal(pid._int_ev, before_v)
+        assert (pid._int_ez == before_z) == z_frozen
+        assert pid.integrator_status()['frozen']
+
+
+def test_i11_integrator_log_has_the_same_format_for_gslqr_and_cpid(captured_short_runs):
+    reports = {label: run[0].get('integrators') for label, run in captured_short_runs.items()}
+    for label in NMPC_LABELS:
+        assert reports[label] is None                 # NMPC 계열은 적분기가 없다
+    keys = {'steps', 'at_limit_steps', 'at_limit_fraction', 'frozen_steps', 'frozen_fraction',
+            'channels'}
+    assert set(reports['GSLQR']) == set(reports['CPID']) == keys
+    assert set(reports['GSLQR']['channels']) == {'z', 'vx'}
+    assert set(reports['CPID']['channels']) == {'vx', 'vy', 'z'}
+    for label in ('GSLQR', 'CPID'):
+        assert reports[label]['steps'] == len(captured_short_runs[label][2]['us'])
+
+
+def test_i11_one_percent_rule_flags_only_long_limit_contact(config):
+    from control.arena import integrator_limit_flags
+
+    def entry(fraction):
+        return dict(controller='CPID', scenario_id='s', integrators=dict(
+            steps=1000, at_limit_steps=int(1000*fraction), at_limit_fraction=fraction,
+            frozen_steps=0, frozen_fraction=0.0,
+            channels={'z': dict(limit=9.81, at_limit_steps=int(1000*fraction), peak_fraction=1.0)}))
+    threshold, flags = integrator_limit_flags(
+        [entry(0.0), entry(0.01), entry(0.011), dict(controller='V13', integrators=None)], config)
+    assert threshold == 0.01
+    assert [f['at_limit_fraction'] for f in flags] == [0.011]
 
 
 # ── I-4 ─────────────────────────────────────────────────────────────

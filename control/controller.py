@@ -40,10 +40,28 @@ class CascadedPID:
 
         # ── 외부 게인 ──
         self.Kp_vel = 1.0
+        # 수평 속도 적분(조건부) — 논문 §5.3 306행 "적분기는 포화 시 조건부 적분".
+        # 기본값 0이면 기존과 비트 동일하다. P만 있으면 순항 항력을 속도 오차로
+        # 버텨 10·20 m/s에서 정상오차가 1.4·3.4 m/s 남았다(2026-09-25 설계영역
+        # 점검, kj 결정으로 추가). 경기장 값은 configs/gains/cpid.json.
+        self.Ki_vel = 0.0
+        # 적분 한계는 **가속도 권한 [m/s²]** 으로 준다. PX4 PositionControl과 같은
+        # 방식이다(적분에 Ki를 먼저 곱해 가속도 단위로 쌓고, 수직은 ±1 g로 자른다).
+        # 상태 크기(m)로 자르면 권한이 Ki에 묶인다. 처음 넣은 int_v_max=5 [m]는
+        # Ki 0.15에서 0.75 m/s²밖에 못 내서 트림 항력(10 m/s 1.47, 20 m/s 4.64 m/s²)을
+        # 못 지웠다. 설계점검에서 시행 시간의 59~86%를 한계에 붙어 있었다(2026-09-25).
+        # 값 1 g는 kj 결정(2026-09-26, PX4 원본과 같게).
+        self.a_int_max = 9.81
         self.Kp_z   = 2.0
         self.Kd_z   = 2.0
         self.Ki_z   = 0.5       # 고도 적분 게인 (정상상태 오차 제거)
-        self.int_z_max = 5.0    # 안티와인드업 한계
+        self.int_z_max = 5.0    # 안티와인드업 한계 (기존 방식: 적분 상태 크기, m·s)
+        # 고도 적분의 경기장 방식(kj 결정 2026-09-26). None이면 위의 기존 방식 그대로다
+        # (매 스텝 적분, 상태 크기로 자름 — 비트 동일). 값을 주면 속도 적분과 같은
+        # 규칙이 된다: 가속도 권한 [m/s²]으로 자르고, 포화 시 적분을 멈춘다(논문 §5.3).
+        # 기존 방식은 권한이 Ki_z·int_z_max = 2.5 m/s²다. 20 m/s 트림 유지에 필요한
+        # 2.85 m/s²(양력 몫)를 막아 고도 오차 +0.175 m를 영구히 남겼다(60초 유지 시험).
+        self.a_int_z_max = None
 
         # ── 내부 게인 ──
         self.Kp_att = np.array([200, 500, 500])
@@ -58,10 +76,14 @@ class CascadedPID:
 
         # 적분기 상태
         self._int_ez = 0.0
+        self._int_ev = np.zeros(2)
+        self._saturated = False     # 이번 스텝에 기울기 한계·로터 한계가 걸렸는가
 
     def reset(self):
         """적분기 초기화."""
         self._int_ez = 0.0
+        self._int_ev = np.zeros(2)
+        self._saturated = False
 
     def __call__(self, t, x):
         pos, vel = x[0:3], x[3:6]
@@ -72,17 +94,21 @@ class CascadedPID:
         e_vel = vel - self.v_ref
         e_z   = pos[2] - self.z_ref
 
-        # 고도 적분기 + 안티와인드업
-        self._int_ez += e_z * self.dt
-        self._int_ez = np.clip(self._int_ez, -self.int_z_max, self.int_z_max)
+        # 고도 적분기 — 기존 방식(a_int_z_max 없음): 매 스텝 적분 + 상태 크기 한계
+        if self.a_int_z_max is None:
+            self._int_ez += e_z * self.dt
+            self._int_ez = np.clip(self._int_ez, -self.int_z_max, self.int_z_max)
 
         a_des = np.zeros(3)
         a_des[0:2] = -self.Kp_vel * e_vel[0:2]
+        if self.Ki_vel:
+            a_des[0:2] -= self.Ki_vel * self._int_ev
         a_des[2]   = -self.Kp_z * e_z - self.Kd_z * vel[2] - self.Ki_z * self._int_ez
 
         F_des = self.m * (a_des + np.array([0, 0, self.g]))
 
         # ── 중간: 힘 → 추력 + 자세 ──
+        self._saturated = False
         T_cmd, R_des = self._force_to_attitude(F_des)
 
         # ── 내부: 자세 PD → 모멘트 ──
@@ -92,7 +118,63 @@ class CascadedPID:
         M_cmd = self.J @ (-self.Kp_att * att_err - self.Kd_att * omega) + gyro_ff
 
         # ── 할당 → 모터속도 ──
-        return self._allocate(T_cmd, M_cmd, x)
+        n_cmd = self._allocate(T_cmd, M_cmd, x)
+
+        # 조건부 적분: 이번 명령이 기울기 한계나 로터 한계에 걸렸으면 적분을
+        # 멈춘다(낼 수 없는 가속도를 계속 적분하면 풀린 뒤 크게 튄다). 한계는
+        # 가속도 권한이라 튜닝으로 Ki를 바꿔도 적분이 낼 수 있는 가속도는 같다.
+        if not self._saturated:
+            if self.Ki_vel:
+                self._int_ev += e_vel[0:2] * self.dt
+                limit = self.a_int_max / self.Ki_vel
+                np.clip(self._int_ev, -limit, limit, out=self._int_ev)
+            if self.a_int_z_max is not None and self.Ki_z:
+                self._int_ez += e_z * self.dt
+                limit = self.a_int_z_max / self.Ki_z
+                self._int_ez = float(np.clip(self._int_ez, -limit, limit))
+        return n_cmd
+
+    def preload_integrators(self, a_ff):
+        """적분기를 '이미 a_ff를 내고 있는' 상태로 채운다. 즉 트림에서 무충격으로 출발한다.
+
+        경기장 규칙(kj 결정 2026-09-26): 모든 제어기는 시작 시점에 명목 제어기
+        모델의 트림 정보를 똑같이 받는다. NMPC는 트림 입력으로 웜스타트하고,
+        GSLQR은 트림 피드포워드가 있다. CPID는 공력 피드포워드가 없어서 트림을
+        적분기로만 유지한다. 그래서 적분기가 0에서 출발하면 20 m/s에서 다 차는 데
+        ~30초가 걸렸다(정확한 트림에서 출발해도 5초 뒤 고도 +0.52 m, 속도 −2.3 m/s).
+
+        a_ff : 트림 유지에 필요한 가속도 명령 [m/s², 세계 좌표].
+               F_des = m(a_ff + g·e_z)가 트림 추력 벡터가 되게 하는 값이다
+               (arena_factory.ControllerModel.trim_acceleration).
+        한계를 넘는 몫은 자른다. 잘린 만큼은 비례항이 오차를 남기며 버틴다.
+        """
+        a_ff = np.asarray(a_ff, dtype=float)
+        if self.Ki_vel:
+            a_xy = np.clip(a_ff[0:2], -self.a_int_max, self.a_int_max)
+            self._int_ev = -a_xy / self.Ki_vel          # a_des = −Ki·∫e 이므로 부호가 반대
+        if self.Ki_z:
+            limit = (self.a_int_z_max if self.a_int_z_max is not None
+                     else self.Ki_z * self.int_z_max)
+            self._int_ez = -float(np.clip(a_ff[2], -limit, limit)) / self.Ki_z
+
+    def integrator_status(self):
+        """적분기 계측용(결과 무영향). 채널별 (현재 크기, 한계)와 이번 스텝 적분 정지 여부.
+
+        크기와 한계는 같은 단위다(가속도 권한 방식은 m/s², 기존 고도 방식은 m·s).
+        경기장이 GSLQR과 같은 형식으로 '한계 도달 스텝'과 '적분 정지 스텝'을 센다.
+        """
+        channels = {}
+        if self.Ki_vel:
+            a = np.abs(self.Ki_vel * self._int_ev)
+            channels['vx'] = (float(a[0]), float(self.a_int_max))
+            channels['vy'] = (float(a[1]), float(self.a_int_max))
+        if self.Ki_z:
+            if self.a_int_z_max is None:
+                channels['z'] = (abs(float(self._int_ez)), float(self.int_z_max))
+            else:
+                channels['z'] = (abs(self.Ki_z * float(self._int_ez)), float(self.a_int_z_max))
+        conditional = bool(self.Ki_vel) or self.a_int_z_max is not None
+        return dict(channels=channels, frozen=bool(self._saturated) and conditional)
 
     def _force_to_attitude(self, F_des):
         """F_des → (T_cmd, R_des).
@@ -117,6 +199,7 @@ class CascadedPID:
         cos_tilt = F_hat[2]
         cos_max = np.cos(self.max_tilt)
         if cos_tilt < cos_max:
+            self._saturated = True             # 조건부 속도 적분이 멈추는 조건 1
             f_hor = F_hat.copy(); f_hor[2] = 0
             hn = np.linalg.norm(f_hor)
             if hn > 1e-8:
@@ -170,12 +253,16 @@ class CascadedPID:
             _, TM_to_f = compute_allocation_matrix(self.p, gamma=gamma)
             f_ind = TM_to_f @ TM
             n_cmd = np.array([rotor_speed_for_thrust(self.p, f, v_axial) for f in f_ind])
-            return np.clip(n_cmd, self.p['n_min'], self.p['n_max'])
-        f_ind = self.TM_to_f @ TM
-        n_cmd = np.zeros(4)
-        for i in range(4):
-            n_cmd[i] = np.sqrt(max(f_ind[i], 0) / self.p['k_T'])
-        return np.clip(n_cmd, self.p['n_min'], self.p['n_max'])
+        else:
+            f_ind = self.TM_to_f @ TM
+            n_cmd = np.zeros(4)
+            for i in range(4):
+                n_cmd[i] = np.sqrt(max(f_ind[i], 0) / self.p['k_T'])
+        n_out = np.clip(n_cmd, self.p['n_min'], self.p['n_max'])
+        # 조건부 속도 적분이 멈추는 조건 2: 어느 로터든 한계에 닿았다(음추력 요구 포함).
+        if np.any(f_ind <= 0.0) or np.any(n_cmd >= self.p['n_max']) or np.any(n_out != n_cmd):
+            self._saturated = True
+        return n_out
 
 
 # ══════════════════════════════════════════════════════
@@ -565,6 +652,7 @@ class ScheduledLQR:
         self.dt = dt
         self.integral_limit = float(integral_limit)
         self._x_int = np.zeros(self.n_integral)
+        self._saturated = False     # 이번 스텝 회전수 명령이 포화했는가(적분 정지 조건)
 
         if V_table is None:
             V_table = np.arange(0, 90, 10).astype(float)
@@ -726,16 +814,33 @@ class ScheduledLQR:
         if self.n_integral:
             # 안티와인드업 — 포화 중에는 적분을 멈춘다. 낼 수 없는 명령을 계속
             # 적분하면 포화가 풀린 뒤 크게 튄다. 크기 제한도 함께 건다.
-            if np.allclose(u, u_sat):
+            self._saturated = not np.allclose(u, u_sat)
+            if not self._saturated:
                 self._x_int += self.dt*np.array(
                     [dx_r[i] for i in self.integral_states])
                 np.clip(self._x_int, -self.integral_limit, self.integral_limit,
                         out=self._x_int)
         return u_sat
 
+    _INTEGRAL_NAMES = ('z', 'vx', 'vy', 'vz')     # 오차상태 앞 4개 [δz, δv(3)]
+
+    def integrator_status(self):
+        """적분기 계측용(결과 무영향). CascadedPID.integrator_status와 같은 형식이다.
+
+        한계는 적분 상태 크기(ξ_z는 m·s, ξ_vx는 m)로 걸려 있어서 크기도 같은 단위로 준다.
+        가속도로 환산한 권한은 운용점·가중치마다 다르다(2026-09-26 진단: 사전 가중치에서
+        x 10.6~20.9, z 13.6~70.6 m/s²).
+        """
+        channels = {}
+        for k, i in enumerate(self.integral_states):
+            name = self._INTEGRAL_NAMES[i] if i < len(self._INTEGRAL_NAMES) else f's{i}'
+            channels[name] = (abs(float(self._x_int[k])), self.integral_limit)
+        return dict(channels=channels, frozen=bool(self.n_integral) and self._saturated)
+
     def reset(self):
         """MC 시행 간 독립성 — 적분 상태를 비운다."""
         self._x_int = np.zeros(self.n_integral)
+        self._saturated = False
 
 
 # ══════════════════════════════════════════════════════

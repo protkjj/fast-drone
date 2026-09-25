@@ -46,6 +46,9 @@ def _build_aero_function(p):
     return ca.Function('kh_light_aero', [v, w], [f, m])
 
 
+_ANCHOR_CACHE = {}
+
+
 def _trim_v_body(native_params, speeds):
     """팀원 자체 find_trim으로 얻은 실제 트림점의 동체좌표 속도(u,w).
 
@@ -54,7 +57,20 @@ def _trim_v_body(native_params, speeds):
     절대 도달하지 않는 조합까지 넣어 전체 최소제곱을 오염시킨 것이었다.
     실제로 제어기가 마주칠 영역(트림 근방)에서만 좋은 근사면 되므로, 이
     함수로 트림 곡선 자체를 앵커로 삼는다.
+
+    같은 기체·같은 속도 목록이면 결과가 같으므로(결정적 트림 솔버) 캐시한다 —
+    공력 적합과 압력중심 스케줄 적합이 같은 앵커를 두 번 풀지 않게.
     """
+    from models.team_light.control.baseline_v2 import parameter_hash
+    key = (parameter_hash(native_params), tuple(float(v) for v in speeds))
+    if key in _ANCHOR_CACHE:
+        return list(_ANCHOR_CACHE[key])
+    anchors = _trim_v_body_uncached(native_params, speeds)
+    _ANCHOR_CACHE[key] = tuple(anchors)
+    return anchors
+
+
+def _trim_v_body_uncached(native_params, speeds):
     anchors = []
     for V in speeds:
         try:
@@ -201,20 +217,74 @@ def fit_lumped_aero(native_params, speeds=None, alpha_window_deg=20.0,
     return coeffs, report
 
 
-def build_controller_params(native_params=None, aero_coeffs=None):
+CP_SCHEDULE_DEGREE = 3
+CP_SCHEDULE_SPEEDS = np.arange(2.0, 90.001, 2.0)
+
+
+def fit_cp_schedule(native_params, aero_coeffs, degree=CP_SCHEDULE_DEGREE,
+                    speeds=CP_SCHEDULE_SPEEDS):
+    """압력중심 스케줄 x_cp(V) = Σ c_k V^k (오름차순 계수) — kj 결정(2026-09-25, I-10).
+
+    상수 x_cp(논문 식9)로는 팀원 분산 공력의 피치모멘트를 트림에서 못 맞춘다 —
+    실제 압력중심이 트림곡선에서 -0.02 m(5 m/s) → +0.032 m(85 m/s)로 움직여
+    트림 각가속도가 20~35 rad/s² 어긋났다. 여기서는 **모멘트 자체**를 최소제곱한다:
+        M_y,팀원(V_i) ≈ -F_z,우리(V_i) · x_cp(V_i)
+    x_cp를 직접 적합하지 않는 이유 — 저속에선 법선력이 0에 가까워 x_cp가 불안정한데,
+    그 구간의 모멘트는 어차피 작다. F_z는 **우리** 집중정수 법선력을 쓴다(그래야
+    우리 모델이 트림에서 팀원 모멘트를 재현한다). 3차가 트림곡선 전체에서 최대
+    |ΔM| 0.004 N·m(각가속도 0.7 rad/s²)로 충분했다(2차는 2.6 rad/s²).
+    반환: (coeffs, report).
+    """
+    from control.dynamics import _body_aerodynamics
+    p = dict(native_params)
+    p.update(aero_coeffs)
+    v, w = ca.SX.sym('v', 3), ca.SX.sym('w', 3)
+    F_ours, _ = _body_aerodynamics(v, w, p)
+    ours = ca.Function('ours_aero', [v, w], [F_ours])
+    team = _build_aero_function(native_params)
+    rows = []
+    for V, u_b, w_b in _trim_v_body(native_params, speeds):
+        vb = np.array([u_b, 0.0, w_b])
+        Fz = float(np.array(ours(vb, np.zeros(3))).ravel()[2])
+        My = float(np.array(team(vb, np.zeros(3))[1]).ravel()[1])
+        rows.append((float(np.linalg.norm(vb)), Fz, My))
+    Vs, Fz, My = (np.array(col) for col in zip(*rows))
+    A = -Fz[:, None]*np.vander(Vs, degree + 1, increasing=True)
+    coeffs, *_ = np.linalg.lstsq(A, My, rcond=None)
+    resid = A @ coeffs - My
+    k = int(np.argmax(np.abs(resid)))
+    report = dict(degree=degree, n_points=len(Vs), speed_range=[float(Vs.min()), float(Vs.max())],
+                  max_abs_moment_error_Nm=float(np.abs(resid).max()),
+                  max_abs_pitch_accel_error=float(np.abs(resid).max()/native_params['Iyy']),
+                  worst_speed=float(Vs[k]),
+                  constant_x_cp_max_abs_moment_error_Nm=float(np.abs(-Fz*aero_coeffs['x_cp'] - My).max()))
+    return [float(c) for c in coeffs], report
+
+
+def build_controller_params(native_params=None, aero_coeffs=None, cp_schedule=True):
     """우리 제어기(V13/M17/F13/GSLQR/CPID)에 넣을 params dict.
 
     기하·질량·추진(k_T/k_Q/J_max 정적기준)은 팀원 값 **그대로**, 공력만
     `fit_lumped_aero`가 적합한 집중정수로 바꾼다. `thrust_axis`는 팀원
     스키마(3벡터)를 우리 스키마(문자열)로 정규화한다(스키마 차이, 물리 차이
     아님 — `test_kh_convention_match.py` 참고).
+
+    2026-09-25 추가(경기장, kj 결정):
+      - 'hover_quat': 팀원 기체의 호버 자세 규약(우리 x축 기본값과 추력축 둘레
+        180° 다르다). 우리 트림·호버 상태가 이 규약을 따르게 해서, 트림을 오차상태
+        기준으로 쓰는 GSLQR·CPID가 가짜 180° 롤 오차를 보지 않게 한다.
+      - 'x_cp_poly': 압력중심 스케줄(fit_cp_schedule). cp_schedule=False면 상수 x_cp만.
     """
+    from models.team_light.control.geometry import hover_quaternion
     native = native_params if native_params is not None else kh_native_params()
     coeffs = aero_coeffs if aero_coeffs is not None else fit_lumped_aero(native, verbose=False)[0]
 
     p = dict(native)
     p['thrust_axis'] = 'x'
     p.update(coeffs)
+    p['hover_quat'] = [float(c) for c in hover_quaternion()]
+    if cp_schedule:
+        p['x_cp_poly'], _ = fit_cp_schedule(native, coeffs)
     # 우리 쪽 body_length/body_diameter 등은 native 에 이미 같은 이름으로
     # 있다(mass,Ixx,Iyy,Izz,body_length,body_diameter,S_ref,d_ref,rho,g,
     # num_rotors,arm_length,rotor_positions,rotor_directions,D_prop,k_T,k_Q,

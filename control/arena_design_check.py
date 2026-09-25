@@ -1,0 +1,168 @@
+"""GSLQR·CPID 설계 영역 확인 — kj 작업지시서(2026-09-25) 작업 C. 결과는 PILOT.
+
+"두 제어기 모두 '설계 영역에서 잘 된다'는 근거(정착 시간, 오버슈트)를 표로
+남긴다." 비교가 아니라 **기준선이 제 영역에서 정상인지** 확인하는 진단이다 —
+기준선이 망가진 채 비교하면 경기장이 기운다.
+
+시험: 팀 플랜트(명목)의 정확한 트림에서 출발해 0.5초 뒤 계단 참조를 준다.
+  고도 +1 m   (속도 참조는 그대로)
+  속도 +1 m/s (고도 참조는 그대로)
+계단은 논문 §5.5가 말하는 '진단 시험' 용도다(주 기동 비교에는 연속 참조).
+운용점: GSLQR 0·20·40·60·85 m/s, CPID 0·10·20 m/s(CPID 설계 영역, 작업지시서).
+
+판정 기준(정착 대역): 계단 크기의 ±5%. 정착시간은 계단 이후 그 대역에 들어가
+끝까지 머무는 첫 시각. 오버슈트는 목표를 넘어선 최대량 / 계단 크기.
+
+실행: python -m control.arena_design_check [--out results/arena]
+"""
+import argparse
+from datetime import datetime, timezone
+import json
+from pathlib import Path
+
+import numpy as np
+
+from control.arena import load_config, DEFAULT_CONFIG, ROOT
+from control.arena_factory import ArenaFactory
+from control.validation_metrics import Acceptance
+
+STEP_TIME = 0.5
+DURATION = 15.0          # 적분기(GSLQR LQI, CPID 속도 적분)의 정상오차 제거까지 보려면 8초는 짧다
+BAND = 0.05                    # 계단 크기의 ±5%
+POINTS = {'GSLQR': (0.0, 20.0, 40.0, 60.0, 85.0), 'CPID': (0.0, 10.0, 20.0)}
+STEPS = {'altitude_+1m': (0.0, 1.0), 'speed_+1mps': (1.0, 0.0)}   # (Δvx, Δz)
+# 설계 영역의 윗끝에서는 속도 계단을 아래로(-1 m/s) 준다. 처음엔 +1로 줬는데 GSLQR
+# 85 m/s에서 참조 86이 스케줄 표(0~85) 밖이라 85로 잘려 오차상태가 0이 됐다 —
+# 제어기가 아니라 점검 설계의 결함이었다(2026-09-25).
+REGION_TOP = {'GSLQR': 85.0, 'CPID': 20.0}
+
+
+class StepProfile:
+    """트림 속도·고도에서 t=STEP_TIME에 계단 하나. 스위트 profile 규약을 따른다."""
+
+    def __init__(self, V, z, dv, dz, duration=DURATION):
+        self.V, self.z, self.dv, self.dz = float(V), float(z), float(dv), float(dz)
+        self.T_total = float(duration)
+        self.phases = [('트림', 0.0, STEP_TIME, V, V, z, z),
+                       ('계단', STEP_TIME, duration - STEP_TIME, V + dv, V + dv, z + dz, z + dz)]
+        self.gust_interval = None
+        self.cruise_start, self.cruise_end = 0.0, self.T_total
+        self.decel_start = self.decel_end = None
+
+    def get_ref(self, t):
+        after = t >= STEP_TIME
+        return (np.array([self.V + self.dv*after, 0.0, 0.0]), self.z + self.dz*after,
+                '계단' if after else '트림')
+
+    def compute_refs(self, ts):
+        after = np.asarray(ts) >= STEP_TIME
+        v = np.zeros((len(after), 3))
+        v[:, 0] = self.V + self.dv*after
+        return v, self.z + self.dz*after
+
+    def get_phase_boundaries(self):
+        return [(name, t, t + d) for name, t, d, *_ in self.phases]
+
+
+def step_metrics(ts, y, y0, target):
+    """정착시간·오버슈트·정상오차 — y는 계단이 걸린 채널(고도 또는 전진속도)."""
+    step = target - y0
+    band = BAND*abs(step)
+    after = ts >= STEP_TIME
+    t, e = ts[after], y[after] - target
+    inside = np.abs(e) <= band
+    settled_from = None
+    if inside[-1]:
+        last_out = np.flatnonzero(~inside)
+        settled_from = float(t[last_out[-1] + 1] if len(last_out) else t[0])
+    overshoot = max(0.0, float(np.max(np.sign(step)*e))) / abs(step)
+    tail = t >= ts[-1] - 1.0
+    return dict(settling_s=None if settled_from is None else settled_from - STEP_TIME,
+                overshoot_pct=100.0*overshoot,
+                steady_error=float(abs(np.mean(e[tail]))),
+                band=band)
+
+
+def run(config, factory, label, V, step_name):
+    import control.validation_suite as suite
+    dv, dz = STEPS[step_name]
+    if dv and V >= REGION_TOP[label] - 1e-9:
+        dv = -dv
+    z = float(config['altitude_m'])
+    profile = StepProfile(V, z, dv, dz)
+    case = dict(case_id=f'design_{label}_{V:g}_{step_name}', factors={})
+    row, result, _ = suite.run_trial(factory, label, profile, case, Acceptance())
+    ts, xs = result['ts'], result['xs']
+    if dz:
+        channel, cross = xs[:, 2], np.abs(xs[:, 3] - V)
+        metrics = step_metrics(ts, channel, z, z + dz)
+        metrics['cross_coupling_max'] = float(np.max(cross))          # 속도 이탈 [m/s]
+    else:
+        channel, cross = xs[:, 3], np.abs(xs[:, 2] - z)
+        metrics = step_metrics(ts, channel, V, V + dv)
+        metrics['cross_coupling_max'] = float(np.max(cross))          # 고도 이탈 [m]
+    step_label = f'altitude_{dz:+g}m' if dz else f'speed_{dv:+g}mps'
+    metrics.update(controller=label, speed=V, step=step_label, stop_reason=row['stop_reason'],
+                   simulated_seconds=row['simulated_seconds'], max_omega=row['max_omega'],
+                   trajectory_sha256=row['trajectory_sha256'], integrators=row.get('integrators'))
+    return metrics
+
+
+def write_markdown(path, rows, meta):
+    lines = [f'# 설계 영역 확인 (GSLQR·CPID) — {meta["label"]}', '',
+             '**PILOT** — 기준선이 제 설계 영역에서 정상인지 보는 진단. 비교 결론 없음.', '',
+             f'재현: `{meta["command"]}` · 설정 sha256 `{meta["config_sha256"][:12]}` · '
+             f'git `{meta["git_revision"]}` dirty={meta["git_dirty"]}', '',
+             f'팀 플랜트 명목, 트림 출발, t={STEP_TIME}s 계단, {DURATION:g}s 관찰. '
+             f'정착 대역 = 계단의 ±{100*BAND:.0f}%. 교차결합 = 다른 채널의 최대 이탈.', '',
+             '적분 한계 % = 어느 적분 채널이든 한계에 닿아 있던 스텝의 비율, 적분 정지 % = 포화로 '
+             '조건부 적분이 멈춘 스텝의 비율(GSLQR·CPID 같은 형식, arena_factory.IntegratorLog).', '',
+             '| 제어기 | 속도 m/s | 계단 | 정착시간 s | 오버슈트 % | 정상오차 | 교차결합 | |ω|max | '
+             '적분 한계 % | 적분 정지 % | 정지 |',
+             '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---|']
+    for r in rows:
+        settle = '미정착' if r['settling_s'] is None else f'{r["settling_s"]:.2f}'
+        integ = r.get('integrators') or {}
+        at_limit = f'{100*integ["at_limit_fraction"]:.2f}' if integ else '-'
+        frozen = f'{100*integ["frozen_fraction"]:.2f}' if integ else '-'
+        lines.append(f'| {r["controller"]} | {r["speed"]:g} | {r["step"]} | {settle} | '
+                     f'{r["overshoot_pct"]:.1f} | {r["steady_error"]:.3g} | '
+                     f'{r["cross_coupling_max"]:.3g} | {r["max_omega"]:.3g} | {at_limit} | {frozen} | '
+                     f'{r["stop_reason"] or ""} |')
+    path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+
+
+def main(argv=None):
+    from control.validation_suite import write_json, environment_fingerprint, git_state
+    from control.arena import config_sha256
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--config', type=Path, default=DEFAULT_CONFIG)
+    parser.add_argument('--out', type=Path, default=ROOT/'results'/'arena')
+    args = parser.parse_args(argv)
+    config = load_config(args.config)
+    factory = ArenaFactory(config)
+    rows = []
+    for label, speeds in POINTS.items():
+        for V in speeds:
+            for step_name in STEPS:
+                print(f'{label} V={V:g} {step_name}', flush=True)
+                rows.append(run(config, factory, label, V, step_name))
+    revision, dirty = git_state()
+    meta = dict(label='PILOT', command='python -m control.arena_design_check',
+                created_utc=datetime.now(timezone.utc).isoformat(),
+                config_sha256=config_sha256(config), git_revision=revision, git_dirty=dirty,
+                controller_model_sha256=factory.controller_model_sha256,
+                environment=environment_fingerprint(), gains=factory.gains,
+                band_fraction=BAND, step_time=STEP_TIME, duration=DURATION)
+    args.out.mkdir(parents=True, exist_ok=True)
+    write_json(args.out/'design_check.json', dict(meta=meta, rows=rows))
+    write_markdown(args.out/'DESIGN_CHECK.md', rows, meta)
+    print(json.dumps([{k: r[k] for k in ('controller', 'speed', 'step', 'settling_s',
+                                         'overshoot_pct', 'steady_error')} for r in rows],
+                     indent=1, ensure_ascii=False))
+    return rows
+
+
+if __name__ == '__main__':
+    main()

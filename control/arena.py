@@ -120,7 +120,33 @@ def validate_config(config):
                 raise ValueError(f"{s['id']}: unknown perturbation factor {factor!r}")
         if s['type'] == 'gust' and s['direction'] not in ('lateral', 'vertical'):
             raise ValueError(f"{s['id']}: gust direction must be lateral or vertical")
+    fraction = config.get('reporting', {}).get('integrator_at_limit_fraction')
+    if fraction is not None and not 0.0 < float(fraction) < 1.0:
+        raise ValueError('reporting.integrator_at_limit_fraction must be in (0, 1)')
     return config
+
+
+def integrator_limit_flags(entries, config):
+    """kj 규칙(2026-09-26): 적분기가 한계에 닿아 있던 시간이 시행의 1%를 넘은 기록을 모은다.
+
+    entries: 'integrators' 필드(arena_factory.IntegratorLog.report)를 가진 dict 목록이다.
+    스모크 행이든 튜닝 평가의 시나리오 항목이든 형식이 같다. 하나라도 걸리면 보고서
+    '결정 필요'에 올린다. 문턱은 설정의 reporting.integrator_at_limit_fraction이다.
+    반환: (문턱, 걸린 기록 목록).
+    """
+    threshold = float(config.get('reporting', {}).get('integrator_at_limit_fraction', 0.01))
+    flags = []
+    for e in entries:
+        report = e.get('integrators')
+        if report and report['at_limit_fraction'] > threshold:
+            flags.append(dict(controller=e.get('controller'),
+                              case=e.get('scenario_id') or e.get('id'),
+                              evaluation=e.get('evaluation'),
+                              at_limit_fraction=report['at_limit_fraction'],
+                              channels={name: ch['at_limit_steps']
+                                        for name, ch in report['channels'].items()
+                                        if ch['at_limit_steps']}))
+    return threshold, flags
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -200,11 +226,8 @@ def _our_state(cp, V, theta, n_pos, n_neg):
     test_arena_fairness가 트림점에서 두 구성이 비트 단위로 같은지 확인한다.
     """
     from control.dynamics import NX
-    if cp.get('thrust_axis', 'z') == 'x':
-        R_hover = Rotation.from_quat([0.0, -np.sqrt(0.5), 0.0, np.sqrt(0.5)])
-    else:
-        R_hover = Rotation.from_quat([1, 0, 0, 0])
-    q = (R_hover * Rotation.from_euler('y', theta)).as_quat()
+    from control.trim import _hover_rotation       # hover_quat 규약까지 트림 솔버와 같게
+    q = (_hover_rotation(cp) * Rotation.from_euler('y', theta)).as_quat()
     x = np.zeros(NX)
     x[3] = V
     x[6:10] = q
