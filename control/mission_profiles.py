@@ -74,6 +74,57 @@ class MissionProfile:
         print(f'  Total: {self.T_total:g} s')
 
 
+class SmoothstepProfile(MissionProfile):
+    """Hold -> paper eq.(32) speed change -> hold (reference-profile tests).
+
+    The ramp uses control.fair_compare.smoothstep, whose first four
+    derivatives vanish at both ends. The mission above keeps its half-cosine
+    ramps; the two shapes are deliberately not mixed.
+    """
+
+    def __init__(self, v0, v1, cruise_alt, lead, ramp, tail):
+        if not np.all(np.isfinite([v0, v1, cruise_alt, lead, ramp, tail])):
+            raise ValueError('smoothstep profile values must be finite')
+        if min(lead, ramp, tail) <= 0 or cruise_alt <= 0 or min(v0, v1) < 0:
+            raise ValueError('positive durations/altitude and nonnegative speeds are required')
+        self.cruise_speed, self.cruise_alt = max(v0, v1), cruise_alt
+        Z = cruise_alt
+        self.phases = [('유지', 0.0, float(lead), v0, v0, Z, Z),
+                       ('기동', float(lead), float(ramp), v0, v1, Z, Z),
+                       ('정착', float(lead+ramp), float(tail), v1, v1, Z, Z)]
+        self.T_total = float(lead+ramp+tail)
+        self.ramp_start, self.ramp_end = float(lead), float(lead+ramp)
+        self.cruise_start, self.cruise_end = self.phase_interval('유지')
+        self.decel_start = self.decel_end = None
+        self.gust_interval = None
+
+    @staticmethod
+    def shape(u):
+        from control.fair_compare import smoothstep
+        return np.vectorize(smoothstep, otypes=[float])(u)
+
+    def get_ref(self, t):
+        for i, (name, start, duration, v0, v1, z0, z1) in enumerate(self.phases):
+            if t < start + duration or i == len(self.phases) - 1:
+                s = float(self.shape((t - start) / duration))
+                return np.array([v0 + (v1-v0)*s, 0.0, 0.0]), z0+(z1-z0)*s, name
+
+    def compute_refs(self, ts):
+        ts = np.asarray(ts)
+        velocities = np.zeros((len(ts), 3))
+        altitudes = np.empty(len(ts))
+        for i, (_, start, duration, v0, v1, z0, z1) in enumerate(self.phases):
+            mask = (ts >= start) & (ts < start+duration)
+            if i == 0:
+                mask |= ts < start
+            if i == len(self.phases)-1:
+                mask |= ts >= start+duration
+            s = self.shape((ts[mask]-start)/duration)
+            velocities[mask, 0] = v0+(v1-v0)*s
+            altitudes[mask] = z0+(z1-z0)*s
+        return velocities, altitudes
+
+
 class GustProfile(MissionProfile):
     """Start at cruise trim, establish flight, apply a gust, then recover."""
 

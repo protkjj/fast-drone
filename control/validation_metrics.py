@@ -112,3 +112,106 @@ def evaluate(result, profile, limits=Acceptance(), n_max=None):
             reasons.append('gust_not_recovered')
     metrics.update(passed=not reasons, failure_reasons=reasons)
     return metrics
+
+
+@dataclass(frozen=True)
+class PaperCriteria:
+    """Paper v5.3 section 5.10 criteria, reported ALONGSIDE Acceptance.
+
+    They are stricter than Acceptance (e.g. body rate 20 rad/s for 0.1 s)
+    and never change `passed`; both views are kept so neither is hidden.
+    """
+    z_error: float = 5.0
+    z_error_seconds: float = 0.5
+    omega: float = 20.0
+    omega_seconds: float = 0.1
+    cruise_velocity_floor: float = 5.0
+    cruise_velocity_fraction: float = 0.25
+    cruise_velocity_seconds: float = 2.0
+    consecutive_solver_failures: int = 3
+    recovery_z: float = 0.5
+    recovery_velocity_floor: float = 0.5
+    recovery_velocity_fraction: float = 0.05
+    recovery_hold: float = 1.0
+
+
+def _longest_consecutive(flags):
+    longest = run = 0
+    for flag in flags:
+        run = run+1 if flag else 0
+        longest = max(longest, run)
+    return longest
+
+
+def paper_evaluate(result, profile, criteria=PaperCriteria(), window=None,
+                   solve_log=None, n_max=None):
+    """Section 5.10 failure flags, the 5.8 evaluation-window RMSE and command TV.
+
+    `window` = (start, end) seconds for eq.(35); None uses the whole record.
+    Cruise tracking applies where the reference speed is constant and nonzero
+    (mission cruise, the whole gust test, reference-profile holds at speed).
+    The solver rule interprets "no valid upper update" as non-accepted status.
+    """
+    ts, xs = result['ts'], result['xs']
+    vr, zr = result['v_refs'], result['z_refs']
+    finite_rows = np.all(np.isfinite(xs), axis=1)
+    ez = np.abs(xs[:, 2]-zr)
+    ev = np.linalg.norm(xs[:, 3:6]-vr, axis=1)
+    omega = np.linalg.norm(xs[:, 10:13], axis=1)
+    reasons = []
+    if not np.all(finite_rows):
+        reasons.append('paper_nonfinite')
+    if np.any(xs[finite_rows, 2] < 0.0):
+        reasons.append('paper_ground_contact')
+    z_run = longest_duration(ts, ez > criteria.z_error)
+    w_run = longest_duration(ts, omega > criteria.omega)
+    if z_run >= criteria.z_error_seconds-1e-10 or w_run >= criteria.omega_seconds-1e-10:
+        reasons.append('paper_state_limit')
+    cruise = np.zeros(len(ts), dtype=bool)
+    for name, start, duration, v0, v1, *_ in profile.phases:
+        if v0 == v1 and v0 > 0:
+            cruise |= (ts >= start) & (ts <= start+duration)
+    limit = np.maximum(criteria.cruise_velocity_floor,
+                       criteria.cruise_velocity_fraction*np.linalg.norm(vr, axis=1))
+    track_run = longest_duration(ts, cruise & (ev > limit))
+    if track_run >= criteria.cruise_velocity_seconds-1e-10:
+        reasons.append('paper_tracking_failure')
+    log = solve_log or []
+    solver_run = _longest_consecutive(not entry.get('accepted', True) for entry in log)
+    if solver_run >= criteria.consecutive_solver_failures:
+        reasons.append('paper_upper_update_failure')
+    lo, hi = window if window is not None else (ts[0], ts[-1])
+    in_window = (ts >= lo-1e-9) & (ts <= hi+1e-9)
+    metrics = dict(
+        paper_failed=bool(reasons), paper_reasons=reasons,
+        paper_z_error_run_seconds=z_run, paper_omega_run_seconds=w_run,
+        paper_cruise_velocity_run_seconds=track_run,
+        paper_max_consecutive_solver_failures=solver_run,
+        window=[float(lo), float(hi)],
+        window_complete=bool(ts[-1] >= hi-1e-8),
+        window_rmse_velocity=float(np.sqrt(np.mean(ev[in_window]**2))) if in_window.any() else None,
+        window_rmse_z=float(np.sqrt(np.mean(ez[in_window]**2))) if in_window.any() else None,
+        window_max_velocity_error=float(np.max(ev[in_window])) if in_window.any() else None,
+        window_max_z_error=float(np.max(ez[in_window])) if in_window.any() else None,
+        window_p95_velocity_error=float(np.percentile(ev[in_window], 95)) if in_window.any() else None,
+        window_p95_z_error=float(np.percentile(ez[in_window], 95)) if in_window.any() else None,
+        window_max_omega=float(np.max(omega[in_window])) if in_window.any() else None)
+    us = np.asarray(result['us'])
+    if n_max is not None and len(us) > 1:
+        # Eq.(36) at the common 2 ms command log: sum of |delta n_c| / n_max.
+        metrics['command_total_variation'] = float(np.sum(np.abs(np.diff(us, axis=0)))/n_max)
+    if profile.gust_interval is not None:
+        _, end = profile.gust_interval
+        v_limit = np.maximum(criteria.recovery_velocity_floor,
+                             criteria.recovery_velocity_fraction*np.linalg.norm(vr, axis=1))
+        good = (ez <= criteria.recovery_z) & (ev <= v_limit) & finite_rows
+        recovered_at = None
+        for i in np.flatnonzero(ts >= end-1e-9):
+            held = (ts >= ts[i]-1e-12) & (ts <= ts[i]+criteria.recovery_hold+1e-9)
+            if ts[-1] < ts[i]+criteria.recovery_hold-1e-9:
+                break
+            if np.all(good[held]):
+                recovered_at = float(ts[i]-end)
+                break
+        metrics['paper_recovery_seconds'] = recovered_at
+    return metrics

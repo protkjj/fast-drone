@@ -518,7 +518,7 @@ class ScheduledLQR:
 
     def __init__(self, params, v_ref, z_ref=0.0, V_table=None, Q=None, R=None,
                  integral_states=(), Q_integral=None, dt=0.001,
-                 integral_limit=5.0):
+                 integral_limit=5.0, trims=None):
         """
         integral_states : tuple
             적분 증강(LQI)할 오차상태 인덱스. 기본값 ()이면 순수 LQR로
@@ -528,6 +528,13 @@ class ScheduledLQR:
             적분상태 크기 제한(안티와인드업). 회전수 명령이 포화한 동안에는
             적분을 아예 멈추고, 그와 별개로 크기도 이 값으로 자른다.
             포화 중 계속 적분하면 풀린 뒤 크게 튄다.
+        trims : list[dict] | None
+            V_table 각 속도의 트림(``state``·``control``·``converged``)을 밖에서
+            준다. None(기본값)이면 기존처럼 안에서 find_trim 연속법으로 구한다.
+            필요한 경우 — 팀원 기체(models/team_light)는 플랜트의 호버 자세가
+            우리 트림과 추력축 둘레 180° 다르다. 트림을 우리 규약으로 두면
+            오차 쿼터니언이 처음부터 180° 롤 오차를 보고 폭주한다. 경기장
+            (control/arena_factory.py)이 플랜트 규약으로 옮긴 트림을 넘긴다.
         """
         from control.trim import find_trim
 
@@ -564,12 +571,17 @@ class ScheduledLQR:
         K_i_list = []
         dropped, guess = [], None
 
-        for V in self.V_table:
-            trim = find_trim(params, float(V), guess=guess, quiet=True)
+        if trims is not None and len(trims) != len(self.V_table):
+            raise ValueError('trims must match V_table one-to-one')
+        for i, V in enumerate(self.V_table):
+            if trims is not None:
+                trim = trims[i]
+            else:
+                trim = find_trim(params, float(V), guess=guess, quiet=True)
             if not trim['converged']:
-                dropped.append((float(V), trim['why'] or '미수렴'))
+                dropped.append((float(V), trim.get('why') or '미수렴'))
                 continue
-            guess = trim['guess']
+            guess = trim.get('guess', guess)
 
             lqr = LQRController(params, trim['state'], trim['control'], Q, R,
                                 integral_states=self.integral_states,

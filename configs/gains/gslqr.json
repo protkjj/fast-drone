@@ -1,0 +1,12 @@
+{
+  "controller": "GSLQR",
+  "status": "prior - NOT tuned on light_rocket_v2_pack_forward",
+  "provenance": "control/controller.py TUNED_Q_DIAG/TUNED_R_SCALE. Tuned 2026-09-22 by research/tune_gains.py on the research JS/WASM engine with the OLD selected profile (1.7117 kg), not on this aircraft or this plant.",
+  "error_state_order": ["dz", "dvx", "dvy", "dvz", "dphi_x", "dphi_y", "dphi_z",
+                        "dw_x", "dw_y", "dw_z", "dn1", "dn2", "dn3", "dn4"],
+  "Q_diag": [6400, 1280, 1280, 20, 50, 50, 50, 5, 5, 5, 0.01, 0.01, 0.01, 0.01],
+  "R_scale": 0.00625,
+  "integral_states": [0, 1],
+  "Q_integral": [3200, 640],
+  "integral_limit": 5.0
+}
