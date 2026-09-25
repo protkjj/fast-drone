@@ -92,7 +92,7 @@ class CascadedPID:
         M_cmd = self.J @ (-self.Kp_att * att_err - self.Kd_att * omega) + gyro_ff
 
         # ── 할당 → 모터속도 ──
-        return self._allocate(T_cmd, M_cmd)
+        return self._allocate(T_cmd, M_cmd, x)
 
     def _force_to_attitude(self, F_des):
         """F_des → (T_cmd, R_des).
@@ -149,9 +149,28 @@ class CascadedPID:
             R_des = np.column_stack([b1, b2, b3])
         return T_cmd, R_des
 
-    def _allocate(self, T_cmd, M_cmd):
-        """[T, Mx, My, Mz] → 모터 속도."""
+    def _allocate(self, T_cmd, M_cmd, x=None):
+        """[T, Mx, My, Mz] → 모터 속도.
+
+        팀원 곡선 기체(propulsion_model이 APC 곡선)이고 현재 상태 x를 받으면
+        두 곳을 제어기 공통 곡선으로 바꾼다(2026-09-25 경로 감사, kj 지시):
+          ① 로터 추력 → 회전수: 정지 역산 sqrt(f/k_T) 대신 현재 축방향 유속에서
+             T(n)=ρ·Ct(J(n))·n²·D⁴ 를 n에 대해 푼다. 정지 역산은 35 m/s 이상에서
+             명령 회전수가 영추력점 아래로 떨어져 추력 0을 만들었다.
+          ② 반토크/추력 비: 상수 k_Q/k_T 대신 측정 회전수의 γ(J) — 할당 행렬의
+             스핀축 모멘트 행이 J에 따라 변한다.
+        그 밖의 기체(우리 자체 기체 등)는 기존 식 그대로다(비트 동일).
+        """
+        from control.dynamics import (uses_prop_curve, axial_airspeed, reaction_torque_ratio,
+                                      rotor_speed_for_thrust, compute_allocation_matrix)
         TM = np.array([T_cmd, M_cmd[0], M_cmd[1], M_cmd[2]])
+        if x is not None and uses_prop_curve(self.p):
+            v_axial = axial_airspeed(self.p, x)
+            gamma = reaction_torque_ratio(self.p, x[13:17], v_axial)
+            _, TM_to_f = compute_allocation_matrix(self.p, gamma=gamma)
+            f_ind = TM_to_f @ TM
+            n_cmd = np.array([rotor_speed_for_thrust(self.p, f, v_axial) for f in f_ind])
+            return np.clip(n_cmd, self.p['n_min'], self.p['n_max'])
         f_ind = self.TM_to_f @ TM
         n_cmd = np.zeros(4)
         for i in range(4):

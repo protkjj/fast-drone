@@ -235,11 +235,18 @@ def build_dynamics(params):
     return f, x, u
 
 
-def compute_allocation_matrix(params):
+def compute_allocation_matrix(params, gamma=None):
     """
     [T1..T4] ↔ [T_total, Mx, My, Mz] 변환 행렬.
 
     추력 방향 e_thrust(축에 따라 [1,0,0] 또는 [0,0,-1]) 기준 교차곱으로 자동 생성.
+
+    gamma : array(4) | None
+        로터별 반토크/추력 비 Q_i/T_i. None(기본값)이면 기존처럼 상수
+        k_Q/k_T 하나를 쓴다(비트 단위로 같은 행렬). 팀원 곡선 기체에서는
+        이 비가 전진비 J에 따라 변한다 — J≈1.2에서 정지값의 약 2.5배라,
+        상수로 두면 추력축 둘레(스핀축) 모멘트를 21~68% 과소평가한다
+        (2026-09-25 경로 감사). 그때 reaction_torque_ratio()의 값을 넘긴다.
     """
     axis = params.get('thrust_axis', 'z')
     e_thrust = np.array([1, 0, 0]) if axis == 'x' else np.array([0, 0, -1])
@@ -247,11 +254,13 @@ def compute_allocation_matrix(params):
     pos = params['rotor_positions']
     dirs = params['rotor_directions']
     nr = params['num_rotors']
+    ks = np.full(nr, k) if gamma is None else np.asarray(gamma, dtype=float)
 
     A = np.zeros((4, nr))
     for i in range(nr):
         A[0, i] = 1.0                                  # T_total
         m = np.cross(pos[i], e_thrust)                  # r × e_thrust
+        k = ks[i]
         # 행 순서는 **축과 무관하게** [T_total, Mx, My, Mz] 로 고정한다.
         # 축마다 순서가 달라지면 쓰는 쪽이 조용히 어긋난다. 반토크는 스핀축
         # (추력축) 둘레에 걸린다.
@@ -265,6 +274,122 @@ def compute_allocation_matrix(params):
             A[3, i] = dirs[i] * k                       # Mz (반토크, 스핀축 = z)
 
     return A, np.linalg.inv(A)
+
+
+# ════════════════════════════════════════════════════
+# 로터 추진 — 수치 헬퍼 (곡선 기체와 선형 기체 공용)
+# ════════════════════════════════════════════════════
+# 팀원 기체(propulsion_model == PROP_CURVE_MODEL)는 추력·반토크가 APC Ct(J)·Cp(J)
+# 곡선을 따른다. `_rotor_forces_moments`(심볼릭)와 같은 곡선을 수치 계산에서도
+# 쓰도록 한 곳에 모았다 — 제어기마다 따로 적으면 한 군데만 선형식으로 남아도
+# 알아채기 어렵다(2026-09-25 경로 감사에서 CPID·F13이 실제로 그랬다).
+
+def uses_prop_curve(params):
+    """팀원 APC 곡선 추진 모델을 쓰는 기체인가 — 곡선 분기의 단일 조건."""
+    return params.get('propulsion_model') == PROP_CURVE_MODEL
+
+
+def axial_airspeed(params, x):
+    """상태 x(17)에서 로터 축방향 유입속도(추력축 방향 동체속도, 음수는 0).
+
+    바람은 모른다 — 제어기는 관성속도만 안다(INDI의 T_meas와 같은 가정).
+    """
+    R = np.array(_quat_to_rotmat_np(x[6:10]))
+    v_body = R.T @ np.asarray(x[3:6], dtype=float)
+    if params.get('thrust_axis', 'z') == 'x':
+        return max(float(v_body[0]), 0.0)
+    return max(float(-v_body[2]), 0.0)
+
+
+def _quat_to_rotmat_np(q):
+    x, y, z, w = (float(c) for c in q)
+    return np.array([
+        [1 - 2*(y*y + z*z), 2*(x*y - w*z), 2*(x*z + w*y)],
+        [2*(x*y + w*z), 1 - 2*(x*x + z*z), 2*(y*z - w*x)],
+        [2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x*x + y*y)]])
+
+
+def rotor_thrust_torque(params, n, v_axial):
+    """로터별 추력 T_i[N]과 반토크 크기 Q_i[N·m] (수치, 배열).
+
+    곡선 기체는 팀원 곡선(`propeller_curve.values_and_derivatives`) 그대로,
+    그 밖에는 기존 선형 fac 모델 — `_rotor_forces_moments`와 같은 분기다.
+    """
+    n = np.maximum(np.asarray(n, dtype=float), 0.0)
+    va = max(float(v_axial), 0.0)
+    if uses_prop_curve(params):
+        from models.team_light.control.propeller_curve import values_and_derivatives
+        T, Q, _, _ = values_and_derivatives(params, n, va)
+        return np.asarray(T, dtype=float), np.asarray(Q, dtype=float)
+    n_rps = n/(2.0*np.pi)
+    J = va/(n_rps*params['D_prop'] + EPS)
+    fac = np.maximum(1.0 - J/params['J_max'], 0.0)
+    return params['k_T']*n**2*fac, params['k_Q']*n**2*fac
+
+
+def reaction_torque_ratio(params, n, v_axial):
+    """로터별 반토크/추력 비 γ_i = Q_i/T_i.
+
+    선형 모델에선 fac가 약분돼 늘 k_Q/k_T(상수)다. 곡선 기체에선
+    Q/T = (Cp/Ct)·D/(2π)가 전진비 J에 따라 변한다(J=0 → 0.0142, J≈1.24 →
+    약 2.9배). 추력이 거의 0인 로터는 0/0을 피해 정지값을 쓴다.
+    """
+    T, Q = rotor_thrust_torque(params, n, v_axial)
+    static = params['k_Q']/params['k_T']
+    return np.where(T > 1e-9, Q/np.maximum(T, 1e-12), static)
+
+
+_J_ZERO_CACHE = {}
+
+
+def _positive_thrust_j_limit(params):
+    """Ct 곡선의 영점 J(추력이 0이 되는 전진비). 팀원 함수는 부를 때마다
+    brentq를 다시 푸므로 곡선 매듭(knots)별로 한 번만 계산해 둔다."""
+    from models.team_light.control.propeller_curve import positive_thrust_j_limit
+    key = tuple(tuple(row) for row in params['prop_curve']['knots'])
+    if key not in _J_ZERO_CACHE:
+        _J_ZERO_CACHE[key] = positive_thrust_j_limit(params)
+    return _J_ZERO_CACHE[key]
+
+
+def rotor_speed_for_thrust(params, thrust, v_axial):
+    """추력 thrust[N]를 내는 로터 회전수 n[rad/s] (역산, 스칼라).
+
+    곡선 기체: T(n) = ρ·Ct(J(n))·n_rps²·D⁴ 를 n에 대해 brentq로 푼다.
+      Ct가 J에 대해 비증가라 T(n)은 n에 대해 단조증가다 — 브래킷 하나로 충분.
+      브래킷 아래끝은 영추력 회전수(J = Ct의 영점): 그보다 느리면 추력이 0이다.
+      요구 ≤ 0 이면 n_min, T(n_max)로도 모자라면 n_max(포화).
+    그 밖의 기체: 기존 정지 역산 sqrt(T/k_T) 그대로(역호환, 비트 동일).
+
+    왜 필요한가 — 정지 역산은 J≈0.4(20 m/s)까지는 0.4% 오차지만, 30 m/s에서
+    추력을 53% 적게, 35 m/s 이상에선 명령 회전수가 영추력점 아래로 떨어져
+    **추력 0**을 만든다(2026-09-25 경로 감사, kj 지적).
+    """
+    thrust = float(thrust)
+    if not uses_prop_curve(params):
+        return float(np.sqrt(max(thrust, 0.0)/params['k_T']))
+    from scipy.optimize import brentq
+    from models.team_light.control.propeller_curve import coefficients
+    n_min, n_max = float(params['n_min']), float(params['n_max'])
+    if thrust <= 0.0:
+        return n_min
+    va = max(float(v_axial), 0.0)
+    D, rho = params['D_prop'], params['rho']
+
+    def excess(n):
+        # rotor_thrust_torque와 같은 식(팀원 곡선)이되 추력만 — 역산 안쪽이라
+        # 토크·미분까지 매번 계산할 필요가 없다.
+        n_rps = n/(2.0*np.pi)
+        ct, _ = coefficients(params, va/(n_rps*D + 1e-8))
+        return float(rho*n_rps**2*D**4*ct) - thrust
+
+    if excess(n_max) <= 0.0:
+        return n_max
+    n_zero = 2.0*np.pi*va/(D*_positive_thrust_j_limit(params))
+    lo = max(n_min, n_zero)
+    if excess(lo) >= 0.0:
+        return lo
+    return float(brentq(excess, lo, n_max, xtol=1e-9, rtol=1e-12, maxiter=200))
 
 
 class AxialDronePlant:
