@@ -195,7 +195,7 @@ def main():
     table.append(('1 environment', ok_env, detail))
     ok_tests, detail = step_tests(args.quick)
     table.append(('2 fairness tests' + (' (quick)' if args.quick else ''), ok_tests,
-                  f'{detail}, peak memory so far {peak_memory_gb():.2f} GB'))
+                  f'{detail}, peak memory so far {peak_memory_gb():.2f} GiB'))
     ok_facts, detail = step_facts()
     table.append(('3 config vs confirmed facts', ok_facts, detail))
     ok_reruns, mode, results = step_reruns(args.quick, args.rtol, fingerprint)
