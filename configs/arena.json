@@ -39,6 +39,7 @@
     "dt_ctrl_s": 0.02,
     "max_iter": 30,
     "tol": 0.0001,
+    "Q_z": 20.0,
     "cost_spec": "paper",
     "warm_start": "measured_state_and_controller_trim_input",
     "soft_constraints": {}
@@ -53,6 +54,31 @@
     "CPID": {"kind": "CPID", "gains": "configs/gains/cpid.json", "design_region_m_s": [0, 20]}
   },
   "seeds": {"main": [1000, 1999], "tuning": [2000, 2999]},
+  "tuning": {
+    "label": "PILOT",
+    "budget": 120,
+    "search": {"method": "compass_log_multiplier", "initial_step": 2.0, "min_step": 1.05},
+    "objective": {"metric": "window_rmse_velocity + window_rmse_z",
+                  "failure": "stop_reason or paper_failed", "failure_penalty": 1000.0},
+    "parameters": {
+      "NMPC": ["w_v", "Q_z", "w_omega", "r_dev", "r_rate", "terminal"],
+      "GSLQR": ["q_z", "q_v_h", "q_v_z", "q_phi", "q_omega", "q_n", "r", "q_iz", "q_ivx"],
+      "CPID": ["Kp_vel", "Kp_z", "Kd_z", "Ki_z", "Kp_att", "Kd_att"]
+    },
+    "scenarios": [
+      {"id": "tune_gust_lateral_p3_V10", "type": "gust", "speed": 10.0,
+       "direction": "lateral", "peak_m_s": 3.0, "times_s": [1.0, 1.0, 2.0]},
+      {"id": "tune_gust_vertical_p4_V40", "type": "gust", "speed": 40.0,
+       "direction": "vertical", "peak_m_s": 4.0, "times_s": [1.0, 1.0, 2.0]},
+      {"id": "tune_gust_lateral_p6_V60", "type": "gust", "speed": 60.0,
+       "direction": "lateral", "peak_m_s": 6.0, "times_s": [1.0, 1.0, 2.0]},
+      {"id": "tune_ramp_40_70_rho0.8", "type": "reference", "from": 40.0, "to": 70.0,
+       "rho": 0.8, "lead_s": 0.5, "tail_s": 1.0},
+      {"id": "tune_hold_V50_mass1.1", "type": "gust", "speed": 50.0,
+       "direction": "vertical", "peak_m_s": 0.0, "times_s": [1.0, 1.0, 1.0],
+       "perturbation": {"mass": 1.1}}
+    ]
+  },
   "acceptance": {
     "max_z_error": 10.0, "max_velocity_error": 15.0, "max_omega": 35.0,
     "sustained_omega": 25.0, "sustained_seconds": 0.2,

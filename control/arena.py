@@ -97,7 +97,12 @@ def validate_config(config):
     ids = [s['id'] for s in config['scenarios']]
     if len(ids) != len(set(ids)):
         raise ValueError('scenario ids must be unique')
-    for s in config['scenarios']:
+    tuning = config.get('tuning', {}).get('scenarios', [])
+    tune_ids = [s['id'] for s in tuning]
+    if len(tune_ids) != len(set(tune_ids)) or set(tune_ids) & set(ids):
+        # 논문 §5.3: 튜닝은 본시험과 다른 별도 시나리오에서 한다.
+        raise ValueError('tuning scenario ids must be unique and disjoint from main-test ids')
+    for s in list(config['scenarios']) + list(tuning):
         if s['type'] not in SCENARIO_TYPES:
             raise ValueError(f"{s['id']}: unknown scenario type {s['type']!r}")
         speeds = ([s['speed']] if 'speed' in s else [s['from'], s['to']])
@@ -321,19 +326,20 @@ def _round_up(value, step):
     return float(np.ceil(value/step - 1e-9)*step)
 
 
-def build_scenarios(config, cp=None, native_params=None, only=None):
+def build_scenarios(config, cp=None, native_params=None, only=None, scenarios=None):
     """설정의 시나리오를 (profile, case) 목록으로 만든다.
 
     cp는 명목 제어기 모델 — 참조 프로필의 a_avail 계산에만 쓴다(명목 모델
     값이라는 논문 정의 그대로). native_params는 섭동 사례에서 플랜트 트림이
     존재하는지 미리 표시하는 데만 쓴다 — 이 정보는 제어기에 전달되지 않는다.
+    scenarios를 주면(튜닝 시나리오 등) 본시험 목록 대신 그것을 만든다.
     """
     from models.team_light.control.trim import find_trim as plant_trim
 
     alt = float(config['altitude_m'])
     dt = float(config['plant']['dt_s'])
     out, accel_cache = [], {}
-    for s in config['scenarios']:
+    for s in (config['scenarios'] if scenarios is None else scenarios):
         if only and s['id'] not in only:
             continue
         meta = dict(type=s['type'])

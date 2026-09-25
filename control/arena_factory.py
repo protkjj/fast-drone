@@ -277,11 +277,14 @@ class ArenaFactory:
     solver_of        NMPC는 SolverMonitor, 나머지는 None.
     """
 
-    def __init__(self, config, native=None, overrides=None):
+    def __init__(self, config, native=None, overrides=None, model=None):
+        """overrides: {label: {...}} 튜닝 후보 — NMPC는 cost_weights·Q_z, GSLQR·CPID는
+        게인 파일의 키를 덮어쓴다. model: 이미 만든 ControllerModel(튜닝이 평가마다
+        제어기 모델을 다시 적합하지 않게). 둘 다 없으면 설정 파일 그대로다."""
         from models.team_light.control.baseline_v2 import baseline_params
         self.config = config
         self.p = native if native is not None else baseline_params()
-        self.model = ControllerModel(self.p)
+        self.model = model if model is not None else ControllerModel(self.p)
         self.cp = self.model.cp
         self.controller_model_sha256 = self.model.sha256
         self.dt = float(config['plant']['dt_s'])
@@ -323,29 +326,25 @@ class ArenaFactory:
         return ctrl.monitor
 
     # ── 제어기별 생성 ──────────────────────────────────────────
-    def _nmpc_kwargs(self, window):
+    def _nmpc_kwargs(self, label, window):
+        """세 NMPC에 **같은 dict**로 넘기는 설정. 가중치 덮어쓰기(튜닝)는
+        overrides[label]['cost_weights']로만 들어온다 — 한 NMPC만 다른 값을
+        받는 것은 튜닝 결과를 쓸 때뿐이고, 그때도 manifest에 그대로 남는다."""
         nm = self.config['nmpc_common']
-        return dict(N=int(nm['N']), dt_nmpc=float(nm['dt_pred_s']), dt_ctrl=float(nm['dt_ctrl_s']),
-                    cost_spec=nm['cost_spec'], ref_fn=window)
-
-    def _check_fixed_solver_settings(self, label):
-        # 세 클래스 모두 IPOPT tol=1e-4가 코드에 박혀 있고, M17은 max_iter도
-        # 30으로 박혀 있다. 설정 파일이 다른 값을 요구하면 조용히 무시하지 말고
-        # 멈춘다 — 설정과 실제가 어긋난 채 돌면 I-3가 거짓말을 하게 된다.
-        nm = self.config['nmpc_common']
-        if float(nm['tol']) != 1e-4:
-            raise ValueError(f'{label}: IPOPT tol is fixed at 1e-4 in the controller code')
-        if label == 'M17' and int(nm['max_iter']) != 30:
-            raise ValueError('M17: IPOPT max_iter is fixed at 30 in control/nmpc.py')
         if nm['soft_constraints']:
             raise ValueError('soft constraints are not implemented in the paper-mode NLPs')
+        override = self.overrides.get(label, {})
+        return dict(N=int(nm['N']), dt_nmpc=float(nm['dt_pred_s']), dt_ctrl=float(nm['dt_ctrl_s']),
+                    max_iter=int(nm['max_iter']), tol=float(nm['tol']),
+                    cost_spec=nm['cost_spec'], ref_fn=window,
+                    Q_z=float(override.get('Q_z', nm['Q_z'])),
+                    cost_weights=override.get('cost_weights'))
 
     def _nmpc_settings(self, label, nmpc, **extra):
-        nm = self.config['nmpc_common']
-        return dict(kind=label, N=nmpc.N, dt_pred_s=nmpc.dt_nmpc, dt_ctrl_s=nmpc.dt_ctrl,
-                    max_iter=getattr(nmpc, '_max_iter', 30), tol=1e-4,
-                    cost_spec=nmpc.cost_spec, preview=nmpc.ref_fn is not None,
-                    warm_start=nm['warm_start'], soft_constraints={}, **extra)
+        # 설정 파일 값이 아니라 **만들어진 객체에 실제로 들어간 값**을 읽는다 —
+        # 설정과 실제가 어긋나면 I-3가 그 차이를 본다.
+        return dict(kind=label, warm_start=self.config['nmpc_common']['warm_start'],
+                    **nmpc.solver_settings(), **extra)
 
     def _trim_input(self, label, v0):
         tr = self.model.trim(float(v0[0]))
@@ -358,11 +357,10 @@ class ArenaFactory:
 
     def _build_v13(self, window, v0, z0):
         from control.hybrid_comparison import VirtualNMPC, ProperHybrid
-        self._check_fixed_solver_settings('V13')
         spec = self.config['controllers']['V13']
-        nm = self.config['nmpc_common']
-        nmpc = VirtualNMPC(self.cp, v_ref=v0, z_ref=z0, max_iter=int(nm['max_iter']),
-                           alloc_feedback=bool(spec['alloc_feedback']), **self._nmpc_kwargs(window))
+        nmpc = VirtualNMPC(self.cp, v_ref=v0, z_ref=z0,
+                           alloc_feedback=bool(spec['alloc_feedback']),
+                           **self._nmpc_kwargs('V13', window))
         inner = ProperHybrid(nmpc, self.cp, dt=self.dt, alloc_mode=spec['alloc_mode'],
                              time_align=spec['time_align'])
         u_trim = self._trim_input('V13', v0)
@@ -374,11 +372,9 @@ class ArenaFactory:
 
     def _build_f13(self, window, v0, z0):
         from control.nmpc_f13 import build_f13_controller
-        self._check_fixed_solver_settings('F13')
         spec = self.config['controllers']['F13']
-        nm = self.config['nmpc_common']
         inner = build_f13_controller(self.cp, v_ref=v0, z_ref=z0, dt=self.dt,
-                                     max_iter=int(nm['max_iter']), **self._nmpc_kwargs(window))
+                                     **self._nmpc_kwargs('F13', window))
         if inner.alloc_mode != spec['alloc_mode'] or inner.time_align != spec['time_align']:
             raise ValueError('F13 INDI settings differ from the arena config')
         nmpc = inner.nmpc.inner
@@ -390,8 +386,7 @@ class ArenaFactory:
 
     def _build_m17(self, window, v0, z0):
         from control.nmpc import NMPCController
-        self._check_fixed_solver_settings('M17')
-        nmpc = NMPCController(self.cp, v_ref=v0, z_ref=z0, **self._nmpc_kwargs(window))
+        nmpc = NMPCController(self.cp, v_ref=v0, z_ref=z0, **self._nmpc_kwargs('M17', window))
         u_trim = self._trim_input('M17', v0)
         settings = self._nmpc_settings('M17', nmpc)
         return ArenaController('M17', nmpc, window, nmpc=nmpc, settings=settings,
