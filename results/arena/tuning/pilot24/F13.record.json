@@ -1,0 +1,103 @@
+{
+  "label": "PILOT",
+  "controller": "F13",
+  "budget": 24,
+  "spent": 24,
+  "parameter_names": [
+    "w_v",
+    "Q_z",
+    "w_omega",
+    "r_dev",
+    "r_rate",
+    "terminal"
+  ],
+  "prior": {
+    "w_v": 5.0,
+    "Q_z": 20.0,
+    "w_omega": 1.0,
+    "r_dev": 0.02,
+    "r_rate": 0.1,
+    "terminal": 10.0
+  },
+  "scenario_ids": [
+    "tune_gust_lateral_p3_V10",
+    "tune_gust_vertical_p4_V40",
+    "tune_gust_lateral_p6_V60",
+    "tune_ramp_40_70_rho0.8",
+    "tune_hold_V50_mass1.1"
+  ],
+  "main_scenario_ids": [
+    "mission_VH",
+    "gust_lateral_p10_VH",
+    "gust_vertical_m5_VH",
+    "ref_accel_0_VH_rho1",
+    "ref_brake_VH_VL_rho1",
+    "mission_VH_mass1.3",
+    "mission_VH_tau2"
+  ],
+  "objective": {
+    "metric": "window_rmse_velocity + window_rmse_z",
+    "failure": "stop_reason or paper_failed",
+    "failure_penalty": 1000.0
+  },
+  "search": {
+    "method": "compass_log_multiplier",
+    "initial_step": 2.0,
+    "min_step": 1.05
+  },
+  "seeds": {
+    "tuning_range": [
+      2000,
+      2999
+    ],
+    "main_range": [
+      1000,
+      1999
+    ],
+    "used": []
+  },
+  "config_sha256": "60fba9acd26db785d5b593f87156f320baad33316a7a4d104e99e9fe37016015",
+  "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+  "status": "complete",
+  "environment": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "machine": "arm64",
+    "cpu": "Apple M4",
+    "python": "3.13.7",
+    "packages": {
+      "numpy": "2.3.3",
+      "scipy": "1.16.3",
+      "casadi": "3.7.2",
+      "matplotlib": "3.10.6"
+    },
+    "threads": {
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1",
+      "MKL_NUM_THREADS": null
+    }
+  },
+  "git_revision": "871ca662c969d7f9b85dfe5e4aa59cc5601812e8",
+  "git_dirty": true,
+  "restarts": 0,
+  "best_exponents": [
+    1.0,
+    0.0,
+    -1.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "best_values": {
+    "w_v": 10.0,
+    "Q_z": 20.0,
+    "w_omega": 0.5,
+    "r_dev": 0.02,
+    "r_rate": 0.1,
+    "terminal": 10.0
+  },
+  "best_objective": 0.14444430166513533,
+  "prior_objective": 0.18328478969558148,
+  "finished_utc": "2026-09-25T16:37:29.239647+00:00"
+}
