@@ -66,8 +66,8 @@ BEFORE = {
     },
 }
 
-KEEP = ('completed', 'stop_reason', 'elapsed_sim_s', 'z_rmse_m', 'vel_rmse_m_s', 'max_omega',
-        'saturation_fraction', 'optimizer_failures', 'optimizer_calls',
+KEEP = ('completed', 'tracking_pass', 'stop_reason', 'elapsed_sim_s', 'z_rmse_m', 'vel_rmse_m_s',
+        'max_omega', 'saturation_fraction', 'optimizer_failures', 'optimizer_calls',
         'prop_domain_outside_fraction')
 
 
@@ -119,21 +119,29 @@ def run_timing(native):
 
 
 def rejudge(after):
-    """kj 판별 규칙을 새 수치(현재 모델)에 다시 적용한다."""
+    """kj 판별 규칙을 새 수치(현재 모델)에 다시 적용한다.
+
+    '통과'를 두 기준으로 따로 본다. 작업 A 표는 완주(정지 없이 4초) 기준이었다. 추종 통과
+    (kh_repro: 끝 오차 < 0.5 m·0.5 m/s, 포화 < 1%)는 더 엄격하다. 두 기준의 판정이 갈리면 둘 다 적는다.
+    """
+    def verdict(ok_default, ok_trim):
+        if not ok_default and not ok_trim:
+            return 'H-시나리오 지지(기본·트림 웜스타트 둘 다 실패)'
+        if not ok_default and ok_trim:
+            return 'H-웜스타트이력 지지(트림 웜스타트만 통과)'
+        if ok_default and ok_trim:
+            return '둘 다 통과 — 판별의 전제(짧은 시험 실패)가 이 기준에선 사라짐'
+        return '예상 밖(기본만 통과) — 따로 조사 필요'
+
     verdicts = {}
     for V in ('80', '85'):
         default = after.get(f'current/default@{V}')
         trim = after.get(f'current/trim@{V}')
         if default is None or trim is None:
             continue
-        if not default['completed'] and not trim['completed']:
-            verdicts[V] = 'H-시나리오 지지 유지(기본·트림 웜스타트 둘 다 실패)'
-        elif not default['completed'] and trim['completed']:
-            verdicts[V] = 'H-웜스타트이력 지지(트림 웜스타트만 통과)'
-        elif default['completed'] and trim['completed']:
-            verdicts[V] = '판별 전제 소멸(둘 다 완주) — 이전 실패는 모델 결함이었을 가능성'
-        else:
-            verdicts[V] = '예상 밖(기본은 완주, 트림 웜스타트는 실패) — 따로 조사 필요'
+        verdicts[V] = dict(completion=verdict(default['completed'], trim['completed']),
+                           tracking=verdict(bool(default.get('tracking_pass')),
+                                            bool(trim.get('tracking_pass'))))
     return verdicts
 
 
@@ -147,10 +155,12 @@ def write_markdown(path, data):
              f'이전 값 출처: `{SOURCE}`(선형 프로펠러·상수 x_cp 시절). '
              f'재현: `{data["meta"]["command"]}` · git `{data["meta"]["git_revision"]}` '
              f'dirty={data["meta"]["git_dirty"]}', '']
-    header = ('| 사례 | 시점 | 완주 | 시간 s | z RMSE | v RMSE | |ω|max | 포화 % | 솔버실패 | 정지사유 |',
-              '|---|---|---|---:|---:|---:|---:|---:|---:|---|')
-    for part in data['parts']:
-        lines += [f'## {part}', '', *header]
+    header = ('| 사례 | 시점 | 완주 | 추종통과 | 시간 s | z RMSE | v RMSE | \\|ω\\|max | 포화 % | 솔버실패 | 정지사유 |',
+              '|---|---|---|---|---:|---:|---:|---:|---:|---:|---|')
+    for part in [p for p in data['parts'] if p in data['after']]:
+        meta = data.get('after_meta', {}).get(part, {})
+        lines += [f'## {part}', '', f'이후 값 계산: git `{meta.get("git_revision")}` '
+                  f'dirty={meta.get("git_dirty")}', '', *header]
         after = data['after'][part]
         keys = sorted(set(BEFORE[part]) | {k.split('/', 1)[-1] for k in after})
         for key in keys:
@@ -163,15 +173,18 @@ def write_markdown(path, data):
                 fails = (f'{r["optimizer_failures"]}/{r["optimizer_calls"]}'
                          if r.get('optimizer_calls') is not None else '—')
                 sat = r.get('saturation_fraction')
-                lines.append(f'| {key} | {when} | {r["completed"]} | {_fmt(r.get("elapsed_sim_s"), ".2f")} | '
+                passed = r.get('tracking_pass')
+                lines.append(f'| {key} | {when} | {r["completed"]} | {"—" if passed is None else passed} | '
+                             f'{_fmt(r.get("elapsed_sim_s"), ".2f")} | '
                              f'{_fmt(r.get("z_rmse_m"), ".4g")} | {_fmt(r.get("vel_rmse_m_s"), ".4g")} | '
                              f'{_fmt(r.get("max_omega"), ".3g")} | '
                              f'{_fmt(None if sat is None else 100*sat, ".1f")} | {fails} | '
                              f'{r.get("stop_reason") or ""} |')
         lines.append('')
     if 'verdicts' in data:
-        lines += ['## 작업 A 판별 규칙 재적용(현재 모델)', '']
-        lines += [f'- {V} m/s: {text}' for V, text in data['verdicts'].items()] or ['- (판별 부분 미실행)']
+        lines += ['## 작업 A 판별 규칙 재적용(현재 모델)', '',
+                  '| 속도 | 완주 기준(작업 A 표의 기준) | 추종 통과 기준(끝 오차·포화 < 1%) |', '|---|---|---|']
+        lines += [f'| {V} m/s | {v["completion"]} | {v["tracking"]} |' for V, v in data['verdicts'].items()]
         lines.append('')
     Path(path).write_text('\n'.join(lines), encoding='utf-8')
 
@@ -183,6 +196,8 @@ def main(argv=None):
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--parts', nargs='+', choices=PARTS, default=list(PARTS))
     parser.add_argument('--out', type=Path, default=ROOT/'results'/'arena')
+    parser.add_argument('--merge', action='store_true',
+                        help='keep parts already in the output JSON and run only --parts')
     args = parser.parse_args(argv)
     native = kh_native_params()
     runners = dict(discriminate=run_discriminate, mission=run_mission, timing=run_timing)
@@ -192,14 +207,25 @@ def main(argv=None):
                           created_utc=datetime.now(timezone.utc).isoformat(),
                           git_revision=revision, git_dirty=dirty,
                           environment=environment_fingerprint()),
-                parts=list(args.parts), before={p: BEFORE[p] for p in args.parts}, after={})
+                parts=list(PARTS), before=BEFORE, after={}, after_meta={})
+    path = args.out/'pilot_before_after.json'
+    if args.merge and path.exists():
+        old = json.loads(path.read_text(encoding='utf-8'))
+        for part, values in old.get('after', {}).items():
+            if part not in args.parts:
+                data['after'][part] = values
+                data['after_meta'][part] = old.get('after_meta', {}).get(part, {})
+        if 'discriminate' not in args.parts and 'verdicts' in old:
+            data['verdicts'] = old['verdicts']
     args.out.mkdir(parents=True, exist_ok=True)
     for part in args.parts:
         print(f'== {LABEL} {part} ==', flush=True)
         data['after'][part] = runners[part](native)
+        data['after_meta'][part] = dict(git_revision=revision, git_dirty=dirty,
+                                        finished_utc=datetime.now(timezone.utc).isoformat())
         if part == 'discriminate':
             data['verdicts'] = rejudge(data['after'][part])
-        write_json(args.out/'pilot_before_after.json', data)        # 부분마다 저장(중단 대비)
+        write_json(path, data)        # 부분마다 저장(중단 대비)
         write_markdown(args.out/'PILOT_BEFORE_AFTER.md', data)
     print(json.dumps(data.get('verdicts', {}), ensure_ascii=False, indent=1))
     return data
