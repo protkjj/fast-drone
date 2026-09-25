@@ -20,6 +20,7 @@ import casadi as ca
 import time as timer
 
 from control.dynamics import build_dynamics, NX, NU, EPS
+from control.nmpc_common import ipopt_options, cost_weights as nmpc_cost_weights
 
 
 class NMPCController:
@@ -34,10 +35,15 @@ class NMPCController:
     def __init__(self, params, v_ref=None, z_ref=0.0, u_ref=None,
                  N=20, dt_nmpc=0.05, dt_ctrl=0.02, Q_z=20.0,
                  electrical_constraints=False, V_b=None,
-                 cost_spec='paper', ref_fn=None):
+                 cost_spec='paper', ref_fn=None, max_iter=30, tol=1e-4,
+                 cost_weights=None):
         """
         Parameters
         ----------
+        max_iter, tol, cost_weights : control/nmpc_common.py 참고.
+            V13·F13과 같은 함수로 IPOPT 옵션·비용 가중치를 만들고 보관한다
+            (경기장 불변식 I-3). 예전엔 max_iter가 30으로 박혀 있어 이 클래스만
+            설정할 수 없었다. 기본값은 기존과 비트 단위로 같다.
         N        : int    예측 지평선 스텝 수 (N * dt_nmpc = 예측 시간)
         dt_nmpc  : float  NMPC 내부 적분 스텝 [s]
         dt_ctrl  : float  제어 주기 (이 간격마다 NLP 재풀이) [s]
@@ -86,6 +92,10 @@ class NMPCController:
             raise ValueError("ref_fn은 cost_spec='paper'에서만 쓸 수 있다.")
         self.cost_spec = cost_spec
         self.ref_fn = ref_fn
+        self._max_iter = max_iter
+        self.ipopt_options = ipopt_options(max_iter, tol)
+        self.cost_weights = nmpc_cost_weights(cost_weights)
+        self.soft_constraints = {}
         self._solve_log = []
         if u_ref is not None:
             self.u_ref = np.array(u_ref)
@@ -116,6 +126,11 @@ class NMPCController:
         self._cold_start = True
         if self._w0_init is not None:
             self.w0 = self._w0_init.copy()
+
+    def solver_settings(self):
+        """경기장 불변식 I-3 비교용 요약(control/nmpc_common.solver_settings)."""
+        from control.nmpc_common import solver_settings
+        return solver_settings(self)
 
     def _build_rk4(self, f, x_sym, u_sym):
         """예측용 RK4 한 스텝 함수."""
@@ -183,19 +198,21 @@ class NMPCController:
         g.append(X_k - x_meas)
         lbg.extend([0.0]*nx); ubg.extend([0.0]*nx)
 
+        W = self.cost_weights          # 논문 식(14)·(16)·(17) 가중치(nmpc_common)
         U_prev = ca.DM(np.full(nu, n_hov))
         for k in range(N):
             e_v = X_k[3:6] - refs[0:3, k]
             e_z = X_k[2] - refs[3, k]
-            J_cost += 5.0*ca.sumsqr(e_v) + self._Q_z*e_z**2 + ca.sumsqr(X_k[10:13])
+            J_cost += (W['w_v']*ca.sumsqr(e_v) + self._Q_z*e_z**2
+                       + W['w_omega']*ca.sumsqr(X_k[10:13]))
 
             U_k = ca.SX.sym(f'U_{k}', nu)
             w.append(U_k)
             lbw.extend([params['n_min']]*nu); ubw.extend([n_max]*nu)
             w0.extend([float(n_hov)]*nu)
 
-            J_cost += 0.02*ca.sumsqr((U_k - n_hov)/n_max)
-            J_cost += 0.10*ca.sumsqr((U_k - U_prev)/n_max)
+            J_cost += W['r_dev']*ca.sumsqr((U_k - n_hov)/n_max)
+            J_cost += W['r_rate']*ca.sumsqr((U_k - U_prev)/n_max)
 
             X_next = new_state(k+1)
             g.append(X_next - self.F(X_k, U_k))
@@ -204,13 +221,11 @@ class NMPCController:
 
         e_v = X_k[3:6] - refs[0:3, N]
         e_z = X_k[2] - refs[3, N]
-        J_cost += 10.0*(5.0*ca.sumsqr(e_v) + self._Q_z*e_z**2 + ca.sumsqr(X_k[10:13]))
+        J_cost += W['terminal']*(W['w_v']*ca.sumsqr(e_v) + self._Q_z*e_z**2
+                                 + W['w_omega']*ca.sumsqr(X_k[10:13]))
 
         nlp = {'f': J_cost, 'x': ca.vertcat(*w), 'g': ca.vertcat(*g), 'p': p}
-        self.solver = ca.nlpsol('nmpc_paper', 'ipopt', nlp, {
-            'ipopt.print_level': 0, 'ipopt.sb': 'yes', 'print_time': 0,
-            'ipopt.max_iter': 30, 'ipopt.warm_start_init_point': 'yes',
-            'ipopt.tol': 1e-4})
+        self.solver = ca.nlpsol('nmpc_paper', 'ipopt', nlp, dict(self.ipopt_options))
         self.lbw = np.array(lbw); self.ubw = np.array(ubw)
         self.lbg = np.array(lbg); self.ubg = np.array(ubg)
         self.w0 = np.array(w0); self._w0_init = self.w0.copy()
@@ -320,14 +335,7 @@ class NMPCController:
         g_cat = ca.vertcat(*g)
 
         nlp = {'f': J, 'x': w_cat, 'g': g_cat, 'p': p}
-        opts = {
-            'ipopt.print_level': 0,
-            'ipopt.sb': 'yes',
-            'print_time': 0,
-            'ipopt.max_iter': 30,
-            'ipopt.warm_start_init_point': 'yes',
-            'ipopt.tol': 1e-4,
-        }
+        opts = dict(self.ipopt_options)
         self.solver = ca.nlpsol('nmpc', 'ipopt', nlp, opts)
 
         self.lbw = np.array(lbw, dtype=float)

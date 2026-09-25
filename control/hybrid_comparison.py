@@ -30,6 +30,7 @@ from control.dynamics import (build_dynamics, _quat_to_rotmat, _quat_derivative,
 from control.trim import find_trim
 from control.controller import ScheduledLQR
 from control.nmpc import NMPCController
+from control.nmpc_common import ipopt_options, cost_weights as nmpc_cost_weights
 
 
 # ══════════════════════════════════════════════════
@@ -120,8 +121,13 @@ class VirtualNMPC:
     def __init__(self, params, v_ref=None, z_ref=0.0, T_ref=None,
                  N=20, dt_nmpc=0.05, dt_ctrl=0.02, Q_z=20.0, max_iter=30,
                  alloc_feedback=False, c2_limit=None,
-                 cost_spec='paper', ref_fn=None):
+                 cost_spec='paper', ref_fn=None, tol=1e-4, cost_weights=None):
         """
+        tol, cost_weights : control/nmpc_common.py 참고. NMPC 계열(V13·M17·F13)이
+            같은 함수로 IPOPT 옵션·비용 가중치를 만들고 인스턴스에 보관한다
+            (경기장 불변식 I-3). 기본값은 기존 동작(논문 가중치, tol 1e-4)과
+            비트 단위로 같다. cost_weights는 'paper' 비용에만 쓰인다.
+
         cost_spec : {'paper','legacy'}
             'paper' (**기본값**, 2026-09-24부터) — 논문 v5.3 식(13)-(18)·(31)의
             정확한 전사.
@@ -195,11 +201,16 @@ class VirtualNMPC:
         self.z_ref = z_ref
         self._Q_z = Q_z
         self._max_iter = max_iter   # IPOPT 반복 상한 (SITL 실시간용 축소 가능)
+        self.ipopt_options = ipopt_options(max_iter, tol)
+        self.cost_weights = nmpc_cost_weights(cost_weights)
         # 논문 식(27)-(28): INDI 배분 결과를 다음 솔브의 입력변화량 비용
         # 기준(ν_{-1|k})으로 쓸지 여부. False면 기존과 동일하게 고정 트림값을
         # 쓴다 — 기본값 False로 기존 호출부(mission_sim 등) 동작을 보존한다.
         self.alloc_feedback = alloc_feedback
         self.c2_limit = c2_limit
+        # C2는 비용이 아니라 제약이지만, 공정성 비교(I-3)에서 '다른 NMPC에 없는
+        # 추가 조건'으로 드러나야 하므로 여기 적어 둔다. 쓰지 않으면 비어 있다.
+        self.soft_constraints = {} if c2_limit is None else {'c2_limit': float(c2_limit)}
         self.cost_spec = cost_spec
         self.ref_fn = ref_fn
 
@@ -246,6 +257,11 @@ class VirtualNMPC:
         self._prev_input = self.u_ref.copy()
         if self._w0_init is not None:
             self.w0 = self._w0_init.copy()
+
+    def solver_settings(self):
+        """경기장 불변식 I-3 비교용 요약(control/nmpc_common.solver_settings)."""
+        from control.nmpc_common import solver_settings
+        return solver_settings(self)
 
     def set_prev_input(self, v):
         """INDI 배분 결과(v_alloc)를 다음 솔브의 입력변화량 비용 기준으로 받는다
@@ -323,10 +339,7 @@ class VirtualNMPC:
 
         nlp = {'f': J_cost, 'x': ca.vertcat(*w),
                'g': ca.vertcat(*g), 'p': p}
-        self.solver = ca.nlpsol('vnmpc', 'ipopt', nlp, {
-            'ipopt.print_level': 0, 'ipopt.sb': 'yes', 'print_time': 0,
-            'ipopt.max_iter': self._max_iter, 'ipopt.warm_start_init_point': 'yes',
-            'ipopt.tol': 1e-4})
+        self.solver = ca.nlpsol('vnmpc', 'ipopt', nlp, dict(self.ipopt_options))
         self.lbw = np.array(lbw)
         self.ubw = np.array(ubw)
         self.lbg = np.array(lbg)
@@ -411,13 +424,14 @@ class VirtualNMPC:
         g.append(X_k - x_meas)              # 측정 상태 고정
         lbg.extend([0.0]*nx); ubg.extend([0.0]*nx)
 
+        W = self.cost_weights          # 논문 식(14)·(16)·(17) 가중치(nmpc_common)
         U_prev = nu_prev
         for k in range(N):
             # ── 단계 상태비용 식(14) ──
             e_v = X_k[3:6] - refs[0:3, k]
             e_z = X_k[2] - refs[3, k]
-            J_cost += (5.0*ca.sumsqr(e_v) + self._Q_z*e_z**2
-                       + ca.sumsqr(X_k[10:13]))
+            J_cost += (W['w_v']*ca.sumsqr(e_v) + self._Q_z*e_z**2
+                       + W['w_omega']*ca.sumsqr(X_k[10:13]))
 
             U_k = ca.SX.sym(f'U_{k}', nu)
             w.append(U_k)
@@ -426,8 +440,8 @@ class VirtualNMPC:
             w0.extend([float(self.T_ref), 0.0, 0.0, 0.0])
 
             # ── 입력비용 식(17) — Dν로 무차원화한 두 항 ──
-            J_cost += 0.02*ca.sumsqr((U_k - nu_h) / D_nu)
-            J_cost += 0.10*ca.sumsqr((U_k - U_prev) / D_nu)
+            J_cost += W['r_dev']*ca.sumsqr((U_k - nu_h) / D_nu)
+            J_cost += W['r_rate']*ca.sumsqr((U_k - U_prev) / D_nu)
 
             if k == 0 and self.c2_limit is not None:
                 g.append(ca.sumsqr((U_k - nu_prev) / D_nu))
@@ -441,14 +455,11 @@ class VirtualNMPC:
         # ── 종말비용 식(16): 단계 상태비용 '전체'에 10배 (ω 포함) ──
         e_v = X_k[3:6] - refs[0:3, N]
         e_z = X_k[2] - refs[3, N]
-        J_cost += 10.0*(5.0*ca.sumsqr(e_v) + self._Q_z*e_z**2
-                        + ca.sumsqr(X_k[10:13]))
+        J_cost += W['terminal']*(W['w_v']*ca.sumsqr(e_v) + self._Q_z*e_z**2
+                                 + W['w_omega']*ca.sumsqr(X_k[10:13]))
 
         nlp = {'f': J_cost, 'x': ca.vertcat(*w), 'g': ca.vertcat(*g), 'p': p}
-        self.solver = ca.nlpsol('vnmpc_paper', 'ipopt', nlp, {
-            'ipopt.print_level': 0, 'ipopt.sb': 'yes', 'print_time': 0,
-            'ipopt.max_iter': self._max_iter, 'ipopt.warm_start_init_point': 'yes',
-            'ipopt.tol': 1e-4})
+        self.solver = ca.nlpsol('vnmpc_paper', 'ipopt', nlp, dict(self.ipopt_options))
         self.lbw = np.array(lbw)
         self.ubw = np.array(ubw)
         self.lbg = np.array(lbg)
