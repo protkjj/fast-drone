@@ -106,12 +106,14 @@ class NMPCController:
         self._last_t = -np.inf
         self._t_now = 0.0
         self._u_current = self.u_ref.copy()
+        self._cold_start = True   # V13와 동일 콜드스타트 웜스타트 보정 플래그
         # _w0_init는 _build_nlp()에서 설정됨
 
     def reset(self):
         """MC 시행 간 독립성 보장을 위한 완전 리셋."""
         self._last_t = -np.inf
         self._u_current = self.u_ref.copy()
+        self._cold_start = True
         if self._w0_init is not None:
             self.w0 = self._w0_init.copy()
 
@@ -343,6 +345,17 @@ class NMPCController:
     def _solve(self, x_current):
         """NLP 풀이 → 첫 제어 추출."""
         if self.cost_spec == 'paper':
+            if self._cold_start:
+                # control/hybrid_comparison.py::VirtualNMPC._solve와 동일한
+                # 콜드스타트 웜스타트 보정(kj 지적, 2026-09-25 저녁) — 같은
+                # 수정을 NMPC 계열 전체에 동일하게 적용한다(V13만 고치지
+                # 않는다). X_k(상태) 부분만 실측값으로 덮어쓰고 U_k(로터
+                # 속도) 추측값은 이미 n_hov라 그대로 둔다.
+                stride = self.nu + self.nx
+                for k in range(self.N + 1):
+                    off = k * stride
+                    self.w0[off:off + self.nx] = x_current
+                self._cold_start = False
             p_val = np.concatenate([x_current, self._reference_horizon().ravel(order='F')])
         else:
             p_val = np.concatenate([x_current, self.v_ref, [self.z_ref], self.u_ref,

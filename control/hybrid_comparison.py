@@ -209,12 +209,14 @@ class VirtualNMPC:
         self.consec_fail = 0
         self.last_status = 'none'
         self._ever_converged = False
+        self._cold_start = True   # 첫 _solve()에서 콜드스타트 웜스타트 보정용
         # _w0_init는 _build_nlp()에서 설정됨
 
     def reset(self):
         """MC 시행 간 독립성 보장을 위한 완전 리셋."""
         self._last_t = -np.inf
         self._u_current = self.u_ref.copy()
+        self._cold_start = True
         self.consec_fail = 0
         self.last_status = 'none'
         self._ever_converged = False
@@ -443,6 +445,27 @@ class VirtualNMPC:
 
     def _solve(self, x13):
         if self.cost_spec == 'paper':
+            if self._cold_start:
+                # kj 지적(2026-09-25 저녁, results/SOLVER_FAILURE_LOG 20:XX) —
+                # _build_nlp_paper의 정적 웜스타트는 상태 부분을 전부
+                # [0,0,0,...,호버쿼터니언,...,0,0,0]로 채운다. 순항속도가
+                # 크고 트림 자세가 호버에서 먼 조건(예: 80m/s, pitch≈-8°)
+                # 에서는 이 추측값이 실측 x13와 크게 어긋나 있어, 다중사격
+                # 등식제약(X_{k+1}=F(X_k,U_k))이 전체 호라이즌에서 동시에
+                # 크게 위반된 채로 첫 뉴턴스텝을 시작한다 — 진단 결과
+                # (control/test_v13_degenerate_first_step.py 및 diag10~12,
+                # 로그 참고) 이게 실제 원인이었다: 콜드스타트 웜스타트를
+                # 트림/실측 상태로 바꾸면(가상입력 U_k 추측값은 이미
+                # 합리적이라 그대로 둠) 정확한 트림에서 항상 수렴했고,
+                # eps로 쿼터니언 정규화만 정칙화해서는(나눗셈 특이점 자체)
+                # 바뀌지 않았다 — 즉 원인은 나눗셈 특이점이 아니라
+                # 웜스타트였다(격리 실험으로 확인, eps 유무 무관).
+                # U_k는 그대로 두고 X_k만 x13으로 덮어쓴다.
+                stride = NU_V + NX_V
+                for k in range(self.N + 1):
+                    off = k * stride
+                    self.w0[off:off + NX_V] = x13
+                self._cold_start = False
             p_val = np.concatenate([x13,
                                     self._reference_horizon().ravel(order='F'),
                                     self._prev_input])

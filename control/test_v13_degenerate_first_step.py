@@ -1,30 +1,31 @@
 """V13(VirtualNMPC) 80/85 m/s 실패 원인 진단 — kj 작업지시서(2026-09-25 저녁)
-3단계(실패 분류) 핵심 발견의 재현 테스트.
+3단계(실패 분류) 관련 테스트. **1차 진단은 kj가 직접 재확인해 정정했다 —
+이 파일은 그 정정을 반영한 버전이다.**
 
-증상: 팀원(규현) 기체+우리 V13 조합에서 80/85 m/s 짧은 시험 중 첫 스텝부터
-가상추력 T_cmd가 트림값(~11.3N)이 아니라 거의 0(~0.38N)으로 나온다.
+증상 1(주요 원인, 수정됨): 정확한 트림 상태(섭동 없음)에서도 콜드스타트
+웜스타트가 나빠(호버형 고정 추측값) 입력이 박스에 붙고
+Maximum_Iterations_Exceeded + NaN 경고가 났다. kj 지적대로 이건 "정확한
+해의 성질"이 아니라 순수 수치 실패였다 — `control/hybrid_comparison.py`
+등의 `_solve()`에 콜드스타트 보정을 넣어 고쳤다(V13/M17/F13 전체,
+`control/test_nmpc_family_cold_start.py` 참고).
 
-이 파일은 그 원인 후보들을 하나씩 제거해 가며 확인한다(로그:
-results/SOLVER_FAILURE_LOG_2026-09-25.md 19:40 항목 참고). 결론은 "느슨한
-수렴 허용오차"도 "웜스타트"도 아니고, 논문 식(17) 입력비용 가중치가 너무
-작아 첫 스텝(U_0)에 대한 비용 민감도가 사실상 0에 가깝다는 것 — 이건
-가설이며 결론이 아니다. NMPC 계열 전체에 적용할 수정 여부는 kj 결정 사항.
+증상 2(더 작은 잔여 문제, 미해결): 콜드스타트 수정 후에도 **작은 섭동**
+(+0.2m/+0.5m/s)이 있으면 여전히 U_0(적용되는 첫 입력)만 트림값보다
+크게 낮게 나온다(예: 80m/s에서 ~0.38N vs 트림 11.3N). 이 파일은 그
+원인 후보를 하나씩 제거해 가며 확인한다 — 웜스타트(트림으로 줘도 안
+없어짐), 수렴 허용오차(강화해도 안 없어짐)는 기각했고, 논문 식(17)
+입력비용 가중치가 U_0에 대한 비용 민감도를 너무 낮춘다는 게 지지되는
+가설이다. 결론이 아니다 — NMPC 계열 전체에 적용할 추가 수정 여부는
+kj 결정 사항.
 """
-import sys
-from pathlib import Path
-
 import numpy as np
 import casadi as ca
 import pytest
 
-_KH_ROOT = Path(__file__).resolve().parent.parent / 'external' / 'fastdrone_kh'
-if str(_KH_ROOT) not in sys.path:
-    sys.path.insert(0, str(_KH_ROOT))
+from models.team_light.control.trim import find_trim as kh_find_trim
 
-from kh_control.trim import find_trim as kh_find_trim  # noqa: E402
-
-from control.kh_adapter import kh_native_params, build_controller_params  # noqa: E402
-from control.hybrid_comparison import VirtualNMPC, NX_V  # noqa: E402
+from control.kh_adapter import kh_native_params, build_controller_params
+from control.hybrid_comparison import VirtualNMPC, NX_V
 
 NATIVE = kh_native_params()
 CP = build_controller_params(NATIVE)
@@ -52,9 +53,17 @@ def test_trim_is_preserved_by_the_virtual_integrator():
     np.testing.assert_allclose(np.linalg.norm(x_next[6:10]), 1.0, atol=1e-9)
 
 
-def test_trim_seeded_warm_start_does_not_fix_it():
-    """가설 기각 근거 2 — 완벽한(트림) 웜스타트를 직접 넣어도 증상이
-    그대로면 '콜드스타트가 나쁜 국소해에 빠뜨린다'는 가설은 틀렸다."""
+def test_perturbed_case_low_u0_survives_proper_warm_start():
+    """증상2 가설 기각 근거 1 — **정확한 트림(섭동 없음)에서는 웜스타트
+    수정 하나로 완전히 고쳐졌다**(control/test_nmpc_family_cold_start.py).
+    하지만 여기서는 아주 작은 섭동(+0.2m/+0.5m/s)이 있는 상태에서, 콜드
+    스타트가 아니라 트림값으로 완벽하게 웜스타트를 줘도(아래처럼 수동
+    구성) 증상이 그대로면 — "웜스타트 품질"은 증상2의 원인이 아니다.
+
+    참고: 프로덕션 `_solve()`도 콜드스타트에서 X_k를 실측값(x0, 트림이
+    아니라 **섭동이 포함된 값**)으로 덮어쓰므로 이 수동 구성과 결과가
+    같다 — 아래 assert는 그 사실 자체도 같이 확인한다.
+    """
     tr, x_trim13, x0 = _perturbed_trim()
     nmpc = VirtualNMPC(CP, v_ref=[SPEED, 0, 0], z_ref=Z, dt_ctrl=0.02, cost_spec='paper')
     N = nmpc.N
@@ -63,20 +72,24 @@ def test_trim_seeded_warm_start_does_not_fix_it():
         w0.append([tr['T_total'], 0.0, 0.0, 0.0])
         w0.append(x_trim13.tolist())
     nmpc.w0 = np.array([v for row in w0 for v in row])
+    nmpc._cold_start = False   # 수동 웜스타트를 프로덕션 콜드스타트 보정이 덮어쓰지 않게
     vc = nmpc._solve(x0)
     assert nmpc.last_status == 'Solve_Succeeded'
-    # 증상 재현: 완벽한 웜스타트에도 T_cmd가 트림(~11.3N)과 거리가 멀다.
+    # 증상 재현: 완벽한(트림) 웜스타트에도 T_cmd가 트림(~11.3N)과 거리가 멀다.
     assert vc[0] < 3.0, (
         f"T_cmd={vc[0]:.3f}N — 트림 웜스타트로도 여전히 낮으면(증상 재현) "
-        "실패 원인이 웜스타트가 아니라는 가설이 유지된다")
+        "'웜스타트 품질'은 증상2의 원인이 아니라는 가설이 유지된다")
 
 
 def test_tighter_tolerance_does_not_fix_it():
-    """가설 기각 근거 3 — ipopt.tol을 1e-4에서 1e-7로, max_iter를 30에서
-    300으로 강화해도 U_0가 그대로면 '느슨한 수렴'이 원인이 아니다.
+    """증상2 가설 기각 근거 2 — (섭동 있는 경우, 트림 웜스타트를 이미 준
+    상태에서) ipopt.tol을 1e-4에서 1e-7로, max_iter를 30에서 300으로
+    강화해도 U_0가 그대로면 '느슨한 수렴'은 증상2의 원인이 아니다.
 
     _build_nlp_paper의 그래프를 그대로 다시 짜되(원본은 안 건드림) tol만
-    바꾼다 — 원본 함수가 tol을 인자로 받지 않아서다.
+    바꾼다 — 원본 함수가 tol을 인자로 받지 않아서다. 웜스타트는 처음부터
+    트림으로 줘서(x_trim13) 증상1(콜드스타트 웜스타트 버그, 이미 수정됨)이
+    안 섞이게 한다.
     """
     tr, x_trim13, x0 = _perturbed_trim()
     base = VirtualNMPC(CP, v_ref=[SPEED, 0, 0], z_ref=Z, dt_ctrl=0.02, cost_spec='paper')
@@ -137,6 +150,10 @@ def test_tighter_tolerance_does_not_fix_it():
 
 
 def _solve_full_T_sequence(speed):
+    """주의: `nmpc.solver(...)`를 직접 불러 `_solve()`를 우회한다 — 즉
+    콜드스타트 수정(증상1) 이전의 원시 웜스타트(호버형 고정값)로 푼
+    해다. 증상1은 이미 고쳤지만, "고치기 전엔 전체 호라이즌이 어떤
+    모양이었는지"는 진단 기록으로 남긴다(아래 두 테스트)."""
     tr = kh_find_trim(NATIVE, speed)
     x13 = np.concatenate([tr['state'][0:10], tr['state'][10:13]])
     x13[2] = Z

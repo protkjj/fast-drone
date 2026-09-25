@@ -1,34 +1,39 @@
-"""kj 지시(권고순서 2·3) — 팀원 분리형과 우리 V13을 같은 플랜트·시나리오로.
+"""kj 지시(권고순서 2·3, 2026-09-25 저녁 갱신) — 팀원 분리형과 우리 V13을
+같은 플랜트·시나리오로.
 
 시나리오 정의(초기오차·지속시간·돌풍·정지조건·성공판정)는 팀원의
-`kh_control.run_baseline_comparison.run_case`를 **그대로 옮겨 적었다**(그
-함수 자체를 재사용하지 못하는 이유는 그 함수가 팀원 제어기 클래스를 직접
-import해 하드코딩하고 있어서다 — 시나리오 로직은 같게, 제어기만 바꿔
-끼운다). 플랜트는 항상 팀원 것(`kh_control.dynamics.AxialDronePlant`)이고,
-우리 쪽 제어기 파라미터는 `control.kh_adapter.build_controller_params()`가
-만든다(로터 기하는 팀원 값 그대로, 공력만 최소제곱 적합).
+`models.team_light.control.run_baseline_comparison.run_case`를 **그대로
+옮겨 적었다**(그 함수 자체를 재사용하지 못하는 이유는 그 함수가 팀원 제어기
+클래스를 직접 import해 하드코딩하고 있어서다 — 시나리오 로직은 같게,
+제어기만 바꿔 끼운다). 플랜트는 항상 팀원 것
+(`models.team_light.control.dynamics.AxialDronePlant`)이고, 우리 쪽 제어기
+파라미터는 `control.kh_adapter.build_controller_params()`가 만든다(로터
+기하는 팀원 값 그대로, 공력만 최소제곱 적합).
+
+**주의**: "팀원 분리형" 비교 대상은 `models/team_light/control/`(우리
+control/의 2026-09-09 옛 스냅샷, cost_spec/S1 등 없음)의 ProperHybrid가
+아니라 `Factory.make('Split',...)`가 실제로 쓰는 `ComparisonNMPC`+
+`ProperHybrid` 조합이다 — 규현의 원 비교실험(docs/BASELINE_V2_RESULTS.md)이
+그 조합으로 나온 결과이므로 여기서도 그대로 쓴다(그래야 46.4s 등 문서
+수치가 재현된다). 우리 V13 쪽은 **현재**(병합 이후 최신) `control/
+hybrid_comparison.py`를 쓴다 — kj 확인사항: 옛 스냅샷 기반 비교는
+'분리형' 자체가 아니라 구버전 구현에 대한 비교라 무효.
 
 실행: python3 -m control.kh_repro
 """
-import sys
 from copy import deepcopy
-from pathlib import Path
 from time import perf_counter
 
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-_KH_ROOT = Path(__file__).resolve().parent.parent / 'external' / 'fastdrone_kh'
-if str(_KH_ROOT) not in sys.path:
-    sys.path.insert(0, str(_KH_ROOT))
+from models.team_light.control.dynamics import AxialDronePlant as KHPlant
+from models.team_light.control.trim import find_trim as kh_find_trim
+from models.team_light.control.propeller_curve import domain_status as kh_domain_status
+from models.team_light.control.run_baseline_comparison import Factory as KHFactory, gust
 
-from kh_control.dynamics import AxialDronePlant as KHPlant  # noqa: E402
-from kh_control.trim import find_trim as kh_find_trim  # noqa: E402
-from kh_control.propeller_curve import domain_status as kh_domain_status  # noqa: E402
-from kh_control.run_baseline_comparison import Factory as KHFactory, gust  # noqa: E402
-
-from control.kh_adapter import kh_native_params, build_controller_params  # noqa: E402
-from control.hybrid_comparison import ProperHybrid, VirtualNMPC  # noqa: E402
+from control.kh_adapter import kh_native_params, build_controller_params
+from control.hybrid_comparison import ProperHybrid, VirtualNMPC
 
 DT = 0.002    # 팀원 시험과 동일 플랜트 스텝(run_baseline_comparison.DT)
 

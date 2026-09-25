@@ -1,6 +1,9 @@
 """kj 작업지시서(2026-09-25 저녁) 2단계 — 65초 통합 미션 재현.
 
-`docs/BASELINE_V2_RESULTS.md`(팀원 규현, `external/fastdrone_kh/docs/`)의
+`docs/BASELINE_V2_RESULTS.md`(팀원 규현, `external/fastdrone_kh/docs/` —
+이 문서·results/61개 시험은 민석의 `models/team_light/`엔 안 들어있어
+그대로 둔다. 코드는 병합된 `models.team_light.control`을 쓰지만 문서
+참고는 원본 전체를 클론한 이쪽이 유일한 소스다)의
 "기존 70 m/s 통합 미션"(이륙10s+안정화3s+가속15s+순항15s+감속15s+호버링7s
 =65s, 순항 중 35s에 10m/s 수직돌풍)을 그대로 재현한다. 먼저 팀원 자신의
 Split/직접NMPC/나이브/GS-LQR/INDI(그들 코드 그대로, `run_baseline_comparison.
@@ -14,37 +17,44 @@ run_case(mission=True)`)로 문서의 숫자(분리형 46.400s, 직접NMPC·나�
 
 실행: python3 -m control.kh_mission_repro
 """
-import sys
-from pathlib import Path
 from time import perf_counter
 
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-_KH_ROOT = Path(__file__).resolve().parent.parent / 'external' / 'fastdrone_kh'
-if str(_KH_ROOT) not in sys.path:
-    sys.path.insert(0, str(_KH_ROOT))
+from models.team_light.control.dynamics import AxialDronePlant as KHPlant
+from models.team_light.control.trim import find_trim as kh_find_trim
+from models.team_light.control.propeller_curve import domain_status as kh_domain_status
+from models.team_light.control.mission_sim import MissionProfile as KHMissionProfile
+from models.team_light.control.run_baseline_comparison import Factory as KHFactory, gust, solver_of
 
-from kh_control.dynamics import AxialDronePlant as KHPlant  # noqa: E402
-from kh_control.trim import find_trim as kh_find_trim  # noqa: E402
-from kh_control.propeller_curve import domain_status as kh_domain_status  # noqa: E402
-from kh_control.mission_sim import MissionProfile as KHMissionProfile  # noqa: E402
-from kh_control.run_baseline_comparison import Factory as KHFactory, gust, solver_of  # noqa: E402
-
-from control.kh_adapter import kh_native_params, build_controller_params  # noqa: E402
-from control.hybrid_comparison import ProperHybrid, VirtualNMPC  # noqa: E402
-from control.kh_repro import _install_solve_log_spy  # noqa: E402
+from control.kh_adapter import kh_native_params, build_controller_params
+from control.hybrid_comparison import ProperHybrid, VirtualNMPC
+from control.kh_repro import _install_solve_log_spy
 
 DT = 0.002
 
 
-def run_mission(plant_params, ctrl_factory, label, *, profile=None):
+def run_mission(plant_params, ctrl_factory, label, *, profile=None, gust_fn=None):
     """`run_baseline_comparison.run_case(mission=True)`와 동일 로직(팀원
-    시나리오 그대로) — 제어기만 팩토리로 교체 가능하게 뺐다."""
+    시나리오 그대로) — 제어기만 팩토리로 교체 가능하게 뺐다.
+
+    gust_fn(t)->3벡터. None이면 팀원 원본과 같이 35s 수직 10m/s 고정
+    (규현의 65s 프로파일 전용 — 다른 길이의 프로파일에 그대로 쓰면 돌풍이
+    엉뚱한 구간에 걸려 가감속 severity 비교가 오염된다. 그럴 때는
+    ``gust_fn=lambda t: np.zeros(3)``로 꺼서 순수 가감속 비교를 한다).
+    """
     profile = profile or KHMissionProfile(70.0, 50.0)
+    gust_fn = gust_fn or (lambda t: gust(t, 2, 10.0, 35.0))
     tr = kh_find_trim(plant_params, 0.0)
     x = tr['state'].copy()
-    x[2] = 2.0
+    # 시작 고도는 프로파일 자신의 t=0 참조를 따른다(하드코딩 2.0이면 안
+    # 된다 — 규현의 6단계 프로파일은 이륙단계(z=2->50)가 있어 우연히
+    # 일치하지만, 이륙단계가 없는 축약 프로파일(예: 민석 타이밍 완화
+    # 연구의 5단계 구조)은 t=0에 이미 순항고도라 2.0으로 시작하면 즉시
+    # 48m 고도오차로 걸린다 — 실제 발견한 버그, results/
+    # SOLVER_FAILURE_LOG_2026-09-25.md 참고).
+    x[2] = profile.get_ref(0.0)[1]
 
     ctrl, solver = ctrl_factory(profile)
     plant = KHPlant(plant_params, dt=DT)
@@ -61,7 +71,7 @@ def run_mission(plant_params, ctrl_factory, label, *, profile=None):
         v_ref, z_ref, _ = profile.get_ref(t)
         if hasattr(ctrl_factory, 'update'):
             ctrl_factory.update(ctrl, v_ref, z_ref)
-        w = gust(t, 2, 10.0, 35.0)
+        w = gust_fn(t)
         try:
             u = np.asarray(ctrl(t, x))
             if not np.all(np.isfinite(u)):

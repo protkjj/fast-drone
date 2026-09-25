@@ -1,38 +1,40 @@
 """새 기체(light_rocket_v2_pack_forward, 팀원 저장소) 어댑터.
 
-kj 지시(권고순서 1) 그대로:
-  1) 팀원 플랜트는 재구현하지 않는다 — `external/fastdrone_kh`(벤더 사본,
-     패키지명만 `kh_control`로 바꿈, `PORTING_NOTE.md`에 근거)를 그대로
-     불러 쓴다. 이 파일은 그 위에 얇은 어댑터만 얹는다.
+kj 지시(권고순서 1, 2026-09-25 저녁 갱신) 그대로:
+  1) 팀원 플랜트는 재구현하지 않는다 — 이제 `models/team_light/control`에
+     git 병합으로 정식 편입되어 있다(kms301111/fast-drone-control, 커밋
+     3bf4e60). 예전에는 이름 충돌 때문에 `external/fastdrone_kh`를
+     `kh_control`로 이름 바꿔 벤더링했었지만, 병합 이후로는 그게 중복이라
+     여기서도 `models.team_light.control`을 그대로 쓴다(어댑터를 새로 만들지
+     않는다 — kj: "이 플랜트를 그대로 쓴다").
   2) 우리 제어기(V13 등)의 예측모델이 쓰는 **집중정수** 공력 계수는 팀원의
      **분산** 공력 모델에서 α·V를 샘플링해 최소제곱으로 적합한다 — 로터
      기하(위치·방향)는 근사하지 않고 팀원 값을 그대로 쓴다(둘 다 동체좌표계
      안에서만 쓰이는 값이라 `control/test_kh_convention_match.py`가 확인한
      것처럼 섞어도 안전하다).
+  3) `models/team_light/control/`(ProperHybrid 등)는 우리 control/의 옛
+     스냅샷(a00c75e, 2026-09-09, cost_spec/time_align/alloc_feedback 등
+     이번 세션 기능이 전혀 없는 187줄짜리 구버전)이다. 팀원의 "분리형
+     부진" 결과는 이 구버전 결과이므로, 재현은 반드시 이 병합 이후의
+     **현재** `control/hybrid_comparison.py`(1006줄)로 한다 — 플랜트만
+     팀원 것을 쓰고 제어기는 우리 최신 코드를 쓰는 이유가 이것이다.
 
 결과 구조: **플랜트는 팀원 것(고충실도, 분산 공력+Ct/Cp 곡선), 제어기
 예측모델은 우리 것(단순화, 이 파일이 적합한 집중정수)** — 2026-09-24 밤에
 만든 "플랜트≠제어기 모델" 원칙(`control/dynamics_hifi.py`)을 외부 기체에도
 그대로 적용한 것이다.
 """
-import sys
-from pathlib import Path
-
 import casadi as ca
 import numpy as np
 
-_KH_ROOT = Path(__file__).resolve().parent.parent / 'external' / 'fastdrone_kh'
-if str(_KH_ROOT) not in sys.path:
-    sys.path.insert(0, str(_KH_ROOT))
-
-from kh_control.baseline_v2 import baseline_params as _kh_baseline_params  # noqa: E402
-from kh_control.light_aero import light_aerodynamics as _kh_light_aero  # noqa: E402
-from kh_control.trim import find_trim as _kh_find_trim  # noqa: E402
+from models.team_light.control.baseline_v2 import baseline_params as _kh_baseline_params  # noqa: E402
+from models.team_light.control.light_aero import light_aerodynamics as _kh_light_aero  # noqa: E402
+from models.team_light.control.trim import find_trim as _kh_find_trim  # noqa: E402
 
 
 def kh_native_params():
     """팀원 플랜트에 그대로 넣을 원본 파라미터. 절대 수정하지 말 것 —
-    이 dict가 `kh_control.dynamics.AxialDronePlant`/`find_trim`의 입력이다.
+    이 dict가 `models.team_light.control.dynamics.AxialDronePlant`/`find_trim`의 입력이다.
     """
     return _kh_baseline_params()
 
@@ -90,7 +92,7 @@ def _sample_near_trim(anchors, alpha_window_deg=20.0, v_scale=(0.85, 1.15),
 
 def fit_lumped_aero(native_params, speeds=None, alpha_window_deg=20.0,
                     omega_probe=0.05, verbose=True):
-    """분산 공력 모델(`kh_control.light_aero`)을 우리 집중정수 계수로 적합.
+    """분산 공력 모델(`models.team_light.control.light_aero`)을 우리 집중정수 계수로 적합.
 
     샘플링은 **팀원 자체 트림 곡선 근방**(±각도창, ±속도스케일)에서만 한다
     (`_sample_near_trim` 참고 — 전 구간 격자를 썼을 때의 실패 기록도 함께

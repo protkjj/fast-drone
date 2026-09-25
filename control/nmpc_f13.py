@@ -121,6 +121,7 @@ class RotorThrustNMPC13:
         self.consec_fail = 0
         self.last_status = 'none'
         self._ever_converged = False
+        self._cold_start = True   # V13/M17와 동일 콜드스타트 웜스타트 보정 플래그
 
     def _build_rk4_substeps(self, f, x_sym, u_sym, substeps=5):
         """논문 4.2절 — control.hybrid_comparison.VirtualNMPC 와 같은 패턴.
@@ -217,6 +218,7 @@ class RotorThrustNMPC13:
         self.consec_fail = 0
         self.last_status = 'none'
         self._ever_converged = False
+        self._cold_start = True
         if self._w0_init is not None:
             self.w0 = self._w0_init.copy()
 
@@ -293,6 +295,15 @@ class RotorThrustNMPC13:
 
     def _solve(self, x13):
         if self.cost_spec == 'paper':
+            if self._cold_start:
+                # control/hybrid_comparison.py::VirtualNMPC._solve와 동일한
+                # 콜드스타트 웜스타트 보정(kj 지적, 2026-09-25 저녁) — NMPC
+                # 계열 전체에 동일 적용(V13만 고치지 않는다).
+                stride = NU_F + NX_V
+                for k in range(self.N + 1):
+                    off = k * stride
+                    self.w0[off:off + NX_V] = x13
+                self._cold_start = False
             p_val = np.concatenate([x13, self._reference_horizon().ravel(order='F')])
         else:
             p_val = np.concatenate([x13, self.v_ref, [self.z_ref], self.f_ref])

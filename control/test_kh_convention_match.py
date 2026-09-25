@@ -1,7 +1,9 @@
 """좌표 규약 일치 테스트 — kj 지시 1): "규약이 같다고 했으니 규약 일치
 테스트 하나만 붙이면 됩니다."
 
-`external/fastdrone_kh`(팀원 저장소, `kh_control`로 이름만 바꾼 벤더 사본)를
+`models/team_light/control`(팀원 규현의 기체, kms301111/fast-drone-control
+병합으로 정식 편입됨 — 2026-09-25 저녁 이전엔 이름 충돌 때문에
+`external/fastdrone_kh`를 `kh_control`로 바꾼 벤더 사본을 썼었다)을
 우리 어댑터로 감싸 쓰기 전에, 두 코드베이스의 물리적 규약이 실제로 같은지
 숫자로 확인한다. 두 저장소가 각자 자기 안에서는 자기완결적이므로, 여기서
 검증하는 건 "섞어 써도 되는 지점"이지 "모든 숫자가 같다"가 아니다.
@@ -15,27 +17,20 @@
 플랜트에서" 를 지키는 한(둘을 섞지 않는 한) 이 롤 오프셋은 물리에 영향이
 없다 — 이 파일이 그 전제를 확인해 둔다.
 """
-import sys
-from pathlib import Path
-
 import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-_KH_ROOT = Path(__file__).resolve().parent.parent / 'external' / 'fastdrone_kh'
-if str(_KH_ROOT) not in sys.path:
-    sys.path.insert(0, str(_KH_ROOT))
+from models.team_light.control.baseline_v2 import baseline_params as kh_baseline_params
+from models.team_light.control.dynamics import AxialDronePlant as KHPlant
+from models.team_light.control.geometry import hover_quaternion as kh_hover_quaternion
+from models.team_light.control.trim import find_trim as kh_find_trim
 
-from kh_control.baseline_v2 import baseline_params as kh_baseline_params  # noqa: E402
-from kh_control.dynamics import AxialDronePlant as KHPlant  # noqa: E402
-from kh_control.geometry import hover_quaternion as kh_hover_quaternion  # noqa: E402
-from kh_control.trim import find_trim as kh_find_trim  # noqa: E402
-
-from control.dynamics import (compute_allocation_matrix,  # noqa: E402
+from control.dynamics import (compute_allocation_matrix,
                               _quat_to_rotmat)
-from control.hybrid_comparison import compute_control_effectiveness  # noqa: E402
-from control.dynamics import AxialDronePlant as OurPlant  # noqa: E402
-from control.vehicle_params import load_selected_params  # noqa: E402
+from control.hybrid_comparison import compute_control_effectiveness
+from control.dynamics import AxialDronePlant as OurPlant
+from control.vehicle_params import load_selected_params
 
 KH = kh_baseline_params()
 OURS = load_selected_params()
