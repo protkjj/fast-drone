@@ -21,10 +21,13 @@
        조건부이고, 출발 때 명목 트림값으로 채운다(NMPC 웜스타트와 같은 정보).
        GSLQR·CPID는 한계 도달·적분 정지 스텝을 같은 형식으로 기록한다
 
-무거운 폐루프 사례는 ARENA_QUICK=1이면 건너뛴다(scripts/verify_arena.py --quick).
+무거운 폐루프 사례는 ARENA_QUICK=1이면 건너뛴다(scripts/verify_arena.py --quick). 빠른 모드는
+M17 NLP도 짓지 않는다(한 번에 ~2 GB — 3 GB 예산). M17은 전체 모드에서 확인한다.
 """
 from copy import deepcopy
+import gc
 import os
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -43,6 +46,11 @@ from models.team_light.control.trim import find_trim as plant_trim
 
 QUICK = os.environ.get('ARENA_QUICK') == '1'
 slow = pytest.mark.skipif(QUICK, reason='ARENA_QUICK=1: heavy closed-loop check skipped')
+# 빠른 모드에서는 M17 NLP를 아예 짓지 않는다. 한 번 짓는 데 최대 ~2 GB라(2026-09-26 실측
+# 1.9 GiB) verify --quick의 메모리 예산 3 GB(kj)에 여유가 없다. M17은 전체 모드에서 확인한다.
+HEAVY = ('M17',)
+LIVE_LABELS = tuple(label for label in ARENA_LABELS if not (QUICK and label in HEAVY))
+LIVE_NMPC = tuple(label for label in NMPC_LABELS if not (QUICK and label in HEAVY))
 
 # 모든 제어기를 한 번씩 돌려 보기 위한 아주 짧은 사례(40 스텝, NMPC 솔브 4회).
 SHORT = GustProfile(85.0, 20.0, 0.04, 0.02, 0.02)
@@ -67,9 +75,28 @@ def factory(config, native):
     return ArenaFactory(config, native)
 
 
+class _Snapshot:
+    """제어기 객체 대신 테스트가 쓰는 값만 떼어 둔다.
+
+    NLP 객체(M17은 1 GB가 넘는다)를 모듈 내내 붙잡고 있으면, 다른 테스트가 NLP를 새로 지을 때
+    둘이 겹쳐 verify --quick이 메모리 예산 3 GB(kj)를 넘었다(실측 3.98 GB).
+    """
+
+    def __init__(self, ctrl):
+        self.settings = deepcopy(ctrl.settings)
+        self.observation = ctrl.observation_spec()
+        self.window_type = type(ctrl.window)
+        self.horizon_s = ctrl.window.horizon_s
+        self.max_lookahead = ctrl.window.max_lookahead
+        nmpc = ctrl.nmpc
+        self.nlp = None if nmpc is None else SimpleNamespace(
+            ubw=np.array(nmpc.ubw, dtype=float).ravel(), N=int(nmpc.N),
+            f_max=getattr(nmpc, 'f_max', None))
+
+
 @pytest.fixture(scope='module')
 def captured_short_runs(factory):
-    """5종을 SHORT로 한 번씩 돌리고 (행, 제어기 객체, 결과)를 모은다 — I-1·I-2·I-3 공용."""
+    """5종을 SHORT로 한 번씩 돌리고 (행, 제어기 스냅샷, 결과)를 모은다 — I-2·I-3·I-11 공용."""
     made = {}
     real_make = factory.make_for_profile
 
@@ -80,9 +107,10 @@ def captured_short_runs(factory):
     factory.make_for_profile = capture
     try:
         runs = {}
-        for label in ARENA_LABELS:
+        for label in LIVE_LABELS:
             row, result, _ = suite.run_trial(factory, label, SHORT, _case('short'), Acceptance())
-            runs[label] = (row, made[label], result)
+            runs[label] = (row, _Snapshot(made.pop(label)), result)
+            gc.collect()
     finally:
         del factory.make_for_profile           # 인스턴스 속성을 지워 원래 메서드로
     return runs
@@ -104,11 +132,11 @@ def test_i1_same_plant_factory_hash_and_initial_state(factory, native, monkeypat
         seen.clear()
         case = dict(_case('i1'), factors=factors)
         rows, starts = {}, {}
-        for label in ARENA_LABELS:
+        for label in LIVE_LABELS:
             row, result, _ = suite.run_trial(factory, label, SHORT, case, Acceptance())
             rows[label], starts[label] = row, result['xs'][0]
         expected = parameter_hash(perturb_params(native, factors))
-        assert len(seen) == len(ARENA_LABELS)
+        assert len(seen) == len(LIVE_LABELS)
         assert set(seen) == {(expected, factory.dt, 'models.team_light.control.dynamics')}
         assert {r['truth_parameter_sha256'] for r in rows.values()} == {expected}
         # 제어기는 플랜트 섭동을 모른다: 명목 제어기 모델 해시가 사례와 무관하게 같다.
@@ -126,18 +154,18 @@ def test_i1_controllers_never_hold_the_plant_parameter_dict(factory):
 # ── I-2 ─────────────────────────────────────────────────────────────
 
 def test_i2_same_observation_keys_and_preview_window(captured_short_runs, config):
-    specs = {label: ctrl.observation_spec() for label, (_, ctrl, _) in captured_short_runs.items()}
+    specs = {label: snap.observation for label, (_, snap, _) in captured_short_runs.items()}
     assert all(spec == specs['V13'] for spec in specs.values()), specs
     H = config['preview_horizon_s']
-    for label, (_, ctrl, _) in captured_short_runs.items():
-        assert type(ctrl.window) is ReferenceWindow
-        assert ctrl.window.horizon_s == H
-        assert ctrl.window.max_lookahead <= H + 1e-9, label
+    for label, (_, snap, _) in captured_short_runs.items():
+        assert snap.window_type is ReferenceWindow
+        assert snap.horizon_s == H
+        assert snap.max_lookahead <= H + 1e-9, label
     # 같은 창을 받았고, 쓰는 폭은 구조가 정한다: NMPC는 예측 구간 전체, 나머지는 현재만.
-    for label in NMPC_LABELS:
-        assert captured_short_runs[label][1].window.max_lookahead == pytest.approx(H, abs=1e-9)
+    for label in LIVE_NMPC:
+        assert captured_short_runs[label][1].max_lookahead == pytest.approx(H, abs=1e-9)
     for label in ('GSLQR', 'CPID'):
-        assert captured_short_runs[label][1].window.max_lookahead == pytest.approx(0.0, abs=1e-12)
+        assert captured_short_runs[label][1].max_lookahead == pytest.approx(0.0, abs=1e-12)
 
 
 def test_i2_preview_beyond_horizon_is_refused():
@@ -162,7 +190,7 @@ I3_KEYS = ('N', 'dt_pred_s', 'dt_ctrl_s', 'ipopt_options', 'cost_spec', 'cost_we
 
 
 def test_i3_nmpc_family_solver_settings_are_identical(captured_short_runs, config):
-    settings = {label: captured_short_runs[label][1].settings for label in NMPC_LABELS}
+    settings = {label: captured_short_runs[label][1].settings for label in LIVE_NMPC}
     for key in I3_KEYS:
         values = {label: s[key] for label, s in settings.items()}
         assert len({repr(v) for v in values.values()}) == 1, f'{key} differs: {values}'
@@ -180,8 +208,8 @@ def test_i3_nmpc_thrust_bounds_are_symmetric(captured_short_runs):
     (kj 확인 요청, 2026-09-25). 한쪽만 유속 의존 상한으로 바뀌면 대칭이 깨지므로
     여기서 묶어 둔다. V13 가상입력 T의 상한 = 4 × F13 로터별 상한.
     """
-    v13 = captured_short_runs['V13'][1].nmpc
-    f13 = captured_short_runs['F13'][1].nmpc
+    v13 = captured_short_runs['V13'][1].nlp
+    f13 = captured_short_runs['F13'][1].nlp
     stride = 13 + 4                            # 배치 [X_0, U_0, X_1, U_1, …]
     T_max_v13 = float(v13.ubw[13])             # 첫 입력 블록 U_0의 T 상한
     f_max_f13 = float(f13.ubw[13])             # 첫 입력 블록 U_0의 로터 1 상한
@@ -190,7 +218,8 @@ def test_i3_nmpc_thrust_bounds_are_symmetric(captured_short_runs):
 
 
 @pytest.mark.parametrize('speed', [0.0, 20.0, 85.0])
-@pytest.mark.parametrize('label', NMPC_LABELS)
+@pytest.mark.parametrize('label', [pytest.param(label, marks=slow) if label in HEAVY else label
+                                   for label in NMPC_LABELS])
 def test_i5_nmpc_converges_near_trim_input_at_exact_trim(factory, config, label, speed):
     """I-5: 명목 제어기 모델의 정확한 트림(플랜트 규약)에서 연속 3회 솔브.
 
@@ -227,7 +256,7 @@ def test_i5_nmpc_converges_near_trim_input_at_exact_trim(factory, config, label,
 
 def test_i3_same_warm_start_rule(factory):
     """세 NMPC의 첫 웜스타트: X 블록 = 실측 초기상태, U 블록 = 명목 모델 트림 입력."""
-    for label in NMPC_LABELS:
+    for label in LIVE_NMPC:
         ctrl = factory.make_for_profile(label, SHORT)
         tr = plant_trim(factory.p, 85.0)
         x = tr['state'].copy()
@@ -662,7 +691,7 @@ def test_i11_cpid_integrators_freeze_while_saturated(factory):
 
 def test_i11_integrator_log_has_the_same_format_for_gslqr_and_cpid(captured_short_runs):
     reports = {label: run[0].get('integrators') for label, run in captured_short_runs.items()}
-    for label in NMPC_LABELS:
+    for label in LIVE_NMPC:
         assert reports[label] is None                 # NMPC 계열은 적분기가 없다
     keys = {'steps', 'at_limit_steps', 'at_limit_fraction', 'frozen_steps', 'frozen_fraction',
             'channels'}
