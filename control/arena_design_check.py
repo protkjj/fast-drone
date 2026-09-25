@@ -14,6 +14,9 @@
 끝까지 머무는 첫 시각. 오버슈트는 목표를 넘어선 최대량 / 계단 크기.
 
 실행: python -m control.arena_design_check [--out results/arena]
+      python -m control.arena_design_check --tuned results/arena/tuning/pilot24 --out <dir>
+        → 튜닝 기록(<label>.record.json)의 최선값으로 같은 점검(kj: 튜닝 뒤에도 CPID가
+          설계 영역에서 수렴하지 못하면 결정 필요로 올린다)
 """
 import argparse
 from datetime import datetime, timezone
@@ -113,6 +116,10 @@ def write_markdown(path, rows, meta):
              '**PILOT** — 기준선이 제 설계 영역에서 정상인지 보는 진단. 비교 결론 없음.', '',
              f'재현: `{meta["command"]}` · 설정 sha256 `{meta["config_sha256"][:12]}` · '
              f'git `{meta["git_revision"]}` dirty={meta["git_dirty"]}', '',
+             *([f'게인: 튜닝 기록 최선값 — ' + ', '.join(
+                 f'{k} 목적함수 {v["prior_objective"]:.4g} → {v["best_objective"]:.4g}(예산 {v["budget"]})'
+                 for k, v in meta['tuned'].items()), ''] if meta.get('tuned') else
+               ['게인: configs/gains 사전값', '']),
              f'팀 플랜트 명목, 트림 출발, t={STEP_TIME}s 계단, {DURATION:g}s 관찰. '
              f'정착 대역 = 계단의 ±{100*BAND:.0f}%. 교차결합 = 다른 채널의 최대 이탈.', '',
              '적분 한계 % = 어느 적분 채널이든 한계에 닿아 있던 스텝의 비율, 적분 정지 % = 포화로 '
@@ -132,6 +139,24 @@ def write_markdown(path, rows, meta):
     path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 
+def tuned_overrides(config, run_dir, labels=('GSLQR', 'CPID')):
+    """튜닝 기록의 최선값을 팩토리 overrides로 바꾼다(arena_tune.parameter_space와 같은 적용)."""
+    from control.arena_tune import parameter_space
+    gains = ArenaFactory(config).gains
+    overrides, used = {}, {}
+    for label in labels:
+        path = Path(run_dir)/f'{label}.record.json'
+        record = json.loads(path.read_text(encoding='utf-8'))
+        if record.get('status') != 'complete':
+            raise ValueError(f'{path}: tuning not complete ({record.get("status")})')
+        _, _, apply = parameter_space(config, label, gains)
+        overrides.update(apply(record['best_values']))
+        used[label] = dict(record=str(path), best_values=record['best_values'],
+                           best_objective=record.get('best_objective'),
+                           prior_objective=record.get('prior_objective'), budget=record['budget'])
+    return overrides, used
+
+
 def main(argv=None):
     from control.validation_suite import write_json, environment_fingerprint, git_state
     from control.arena import config_sha256
@@ -139,9 +164,11 @@ def main(argv=None):
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--config', type=Path, default=DEFAULT_CONFIG)
     parser.add_argument('--out', type=Path, default=ROOT/'results'/'arena')
+    parser.add_argument('--tuned', type=Path, help='tuning run-dir: use each record\'s best values')
     args = parser.parse_args(argv)
     config = load_config(args.config)
-    factory = ArenaFactory(config)
+    overrides, tuned = tuned_overrides(config, args.tuned) if args.tuned else (None, None)
+    factory = ArenaFactory(config, overrides=overrides)
     rows = []
     for label, speeds in POINTS.items():
         for V in speeds:
@@ -149,7 +176,8 @@ def main(argv=None):
                 print(f'{label} V={V:g} {step_name}', flush=True)
                 rows.append(run(config, factory, label, V, step_name))
     revision, dirty = git_state()
-    meta = dict(label='PILOT', command='python -m control.arena_design_check',
+    command = 'python -m control.arena_design_check' + (f' --tuned {args.tuned}' if args.tuned else '')
+    meta = dict(label='PILOT', command=command, tuned=tuned,
                 created_utc=datetime.now(timezone.utc).isoformat(),
                 config_sha256=config_sha256(config), git_revision=revision, git_dirty=dirty,
                 controller_model_sha256=factory.controller_model_sha256,
