@@ -23,6 +23,11 @@ EPS = 1e-8
 NX  = 17
 NU  = 4
 
+try:
+    from models.team_light.control.propeller_curve import MODEL as PROP_CURVE_MODEL
+except ImportError:
+    PROP_CURVE_MODEL = 'apc_30k_pchip_v2'   # models/team_light 미병합 환경 대비 폴백
+
 # ════════════════════════════════════════════════════
 # 헬퍼
 # ════════════════════════════════════════════════════
@@ -130,17 +135,30 @@ def _rotor_forces_moments(v_body, n_vec, omega, p):
     M_tot = ca.SX.zeros(3)
     h_net = 0.0
 
+    use_curve = p.get('propulsion_model') == PROP_CURVE_MODEL
+    if use_curve:
+        from models.team_light.control.propeller_curve import symbolic_force_torque
+
     for i in range(p['num_rotors']):
         ni = n_vec[i]
         di = float(dirs[i])
         ri = pos[i]
 
-        n_rps = ni / (2.0 * ca.pi)
-        J = V_axial / (n_rps * p['D_prop'] + EPS)
-        fac = ca.fmax(1.0 - J / p['J_max'], 0.0)
-
-        Ti = p['k_T'] * ni**2 * fac
-        Qi = p['k_Q'] * ni**2 * fac
+        if use_curve:
+            # kj 지적(2026-09-25 밤): 선형 fac=1-J/J_max 모델이 APC
+            # 5.5x6.5E 실제 CT(J)를 트림 회전수에서 0.43~0.69배로 크게
+            # 과소평가한다(J_max=1.35인데 실제 곡선은 J≈0.8까지 거의
+            # 평평함). J<0.6에서 값이 확 꺾여 트림·짧은시험 포화의 근본
+            # 원인 후보. propulsion_model이 이 값이면(팀원 기체) 팀원
+            # 자신의 매끄러운 PCHIP 곡선을 그대로 쓴다 — 재구현 안 함,
+            # 우리 자신의 기체(이 값이 없는 경우)는 기존 선형모델 그대로.
+            Ti, Qi = symbolic_force_torque(p, ni, V_axial)
+        else:
+            n_rps = ni / (2.0 * ca.pi)
+            J = V_axial / (n_rps * p['D_prop'] + EPS)
+            fac = ca.fmax(1.0 - J / p['J_max'], 0.0)
+            Ti = p['k_T'] * ni**2 * fac
+            Qi = p['k_Q'] * ni**2 * fac
 
         if axis == 'x':
             # 추력 [T, 0, 0].  모멘트 r × [T,0,0] = [0, r_z·T, -r_y·T]

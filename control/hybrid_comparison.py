@@ -16,6 +16,8 @@ VirtualNMPC:
   C_Na ±20% + 돌풍 → 분리가 모델 오차도 보상하는지
 """
 
+from functools import lru_cache
+
 import numpy as np
 import casadi as ca
 import time as timer
@@ -23,7 +25,8 @@ from scipy.spatial.transform import Rotation
 
 from control.vehicle_params import vehicle_params as P
 from control.dynamics import (build_dynamics, _quat_to_rotmat, _quat_derivative,
-                      _body_aerodynamics, EPS, compute_allocation_matrix)
+                      _body_aerodynamics, EPS, compute_allocation_matrix,
+                      PROP_CURVE_MODEL)
 from control.trim import find_trim
 from control.controller import ScheduledLQR
 from control.nmpc import NMPCController
@@ -37,14 +40,34 @@ NX_V = 13   # [p(3), v(3), q(4), ω(3)]
 NU_V = 4    # [T, ν_ωx, ν_ωy, ν_ωz]
 
 
+def _curve_thrust(params, n, V_axial):
+    """팀원 APC 곡선 기반 로터 추력(수치, 배열 가능) — 곡선 재구현 없이
+    `models.team_light.control.propeller_curve.coefficients()`를 그대로
+    쓴다(CasADi 대칭 미분이 필요 없는 자리 — `rotor_thrust_cap`, INDI의
+    T_meas, `_fallback`용)."""
+    from models.team_light.control.propeller_curve import coefficients
+    n = np.asarray(n, dtype=float)
+    n_rps = n / (2 * np.pi)
+    J = V_axial / (n_rps * params['D_prop'] + 1e-8)
+    CT, _ = coefficients(params, J)
+    return params['rho'] * n_rps**2 * params['D_prop']**4 * CT
+
+
 def rotor_thrust_cap(params, V_axial):
     """유속 V_axial·명목 최대 회전수에서의 로터별 추력 상한 f_max,i (식A2).
 
     전진비 J가 커지면 같은 회전수로 낼 수 있는 추력이 줄어든다. 이 상한은
     제어법칙의 선택이 아니라 물리적 사실이므로, 제약 배분(A1)과 기하 외부
     루프의 적분기 정지 판정이 같은 값을 써야 한다 — 그래서 모듈 함수로 뺐다.
+
+    `propulsion_model`이 팀원 APC 곡선이면 그 곡선으로, 아니면(우리 자신의
+    기체) 기존 선형 fac 모델로 — kj 지적(2026-09-25 밤)에 따라 선형모델이
+    실제보다 훨씬 낮은 추력상한을 만들어 왔었다(80/85m/s에서 실제의
+    43%뿐). `control/dynamics.py`와 동일한 조건 분기.
     """
     n_i = params['n_max']
+    if params.get('propulsion_model') == PROP_CURVE_MODEL:
+        return np.full(4, float(_curve_thrust(params, n_i, V_axial)))
     n_rps = n_i / (2 * np.pi)
     J = V_axial / (n_rps * params['D_prop'] + 1e-8)
     fac = max(1.0 - J / params['J_max'], 0.0)
@@ -704,14 +727,19 @@ class ProperHybrid:
         V_axial = max(v_body[0] if self.p.get('thrust_axis', 'z') == 'x'
                       else -v_body[2], 0.0)
 
-        # 전진비 보정된 로터별 추력 f_k
-        f_k = np.empty(4)
-        for i in range(4):
-            ni = n_actual[i]
-            n_rps = ni / (2 * np.pi)
-            J = V_axial / (n_rps * self.p['D_prop'] + 1e-8)
-            fac = max(1.0 - J / self.p['J_max'], 0.0)
-            f_k[i] = self.p['k_T'] * ni**2 * fac
+        # 전진비 보정된 로터별 추력 f_k (T_meas) — kj 지적(2026-09-25 밤):
+        # 선형 fac 모델은 팀원 APC 곡선 대비 80/85m/s 트림에서 실제 추력의
+        # 43%만 준다. propulsion_model이 곡선이면 그걸로 측정 추력을 잰다.
+        if self.p.get('propulsion_model') == PROP_CURVE_MODEL:
+            f_k = _curve_thrust(self.p, n_actual, V_axial)
+        else:
+            f_k = np.empty(4)
+            for i in range(4):
+                ni = n_actual[i]
+                n_rps = ni / (2 * np.pi)
+                J = V_axial / (n_rps * self.p['D_prop'] + 1e-8)
+                fac = max(1.0 - J / self.p['J_max'], 0.0)
+                f_k[i] = self.p['k_T'] * ni**2 * fac
 
         if self.time_align == 'S1':
             # 식(22) 뒷부분 + 식(23): 중간시각 정렬 후 각가속도와 '같은' 필터.
@@ -774,18 +802,60 @@ class ProperHybrid:
         return compute_control_effectiveness(self.p, n, v_body)
 
     def _fallback(self, T_cmd, omega_dot_des):
+        """드물게만 쓰이는 경로(초기화 전·센서 NaN)라 J(전진비) 없이 정지
+        추력(J=0)만으로 역산한다 — 선형모델의 기존 근사(n=sqrt(f/k_T),
+        fac=1 가정)와 같은 성격. 곡선모델이면 k_T 대신 정지 CT(0) 기반
+        계수를 쓴다(kj 지적 2026-09-25 밤 — k_T 자체가 곡선과 안 맞을 수
+        있어 이 근사도 일관되게 맞춘다)."""
         J = np.diag([self.p['Ixx'], self.p['Iyy'], self.p['Izz']])
         TM = np.array([T_cmd, *(J @ omega_dot_des)])
         f_ind = self._TM_to_f @ TM
+        k_T_static = self._static_k_T()
         n = np.zeros(4)
         for i in range(4):
-            n[i] = np.sqrt(max(f_ind[i], 0) / self.p['k_T'])
+            n[i] = np.sqrt(max(f_ind[i], 0) / k_T_static)
         return np.clip(n, self.p['n_min'], self.p['n_max'])
+
+    def _static_k_T(self):
+        if self.p.get('propulsion_model') == PROP_CURVE_MODEL:
+            from models.team_light.control.propeller_curve import coefficients
+            CT0, _ = coefficients(self.p, 0.0)
+            return self.p['rho'] * self.p['D_prop']**4 * float(CT0) / (2*np.pi)**2
+        return self.p['k_T']
 
 
 # ══════════════════════════════════════════════════
 # 4. NaiveHybrid (이전 버전, 비교용)
 # ══════════════════════════════════════════════════
+
+@lru_cache(maxsize=8)
+def _curve_thrust_torque_deriv_fn(knots_key, D_prop, rho):
+    """팀원(규현) APC 곡선 기반 T(n,V)·Q(n,V)와 dT/dn·dQ/dn — 한 번만 짓고
+    캐싱한다(INDI가 매 제어주기 부르므로 매번 CasADi Function을 새로
+    지으면 느리다). `models.team_light.control.propeller_curve`를 그대로
+    불러 쓴다 — 곡선을 재구현하지 않는다."""
+    from models.team_light.control.propeller_curve import symbolic_force_torque
+    n_sym = ca.SX.sym('n')
+    v_sym = ca.SX.sym('v')
+    p = {'prop_curve': {'knots': list(knots_key)}, 'D_prop': D_prop, 'rho': rho}
+    T_sym, Q_sym = symbolic_force_torque(p, n_sym, v_sym)
+    dT_dn = ca.jacobian(T_sym, n_sym)
+    dQ_dn = ca.jacobian(Q_sym, n_sym)
+    return ca.Function('curve_TQ_deriv', [n_sym, v_sym], [T_sym, Q_sym, dT_dn, dQ_dn])
+
+
+def _curve_deriv(params, n_vec, axial):
+    """로터별 dT/dn, dQ/dn (팀원 APC 곡선 기반)."""
+    knots_key = tuple(tuple(row) for row in params['prop_curve']['knots'])
+    fn = _curve_thrust_torque_deriv_fn(knots_key, params['D_prop'], params['rho'])
+    dT = np.empty(len(n_vec))
+    dQ = np.empty(len(n_vec))
+    for i, ni in enumerate(n_vec):
+        _, _, dTi, dQi = fn(ni, axial)
+        dT[i] = float(dTi)
+        dQ[i] = float(dQi)
+    return dT, dQ
+
 
 def compute_control_effectiveness(params, n_actual, v_body=None):
     """추진 wrench의 국소 미분 ∂[T, M/I]/∂n (각속도 0 기준).
@@ -799,20 +869,36 @@ def compute_control_effectiveness(params, n_actual, v_body=None):
     깨진다. compute_allocation_matrix가 이미 축을 아는 모멘트팔/반토크 구조를
     만드니 그걸 재사용한다 — z축 기본값에서는 이전 손계산과 수학적으로 동일하다
     (T=k_T*n^2*fac(n)의 곱미분이 정확히 dT/dn=k_T*n*(1+fac); Q=k*T가 항상
-    성립해 반토크 행에 dT/dn을 곱해도 dQ/dn이 그대로 나온다).
+    성립해 반토크 행에 dT/dn을 곱해도 dQ/dn이 그대로 나온다) — **단 이 Q=k*T
+    가정은 선형 fac 모델에서만 참이다.** 팀원 APC 곡선은 CT·CP가 J에 따라
+    서로 다르게 움직여(예: J=0.79에서 CT는 정지 대비 12% 줄지만 CP는 오히려
+    44% 늘어난다) 이 가정이 깨진다 — `propulsion_model`이 곡선 모델이면
+    반토크 행(스핀축 둘레)만 실제 dQ/dn으로 따로 계산한다(kj 지적,
+    2026-09-25 밤). 나머지(총추력 행·기하 모멘트팔 행)는 dT/dn을 그대로
+    쓴다 — 그 행들은 모멘트=팔×추력이라 실제로 추력에 비례한다.
     """
     n = np.asarray(n_actual, dtype=float)
+    axis = params.get('thrust_axis', 'z')
     axial = 0.0 if v_body is None else max(
-        v_body[0] if params.get('thrust_axis', 'z') == 'x' else -v_body[2], 0.0)
-    b = params['D_prop'] / (2 * np.pi)
-    denominator = b * n + EPS
-    c = axial / params['J_max']
-    factor = 1.0 - c / denominator
-    derivative = np.where(factor > 0.0,
-                          params['k_T'] * (2 * n * factor + n**2 * c * b / denominator**2),
-                          0.0)
+        v_body[0] if axis == 'x' else -v_body[2], 0.0)
     allocation, _ = compute_allocation_matrix(params)
-    G = allocation * derivative[np.newaxis, :]
+
+    if params.get('propulsion_model') == PROP_CURVE_MODEL:
+        dT, dQ = _curve_deriv(params, n, axial)
+        dirs = np.asarray(params['rotor_directions'], dtype=float)
+        G = allocation * dT[np.newaxis, :]
+        torque_row = 1 if axis == 'x' else 3   # compute_allocation_matrix와 동일 규약(반토크 행)
+        G[torque_row, :] = dirs * dQ
+    else:
+        b = params['D_prop'] / (2 * np.pi)
+        denominator = b * n + EPS
+        c = axial / params['J_max']
+        factor = 1.0 - c / denominator
+        derivative = np.where(factor > 0.0,
+                              params['k_T'] * (2 * n * factor + n**2 * c * b / denominator**2),
+                              0.0)
+        G = allocation * derivative[np.newaxis, :]
+
     G[1:4] /= np.array([params['Ixx'], params['Iyy'], params['Izz']])[:, None]
     return G
 

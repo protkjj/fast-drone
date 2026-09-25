@@ -9,15 +9,21 @@
 kj 설계대로 (1) 짧은 시험의 웜스타트를 트림 상태·트림 입력으로 채우고
 (2) 쿼터니언 정규화 나눗셈 특이점을 eps로 고친(V13/M17/F13 전체 적용,
 `control/hybrid_comparison.py`·`nmpc.py`·`nmpc_f13.py`) 뒤 재실행했다.
-**결과: 실패 양상이 바뀌지 않았다** — 두 웜스타트 조건이 z_RMSE·
+**결과(당시): 실패 양상이 바뀌지 않았다** — 두 웜스타트 조건이 z_RMSE·
 v_RMSE·포화율·정지사유까지 사실상 동일했다. kj 판정 규칙("1)+2) 후에도
 실패하면 시나리오 종류로 판정")에 따라 **H-시나리오가 지지, H-웜스타트
-이력(이 단순한 형태)은 기각**이다.
+이력(이 단순한 형태)은 기각**이었다.
 
-주의: 여기서 기각한 건 "짧은 시험에 트림 하나로 된 단발 웜스타트를
-줘도 안 고쳐진다"는 좁은 의미의 H-웜스타트이력이다. 미션처럼 호버부터
-"점진적으로 누적되는" 웜스타트 이력까지 완전히 배제한 건 아니다 —
-그건 별도 실험이 필요하다(다음 세션 후보).
+**🔴 보류(2026-09-25 밤)**: 이 판정 이후 프로펠러 모델 자체가 선형
+fac 모델(APC 실제 대비 트림에서 43~69%만 추력을 줌)에서 팀원 APC 곡선
+기반으로 바뀌었다(`control/dynamics.py`·`hybrid_comparison.py`,
+results/SOLVER_FAILURE_REPORT_2026-09-25.md 참고). 그 결과 80m/s 짧은
+시험이 **완주하는 쪽으로 바뀌어** 아래 두 테스트가 깨졌다 — 이 판정
+자체가 옛(틀린) 프로펠러 모델 기준이었다는 뜻이다. kj 지시: 이번
+세션은 프로펠러 모델 교체까지만 하고 판정·시험 재실행·결론은 다음
+세션(arena-completion)이 맡는다 — 그래서 여기서 새 판정을 내리지
+않고 **재평가 보류로 스킵**만 해 둔다. 85m/s는 여전히 기존 결과대로
+실패해 아직 스킵하지 않았다(그 자체가 재확인 대상).
 """
 import numpy as np
 import pytest
@@ -43,7 +49,13 @@ def test_trim_warmstart_injection_actually_changes_w0():
     assert nmpc_trim.w0[3] == pytest.approx(80.0)   # vx = 순항속도
 
 
-@pytest.mark.parametrize('speed', [80.0, 85.0])
+@pytest.mark.parametrize('speed', [
+    pytest.param(80.0, marks=pytest.mark.skip(
+        reason="프로펠러 곡선 수정(2026-09-25 밤) 이후 80m/s가 완주하는 "
+               "쪽으로 바뀜 — 이 판정은 옛 프로펠러 모델 기준. 재평가는 "
+               "arena-completion 세션 담당, 여기서 새로 판정하지 않음.")),
+    85.0,
+])
 def test_trim_warmstart_does_not_rescue_short_test(speed):
     """핵심 판별 결과 — 트림 웜스타트(+eps 정칙화는 코드에 항상 적용됨)를
     줘도 80/85m/s 짧은 시험(nominal)은 여전히 실패한다."""
@@ -55,6 +67,10 @@ def test_trim_warmstart_does_not_rescue_short_test(speed):
     assert result['saturation_fraction'] > 0.5   # 여전히 심하게 포화
 
 
+@pytest.mark.skip(
+    reason="프로펠러 곡선 수정(2026-09-25 밤) 이후 80m/s가 완주하는 쪽으로 "
+           "바뀜 — 이 판정은 옛 프로펠러 모델 기준. 재평가는 arena-completion "
+           "세션 담당, 여기서 새로 판정하지 않음.")
 def test_trim_warmstart_and_default_fail_the_same_way():
     """대조군(기본 웜스타트)과 실험군(트림 웜스타트)의 실패 양상이
     사실상 같다는 것 자체를 고정한다 — "웜스타트를 고치면 나아진다"는
