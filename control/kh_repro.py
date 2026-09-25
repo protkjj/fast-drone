@@ -64,9 +64,38 @@ def _install_solve_log_spy(nmpc):
 
 
 def make_our_split(ctrl_params, speed, z, dt_ctrl=0.02):
-    """우리 V13(S1 시간정렬 + 논문 비용함수) — kj 지시: 'S1·논문 비용함수 적용판'."""
+    """우리 V13(S1 시간정렬 + 논문 비용함수) — kj 지시: 'S1·논문 비용함수 적용판'.
+
+    콜드스타트 웜스타트는 `VirtualNMPC._solve()`의 `_cold_start` 보정이
+    첫 호출에서 **실측 상태**(여기서는 트림+섭동)로 채운다."""
     nmpc = VirtualNMPC(ctrl_params, v_ref=[speed, 0, 0], z_ref=z,
                        dt_ctrl=dt_ctrl, cost_spec='paper')
+    _install_solve_log_spy(nmpc)
+    hyb = ProperHybrid(nmpc, ctrl_params, dt=DT, time_align='S1')
+    return hyb, nmpc
+
+
+def make_our_split_trim_warmstart(ctrl_params, native_params, speed, z, dt_ctrl=0.02):
+    """kj 판별실험 1) — 콜드스타트 웜스타트를 실측(트림+섭동) 대신
+    **정확한 트림 상태·트림 입력**으로 채운 판. H-웜스타트이력 가설
+    검증용 — 미션이 "쉬운 지점(호버)에서 시작해 웜스타트가 이어지는"
+    것과 비슷하게, 짧은 시험도 "이미 좋은 웜스타트를 들고 시작"하면
+    통과하는지 본다. `make_our_split`과 차이는 이 웜스타트 하나뿐이다.
+    """
+    nmpc = VirtualNMPC(ctrl_params, v_ref=[speed, 0, 0], z_ref=z,
+                       dt_ctrl=dt_ctrl, cost_spec='paper')
+    tr = kh_find_trim(native_params, speed)
+    x_trim13 = np.concatenate([tr['state'][0:10], tr['state'][10:13]])
+    x_trim13[2] = z
+    u_trim = np.array([tr['T_total'], 0.0, 0.0, 0.0])
+    stride = 4 + 13   # NU_V + NX_V
+    for k in range(nmpc.N + 1):
+        off = k * stride
+        nmpc.w0[off:off + 13] = x_trim13
+    for k in range(nmpc.N):
+        off = k * stride + 13
+        nmpc.w0[off:off + 4] = u_trim
+    nmpc._cold_start = False   # _solve()의 실측 기반 보정이 위 트림 웜스타트를 덮어쓰지 않게
     _install_solve_log_spy(nmpc)
     hyb = ProperHybrid(nmpc, ctrl_params, dt=DT, time_align='S1')
     return hyb, nmpc

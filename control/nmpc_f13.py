@@ -26,7 +26,7 @@ import numpy as np
 import casadi as ca
 
 from control.dynamics import (_quat_to_rotmat, _quat_derivative,
-                               _body_aerodynamics, compute_allocation_matrix)
+                               _body_aerodynamics, compute_allocation_matrix, EPS)
 from control.hybrid_comparison import NX_V
 
 NU_F = 4  # 로터별 추력 입력 [N]
@@ -125,7 +125,9 @@ class RotorThrustNMPC13:
 
     def _build_rk4_substeps(self, f, x_sym, u_sym, substeps=5):
         """논문 4.2절 — control.hybrid_comparison.VirtualNMPC 와 같은 패턴.
-        F13 은 13상태라 쿼터니언이 x[6:10]인 것은 V13/M17과 같다."""
+        F13 은 13상태라 쿼터니언이 x[6:10]인 것은 V13/M17과 같다.
+        `ca.norm_2`의 0 근처 나눗셈 특이점도 eps로 정칙화(kj 지적,
+        2026-09-25 저녁 — NMPC 계열 전체 동일 적용)."""
         h = self.dt_nmpc / substeps
         st = x_sym
         for _ in range(substeps):
@@ -134,7 +136,8 @@ class RotorThrustNMPC13:
             k3 = f(st + h/2*k2, u_sym)
             k4 = f(st + h*k3, u_sym)
             st = st + h/6*(k1 + 2*k2 + 2*k3 + k4)
-            st = ca.vertcat(st[0:6], st[6:10]/ca.norm_2(st[6:10]), st[10:13])
+            q_norm = ca.sqrt(ca.sumsqr(st[6:10]) + EPS)
+            st = ca.vertcat(st[0:6], st[6:10]/q_norm, st[10:13])
         return ca.Function('F13_paper', [x_sym, u_sym], [st])
 
     def _reference_horizon(self):

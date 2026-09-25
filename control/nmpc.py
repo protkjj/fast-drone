@@ -19,7 +19,7 @@ import numpy as np
 import casadi as ca
 import time as timer
 
-from control.dynamics import build_dynamics, NX, NU
+from control.dynamics import build_dynamics, NX, NU, EPS
 
 
 class NMPCController:
@@ -133,6 +133,8 @@ class NMPCController:
         control/hybrid_comparison.py::VirtualNMPC._make_substep_integrator 와
         같은 패턴(그쪽 주석 참고 — 실효 스텝을 줄여 빠른 자세 변화의 적분
         오차를 줄이고, 정규화 없이 RK4 만 쓰면 쿼터니언 노름이 서서히 벌어진다).
+        `ca.norm_2`의 0 근처 나눗셈 특이점도 그쪽과 동일하게 eps로 정칙화
+        (kj 지적, 2026-09-25 저녁 — NMPC 계열 전체 동일 적용).
         """
         h = self.dt_nmpc / substeps
         st = x_sym
@@ -142,7 +144,8 @@ class NMPCController:
             k3 = f(st + h/2*k2, u_sym)
             k4 = f(st + h*k3, u_sym)
             st = st + h/6*(k1 + 2*k2 + 2*k3 + k4)
-            st = ca.vertcat(st[0:6], st[6:10]/ca.norm_2(st[6:10]), st[10:17])
+            q_norm = ca.sqrt(ca.sumsqr(st[6:10]) + EPS)
+            st = ca.vertcat(st[0:6], st[6:10]/q_norm, st[10:17])
         return ca.Function('F_paper', [x_sym, u_sym], [st])
 
     def _build_nlp_paper(self, params):

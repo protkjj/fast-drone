@@ -318,6 +318,14 @@ class VirtualNMPC:
         적분 오차가 예측을 왜곡한다. 세부적분으로 실효 스텝을 10 ms로 줄이고,
         매 세부단계마다 쿼터니언을 정규화해 단위노름에서 벗어나지 않게 한다
         (정규화를 안 하면 RK4가 노름을 조금씩 키워 자세가 서서히 뒤틀린다).
+
+        `ca.norm_2`는 0 근처에서 미분(1/(2·sqrt(x)))이 발산한다 — IPOPT가
+        수렴 전 탐색 중 만드는 극단적 시행점에서 쿼터니언 성분이 0 근처를
+        지나가면 NaN이 날 수 있다(kj 지적, 2026-09-25 저녁: 정확한 트림
+        단발 솔브의 격리실험에서는 이게 최종 결과를 바꾸진 않았지만, 짧은
+        시험 같은 다단계 폐루프에서는 다를 수 있어 별도로 없앤다). eps로
+        정칙화해 이 나눗셈 특이점 자체를 없앤다 — M17(`nmpc.py`)·
+        F13(`nmpc_f13.py`)에도 동일 적용.
         """
         h = self.dt_nmpc / substeps
         st = x_sym
@@ -327,7 +335,8 @@ class VirtualNMPC:
             k3 = f(st + h/2*k2, u_sym)
             k4 = f(st + h*k3, u_sym)
             st = st + h/6*(k1 + 2*k2 + 2*k3 + k4)
-            st = ca.vertcat(st[0:6], st[6:10]/ca.norm_2(st[6:10]), st[10:13])
+            q_norm = ca.sqrt(ca.sumsqr(st[6:10]) + EPS)
+            st = ca.vertcat(st[0:6], st[6:10]/q_norm, st[10:13])
         return ca.Function('F_paper', [x_sym, u_sym], [st])
 
     def _build_nlp_paper(self, params, x_sym, u_sym):
