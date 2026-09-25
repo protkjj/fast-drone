@@ -1,0 +1,441 @@
+{
+  "meta": {
+    "label": "PILOT",
+    "source": "results/SOLVER_FAILURE_REPORT_2026-09-25.md",
+    "command": "python -m control.pilot_before_after --parts discriminate mission timing",
+    "created_utc": "2026-09-25T16:03:39.920662+00:00",
+    "git_revision": "cb1841c93fdadb78ff94bdc2be032bf453e04451",
+    "git_dirty": true,
+    "environment": {
+      "system": "Darwin",
+      "release": "25.6.0",
+      "machine": "arm64",
+      "cpu": "Apple M4",
+      "python": "3.13.7",
+      "packages": {
+        "numpy": "2.3.3",
+        "scipy": "1.16.3",
+        "casadi": "3.7.2",
+        "matplotlib": "3.10.6"
+      },
+      "threads": {
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "VECLIB_MAXIMUM_THREADS": "1",
+        "MKL_NUM_THREADS": null
+      }
+    }
+  },
+  "parts": [
+    "discriminate",
+    "mission",
+    "timing"
+  ],
+  "before": {
+    "discriminate": {
+      "default@80": {
+        "completed": false,
+        "z_rmse_m": 0.6974,
+        "vel_rmse_m_s": 13.12,
+        "saturation_fraction": 0.914,
+        "optimizer_failures": 2,
+        "optimizer_calls": 50,
+        "stop_reason": "velocity error limit",
+        "max_omega": null,
+        "elapsed_sim_s": null
+      },
+      "trim@80": {
+        "completed": false,
+        "z_rmse_m": 0.6975,
+        "vel_rmse_m_s": 13.119,
+        "saturation_fraction": 0.912,
+        "optimizer_failures": 2,
+        "optimizer_calls": 50,
+        "stop_reason": "velocity error limit",
+        "max_omega": null,
+        "elapsed_sim_s": null
+      },
+      "default@85": {
+        "completed": false,
+        "z_rmse_m": 0.6945,
+        "vel_rmse_m_s": 14.345,
+        "saturation_fraction": 0.912,
+        "optimizer_failures": 3,
+        "optimizer_calls": 51,
+        "stop_reason": "velocity error limit",
+        "max_omega": null,
+        "elapsed_sim_s": null
+      },
+      "trim@85": {
+        "completed": false,
+        "z_rmse_m": 0.6982,
+        "vel_rmse_m_s": 14.355,
+        "saturation_fraction": 0.915,
+        "optimizer_failures": 2,
+        "optimizer_calls": 51,
+        "stop_reason": "velocity error limit",
+        "max_omega": null,
+        "elapsed_sim_s": null
+      }
+    },
+    "mission": {
+      "V13@70": {
+        "completed": true,
+        "z_rmse_m": 0.524,
+        "vel_rmse_m_s": 2.869,
+        "saturation_fraction": 0.065,
+        "optimizer_failures": 2,
+        "optimizer_calls": 3250,
+        "stop_reason": null,
+        "max_omega": 11.15,
+        "elapsed_sim_s": 65.0
+      },
+      "V13@80": {
+        "completed": true,
+        "z_rmse_m": 1.307,
+        "vel_rmse_m_s": 3.538,
+        "saturation_fraction": 0.075,
+        "optimizer_failures": 2,
+        "optimizer_calls": 3250,
+        "stop_reason": null,
+        "max_omega": 16.21,
+        "elapsed_sim_s": 65.0
+      },
+      "V13@85": {
+        "completed": true,
+        "z_rmse_m": 0.833,
+        "vel_rmse_m_s": 3.267,
+        "saturation_fraction": 0.081,
+        "optimizer_failures": 2,
+        "optimizer_calls": 3250,
+        "stop_reason": null,
+        "max_omega": 12.58,
+        "elapsed_sim_s": 65.0
+      }
+    },
+    "timing": {
+      "original@70": {
+        "completed": true,
+        "z_rmse_m": 0.36,
+        "vel_rmse_m_s": 1.852,
+        "saturation_fraction": 0.077,
+        "optimizer_failures": 2,
+        "optimizer_calls": 2750,
+        "stop_reason": null,
+        "max_omega": 10.04,
+        "elapsed_sim_s": 55.0
+      },
+      "relaxed@70": {
+        "completed": true,
+        "z_rmse_m": 0.136,
+        "vel_rmse_m_s": 1.275,
+        "saturation_fraction": 0.086,
+        "optimizer_failures": 2,
+        "optimizer_calls": 2000,
+        "stop_reason": null,
+        "max_omega": 12.07,
+        "elapsed_sim_s": 40.0
+      },
+      "original@80": {
+        "completed": true,
+        "z_rmse_m": 0.217,
+        "vel_rmse_m_s": 1.771,
+        "saturation_fraction": 0.083,
+        "optimizer_failures": 4,
+        "optimizer_calls": 2750,
+        "stop_reason": null,
+        "max_omega": 15.97,
+        "elapsed_sim_s": 55.0
+      },
+      "relaxed@80": {
+        "completed": true,
+        "z_rmse_m": 0.414,
+        "vel_rmse_m_s": 1.841,
+        "saturation_fraction": 0.127,
+        "optimizer_failures": 5,
+        "optimizer_calls": 2000,
+        "stop_reason": null,
+        "max_omega": 15.42,
+        "elapsed_sim_s": 40.0
+      },
+      "original@85": {
+        "completed": true,
+        "z_rmse_m": 2.374,
+        "vel_rmse_m_s": 4.37,
+        "saturation_fraction": 0.146,
+        "optimizer_failures": 15,
+        "optimizer_calls": 2750,
+        "stop_reason": null,
+        "max_omega": 14.62,
+        "elapsed_sim_s": 55.0
+      },
+      "relaxed@85": {
+        "completed": true,
+        "z_rmse_m": 0.642,
+        "vel_rmse_m_s": 3.198,
+        "saturation_fraction": 0.138,
+        "optimizer_failures": 3,
+        "optimizer_calls": 2000,
+        "stop_reason": null,
+        "max_omega": 14.7,
+        "elapsed_sim_s": 40.0
+      }
+    }
+  },
+  "after": {
+    "discriminate": {
+      "current/default@80": {
+        "completed": true,
+        "tracking_pass": false,
+        "stop_reason": null,
+        "elapsed_sim_s": 4.0,
+        "z_rmse_m": 2.3705704737357243,
+        "vel_rmse_m_s": 11.433054289715907,
+        "max_omega": 18.85925268093451,
+        "saturation_fraction": 0.9575,
+        "optimizer_failures": 2,
+        "optimizer_calls": 200,
+        "prop_domain_outside_fraction": 0.13
+      },
+      "current/trim@80": {
+        "completed": true,
+        "tracking_pass": false,
+        "stop_reason": null,
+        "elapsed_sim_s": 4.0,
+        "z_rmse_m": 2.309654581451152,
+        "vel_rmse_m_s": 11.42769426987988,
+        "max_omega": 18.853631965209384,
+        "saturation_fraction": 0.966,
+        "optimizer_failures": 2,
+        "optimizer_calls": 200,
+        "prop_domain_outside_fraction": 0.0645
+      },
+      "current/default@85": {
+        "completed": false,
+        "tracking_pass": false,
+        "stop_reason": "velocity error limit",
+        "elapsed_sim_s": 2.108,
+        "z_rmse_m": 1.388914649191124,
+        "vel_rmse_m_s": 13.808798579990414,
+        "max_omega": 21.10445591755098,
+        "saturation_fraction": 0.928842504743833,
+        "optimizer_failures": 2,
+        "optimizer_calls": 106,
+        "prop_domain_outside_fraction": 0.18026565464895636
+      },
+      "current/trim@85": {
+        "completed": false,
+        "tracking_pass": false,
+        "stop_reason": "velocity error limit",
+        "elapsed_sim_s": 1.8840000000000001,
+        "z_rmse_m": 1.4470304372894705,
+        "vel_rmse_m_s": 14.002946053072904,
+        "max_omega": 19.173638662205274,
+        "saturation_fraction": 0.8938428874734607,
+        "optimizer_failures": 2,
+        "optimizer_calls": 95,
+        "prop_domain_outside_fraction": 0.13481953290870488
+      },
+      "propeller_only/default@80": {
+        "completed": true,
+        "tracking_pass": false,
+        "stop_reason": null,
+        "elapsed_sim_s": 4.0,
+        "z_rmse_m": 2.3705704737357243,
+        "vel_rmse_m_s": 11.433054289715907,
+        "max_omega": 18.85925268093451,
+        "saturation_fraction": 0.9575,
+        "optimizer_failures": 2,
+        "optimizer_calls": 200,
+        "prop_domain_outside_fraction": 0.13
+      },
+      "propeller_only/trim@80": {
+        "completed": true,
+        "tracking_pass": false,
+        "stop_reason": null,
+        "elapsed_sim_s": 4.0,
+        "z_rmse_m": 2.309654581451152,
+        "vel_rmse_m_s": 11.42769426987988,
+        "max_omega": 18.853631965209384,
+        "saturation_fraction": 0.966,
+        "optimizer_failures": 2,
+        "optimizer_calls": 200,
+        "prop_domain_outside_fraction": 0.0645
+      },
+      "propeller_only/default@85": {
+        "completed": false,
+        "tracking_pass": false,
+        "stop_reason": "velocity error limit",
+        "elapsed_sim_s": 2.108,
+        "z_rmse_m": 1.388914649191124,
+        "vel_rmse_m_s": 13.808798579990414,
+        "max_omega": 21.10445591755098,
+        "saturation_fraction": 0.928842504743833,
+        "optimizer_failures": 2,
+        "optimizer_calls": 106,
+        "prop_domain_outside_fraction": 0.18026565464895636
+      },
+      "propeller_only/trim@85": {
+        "completed": false,
+        "tracking_pass": false,
+        "stop_reason": "velocity error limit",
+        "elapsed_sim_s": 1.8840000000000001,
+        "z_rmse_m": 1.4470304372894705,
+        "vel_rmse_m_s": 14.002946053072904,
+        "max_omega": 19.173638662205274,
+        "saturation_fraction": 0.8938428874734607,
+        "optimizer_failures": 2,
+        "optimizer_calls": 95,
+        "prop_domain_outside_fraction": 0.13481953290870488
+      }
+    },
+    "mission": {
+      "V13@70": {
+        "completed": true,
+        "tracking_pass": null,
+        "stop_reason": null,
+        "elapsed_sim_s": 65.0,
+        "z_rmse_m": 0.2848903312039056,
+        "vel_rmse_m_s": 2.7491081328905205,
+        "max_omega": 10.615156054397907,
+        "saturation_fraction": 0.05756923076923077,
+        "optimizer_failures": 2,
+        "optimizer_calls": 3250,
+        "prop_domain_outside_fraction": 0.15996923076923078
+      },
+      "V13@80": {
+        "completed": true,
+        "tracking_pass": null,
+        "stop_reason": null,
+        "elapsed_sim_s": 65.0,
+        "z_rmse_m": 0.6278715030088201,
+        "vel_rmse_m_s": 3.60839803678801,
+        "max_omega": 13.282452317013753,
+        "saturation_fraction": 0.07461538461538461,
+        "optimizer_failures": 2,
+        "optimizer_calls": 3250,
+        "prop_domain_outside_fraction": 0.1540923076923077
+      },
+      "V13@85": {
+        "completed": true,
+        "tracking_pass": null,
+        "stop_reason": null,
+        "elapsed_sim_s": 65.0,
+        "z_rmse_m": 0.2685337548842906,
+        "vel_rmse_m_s": 4.016700444923222,
+        "max_omega": 13.866561575621654,
+        "saturation_fraction": 0.07113846153846154,
+        "optimizer_failures": 2,
+        "optimizer_calls": 3250,
+        "prop_domain_outside_fraction": 0.15215384615384617
+      }
+    },
+    "timing": {
+      "original@70": {
+        "completed": true,
+        "tracking_pass": null,
+        "stop_reason": null,
+        "elapsed_sim_s": 55.0,
+        "z_rmse_m": 0.2652668242945575,
+        "vel_rmse_m_s": 1.9968694331445265,
+        "max_omega": 10.511615679979329,
+        "saturation_fraction": 0.066,
+        "optimizer_failures": 1,
+        "optimizer_calls": 2750,
+        "prop_domain_outside_fraction": 0.19047272727272727
+      },
+      "relaxed@70": {
+        "completed": true,
+        "tracking_pass": null,
+        "stop_reason": null,
+        "elapsed_sim_s": 40.0,
+        "z_rmse_m": 0.18295407289585183,
+        "vel_rmse_m_s": 1.1264050248943234,
+        "max_omega": 13.447167806134836,
+        "saturation_fraction": 0.06115,
+        "optimizer_failures": 2,
+        "optimizer_calls": 2000,
+        "prop_domain_outside_fraction": 0.3167
+      },
+      "original@80": {
+        "completed": false,
+        "tracking_pass": null,
+        "stop_reason": "5 consecutive optimizer failures",
+        "elapsed_sim_s": 40.980000000000004,
+        "z_rmse_m": 1.5544432357198013,
+        "vel_rmse_m_s": 3.4840754044022852,
+        "max_omega": 15.320159485580627,
+        "saturation_fraction": 0.1022938018545632,
+        "optimizer_failures": 7,
+        "optimizer_calls": 2050,
+        "prop_domain_outside_fraction": 0.06525134211810639
+      },
+      "relaxed@80": {
+        "completed": true,
+        "tracking_pass": null,
+        "stop_reason": null,
+        "elapsed_sim_s": 40.0,
+        "z_rmse_m": 0.2335382605162002,
+        "vel_rmse_m_s": 1.8391068862145716,
+        "max_omega": 10.297566966863752,
+        "saturation_fraction": 0.11015,
+        "optimizer_failures": 3,
+        "optimizer_calls": 2000,
+        "prop_domain_outside_fraction": 0.34735
+      },
+      "original@85": {
+        "completed": true,
+        "tracking_pass": null,
+        "stop_reason": null,
+        "elapsed_sim_s": 55.0,
+        "z_rmse_m": 0.25480075876426816,
+        "vel_rmse_m_s": 3.757869357251514,
+        "max_omega": 13.80640889396082,
+        "saturation_fraction": 0.08745454545454545,
+        "optimizer_failures": 2,
+        "optimizer_calls": 2750,
+        "prop_domain_outside_fraction": 0.18
+      },
+      "relaxed@85": {
+        "completed": true,
+        "tracking_pass": null,
+        "stop_reason": null,
+        "elapsed_sim_s": 40.0,
+        "z_rmse_m": 0.4036738792795389,
+        "vel_rmse_m_s": 1.9855214572793045,
+        "max_omega": 14.971013608330301,
+        "saturation_fraction": 0.1218,
+        "optimizer_failures": 2,
+        "optimizer_calls": 2000,
+        "prop_domain_outside_fraction": 0.33425
+      }
+    }
+  },
+  "after_meta": {
+    "discriminate": {
+      "git_revision": "cb1841c93fdadb78ff94bdc2be032bf453e04451",
+      "git_dirty": true,
+      "finished_utc": "2026-09-25T16:09:11.533444+00:00"
+    },
+    "mission": {
+      "git_revision": "cb1841c93fdadb78ff94bdc2be032bf453e04451",
+      "git_dirty": true,
+      "finished_utc": "2026-09-25T16:27:38.203047+00:00"
+    },
+    "timing": {
+      "git_revision": "cb1841c93fdadb78ff94bdc2be032bf453e04451",
+      "git_dirty": true,
+      "finished_utc": "2026-09-25T16:51:37.898706+00:00"
+    }
+  },
+  "verdicts": {
+    "80": {
+      "completion": "둘 다 통과 — 판별의 전제(짧은 시험 실패)가 이 기준에선 사라짐",
+      "tracking": "H-시나리오 지지(기본·트림 웜스타트 둘 다 실패)"
+    },
+    "85": {
+      "completion": "H-시나리오 지지(기본·트림 웜스타트 둘 다 실패)",
+      "tracking": "H-시나리오 지지(기본·트림 웜스타트 둘 다 실패)"
+    }
+  }
+}
