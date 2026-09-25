@@ -1,0 +1,16 @@
+{
+  "source_url": "https://www.apcprop.com/files/PER3_55x65E.dat",
+  "source_kind": "Manufacturer calculation, not measured flight or wind-tunnel data",
+  "version": "v2022-0915; simulation 2022-09-27",
+  "retrieved": "2026-09-25",
+  "extraction": "Numerical J/Ct/Cp columns checked against public source using web tool; not the complete source file.",
+  "reference_rpm": 30000,
+  "method": "Independent shape-preserving cubic (PCHIP) interpolation of Ct(J) and Cp(J); no fitting to aircraft trim",
+  "columns": ["J", "Ct", "Cp"],
+  "knots": [[0,0.1437,0.0920],[0.2791,0.1434,0.1043],[0.5582,0.1425,0.1258],[0.7908,0.1261,0.1323],[0.9303,0.1014,0.1168],[1.0698,0.0698,0.0898],[1.1629,0.0468,0.0675],[1.2094,0.0350,0.0555],[1.3024,0.0114,0.0304],[1.3489,-0.0001,0.0178]],
+  "heldout_30000_rpm": [[0.0465,0.1435,0.0934],[0.0930,0.1434,0.0950],[0.1395,0.1434,0.0969],[0.1861,0.1433,0.0991],[0.2326,0.1434,0.1016],[0.3256,0.1435,0.1074],[0.3721,0.1436,0.1108],[0.4186,0.1436,0.1144],[0.4652,0.1435,0.1181],[0.5117,0.1432,0.1220],[0.6047,0.1413,0.1293],[0.6512,0.1394,0.1321],[0.6977,0.1363,0.1338],[0.7442,0.1320,0.1339],[0.8373,0.1190,0.1287],[0.8838,0.1106,0.1235],[0.9768,0.0914,0.1088],[1.0233,0.0808,0.0997],[1.1164,0.0584,0.0790],[1.2559,0.0232,0.0431]],
+  "check_20000_rpm": [[0,0.1430,0.0909],[0.2786,0.1424,0.1034],[0.5571,0.1401,0.1237],[0.7893,0.1214,0.1274],[0.9286,0.0967,0.1119],[1.0679,0.0662,0.0865],[1.1607,0.0443,0.0660],[1.2071,0.0331,0.0549],[1.3000,0.0108,0.0316],[1.3464,0.0000,0.0197]],
+  "check_33000_rpm": [[0,0.1440,0.0931],[0.2790,0.1438,0.1053],[0.5580,0.1434,0.1269],[0.7904,0.1282,0.1347],[0.9299,0.1036,0.1193],[1.0694,0.0716,0.0918],[1.1624,0.0482,0.0693],[1.2089,0.0361,0.0572],[1.3019,0.0118,0.0327],[1.3484,-0.0002,0.0209]],
+  "assumed_rpm_working_range": [10000,33000],
+  "limitations": ["30k-rpm coefficient shape reused at other RPM; RPM/Reynolds/Mach dependence not modeled", "J<0 uses static coefficients; J above data is clamped and NOT validated", "Negative thrust clipped to zero; stopped/windmilling/reverse-flow behavior not validated", "No oblique inflow, blade flapping, motor power, battery, current or thermal model"]
+}

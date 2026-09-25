@@ -1,0 +1,19 @@
+{
+  "source_url": "https://www.apcprop.com/files/PER3_55x65E.dat",
+  "source_kind": "Manufacturer vortex-method prediction, NOT wind-tunnel measurement",
+  "source_version": "v2022-0915, simulation date 2022-09-27",
+  "retrieved": "2026-09-25",
+  "extraction": "Selected numerical rows read through the web tool; direct file download returned HTTP 403. Not the complete file.",
+  "diameter_m": 0.1397,
+  "pitch_m": 0.1651,
+  "prop_mass_kg": 0.00396893,
+  "mass_source": "https://www.apcprop.com/product/5-5x6-5e/ (0.14 oz)",
+  "rpm_limit_source": "https://www.apcprop.com/technical-information/rpm-limits/",
+  "rpm_limit_category": "Speed 400 Electric: 190000 / diameter_inches",
+  "manufacturer_recommended_rpm_limit": 34545.454545454544,
+  "data_rpm_range": [1000, 33000],
+  "static_rows_rpm_ct_cp": [[10000, 0.1424, 0.0927], [20000, 0.1430, 0.0909], [30000, 0.1437, 0.0920]],
+  "curve_rpm": 30000,
+  "curve_columns": ["J", "Ct", "Cp"],
+  "curve": [[0.0, 0.1437, 0.0920], [0.2791, 0.1434, 0.1043], [0.5582, 0.1425, 0.1258], [0.7908, 0.1261, 0.1323], [0.9303, 0.1014, 0.1168], [1.0698, 0.0698, 0.0898], [1.1629, 0.0468, 0.0675], [1.2094, 0.0350, 0.0555], [1.3024, 0.0114, 0.0304], [1.3489, -0.0001, 0.0178]]
+}

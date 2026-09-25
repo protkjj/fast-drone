@@ -25,7 +25,7 @@ from control.hybrid_comparison import ProperHybrid
 from control.vnmpc_acados import AcadosVirtualNMPC
 from control.fallback_controller import HybridWithFallback
 from control.controller import ScheduledLQR
-from control.mission_sim import MissionProfile, MissionController, run_mission
+from control.mission_sim import LegacyMissionProfile as MissionProfile, MissionController, run_mission
 from control.gust_comparison import make_gust_fn
 
 CONFIGS = {

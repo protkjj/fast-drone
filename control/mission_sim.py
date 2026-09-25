@@ -1,5 +1,10 @@
 """
-전 비행구간 통합 시뮬레이션 — 이륙->가속->순항(+돌풍)->감속->호버
+시뮬레이션 진입점: 기본 성능 / 독립 돌풍 / 불확실성 스윕 / MC
+
+python -m control.mission_sim --help
+
+아래 LegacyMissionProfile 및 legacy_main은 과거 65초 실험 재현용이다.
+이전 실험 설명: 이륙->가속->순항(+돌풍)->감속->호버
 ================================================================
 
 전체 비행을 하나로 이어붙여서 제어기 성능을 본다.
@@ -17,6 +22,7 @@
 import numpy as np
 import time as timer
 
+from control.mission_profiles import MissionProfile, GustProfile
 from control.vehicle_params import vehicle_params as P
 from control.dynamics import AxialDronePlant
 from control.trim import find_trim
@@ -31,7 +37,7 @@ from control.ekf_comparison import _reset_controller
 # 1. 미션 프로파일
 # ════════════════════════════════════════════════════
 
-class MissionProfile:
+class LegacyMissionProfile:
     """
     비행 구간별 기준 궤적 생성.
 
@@ -54,6 +60,8 @@ class MissionProfile:
         self.T_total = sum(p[2] for p in self.phases)  # 65초
         self.cruise_speed = cruise_speed
         self.cruise_alt = cruise_alt
+
+        self.gust_interval = (35.0, 36.0)
 
         # 순항 구간 시간 범위 (돌풍 랜덤화에 사용)
         cruise = self.phases[3]
@@ -333,7 +341,7 @@ def diagnose_deceleration(n_trials=30, seed=0, nmpc_N=20, dt_nmpc=0.05):
     """
     plant = AxialDronePlant(P, dt=0.001)
     dt = plant.dt
-    profile = MissionProfile(cruise_speed=70.0, cruise_alt=50.0)
+    profile = LegacyMissionProfile(cruise_speed=70.0, cruise_alt=50.0)
     gust_fn = make_gust_fn('vertical', 10.0, 35.0, 1.0)
 
     horizon_sec = nmpc_N * dt_nmpc
@@ -522,36 +530,27 @@ def plot_mission(results, profile, save_path='results/mission_plot.png'):
     for ax in axes:
         for name, t0, t1 in phase_bounds:
             ax.axvline(t0, color='gray', linewidth=0.5, alpha=0.3)
-        ax.axvspan(35, 36, color='red', alpha=0.15)
+        gust_interval = getattr(profile, 'gust_interval', None)
+        if gust_interval is not None:
+            ax.axvspan(*gust_interval, color='red', alpha=0.15)
         ax.legend(fontsize=8, loc='upper right')
         ax.grid(True, alpha=0.2)
 
     # 구간 이름 (영어)
     phase_en = {'이륙': 'Takeoff', '안정화': 'Stab', '가속': 'Accel',
-                '순항': 'Cruise', '감속': 'Decel', '호버링': 'Hover'}
+                '순항': 'Cruise', '감속': 'Decel', '호버링': 'Hover',
+                '초기호버': 'Hover', '돌풍': 'Gust', '회복': 'Recovery'}
     for name, t0, t1 in phase_bounds:
         mid = (t0 + t1) / 2
         axes[0].text(mid, axes[0].get_ylim()[1] * 0.95,
                      phase_en.get(name, name),
                      ha='center', fontsize=8, alpha=0.6)
 
-    # 돌풍 라벨
-    axes[2].annotate('Gust', xy=(35.5, 0),
-                     xytext=(37.5, axes[2].get_ylim()[1]*0.7),
-                     fontsize=9, color='red', fontweight='bold',
-                     arrowprops=dict(arrowstyle='->', color='red', lw=1.5),
-                     ha='center')
-
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     print(f"\n  [저장] {save_path}")
 
-    # macOS에서 자동 열기
-    import subprocess
-    try:
-        subprocess.Popen(['open', save_path])
-    except Exception:
-        pass
+    plt.close(fig)
 
 
 # ════════════════════════════════════════════════════
@@ -591,11 +590,11 @@ def _print_metric_table(title, key, ctrl_names, all_pm, phase_bounds, results):
 # 6. 메인
 # ════════════════════════════════════════════════════
 
-def main():
+def legacy_main():
     plant = AxialDronePlant(P, dt=0.001)
     dt = plant.dt
 
-    profile = MissionProfile(cruise_speed=70.0, cruise_alt=50.0)
+    profile = LegacyMissionProfile(cruise_speed=70.0, cruise_alt=50.0)
 
     print("\n" + "=" * 70)
     print("  전 비행구간 통합 시뮬레이션 (돌풍 포함)")
@@ -855,6 +854,12 @@ def main():
     print(f"\n{'='*70}")
     print("  완료!")
     print(f"{'='*70}")
+
+
+def main():
+    # Each validation stage is explicitly selected; default is nominal only.
+    from control.validation_suite import main as validation_main
+    validation_main()
 
 
 if __name__ == '__main__':

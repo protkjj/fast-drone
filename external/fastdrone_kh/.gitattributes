@@ -1,0 +1,9 @@
+* text=auto
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.png binary
+*.npz binary
+# Preserve original archived result bytes, including their line endings.
+results/baseline_v2/run_20260924T161648152853Z/** -text whitespace=cr-at-eol

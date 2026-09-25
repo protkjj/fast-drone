@@ -22,7 +22,7 @@ from control.dynamics import AxialDronePlant
 from control.hybrid_comparison import ProperHybrid
 from control.vnmpc_acados import AcadosVirtualNMPC
 from control.controller import ScheduledLQR
-from control.mission_sim import (MissionProfile, MissionController, run_mission,
+from control.mission_sim import (LegacyMissionProfile as MissionProfile, MissionController, run_mission,
                          compute_phase_metrics, compute_overall)
 from control.gust_comparison import make_gust_fn
 from control.acados_fallback_mc import LoggedFB, omega_metrics

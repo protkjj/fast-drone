@@ -50,6 +50,7 @@ class CascadedPID:
         self.Kd_att = np.array([20, 50, 50])
 
         self.max_tilt = np.radians(35)
+        self.axis = params.get('thrust_axis', 'z')
 
         from control.dynamics import compute_allocation_matrix
         self.f_to_TM, self.TM_to_f = compute_allocation_matrix(params)
@@ -94,33 +95,58 @@ class CascadedPID:
         return self._allocate(T_cmd, M_cmd)
 
     def _force_to_attitude(self, F_des):
-        """F_des → (T_cmd, R_des)."""
+        """F_des → (T_cmd, R_des).
+
+        2026-09-25 밤(야간지시 3-e): 로켓형(thrust_axis='x')에서는 추력이
+        동체 +x다. 틸트 제한은 "F_des가 세계 수직에서 얼마나 기우는가"라는
+        물리량이라 축과 무관하게 그대로 쓴다 — F_hat(= F_des 방향, 예전
+        b3_des=-F_hat과 부호만 다르다)의 세계 z성분으로 잰다. 축마다 달라지는
+        건 그 다음, F_hat을 **어느 동체축에 정렬시키는가**뿐이다:
+          z축: 3번째 열(body z)을 -F_hat에 (추력이 body -z)
+          x축: 1번째 열(body x)을 +F_hat에 (추력이 body +x)
+        control/gindi.py::GeometricGuidance._desired_attitude와 같은 축
+        분기를 쓴다 — GINDI의 기하 외부루프와 CPID가 원래 같은 구성이어야
+        한다는 논문 306행 서술과도 맞다. 요(heading)만 CPID 고유 자유도
+        (self.heading, 임의 목표 방위)라 GINDI의 고정 heading 대신 그걸 쓴다.
+        """
         F_norm = max(np.linalg.norm(F_des), 1e-6)
         T_cmd = F_norm
+        F_hat = F_des / F_norm
 
-        b3_des = -F_des / F_norm
-
-        # 틸트 제한
-        cos_tilt = -b3_des[2]
-        cos_max  = np.cos(self.max_tilt)
+        # 틸트 제한 — 세계 수직(+z)에서 F_hat이 벗어난 각도를 제한한다.
+        cos_tilt = F_hat[2]
+        cos_max = np.cos(self.max_tilt)
         if cos_tilt < cos_max:
-            b3_hor = b3_des.copy(); b3_hor[2] = 0
-            hn = np.linalg.norm(b3_hor)
+            f_hor = F_hat.copy(); f_hor[2] = 0
+            hn = np.linalg.norm(f_hor)
             if hn > 1e-8:
                 s = np.sqrt(1 - cos_max**2) / hn
-                b3_des = np.array([b3_hor[0]*s, b3_hor[1]*s, -cos_max])
+                F_hat = np.array([f_hor[0]*s, f_hor[1]*s, cos_max])
             else:
-                b3_des = np.array([0, 0, -1])
+                F_hat = np.array([0.0, 0.0, 1.0])
 
         c1 = np.array([np.cos(self.heading), np.sin(self.heading), 0])
-        b2_raw = np.cross(b3_des, c1)
-        bn = np.linalg.norm(b2_raw)
-        if bn < 1e-6:
-            b2_raw = np.cross(b3_des, np.array([0, 1, 0]))
+
+        if self.axis == 'x':
+            b1 = F_hat
+            b2_raw = np.cross(b1, c1)          # heading 을 body-x에 수직 평면으로 투영
             bn = np.linalg.norm(b2_raw)
-        b2 = b2_raw / bn
-        b1 = np.cross(b2, b3_des)
-        R_des = np.column_stack([b1, b2, b3_des])
+            if bn < 1e-6:
+                b2_raw = np.cross(b1, np.array([0, 0, 1.0]))
+                bn = np.linalg.norm(b2_raw)
+            b2 = b2_raw / bn
+            b3 = np.cross(b1, b2)
+            R_des = np.column_stack([b1, b2, b3])
+        else:
+            b3 = -F_hat
+            b2_raw = np.cross(b3, c1)
+            bn = np.linalg.norm(b2_raw)
+            if bn < 1e-6:
+                b2_raw = np.cross(b3, np.array([0, 1, 0]))
+                bn = np.linalg.norm(b2_raw)
+            b2 = b2_raw / bn
+            b1 = np.cross(b2, b3)
+            R_des = np.column_stack([b1, b2, b3])
         return T_cmd, R_des
 
     def _allocate(self, T_cmd, M_cmd):
@@ -216,6 +242,43 @@ def linearize_error_state(params, x_trim, u_trim):
     return A_r, B_r, T, T_pinv
 
 
+# ══════════════════════════════════════════════════════════════════════
+# GSLQR 비용 가중치 — 논문 §5.3 프로토콜로 튜닝된 값
+# ══════════════════════════════════════════════════════════════════════
+# 오차상태 순서 δx_r(14) = [δz, δv(3), δφ(3), δω(3), δn(4)]
+#
+# 2026-09-22 research/tune_gains.py 가 §5.3 프로토콜(독립 튜닝 시나리오,
+# 동일 예산 120평가, 본시험 비참조)로 찾은 값. 이력·선택 규칙은
+# research/results/tuned_gains.json, 설명은 research/GAIN_TUNING.md.
+#
+# 튜닝 전 placeholder 였던 [100,10,10,20, 50,50,50, 5,5,5, .01x4] / 0.05·I 가
+# 2026-09-24까지 control 에 남아 있었다. **그 상태로는 논문의 주된 주장
+# (LQR 대비 하이브리드 우수성)을 낼 수 없다** — 미튜닝 기준선을 이긴 것이
+# 되기 때문이다. 선정 프로파일 섭동회복 실측:
+#
+#   V=8  RMSE_z  placeholder 1.1199 → 튜닝 0.1160  (9.7배)
+#   V=14 RMSE_z  placeholder 2.0311 → 튜닝 0.1564  (13.0배)
+#
+# 같은 조건 V13 하이브리드는 0.0758 / 0.1515 다. 즉 기준선을 튜닝하면
+# 하이브리드의 고도 우위가 V=8 에서 14.8배→1.53배, V=14 에서 13.4배→1.03배로
+# 줄어든다. 자세한 비교는 results/LQR_VS_HYBRID_FAIRNESS.md.
+#
+# 개정3 채택값. 개정1(q_v_h ×64)과 개정2(q_z ×128)가 각각 한 축만 찾고 그
+# 조합을 한 번도 방문하지 못한 것이 나침반 탐색의 경로의존성 때문이었다 —
+# 출발점만 옮겨 같은 절차·같은 예산으로 다시 돌리자 조합을 찾았다.
+# GSLQR 의 고도 추종이 나빴던 것은 구조 한계(적분기 부재)가 아니라 가중치
+# 문제였다.
+#
+# ⚠ §5.3 이 본시험 결과를 보고 가중치를 다시 고르는 것을 금지한다.
+#   손으로 고치지 말 것 — test_lqr_gains_match_the_tuned_values 가 묶어 둔다.
+TUNED_Q_DIAG = [6400, 1280, 1280, 20, 50, 50, 50, 5, 5, 5, .01, .01, .01, .01]
+TUNED_R_SCALE = .00625
+
+# 튜닝 전 값. 옛 결과 재현·비교용으로만 남긴다(논문 결과에 쓰지 말 것).
+PLACEHOLDER_Q_DIAG = [100, 10, 10, 20, 50, 50, 50, 5, 5, 5, .01, .01, .01, .01]
+PLACEHOLDER_R_SCALE = 0.05
+
+
 class LQRController:
     """
     Error-State LQR — 쿼터니언 축소 (17D → 14D 오차상태).
@@ -226,7 +289,35 @@ class LQRController:
     여기서 δx_r은 현재 상태에서 트림으로의 오차를 14D로 변환한 것.
     """
 
-    def __init__(self, params, x_trim, u_trim, Q=None, R=None):
+    def __init__(self, params, x_trim, u_trim, Q=None, R=None,
+                 integral_states=(), Q_integral=None):
+        """
+        integral_states : tuple
+            적분 증강(LQI)할 오차상태 인덱스. 빈 튜플(기본값)이면 순수 LQR.
+            오차상태 순서가 [δz, δv(3), δφ(3), δω(3), δn(4)]이므로
+            ``(0,)`` 은 고도, ``(0, 1)`` 은 고도와 전진속도다.
+
+            왜 필요한가 — 논문 표7의 섭동은 **플랜트에만** 걸리고 제어기 명목값은
+            고정된다. 그러면 트림 피드포워드 u_trim 이 틀린 값이 되는데, 적분기가
+            없는 LQR 은 그 일정 오차를 영영 없애지 못한다. 실측(V=40 순항):
+
+                섭동            GSLQR δz    V13 δz
+                없음             0.0000    -0.0006
+                질량 +30%       -0.2443    -0.0929
+                추력계수 -30%    -0.3469    -0.1371
+
+            명목에서 GSLQR 은 정확히 0 이다 — 튜닝이 나쁜 게 아니라 구조가
+            일정 외란을 못 지운다. 표준 추종용 LQR 은 보통 적분 증강을 쓰므로,
+            이걸 빼고 비교하면 "적분기만 넣으면 되는 것 아니냐"는 반론이 선다.
+            공정한 비교를 위해 GSLQR 과 GSLQR-I 를 함께 보고할 것.
+
+            증강 방식은 표준 LQI 다 — 오차상태에 적분상태를 붙여 A·B 를 키우고
+            ARE 를 다시 푼다. 사후에 적분항을 더하는 방식이 아니다(그건 최적성이
+            깨지고 이득 조율이 임의가 된다).
+        Q_integral : array-like | None
+            적분상태의 가중치. None 이면 해당 상태 가중치의 0.5배를 쓴다 —
+            적분이 비례항보다 느리게 작용하도록.
+        """
         self.p = params
         self.x_trim = x_trim.copy()
         self.u_trim = u_trim.copy()
@@ -239,35 +330,59 @@ class LQRController:
 
         # ── 비용 행렬 (14D) ──
         if Q is None:
-            Q = np.diag([
-                100,               # δz (고도) — 강하게
-                10, 10, 20,        # δv (속도)
-                50, 50, 50,        # δφ (자세 오차) — 강하게
-                5, 5, 5,           # δω (각속도)
-                0.01, 0.01, 0.01, 0.01
-            ])
+            Q = np.diag(TUNED_Q_DIAG)
         if R is None:
-            R = np.eye(4) * 0.05
+            R = np.eye(4) * TUNED_R_SCALE
 
         self.Q, self.R_cost = Q, R
+        self.integral_states = tuple(int(i) for i in integral_states)
+        self.n_integral = len(self.integral_states)
+
+        # ── 적분 증강 (LQI) ──
+        # ẋ_i = C δx_r  를 상태에 붙인다. A_aug = [[A, 0], [C, 0]], B_aug = [[B], [0]]
+        if self.n_integral:
+            n = self.n_reduced
+            C = np.zeros((self.n_integral, n))
+            for row, idx in enumerate(self.integral_states):
+                C[row, idx] = 1.0
+            self.C_integral = C
+            A_des = np.block([[A_r, np.zeros((n, self.n_integral))],
+                              [C, np.zeros((self.n_integral,)*2)]])
+            B_des = np.vstack([B_r, np.zeros((self.n_integral, B_r.shape[1]))])
+            if Q_integral is None:
+                Q_integral = [0.5*Q[i, i] for i in self.integral_states]
+            Q_des = np.block([
+                [Q, np.zeros((n, self.n_integral))],
+                [np.zeros((self.n_integral, n)), np.diag(np.asarray(Q_integral, float))]])
+        else:
+            self.C_integral = None
+            A_des, B_des, Q_des = A_r, B_r, Q
 
         # ── ARE 풀이 ──
         try:
-            P = solve_continuous_are(A_r, B_r, Q, R)
-            self.K_r = np.linalg.inv(R) @ B_r.T @ P   # 4×14
+            P = solve_continuous_are(A_des, B_des, Q_des, R)
+            K_des = np.linalg.inv(R) @ B_des.T @ P
+            # 적분 이득은 따로 보관 — δx_r 에 곱할 부분만 K_r 로 둔다.
+            self.K_r = K_des[:, :self.n_reduced]      # 4×14
+            self.K_integral = (K_des[:, self.n_reduced:] if self.n_integral
+                               else None)
             self.valid = True
 
-            A_cl = A_r - B_r @ self.K_r
+            # 폐루프 고유값은 **증강계** 기준이어야 한다 — 적분상태를 뺀
+            # 부분행렬로 재면 적분 모드의 안정성을 못 본다.
+            A_cl = A_des - B_des @ K_des
             self.eigvals = np.linalg.eigvals(A_cl)
             self.max_real = np.max(np.real(self.eigvals))
 
             # 풀 상태용 K: K_full(4×17) = K_r(4×14) @ T_pinv(14×17)
+            # (적분 부분은 상태가 아니라 제어기 내부 기억이라 여기 안 들어간다)
             self.K = self.K_r @ self.T_pinv
 
         except np.linalg.LinAlgError as e:
             print(f"  [경고] ARE 풀이 실패: {e}")
             self.K = np.zeros((4, 17))
             self.K_r = np.zeros((4, self.n_reduced))
+            self.K_integral = None
             self.valid = False
             self.eigvals = np.array([])
             self.max_real = float('inf')
@@ -401,42 +516,112 @@ class ScheduledLQR:
       불연속적으로 점프 → 제어 입력 튐. 선형 보간은 이를 방지.
     """
 
-    def __init__(self, params, v_ref, z_ref=0.0, V_table=None, Q=None, R=None):
+    def __init__(self, params, v_ref, z_ref=0.0, V_table=None, Q=None, R=None,
+                 integral_states=(), Q_integral=None, dt=0.001,
+                 integral_limit=5.0):
+        """
+        integral_states : tuple
+            적분 증강(LQI)할 오차상태 인덱스. 기본값 ()이면 순수 LQR로
+            기존 동작이 그대로 보존된다. ``(0,)``=고도, ``(0,1)``=고도+전진속도.
+            근거와 실측은 LQRController 의 같은 인자 설명 참조.
+        integral_limit : float
+            적분상태 크기 제한(안티와인드업). 회전수 명령이 포화한 동안에는
+            적분을 아예 멈추고, 그와 별개로 크기도 이 값으로 자른다.
+            포화 중 계속 적분하면 풀린 뒤 크게 튄다.
+        """
         from control.trim import find_trim
 
         self.p = params
         self.v_ref = np.array(v_ref, dtype=float)
         self.z_ref = z_ref
+        self.integral_states = tuple(int(i) for i in integral_states)
+        self.n_integral = len(self.integral_states)
+        self.dt = dt
+        self.integral_limit = float(integral_limit)
+        self._x_int = np.zeros(self.n_integral)
 
         if V_table is None:
             V_table = np.arange(0, 90, 10).astype(float)
         self.V_table = np.array(V_table, dtype=float)
 
         # ── 각 속도에서 게인 사전 계산 ──
-        K_r_list, x_trim_list, u_trim_list = [], [], []
-        n_valid = 0
+        #
+        # ★ **트림이 수렴한 속도만 격자에 넣는다.** 예전에는 find_trim 의
+        #   'converged' 를 보지 않고 실패한 점까지 넣었다. _interpolate 가
+        #   np.interp 로 이웃과 선형 보간하므로, 물리적으로 없는 트림점 하나가
+        #   **유효 구간의 게인까지 끌어내린다.**
+        #   실측(선정 프로파일, 기본 격자 0..80): 20 이상 7개 점이 트림 없음인데
+        #   전부 격자에 들어갔고, 로그는 "9/9 유효"라고 찍었다(lqr.valid 는 ARE 가
+        #   풀렸는지만 보지 트림 존재를 보지 않는다). 그 결과 **트림이 멀쩡한
+        #   V=15 에서 게인이 직접 설계 대비 190% 어긋났다**(‖K‖ 1952 vs 799,
+        #   u_trim 682 vs 1004). rocket 프로파일도 70·80 에서 같은 일을 겪고 있었다.
+        #
+        # ★ 연속법(직전 해를 다음 초기값으로)을 쓴다. trim.py 가 "냉시동 fsolve 는
+        #   고속에서 엉뚱한 가지로 빠진다"고 경고하는 그대로다. 실측: rocket 의
+        #   70·80 이 냉시동에선 실패하지만 연속법으론 수렴한다. 기존 점들의 해는
+        #   솔버 허용오차 수준(상태 최대 5.8e-8, 수렴 판정 1e-6 보다 작다)에서 같다.
+        speeds, K_r_list, x_trim_list, u_trim_list = [], [], [], []
+        K_i_list = []
+        dropped, guess = [], None
 
         for V in self.V_table:
-            trim = find_trim(params, float(V))
-            x_t, u_t = trim['state'].copy(), trim['control'].copy()
+            trim = find_trim(params, float(V), guess=guess, quiet=True)
+            if not trim['converged']:
+                dropped.append((float(V), trim['why'] or '미수렴'))
+                continue
+            guess = trim['guess']
 
-            lqr = LQRController(params, x_t, u_t, Q, R)
-            if lqr.valid:
-                K_r_list.append(lqr.K_r.flatten())   # 4×14 = 56개 원소
-                n_valid += 1
-            else:
-                K_r_list.append(np.zeros(4 * 14))
+            lqr = LQRController(params, trim['state'], trim['control'], Q, R,
+                                integral_states=self.integral_states,
+                                Q_integral=Q_integral)
+            if not lqr.valid:
+                dropped.append((float(V), 'ARE 해 없음'))
+                continue
 
-            x_trim_list.append(x_t)
-            u_trim_list.append(u_t)
+            speeds.append(float(V))
+            K_r_list.append(lqr.K_r.flatten())        # 4×14 = 56개 원소
+            if self.n_integral:
+                K_i_list.append(lqr.K_integral.flatten())   # 4×n_i
+            x_trim_list.append(trim['state'].copy())
+            u_trim_list.append(trim['control'].copy())
 
-        # 보간용 배열: 각 행이 한 속도점의 값
-        self._K_r_flat = np.array(K_r_list)       # (N_speeds, 56)
-        self._x_trim_arr = np.array(x_trim_list)  # (N_speeds, 17)
-        self._u_trim_arr = np.array(u_trim_list)  # (N_speeds, 4)
+        if len(speeds) < 2:
+            raise ValueError(
+                f"ScheduledLQR: 트림이 잡히는 속도점이 {len(speeds)}개뿐이라 보간할 수 없다. "
+                f"버려진 점: {dropped}. V_table 을 트림이 존재하는 구간으로 좁혀야 한다.")
+
+        # 보간 격자는 **살아남은 속도만** 담는다.
+        self.V_table = np.array(speeds)
+        self.dropped = dropped
+        self._K_r_flat = np.array(K_r_list)       # (N_valid, 56)
+        self._K_i_flat = np.array(K_i_list) if self.n_integral else None
+        self._x_trim_arr = np.array(x_trim_list)  # (N_valid, 17)
+        self._u_trim_arr = np.array(u_trim_list)  # (N_valid, 4)
         self._nr = 14  # 축소 상태 차원
 
-        print(f"  ScheduledLQR: {n_valid}/{len(V_table)} 속도점 유효")
+        print(f"  ScheduledLQR: {len(speeds)}/{len(V_table)} 속도점 유효"
+              f" (격자 {speeds[0]:.0f}~{speeds[-1]:.0f} m/s)")
+        if dropped:
+            detail = ', '.join(f"{v:.0f}({why})" for v, why in dropped)
+            print(f"    제외: {detail}")
+        # 요청 격자의 절반 이상이 잘려나갔다면 격자 자체가 이 기체의 트림 구간을
+        # 훨씬 벗어난 것이다. 남은 점들 바깥은 외삽(clip)이라 조용히 틀린 게인이
+        # 쓰인다 — 실측으로 85.6% 오차가 났다. 프로파일과 무관한 일반 안전장치다.
+        if len(dropped) * 2 > len(V_table):
+            print(f"    ⚠ 요청 격자 {len(V_table)}점 중 {len(dropped)}점이 제외됐다. "
+                  f"V_table 이 이 기체의 트림 구간({speeds[0]:.0f}~{speeds[-1]:.0f} m/s)보다 "
+                  f"훨씬 넓다 — 그 바깥은 외삽이라 게인이 크게 어긋난다. "
+                  f"격자를 트림 구간에 맞춰 다시 줄 것.")
+
+    def _interpolate_integral(self, V):
+        """V에서 적분 이득 K_i(4×n_i) 선형 보간. 적분 없으면 None."""
+        if not self.n_integral:
+            return None
+        V_c = np.clip(V, self.V_table[0], self.V_table[-1])
+        return np.array([
+            np.interp(V_c, self.V_table, self._K_i_flat[:, j])
+            for j in range(self._K_i_flat.shape[1])
+        ]).reshape(4, self.n_integral)
 
     def _interpolate(self, V):
         """V에서 K_r(4×14), x_trim(17), u_trim(4) 선형 보간."""
@@ -500,7 +685,26 @@ class ScheduledLQR:
 
         dx_r = self._compute_error_state(x, x_trim)
         u = u_trim - K_r @ dx_r
-        return np.clip(u, self.p['n_min'], self.p['n_max'])
+
+        if self.n_integral:
+            K_i = self._interpolate_integral(V)
+            u = u - K_i @ self._x_int
+
+        u_sat = np.clip(u, self.p['n_min'], self.p['n_max'])
+
+        if self.n_integral:
+            # 안티와인드업 — 포화 중에는 적분을 멈춘다. 낼 수 없는 명령을 계속
+            # 적분하면 포화가 풀린 뒤 크게 튄다. 크기 제한도 함께 건다.
+            if np.allclose(u, u_sat):
+                self._x_int += self.dt*np.array(
+                    [dx_r[i] for i in self.integral_states])
+                np.clip(self._x_int, -self.integral_limit, self.integral_limit,
+                        out=self._x_int)
+        return u_sat
+
+    def reset(self):
+        """MC 시행 간 독립성 — 적분 상태를 비운다."""
+        self._x_int = np.zeros(self.n_integral)
 
 
 # ══════════════════════════════════════════════════════

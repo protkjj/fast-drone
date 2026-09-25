@@ -1,0 +1,11 @@
+{
+  "max_z_error": 10.0,
+  "max_velocity_error": 15.0,
+  "max_omega": 35.0,
+  "sustained_omega": 25.0,
+  "sustained_seconds": 0.2,
+  "recovery_z": 0.5,
+  "recovery_velocity": 0.5,
+  "recovery_omega": 1.0,
+  "recovery_hold": 0.5
+}
