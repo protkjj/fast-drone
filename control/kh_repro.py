@@ -182,14 +182,16 @@ def run_case(plant_params, ctrl_factory, label, speed, case, *, duration=4.0):
         prop_domain_outside_fraction=outside/max(len(commands), 1),
         optimizer_failures=n_fail, optimizer_calls=len(solve_log),
         last_solve_log_entries=solve_log[-3:] if solve_log else [],
+        # 작업지시서 절대규칙 5: 모든 평가에 |ω| 포함(2026-09-26 추가, 보고용 필드)
+        max_omega=float(np.max(np.linalg.norm(states[:, 10:13], axis=1))),
     )
     result['tracking_pass'] = bool(
         reason is None and abs(ez[-1]) < 0.5 and np.linalg.norm(ev[-1]) < 0.5
         and saturation < 0.01)
     print(f"  {label:14s} {speed:5.1f}m/s {case:9s}  완주={result['completed']!s:5s}  "
           f"z_RMSE={result['z_rmse_m']:.4f}  v_RMSE={result['vel_rmse_m_s']:.3f}  "
-          f"sat={100*saturation:.1f}%  솔버실패={n_fail}/{len(solve_log)}  "
-          f"정지사유={reason}")
+          f"|w|max={result['max_omega']:.2f}  sat={100*saturation:.1f}%  "
+          f"솔버실패={n_fail}/{len(solve_log)}  정지사유={reason}")
     return result
 
 
