@@ -1,0 +1,728 @@
+{
+  "meta": {
+    "label": "PILOT",
+    "command": "python -m control.arena_design_check --tuned results/arena/tuning/main120",
+    "tuned": {
+      "GSLQR": {
+        "record": "results/arena/tuning/main120/GSLQR.record.json",
+        "best_values": {
+          "q_z": 6400.0,
+          "q_v_h": 81920.0,
+          "q_v_z": 20.0,
+          "q_phi": 50.0,
+          "q_omega": 5.0,
+          "q_n": 0.01,
+          "r": 0.003125,
+          "q_iz": 3200.0,
+          "q_ivx": 640.0
+        },
+        "best_objective": 0.20326943983164436,
+        "prior_objective": 0.48438070105802955,
+        "budget": 120
+      },
+      "CPID": {
+        "record": "results/arena/tuning/main120/CPID.record.json",
+        "best_values": {
+          "Kp_vel": 32.0,
+          "Ki_vel": 0.15,
+          "Kp_z": 16.0,
+          "Kd_z": 4.0,
+          "Ki_z": 0.5,
+          "Kp_att": 1.0,
+          "Kd_att": 1.0
+        },
+        "best_objective": 500.02364122891356,
+        "prior_objective": 500.21325190599265,
+        "budget": 120
+      }
+    },
+    "shape": "smooth",
+    "ramp_s": 1.0,
+    "feedforward": "on",
+    "created_utc": "2026-09-26T15:43:41.036672+00:00",
+    "config_sha256": "19cd72375ef768d7ef4f8909c9c51f0e5cf11d5aa2299afbf7c48d0f9f63d82f",
+    "git_revision": "1225c50eaffda2662973e0bed450b3adad0e8c1d",
+    "git_dirty": false,
+    "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+    "environment": {
+      "system": "Darwin",
+      "release": "25.6.0",
+      "machine": "arm64",
+      "cpu": "Apple M4",
+      "python": "3.13.7",
+      "packages": {
+        "numpy": "2.3.3",
+        "scipy": "1.16.3",
+        "casadi": "3.7.2",
+        "matplotlib": "3.10.6"
+      },
+      "threads": {
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "VECLIB_MAXIMUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1"
+      }
+    },
+    "gains": {
+      "GSLQR": {
+        "controller": "GSLQR",
+        "status": "prior - NOT tuned on light_rocket_v2_pack_forward",
+        "provenance": "control/controller.py TUNED_Q_DIAG/TUNED_R_SCALE. Tuned 2026-09-22 by research/tune_gains.py on the research JS/WASM engine with the OLD selected profile (1.7117 kg), not on this aircraft or this plant.",
+        "error_state_order": [
+          "dz",
+          "dvx",
+          "dvy",
+          "dvz",
+          "dphi_x",
+          "dphi_y",
+          "dphi_z",
+          "dw_x",
+          "dw_y",
+          "dw_z",
+          "dn1",
+          "dn2",
+          "dn3",
+          "dn4"
+        ],
+        "Q_diag": [
+          6400.0,
+          81920.0,
+          81920.0,
+          20.0,
+          50.0,
+          50.0,
+          50.0,
+          5.0,
+          5.0,
+          5.0,
+          0.01,
+          0.01,
+          0.01,
+          0.01
+        ],
+        "R_scale": 0.003125,
+        "integral_states": [
+          0,
+          1
+        ],
+        "Q_integral": [
+          3200.0,
+          640.0
+        ],
+        "integral_limit": 50.0,
+        "integral_limit_note": "State limit on the LQI integrals (xi_z in m*s, xi_vx in m), with integration frozen while any rotor command saturates. Class default is 5.0 (unchanged).",
+        "feedforward_note": "Reference-acceleration feed-forward (configs/arena.json controllers.GSLQR.reference_feedforward = window_acceleration), standard tracking-LQR form u = u_ss - K(x - x_ss): at each schedule point the steady forward-acceleration state/input offset [dphi, dn] per 1 m/s^2 is solved from the same error-state linearization the LQR uses (velocity + angular-acceleration rows, min norm in the LQR's own weights diag(Q_phi, Q_n + R); control/controller.py::feedforward_gain) and interpolated like K. The linear offset is used only inside its validity range, found from the nominal model alone (control/controller.py::feedforward_validity: |dv_x - a| <= 0.1|a|, |dv_z| <= 0.1|a|, |dw| <= 2 rad/s^2, 0.1 m/s^2 scan; ~1.4-2.6 m/s^2 below 25 m/s, 4-8 m/s^2 above 30 m/s), beyond which the reference acceleration is clipped. a_ref is the forward difference of the reference velocity over the NMPC's first prediction interval (0.05 s) of the same window. Class default off (legacy bit-identical); a constant reference skips the path.",
+        "change_record": "2026-09-26 kj decision 6-9: the smoke run hit the 5.0 limit on xi_vx for 10.97% (mass x1.3) and 4.89% (motor tau x2) of the mission (1% rule). With the limit removed, mass x1.3 counts as 'impact' under the pre-registered rule (stop 44.33 -> 44.59 s; over the common window RMSE v 7.96 -> 7.11, z 5.17 -> 4.89; trajectories identical until 37.94 s); tau x2 shows no impact; the divergence outcome is unchanged in both. kj rule: widen if impact. 50 is the smallest candidate (5 -> 50 -> 500) that keeps every GSLQR smoke case at 0% time-at-limit (peak |xi_vx| 5.99). Made AFTER seeing smoke results, OUTSIDE the tuning budget, in GSLQR's FAVOUR (baseline-strengthening). Evidence: results/arena/INTEGRATORS_SMOKE.md. 2026-09-26 afternoon kj decision 2: reference-acceleration feed-forward (see feedforward_note), because the NMPCs see the reference 1 s ahead while GSLQR only saw the current reference (tuning ramp 0->15: GSLQR window RMSE v 0.58 vs NMPC 0.035-0.072). A plan-review prototype showed that the UNBOUNDED linear feed-forward made GSLQR diverge earlier on ref_accel_0_VH_rho1 (6.33 -> 4.11 s; reference acceleration up to ~60 m/s^2 is far outside the linearization) — the validity-range rule was written after seeing that and is model-only, not fitted to simulation results. AFTER seeing results, OUTSIDE the tuning budget, in GSLQR's FAVOUR. Before/after: results/arena/FEEDFORWARD.md."
+      },
+      "CPID": {
+        "controller": "CPID",
+        "status": "prior - class defaults, NOT tuned on light_rocket_v2_pack_forward",
+        "provenance": "control/controller.py CascadedPID attribute defaults (z-axis multirotor era). Ki_vel prior 0.15 = research/tune_gains.py CPID_BASE kiV_h (different CPID structure, prior only); added 2026-09-25 by kj decision (conditional velocity integral, paper sec 5.3).",
+        "Kp_vel": 32.0,
+        "Ki_vel": 0.15,
+        "a_int_max": 9.81,
+        "Kp_z": 16.0,
+        "Kd_z": 4.0,
+        "Ki_z": 0.5,
+        "int_z_max": 5.0,
+        "a_int_z_max": 9.81,
+        "Kp_att": [
+          200.0,
+          500.0,
+          500.0
+        ],
+        "Kd_att": [
+          20.0,
+          50.0,
+          50.0
+        ],
+        "max_tilt_deg": 45.0,
+        "heading": "from_plant_hover_convention",
+        "role": "Low-speed practical baseline, design region 0-20 m/s (configs/arena.json controllers.CPID.design_region_m_s). Excluded from main-test scenarios that go above the region (kj decision 2026-09-26); the high-speed limit of linear fixed-gain control is GSLQR's role.",
+        "design_note": "Tilt limit is measured from world vertical. The trim thrust axis is 33.4 deg (controller model) / 34.1 deg (plant) from vertical at 20 m/s and 45.1 deg at 25 m/s, so with the PX4 default 45 deg the design region 0-20 m/s keeps ~11 deg of margin. No aero feed-forward: the integrators carry the aerodynamic share of the trim (20 m/s: 4.63 m/s^2 horizontal, 2.85 m/s^2 vertical), so the arena preloads them from the controller-model trim (configs/arena.json controllers.CPID.integrator_preload).",
+        "integrator_note": "Both integrators (horizontal velocity, altitude) are limited as ACCELERATION AUTHORITY in m/s^2 (1 g), independent of Ki, and are frozen while the command is tilt- or rotor-limited (paper sec 5.3 conditional integration). PX4 PositionControl limits only the VERTICAL velocity integral to +-1 g (CONSTANTS_ONE_G) and uses tracking anti-windup with no fixed magnitude in the horizontal plane; the horizontal +-1 g here extends PX4's vertical criterion to the horizontal plane. It never binds inside the design region (design check: limit -> infinity is bit-identical). a_int_z_max=null restores the legacy altitude integrator (unconditional, state limit int_z_max in m*s = 2.5 m/s^2 at Ki_z 0.5).",
+        "feedforward_note": "Reference-acceleration feed-forward (configs/arena.json controllers.CPID.reference_feedforward = window_acceleration): a_des = a_ref + velocity PID, the same structure as PX4 PositionControl (setInputSetpoint puts the trajectory acceleration in _acc_sp and _velocityControl adds the PID output to it; checked in PX4 main 7c8d6daca9be). a_ref is the forward difference of the reference velocity over the NMPC's first prediction interval (0.05 s) of the same reference window the NMPCs read. Class default off (legacy bit-identical); with a constant reference a_ref is exactly 0 and the path is skipped.",
+        "change_record": "2026-09-26 kj decision: velocity integral limit 5 -> 9.81 m/s^2, altitude integral legacy -> 9.81 m/s^2 conditional, plus integrator preload. 2026-09-26 kj decision: max_tilt_deg 35 -> 45 = PX4 default MPC_TILTMAX_AIR (checked in PX4 main, src/modules/mc_pos_control/multicopter_position_control_limits_params.yaml: default 45.0) because the manuscript describes CPID as the PX4 structure and the 20 m/s trim (33.4 deg) sat at the edge of 35 deg; class default stays 35 (legacy bit-identical). 2026-09-26 afternoon kj decision 2: reference-acceleration feed-forward (see feedforward_note) after the new tuning ramp 0->15 showed CPID window RMSE v 2.72 vs 0.035-0.58 for the others. All of these were made AFTER seeing results, OUTSIDE the tuning budget, in CPID's FAVOUR (baseline-strengthening). Recorded in the fairness table of results/ARENA_STATUS; before/after in results/arena/FEEDFORWARD.md."
+      }
+    },
+    "band_fraction": 0.05,
+    "step_time": 0.5,
+    "duration": 15.0
+  },
+  "rows": [
+    {
+      "settling_s": 3.9800000000000004,
+      "overshoot_pct": 26.933631780034517,
+      "steady_error": 4.617358874761108e-05,
+      "band": 0.05,
+      "cross_coupling_max": 1.1557969337260899e-12,
+      "controller": "GSLQR",
+      "speed": 0.0,
+      "step": "altitude_+1m",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 7.371987468144974e-12,
+      "trajectory_sha256": "7b5e4b2e04eeaf78c340ebb8eb61eb06d904f34447b821ac230562d5ad2911dd",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.00960951273051543
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 1.7977329796901357e-13
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 0.938,
+      "overshoot_pct": 6.955797021000598,
+      "steady_error": 0.0023645227796643044,
+      "band": 0.05,
+      "cross_coupling_max": 0.017081548488729226,
+      "controller": "GSLQR",
+      "speed": 0.0,
+      "step": "speed_+1mps",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 1.4386858497304478,
+      "trajectory_sha256": "537bebe0164596ae57ac928d1221ba589c6e7bb80ef1c5d9861a78cbb1c7b0d4",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0002598237006402483
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0010065866530353004
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 4.098,
+      "overshoot_pct": 31.05601988517641,
+      "steady_error": 5.5113971906331706e-05,
+      "band": 0.05,
+      "cross_coupling_max": 0.027254717437205755,
+      "controller": "GSLQR",
+      "speed": 20.0,
+      "step": "altitude_+1m",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 0.43173509746069666,
+      "trajectory_sha256": "5c54fcadbd665a555d5845b807b1cb2b5f64d092c3eb22ec3d51af1d5756d7d8",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.01019233659789009
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.001675272433155405
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 0.754,
+      "overshoot_pct": 1.0191284853380722,
+      "steady_error": 0.001999974336315274,
+      "band": 0.05,
+      "cross_coupling_max": 0.04135635318473163,
+      "controller": "GSLQR",
+      "speed": 20.0,
+      "step": "speed_+1mps",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 0.7171945577669763,
+      "trajectory_sha256": "c04f99f5ed3e9749ca606660117c15680aa472e6fa8eb69eaf16144d646fd6b4",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0012720386487428687
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0015564438743521486
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 2.8200000000000003,
+      "overshoot_pct": 29.96536475679754,
+      "steady_error": 2.7978384693015326e-05,
+      "band": 0.05,
+      "cross_coupling_max": 0.025106946797443186,
+      "controller": "GSLQR",
+      "speed": 40.0,
+      "step": "altitude_+1m",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 0.7629873656008774,
+      "trajectory_sha256": "48f090b37769fa3ad6834e665dbc54304d630cff6cb25d761acdb5f6e2fae144",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.00734988882949103
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.00023406301786483153
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 0.756,
+      "overshoot_pct": 0.061517298882307614,
+      "steady_error": 0.00013693710763152886,
+      "band": 0.05,
+      "cross_coupling_max": 0.01879733238842718,
+      "controller": "GSLQR",
+      "speed": 40.0,
+      "step": "speed_+1mps",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 0.15437821559528433,
+      "trajectory_sha256": "53b039a347151933909f77349a673a0ec6af5c50627552015643f724d2e6be2f",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0001781870621903624
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 8.923482093635562e-05
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 3.0260000000000002,
+      "overshoot_pct": 27.401409375298158,
+      "steady_error": 2.306579077779962e-05,
+      "band": 0.05,
+      "cross_coupling_max": 0.013902646809235364,
+      "controller": "GSLQR",
+      "speed": 60.0,
+      "step": "altitude_+1m",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 0.6114319063375372,
+      "trajectory_sha256": "7632023bb93a8004df14d6c03ad8fcf2116daa160f64183151dd214168b68458",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.006295362645220994
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0001415968853641336
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 0.756,
+      "overshoot_pct": 0.0,
+      "steady_error": 0.00017373402521517328,
+      "band": 0.05,
+      "cross_coupling_max": 0.011782363026838993,
+      "controller": "GSLQR",
+      "speed": 60.0,
+      "step": "speed_+1mps",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 0.049985797472158526,
+      "trajectory_sha256": "d55b8f7589e742ea69523186b2c53df1163c64b91d4b8c8114a41fd8fcc59b01",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0001679483147342437
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 9.57887131658091e-05
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 2.894,
+      "overshoot_pct": 23.38656841322937,
+      "steady_error": 2.024293748578737e-05,
+      "band": 0.05,
+      "cross_coupling_max": 0.0073907238117101315,
+      "controller": "GSLQR",
+      "speed": 85.0,
+      "step": "altitude_+1m",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 0.4563189048900958,
+      "trajectory_sha256": "0cb5bfe5e9c76adbcfb3e8543104cabd1455cd2a61b081ac61127490e347bc6d",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.005385593006532387
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.00010486786038823432
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 0.754,
+      "overshoot_pct": 0.05340337394557082,
+      "steady_error": 0.0001711554171250131,
+      "band": 0.05,
+      "cross_coupling_max": 0.008526652459313055,
+      "controller": "GSLQR",
+      "speed": 85.0,
+      "step": "speed_-1mps",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 0.03221893042896597,
+      "trajectory_sha256": "ff52ddec30fd4241ca6109fcc1b20bf36387635ea7cf06f6bfbaffd5b844273d",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.00033215585092508386
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 8.729224196878488e-05
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 1.8319999999999999,
+      "overshoot_pct": 16.01406386911215,
+      "steady_error": 0.005194813498819035,
+      "band": 0.05,
+      "cross_coupling_max": 4.354143779148385e-13,
+      "controller": "CPID",
+      "speed": 0.0,
+      "step": "altitude_+1m",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 8.96188620541431e-12,
+      "trajectory_sha256": "070bba7a4ec27093cb8cc1d113c2f92ea4df17832878a86c9809a893cf93ea93",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "vx": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 7.544520573834797e-13
+          },
+          "vy": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 1.2246467991477644e-16
+          },
+          "z": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.015935820035288442
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 0.72,
+      "overshoot_pct": 0.4539933413331587,
+      "steady_error": 0.00042704878808251425,
+      "band": 0.05,
+      "cross_coupling_max": 0.004485712567699807,
+      "controller": "CPID",
+      "speed": 0.0,
+      "step": "speed_+1mps",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 1.2057821196271379,
+      "trajectory_sha256": "56913bc0b44ad71977c360e88a324599255ac40aa58d10d27487ef75c787845a",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "vx": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 9.487134568392951e-05
+          },
+          "vy": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 1.2246467991477644e-16
+          },
+          "z": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 8.029100846153098e-05
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 1.8559999999999999,
+      "overshoot_pct": 17.349395023324732,
+      "steady_error": 0.007238624811279798,
+      "band": 0.05,
+      "cross_coupling_max": 0.015307579068879917,
+      "controller": "CPID",
+      "speed": 10.0,
+      "step": "altitude_+1m",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 0.6649844084927379,
+      "trajectory_sha256": "b33145bacdc9fea5bed40fcd835d70ec149fe07c683a3d44e1263005c7ce725f",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "vx": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.1496633492418869
+          },
+          "vy": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 1.2008447425219694e-16
+          },
+          "z": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.019481505571157322
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 0.736,
+      "overshoot_pct": 0.0,
+      "steady_error": 0.0103626694647061,
+      "band": 0.05,
+      "cross_coupling_max": 0.027070962131787724,
+      "controller": "CPID",
+      "speed": 10.0,
+      "step": "speed_+1mps",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 1.1149976333826201,
+      "trajectory_sha256": "98ee9c86dcf900dad70b165d4abf7544851908de25ae1133474a9cc9fc74d1f3",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "vx": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.15166331241883818
+          },
+          "vy": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 1.2008447425219694e-16
+          },
+          "z": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.025745582819201855
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 1.9500000000000002,
+      "overshoot_pct": 22.674580620493856,
+      "steady_error": 0.008598511089220348,
+      "band": 0.05,
+      "cross_coupling_max": 0.04594699870796504,
+      "controller": "CPID",
+      "speed": 20.0,
+      "step": "altitude_+1m",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 1.7291832721367095,
+      "trajectory_sha256": "98aaa340a45615b38e0d29176ad2bf5e8ccca8dc034b1f33e57fe123e758dbe7",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 288,
+        "frozen_fraction": 0.0384,
+        "channels": {
+          "vx": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.47337580605344753
+          },
+          "vy": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 2.9620795713380973e-15
+          },
+          "z": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.28272757991319714
+          }
+        }
+      }
+    },
+    {
+      "settling_s": 0.73,
+      "overshoot_pct": 0.0,
+      "steady_error": 0.007100370482296693,
+      "band": 0.05,
+      "cross_coupling_max": 0.03716614399064966,
+      "controller": "CPID",
+      "speed": 20.0,
+      "step": "speed_-1mps",
+      "shape": "smooth",
+      "stop_reason": null,
+      "simulated_seconds": 15.0,
+      "max_omega": 0.8167913259317521,
+      "trajectory_sha256": "85a791c89676acbe0a162e9eb3e74e8b860b97e9dd0ceee171e258e7a45c1ebe",
+      "integrators": {
+        "steps": 7500,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "vx": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.4733473905601223
+          },
+          "vy": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 9.422066743670218e-17
+          },
+          "z": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.2827781212096511
+          }
+        }
+      }
+    }
+  ]
+}
