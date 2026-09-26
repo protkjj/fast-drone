@@ -1000,6 +1000,8 @@ done
 | 튜닝 저속 사례 고르기(8.3) | `python -m control.arena_tuning_candidates --controllers V13 M17 F13 GSLQR` | ~11분(최대 RSS 2.75 GiB) |
 | 튜닝 기록 요약(11절, 읽기 전용 — 도는 중인 기록도 PARTIAL로 읽는다) | `python -m control.arena_tuning_report --run-dir results/arena/tuning/main120` | 수 초 |
 | 튜닝값 설계점검(11.4) | `python -m control.arena_design_check --tuned results/arena/tuning/main120 --out results/arena/design_check_main120` | ~4분 |
+| 튜닝값 스모크(11.5-4). 기록이 complete·같은 설정 해시·I-4 통과여야 하고, `smoke_reference.json`에는 못 쓴다 | `python -m control.validation_suite --config configs/arena.json --smoke --tuned results/arena/tuning/main120 [--only-controllers …] --reference-out <튜닝값 참조.json>` | 4종 ~1시간, M17 ~1.5시간 |
+| 나눠 돌린 스모크 합치기. 같은 커밋·설정·환경·게인 출처여야 한다 | `python -m control.arena_reference_merge --runs <실행 A> <실행 B> --out <참조.json>` | 수 초 |
 | 검증 | `python scripts/verify_arena.py [--quick]` | 10.9분 / 2.0분(2026-09-26 오후, 새 참조) |
 
 ### A.4 이번 밤의 사고와 조치(kj 부재 중, 사후 보고)
