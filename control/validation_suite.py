@@ -552,7 +552,9 @@ def run_arena(args, parser):
     reference = dict(
         label=label, created_utc=datetime.now(timezone.utc).isoformat(),
         command='python -m control.validation_suite --config '+str(args.config)+' --smoke'
-                + ('' if tuned is None else ' --tuned '+str(args.tuned)),
+                + ('' if tuned is None else ' --tuned '+str(args.tuned))
+                + (' --only-controllers '+' '.join(labels) if args.only_controllers else '')
+                + (' --only-cases '+' '.join(args.only_cases) if args.only_cases else ''),
         config_sha256=manifest['config_sha256'], git_revision=revision, git_dirty=dirty,
         parameter_sha256=manifest['parameter_sha256'],
         controller_model_sha256=manifest['controller_model_sha256'],

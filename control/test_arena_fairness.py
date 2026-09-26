@@ -1092,6 +1092,8 @@ def test_i4_tuned_arena_run_applies_and_records_the_best_values(config, factory,
         tuned = json.loads((out/name).read_text(encoding='utf-8'))['tuned']['controllers']['CPID']
         assert tuned['record_sha256'] == sha and tuned['best_values']['Kp_vel'] == 32.0
     assert 'Gains: **tuned**' in (out/'REPORT.md').read_text(encoding='utf-8')
+    command = json.loads((out/'arena_reference.json').read_text(encoding='utf-8'))['command']
+    assert command.endswith(f"--tuned {tmp_path/'run'} --only-controllers CPID --only-cases gust_lateral_p10_VL")
 
 
 @pytest.mark.parametrize('problem, needle', [

@@ -17,7 +17,8 @@ def fake_run(name, controllers, tuned=None, **changes):
         manifest['tuned'] = dict(run_dir=tuned, controllers={c: dict(record_sha256=c*4) for c in controllers})
     manifest.update(changes)
     reference = dict(label='SMOKE', created_utc='2026-09-28T00:00:00+00:00',
-                     command='python -m control.validation_suite --config configs/arena.json --smoke',
+                     command='python -m control.validation_suite --config configs/arena.json --smoke'
+                             ' --only-controllers ' + ' '.join(controllers),
                      controller_settings={c: dict(kind=c) for c in controllers},
                      rows=[dict(scenario_id=s, controller=c, trajectory_sha256=s + c)
                            for s in ('s1', 's2') for c in controllers])
@@ -31,7 +32,7 @@ def test_merge_orders_rows_like_a_single_run_and_keeps_provenance():
     assert [r['merged_from'] for r in merged['rows'][:3]] == ['A', 'B', 'A']
     assert set(merged['controller_settings']) == set(ORDER)
     assert [m['controllers'] for m in merged['merged_from']] == [['V13', 'CPID'], ['M17']]
-    assert merged['command'].count('--only-controllers') == 2
+    assert merged['command'].count('--only-controllers') == 2       # 명령에 이미 있으면 다시 붙이지 않는다
     assert 'tuned' not in merged
 
 

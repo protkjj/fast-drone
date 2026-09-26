@@ -75,7 +75,8 @@ def merge(runs):
     reference = runs[0][2]
     merged = dict(
         label=reference['label'], created_utc=datetime.now(timezone.utc).isoformat(),
-        command=' + '.join(f"{r['command']} --only-controllers {' '.join(m['controllers'])}" for _, m, r in runs),
+        command=' + '.join(r['command'] if '--only-controllers' in r['command']      # 옛 실행은 명령에 없었다
+                           else f"{r['command']} --only-controllers {' '.join(m['controllers'])}" for _, m, r in runs),
         merged_from=[dict(run=name, controllers=m['controllers'], created_utc=r['created_utc']) for name, m, r in runs],
         config_sha256=first['config_sha256'], git_revision=first['git_revision'], git_dirty=first['git_dirty'],
         parameter_sha256=first['parameter_sha256'], controller_model_sha256=first['controller_model_sha256'],
