@@ -102,3 +102,12 @@ def test_complete_record_with_a_different_best_is_refused():
     record['best_exponents'] = [1.0, 0.0]
     with pytest.raises(ReplayMismatch):
         analyse(record, log)
+
+
+def test_path_check_follows_strict_improvements_only():
+    # arena_tuning_path_check가 따라가는 경로: 평가 0(사전값) + 누적 최선이 엄밀히 좋아진 평가.
+    # 평가 11 (2,1)은 최선 (2,0)과 목적함수가 같아 경로에 들어가지 않는다.
+    from control.arena_tuning_path_check import improvements
+    record, log = synthetic_run(lambda e: 2.0**(-e[0]), n=2, budget=12, cliff=lambda e: e[0] >= 3)
+    assert log[11]['objective'] == log[5]['objective']
+    assert [e['index'] for e in improvements(log)] == [0, 1, 5]
