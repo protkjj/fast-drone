@@ -945,6 +945,440 @@
         "controller": "GSLQR",
         "speed": 0.0,
         "step": "altitude_+1m",
+        "settling_s": 4.094,
+        "overshoot_pct": 27.628602690232995,
+        "steady_error": 5.0062133339623525e-05,
+        "cross_coupling_max": 2.0880018756587927e-12,
+        "max_omega": 3.68500731486816e-12,
+        "stop_reason": null,
+        "trajectory_sha256": "34158b5cb039d4b79a09c5cb76b3fe4b1fce1aa406c9e2f1f8dc4e79e0b1977e"
+      },
+      "on": {
+        "controller": "GSLQR",
+        "speed": 0.0,
+        "step": "altitude_+1m",
+        "settling_s": 4.094,
+        "overshoot_pct": 27.628602690232995,
+        "steady_error": 5.0062133339623525e-05,
+        "cross_coupling_max": 2.0880018756587927e-12,
+        "max_omega": 3.68500731486816e-12,
+        "stop_reason": null,
+        "trajectory_sha256": "34158b5cb039d4b79a09c5cb76b3fe4b1fce1aa406c9e2f1f8dc4e79e0b1977e"
+      },
+      "identical": true
+    },
+    {
+      "off": {
+        "controller": "GSLQR",
+        "speed": 0.0,
+        "step": "speed_+1mps",
+        "settling_s": 2.86,
+        "overshoot_pct": 20.967111307462094,
+        "steady_error": 1.9385311000250565e-05,
+        "cross_coupling_max": 0.017888182615998005,
+        "max_omega": 0.7606917465262824,
+        "stop_reason": null,
+        "trajectory_sha256": "044c17c4a1bdb2f984697e0734f6188c29a66c95564175f87fa09f72f49f1c73"
+      },
+      "on": {
+        "controller": "GSLQR",
+        "speed": 0.0,
+        "step": "speed_+1mps",
+        "settling_s": 1.288,
+        "overshoot_pct": 25.20062432374559,
+        "steady_error": 7.280823355894059e-07,
+        "cross_coupling_max": 0.02287583985157937,
+        "max_omega": 1.2750258721791423,
+        "stop_reason": null,
+        "trajectory_sha256": "4d997785e043a360c997d857f4febfa8e6c7f332b5e755e469746b2adf46a8f5"
+      },
+      "identical": false
+    },
+    {
+      "off": {
+        "controller": "GSLQR",
+        "speed": 20.0,
+        "step": "altitude_+1m",
+        "settling_s": 4.2700000000000005,
+        "overshoot_pct": 29.273495774127767,
+        "steady_error": 5.8683772869665185e-05,
+        "cross_coupling_max": 0.18890701705033308,
+        "max_omega": 0.4666178121122697,
+        "stop_reason": null,
+        "trajectory_sha256": "99e8c905f984ac0c6a586bd25df5ae3f28022b0fba31dac2e9aecb3b23489bb1"
+      },
+      "on": {
+        "controller": "GSLQR",
+        "speed": 20.0,
+        "step": "altitude_+1m",
+        "settling_s": 4.2700000000000005,
+        "overshoot_pct": 29.273495774127767,
+        "steady_error": 5.8683772869665185e-05,
+        "cross_coupling_max": 0.18890701705033308,
+        "max_omega": 0.4666178121122697,
+        "stop_reason": null,
+        "trajectory_sha256": "99e8c905f984ac0c6a586bd25df5ae3f28022b0fba31dac2e9aecb3b23489bb1"
+      },
+      "identical": true
+    },
+    {
+      "off": {
+        "controller": "GSLQR",
+        "speed": 20.0,
+        "step": "speed_+1mps",
+        "settling_s": 3.216,
+        "overshoot_pct": 12.220228194619764,
+        "steady_error": 1.154197925995681e-05,
+        "cross_coupling_max": 0.017031191276707602,
+        "max_omega": 0.467481243956064,
+        "stop_reason": null,
+        "trajectory_sha256": "26625bda4ecb6ad6cf65a4a1ec6241b80038b210f476969c0fbcdfc8f1f5ddf0"
+      },
+      "on": {
+        "controller": "GSLQR",
+        "speed": 20.0,
+        "step": "speed_+1mps",
+        "settling_s": 1.1600000000000001,
+        "overshoot_pct": 6.569801115140095,
+        "steady_error": 2.4743883260537622e-06,
+        "cross_coupling_max": 0.01809645726362774,
+        "max_omega": 0.5824364261988265,
+        "stop_reason": null,
+        "trajectory_sha256": "a8e92d4d783a1381485c7cc0949e5c4e804334c1ccad3efb1f891e990b294f40"
+      },
+      "identical": false
+    },
+    {
+      "off": {
+        "controller": "GSLQR",
+        "speed": 40.0,
+        "step": "altitude_+1m",
+        "settling_s": 2.882,
+        "overshoot_pct": 30.901049208074127,
+        "steady_error": 3.092024541333695e-05,
+        "cross_coupling_max": 0.23803021376627953,
+        "max_omega": 0.8008819686421622,
+        "stop_reason": null,
+        "trajectory_sha256": "635e8dfdc06f55dcd5e18ff8bde642484038283e186ac65b69df84a0f854073e"
+      },
+      "on": {
+        "controller": "GSLQR",
+        "speed": 40.0,
+        "step": "altitude_+1m",
+        "settling_s": 2.882,
+        "overshoot_pct": 30.901049208074127,
+        "steady_error": 3.092024541333695e-05,
+        "cross_coupling_max": 0.23803021376627953,
+        "max_omega": 0.8008819686421622,
+        "stop_reason": null,
+        "trajectory_sha256": "635e8dfdc06f55dcd5e18ff8bde642484038283e186ac65b69df84a0f854073e"
+      },
+      "identical": true
+    },
+    {
+      "off": {
+        "controller": "GSLQR",
+        "speed": 40.0,
+        "step": "speed_+1mps",
+        "settling_s": 2.932,
+        "overshoot_pct": 9.557737331984129,
+        "steady_error": 2.029454446702623e-05,
+        "cross_coupling_max": 0.013679497203494151,
+        "max_omega": 0.10924567147098538,
+        "stop_reason": null,
+        "trajectory_sha256": "4eb5bedae809a4beee4bb21ba0dd3fb525f908cd21e4d749f33699feee442c60"
+      },
+      "on": {
+        "controller": "GSLQR",
+        "speed": 40.0,
+        "step": "speed_+1mps",
+        "settling_s": 0.764,
+        "overshoot_pct": 0.34149378682144516,
+        "steady_error": 5.519066846970477e-07,
+        "cross_coupling_max": 0.021838004748172324,
+        "max_omega": 0.1529704476961018,
+        "stop_reason": null,
+        "trajectory_sha256": "59c14f82444294b8331b7fd8f49a5a6f871fa2880bc9cc9eee2129ce5d614574"
+      },
+      "identical": false
+    },
+    {
+      "off": {
+        "controller": "GSLQR",
+        "speed": 60.0,
+        "step": "altitude_+1m",
+        "settling_s": 3.0580000000000003,
+        "overshoot_pct": 28.64079357050322,
+        "steady_error": 2.4735448677039803e-05,
+        "cross_coupling_max": 0.05863127432488824,
+        "max_omega": 0.5636355418990361,
+        "stop_reason": null,
+        "trajectory_sha256": "8b3aaad3b5a4f78c239eadf85610c4cf24c4c16c2d49a425719211e3bae5146f"
+      },
+      "on": {
+        "controller": "GSLQR",
+        "speed": 60.0,
+        "step": "altitude_+1m",
+        "settling_s": 3.0580000000000003,
+        "overshoot_pct": 28.64079357050322,
+        "steady_error": 2.4735448677039803e-05,
+        "cross_coupling_max": 0.05863127432488824,
+        "max_omega": 0.5636355418990361,
+        "stop_reason": null,
+        "trajectory_sha256": "8b3aaad3b5a4f78c239eadf85610c4cf24c4c16c2d49a425719211e3bae5146f"
+      },
+      "identical": true
+    },
+    {
+      "off": {
+        "controller": "GSLQR",
+        "speed": 60.0,
+        "step": "speed_+1mps",
+        "settling_s": 2.364,
+        "overshoot_pct": 7.744355060968644,
+        "steady_error": 1.595861703682449e-05,
+        "cross_coupling_max": 0.01255122960178312,
+        "max_omega": 0.0377244140578398,
+        "stop_reason": null,
+        "trajectory_sha256": "7183b7d8d9952f68bef3313fafb2479e90b451707441069b27af9df74470cd77"
+      },
+      "on": {
+        "controller": "GSLQR",
+        "speed": 60.0,
+        "step": "speed_+1mps",
+        "settling_s": 0.772,
+        "overshoot_pct": 0.0,
+        "steady_error": 1.2514149520762103e-07,
+        "cross_coupling_max": 0.0130956424827815,
+        "max_omega": 0.04900509470081592,
+        "stop_reason": null,
+        "trajectory_sha256": "2952700bb7ecf01daec09b3760b295527e1b8cbbc52d2b4599499c05c845efec"
+      },
+      "identical": false
+    },
+    {
+      "off": {
+        "controller": "GSLQR",
+        "speed": 85.0,
+        "step": "altitude_+1m",
+        "settling_s": 2.968,
+        "overshoot_pct": 24.588068477040537,
+        "steady_error": 2.156532451569282e-05,
+        "cross_coupling_max": 0.014829125440996904,
+        "max_omega": 0.4209301746116286,
+        "stop_reason": null,
+        "trajectory_sha256": "edf4dd421b419611626646a1dfe80925c464e730cf2d5594929ef8b358d80f55"
+      },
+      "on": {
+        "controller": "GSLQR",
+        "speed": 85.0,
+        "step": "altitude_+1m",
+        "settling_s": 2.968,
+        "overshoot_pct": 24.588068477040537,
+        "steady_error": 2.156532451569282e-05,
+        "cross_coupling_max": 0.014829125440996904,
+        "max_omega": 0.4209301746116286,
+        "stop_reason": null,
+        "trajectory_sha256": "edf4dd421b419611626646a1dfe80925c464e730cf2d5594929ef8b358d80f55"
+      },
+      "identical": true
+    },
+    {
+      "off": {
+        "controller": "GSLQR",
+        "speed": 85.0,
+        "step": "speed_-1mps",
+        "settling_s": 1.944,
+        "overshoot_pct": 6.720799753351514,
+        "steady_error": 1.2563248663887251e-05,
+        "cross_coupling_max": 0.009295016278407786,
+        "max_omega": 0.03126158042849827,
+        "stop_reason": null,
+        "trajectory_sha256": "ef1415012e14fcd4c0389c769418b7f114ba58958c73340bf194dbca3cf5d506"
+      },
+      "on": {
+        "controller": "GSLQR",
+        "speed": 85.0,
+        "step": "speed_-1mps",
+        "settling_s": 0.774,
+        "overshoot_pct": 0.379832118755985,
+        "steady_error": 7.587733003259847e-07,
+        "cross_coupling_max": 0.00921816197376657,
+        "max_omega": 0.03126158042849827,
+        "stop_reason": null,
+        "trajectory_sha256": "3c163f01e5f303c945f2e3e4f02e663be8c7dedf6b1fe1b08c4b1368822721f8"
+      },
+      "identical": false
+    },
+    {
+      "off": {
+        "controller": "CPID",
+        "speed": 0.0,
+        "step": "altitude_+1m",
+        "settling_s": 7.396,
+        "overshoot_pct": 26.642682878207324,
+        "steady_error": 0.005231097879692466,
+        "cross_coupling_max": 6.069908837952705e-12,
+        "max_omega": 7.812576480380048e-12,
+        "stop_reason": null,
+        "trajectory_sha256": "dab1fcc0accda36d0303a0e738657e682d249eff9710766f20330d4b73fba5b2"
+      },
+      "on": {
+        "controller": "CPID",
+        "speed": 0.0,
+        "step": "altitude_+1m",
+        "settling_s": 7.396,
+        "overshoot_pct": 26.642682878207324,
+        "steady_error": 0.005231097879692466,
+        "cross_coupling_max": 6.069908837952705e-12,
+        "max_omega": 7.812576480380048e-12,
+        "stop_reason": null,
+        "trajectory_sha256": "dab1fcc0accda36d0303a0e738657e682d249eff9710766f20330d4b73fba5b2"
+      },
+      "identical": true
+    },
+    {
+      "off": {
+        "controller": "CPID",
+        "speed": 0.0,
+        "step": "speed_+1mps",
+        "settling_s": 9.224,
+        "overshoot_pct": 8.681470714697737,
+        "steady_error": 0.021844816069873773,
+        "cross_coupling_max": 0.0008076057063703956,
+        "max_omega": 0.212314613409052,
+        "stop_reason": null,
+        "trajectory_sha256": "259bd18106d5fbefb012862a6ebc2d32f15c93aeada4ea262394c10c3e15dfbf"
+      },
+      "on": {
+        "controller": "CPID",
+        "speed": 0.0,
+        "step": "speed_+1mps",
+        "settling_s": 0.798,
+        "overshoot_pct": 4.54975578514516,
+        "steady_error": 0.002245255707707758,
+        "cross_coupling_max": 0.005839013093538625,
+        "max_omega": 0.8625295447083965,
+        "stop_reason": null,
+        "trajectory_sha256": "415f9c7e2af2abc5b3439a96ba768c78efa63e04cda412ad2bfd19b2dbf27628"
+      },
+      "identical": false
+    },
+    {
+      "off": {
+        "controller": "CPID",
+        "speed": 10.0,
+        "step": "altitude_+1m",
+        "settling_s": 7.513999999999999,
+        "overshoot_pct": 28.630144867352314,
+        "steady_error": 0.005725387489290558,
+        "cross_coupling_max": 0.04409154133754711,
+        "max_omega": 0.05403251154937619,
+        "stop_reason": null,
+        "trajectory_sha256": "2c5d01e37b18ef96293c288c2e052b6f361d1d5cd44d37a9d4b1be952e75322d"
+      },
+      "on": {
+        "controller": "CPID",
+        "speed": 10.0,
+        "step": "altitude_+1m",
+        "settling_s": 7.513999999999999,
+        "overshoot_pct": 28.630144867352314,
+        "steady_error": 0.005725387489290558,
+        "cross_coupling_max": 0.04409154133754711,
+        "max_omega": 0.05403251154937619,
+        "stop_reason": null,
+        "trajectory_sha256": "2c5d01e37b18ef96293c288c2e052b6f361d1d5cd44d37a9d4b1be952e75322d"
+      },
+      "identical": true
+    },
+    {
+      "off": {
+        "controller": "CPID",
+        "speed": 10.0,
+        "step": "speed_+1mps",
+        "settling_s": 11.954,
+        "overshoot_pct": 0.0,
+        "steady_error": 0.03871825886873654,
+        "cross_coupling_max": 0.07193058725910362,
+        "max_omega": 0.21044806734899626,
+        "stop_reason": null,
+        "trajectory_sha256": "af21ed2c6819cc476fc4da6d08b01980ee01a6b9e547e1c24264560888e43399"
+      },
+      "on": {
+        "controller": "CPID",
+        "speed": 10.0,
+        "step": "speed_+1mps",
+        "settling_s": null,
+        "overshoot_pct": 0.0,
+        "steady_error": 0.06068653914449108,
+        "cross_coupling_max": 0.08483664362272947,
+        "max_omega": 0.8246850873730266,
+        "stop_reason": null,
+        "trajectory_sha256": "da3d3b2077bb2eb91a0cebd5a1589425a5fd2b28b757a2fff0f24bac2b81dd6d"
+      },
+      "identical": false
+    },
+    {
+      "off": {
+        "controller": "CPID",
+        "speed": 20.0,
+        "step": "altitude_+1m",
+        "settling_s": 7.702,
+        "overshoot_pct": 30.555733775519656,
+        "steady_error": 0.005717914060440648,
+        "cross_coupling_max": 0.1025069763592974,
+        "max_omega": 0.1908705978461096,
+        "stop_reason": null,
+        "trajectory_sha256": "b87d8ed524b2c519eb3910ac23863b3dc8ff522e365f19baf9f21b9bd3c263be"
+      },
+      "on": {
+        "controller": "CPID",
+        "speed": 20.0,
+        "step": "altitude_+1m",
+        "settling_s": 7.702,
+        "overshoot_pct": 30.555733775519656,
+        "steady_error": 0.005717914060440648,
+        "cross_coupling_max": 0.1025069763592974,
+        "max_omega": 0.1908705978461096,
+        "stop_reason": null,
+        "trajectory_sha256": "b87d8ed524b2c519eb3910ac23863b3dc8ff522e365f19baf9f21b9bd3c263be"
+      },
+      "identical": true
+    },
+    {
+      "off": {
+        "controller": "CPID",
+        "speed": 20.0,
+        "step": "speed_-1mps",
+        "settling_s": 8.844,
+        "overshoot_pct": 0.0,
+        "steady_error": 0.02513548374575023,
+        "cross_coupling_max": 0.1163034859247638,
+        "max_omega": 0.20085378658249875,
+        "stop_reason": null,
+        "trajectory_sha256": "42b2015667ebe06c10d65547d32761c646198be7e11217e705e7a2e0fd2c4523"
+      },
+      "on": {
+        "controller": "CPID",
+        "speed": 20.0,
+        "step": "speed_-1mps",
+        "settling_s": 13.414,
+        "overshoot_pct": 21.228561125045786,
+        "steady_error": 0.04634496232360174,
+        "cross_coupling_max": 0.14542457080946036,
+        "max_omega": 0.9278653536519123,
+        "stop_reason": null,
+        "trajectory_sha256": "0e7fad0ce25ffa8d3952ca6cb0103eda7d3ea3795d885fb5fe966beca3cd777e"
+      },
+      "identical": false
+    }
+  ],
+  "design_step": [
+    {
+      "off": {
+        "controller": "GSLQR",
+        "speed": 0.0,
+        "step": "altitude_+1m",
         "settling_s": 3.542,
         "overshoot_pct": 28.130605282483145,
         "steady_error": 3.400448533004172e-05,
@@ -1376,9 +1810,9 @@
   "meta": {
     "label": "PILOT",
     "command": "python -m control.arena_feedforward_check",
-    "created_utc": "2026-09-26T07:34:20.518228+00:00",
+    "created_utc": "2026-09-26T07:54:49.035398+00:00",
     "config_sha256": "19cd72375ef768d7ef4f8909c9c51f0e5cf11d5aa2299afbf7c48d0f9f63d82f",
-    "git_revision": "5b4da1932b428263e138932f1aa035196f85253d",
+    "git_revision": "4b20634f18d6c12975b14ad631d3410b99747872",
     "git_dirty": true,
     "environment": {
       "system": "Darwin",

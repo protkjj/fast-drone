@@ -13,7 +13,7 @@ kj 결정 2: 참조 가속도 피드포워드를 두 기준선에 넣었다.
       CPID   튜닝 tune_ramp_0_15_rho0.1
              (설계 영역 안의 가속 사례는 이것뿐이다. 본시험의 CPID 사례는 V_L 돌풍이다)
   (2) 참조가 일정한 사례: 끔/켬 궤적이 비트 동일해야 한다(피드포워드가 0이라 건너뛴다)
-  (3) 설계점검(계단), 끔/켬
+  (3) 설계점검 끔/켬 — 매끄러운 계단(지금 근거)과 원계단(옛 기록) 둘 다
       계단 참조를 차분하면 계단 직전 0.05 s 동안 큰 가속도 펄스가 된다. 본시험 참조는 매끄럽다.
       고도 계단은 속도 참조가 일정해서 동일해야 한다.
   (4) GSLQR 유효 범위 표, 그리고 사례마다 참조 가속도가 그 범위를 넘은 시간 비율
@@ -132,13 +132,13 @@ def feedforward_saturation(config, factory, case_id, t_end):
     return dict(active_fraction=active/n, saturated_fraction=saturated/n, peak_a_ref=peak)
 
 
-def design_points(config, factory):
+def design_points(config, factory, shape):
     import control.arena_design_check as dc
     rows = []
     for label in LABELS:
         for V in dc.POINTS[label]:
             for step_name in dc.STEPS:
-                m = dc.run(config, factory, label, V, step_name)
+                m = dc.run(config, factory, label, V, step_name, shape=shape)
                 rows.append({k: m[k] for k in ('controller', 'speed', 'step', 'settling_s', 'overshoot_pct',
                                                'steady_error', 'cross_coupling_max', 'max_omega', 'stop_reason',
                                                'trajectory_sha256')})
@@ -174,9 +174,11 @@ def compare(config, sections=('accel', 'constant', 'design')):
                                             identical=before['trajectory_sha256'] == after['trajectory_sha256']))
                 print(label, case_id, 'identical', out['constant'][-1]['identical'], flush=True)
     if 'design' in sections:
-        before, after = design_points(off_config, off), design_points(config, on)
-        out['design'] = [dict(off=b, on=a, identical=b['trajectory_sha256'] == a['trajectory_sha256'])
-                         for b, a in zip(before, after)]
+        # 매끄러운 계단(지금 근거, kj 결정 2026-09-26 오후)과 원계단(옛 기록) 둘 다 끔/켬을 대조한다
+        for key, shape in (('design', 'smooth'), ('design_step', 'step')):
+            before, after = design_points(off_config, off, shape), design_points(config, on, shape)
+            out[key] = [dict(off=b, on=a, identical=b['trajectory_sha256'] == a['trajectory_sha256'])
+                        for b, a in zip(before, after)]
     return out
 
 
@@ -251,21 +253,30 @@ def write_markdown(path, data):
             lines.append(f"| {r['controller']} | {r['case']} | {r['identical']} | "
                          f"{a['stop_reason'] or '끝까지'} · {a['simulated_seconds']:.2f} | {a['max_omega']:.3g} |")
         lines.append('')
-    if 'design' in data:
-        lines += ['## 3. 설계점검(계단) 끔 → 켬', '',
-                  '계단을 차분하면 계단 직전 0.05 s 동안 1 m/s ÷ 0.05 s = 20 m/s²의 참조 가속 펄스가 된다'
-                  '(GSLQR은 유효 범위에서 포화). 본시험 참조는 매끄러워 이런 펄스가 없다.', '',
+    notes = {'design': ('3. 설계점검 — 매끄러운 계단(지금 근거) 끔 → 켬',
+                        '모든 제어기에 같은 매끄러운 계단(논문 식(32) smoothstep, 1 s 전이 — kj 결정 2026-09-26 오후). '
+                        'PX4가 설정값을 궤적 생성기로 매끄럽게 만든 뒤 가속도를 피드포워드하는 구조와 같다. '
+                        '정착시간은 계단 시작부터 재서 전이 1 s가 들어 있다.'),
+             'design_step': ('3-1. 설계점검 — 원계단(옛 기록) 끔 → 켬',
+                             '원계단을 차분하면 계단 직전 0.05 s 동안 1 m/s ÷ 0.05 s = 20 m/s²의 참조 가속 펄스가 된다'
+                             '(GSLQR은 유효 범위에서 포화). 기준선의 루프가 아니라 그 펄스를 재게 되어 설계점검을 '
+                             '매끄러운 계단으로 바꿨다. 기록으로만 남긴다.')}
+    for key in ('design', 'design_step'):
+        if key not in data:
+            continue
+        title, note = notes[key]
+        lines += [f'## {title}', '', note, '',
                   '| 제어기 | 속도 | 계단 | 동일 | 정착 s 끔 → 켬 | 오버슈트 % 끔 → 켬 | 정상오차 끔 → 켬 | '
                   '\\|ω\\|max 끔 → 켬 | 정지(켬) |', '|---|---:|---|---|---|---|---|---|---|']
-        for r in data['design']:
+        for r in data[key]:
             b, a = r['off'], r['on']
             lines.append(f"| {a['controller']} | {a['speed']:g} | {a['step']} | {r['identical']} | "
                          f"{_fmt(b['settling_s'], '.2f')} → {_fmt(a['settling_s'], '.2f')} | "
                          f"{_fmt(b['overshoot_pct'], '.1f')} → {_fmt(a['overshoot_pct'], '.1f')} | "
                          f"{_fmt(b['steady_error'], '.3g')} → {_fmt(a['steady_error'], '.3g')} | "
                          f"{b['max_omega']:.3g} → {a['max_omega']:.3g} | {a['stop_reason'] or '—'} |")
-        settled = sum(r['on']['settling_s'] is not None for r in data['design'])
-        lines += ['', f'켬에서 정착한 점: {settled}/{len(data["design"])}', '']
+        settled = sum(r['on']['settling_s'] is not None for r in data[key])
+        lines += ['', f'켬에서 정착한 점: {settled}/{len(data[key])}', '']
     lines += ['## 4. GSLQR 선형 피드포워드 유효 범위(명목 모델만, 규칙은 실행 전에 적음)', '',
               '선형 목표점(트림 자세 ⊗ δφ, ω = 0, n = u = clip(u_trim + δn))에서 명목 모델의 가속도가 '
               '|v̇_x − a| ≤ 0.1|a|, |v̇_z| ≤ 0.1|a|, |ω̇| ≤ 2 rad/s²를 0부터 이어서 만족하는 가장 큰 |a|.', '',

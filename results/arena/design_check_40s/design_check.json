@@ -1,12 +1,12 @@
 {
   "meta": {
     "label": "PILOT",
-    "command": "python -m control.arena_design_check",
+    "command": "python -m control.arena_design_check --duration 40",
     "tuned": null,
     "shape": "smooth",
     "ramp_s": 1.0,
     "feedforward": "on",
-    "created_utc": "2026-09-26T07:47:33.437670+00:00",
+    "created_utc": "2026-09-26T08:01:55.758072+00:00",
     "config_sha256": "19cd72375ef768d7ef4f8909c9c51f0e5cf11d5aa2299afbf7c48d0f9f63d82f",
     "git_revision": "4b20634f18d6c12975b14ad631d3410b99747872",
     "git_dirty": true,
@@ -114,13 +114,13 @@
     },
     "band_fraction": 0.05,
     "step_time": 0.5,
-    "duration": 15.0
+    "duration": 40.0
   },
   "rows": [
     {
       "settling_s": 4.094,
       "overshoot_pct": 27.628602690232995,
-      "steady_error": 5.0062133339623525e-05,
+      "steady_error": 1.945178105969519e-12,
       "band": 0.05,
       "cross_coupling_max": 2.0880018756587927e-12,
       "controller": "GSLQR",
@@ -128,11 +128,11 @@
       "step": "altitude_+1m",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 3.68500731486816e-12,
-      "trajectory_sha256": "34158b5cb039d4b79a09c5cb76b3fe4b1fce1aa406c9e2f1f8dc4e79e0b1977e",
+      "trajectory_sha256": "c898c9fd606967080af7e964fc1ad9a3609685bf0bf856503b32949713746aab",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -146,7 +146,7 @@
           "vx": {
             "limit": 50.0,
             "at_limit_steps": 0,
-            "peak_fraction": 6.996454549874468e-14
+            "peak_fraction": 7.012589944473855e-14
           }
         }
       }
@@ -154,7 +154,7 @@
     {
       "settling_s": 1.288,
       "overshoot_pct": 25.20062432374559,
-      "steady_error": 7.280823355894059e-07,
+      "steady_error": 1.2878587085651816e-14,
       "band": 0.05,
       "cross_coupling_max": 0.02287583985157937,
       "controller": "GSLQR",
@@ -162,11 +162,11 @@
       "step": "speed_+1mps",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 1.2750258721791423,
-      "trajectory_sha256": "4d997785e043a360c997d857f4febfa8e6c7f332b5e755e469746b2adf46a8f5",
+      "trajectory_sha256": "58f0d7c215177c73790f215619f8789819efceb938ec6cc98026bd8223e6e84a",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -188,7 +188,7 @@
     {
       "settling_s": 4.2700000000000005,
       "overshoot_pct": 29.273495774127767,
-      "steady_error": 5.8683772869665185e-05,
+      "steady_error": 2.3214750148827897e-12,
       "band": 0.05,
       "cross_coupling_max": 0.18890701705033308,
       "controller": "GSLQR",
@@ -196,11 +196,11 @@
       "step": "altitude_+1m",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 0.4666178121122697,
-      "trajectory_sha256": "99e8c905f984ac0c6a586bd25df5ae3f28022b0fba31dac2e9aecb3b23489bb1",
+      "trajectory_sha256": "3bd16b964130a9c129fce69af1ee2ea6bbb7d5bcd9f40c8790016788485cd333",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -222,7 +222,7 @@
     {
       "settling_s": 1.1600000000000001,
       "overshoot_pct": 6.569801115140095,
-      "steady_error": 2.4743883260537622e-06,
+      "steady_error": 4.973799150320701e-14,
       "band": 0.05,
       "cross_coupling_max": 0.01809645726362774,
       "controller": "GSLQR",
@@ -230,11 +230,11 @@
       "step": "speed_+1mps",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 0.5824364261988265,
-      "trajectory_sha256": "a8e92d4d783a1381485c7cc0949e5c4e804334c1ccad3efb1f891e990b294f40",
+      "trajectory_sha256": "e9203324e05c002b20d6270e79877397d665d542a0958e342879c6cfff270fa4",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -243,7 +243,7 @@
           "z": {
             "limit": 50.0,
             "at_limit_steps": 0,
-            "peak_fraction": 0.0009821722726199137
+            "peak_fraction": 0.0009822753433481237
           },
           "vx": {
             "limit": 50.0,
@@ -256,7 +256,7 @@
     {
       "settling_s": 2.882,
       "overshoot_pct": 30.901049208074127,
-      "steady_error": 3.092024541333695e-05,
+      "steady_error": 1.0729195309977513e-12,
       "band": 0.05,
       "cross_coupling_max": 0.23803021376627953,
       "controller": "GSLQR",
@@ -264,11 +264,11 @@
       "step": "altitude_+1m",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 0.8008819686421622,
-      "trajectory_sha256": "635e8dfdc06f55dcd5e18ff8bde642484038283e186ac65b69df84a0f854073e",
+      "trajectory_sha256": "551ba8c4f7c632385286358d3a06aff7e4b91b25662079f9ba970890c447482d",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -290,7 +290,7 @@
     {
       "settling_s": 0.764,
       "overshoot_pct": 0.34149378682144516,
-      "steady_error": 5.519066846970477e-07,
+      "steady_error": 3.3130296022666546e-14,
       "band": 0.05,
       "cross_coupling_max": 0.021838004748172324,
       "controller": "GSLQR",
@@ -298,11 +298,11 @@
       "step": "speed_+1mps",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 0.1529704476961018,
-      "trajectory_sha256": "59c14f82444294b8331b7fd8f49a5a6f871fa2880bc9cc9eee2129ce5d614574",
+      "trajectory_sha256": "1db78ed4743ece140e613cea7c61eed75aa4505140ef16d24869f1c53cf65694",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -316,7 +316,7 @@
           "vx": {
             "limit": 50.0,
             "at_limit_steps": 0,
-            "peak_fraction": 9.751468157257541e-05
+            "peak_fraction": 9.75254922598109e-05
           }
         }
       }
@@ -324,7 +324,7 @@
     {
       "settling_s": 3.0580000000000003,
       "overshoot_pct": 28.64079357050322,
-      "steady_error": 2.4735448677039803e-05,
+      "steady_error": 8.082742725290193e-13,
       "band": 0.05,
       "cross_coupling_max": 0.05863127432488824,
       "controller": "GSLQR",
@@ -332,11 +332,11 @@
       "step": "altitude_+1m",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 0.5636355418990361,
-      "trajectory_sha256": "8b3aaad3b5a4f78c239eadf85610c4cf24c4c16c2d49a425719211e3bae5146f",
+      "trajectory_sha256": "e6cefc07d4bd0c877584d87acd4c2fa347d23b13bb4720865b6b99525f2c8f34",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -358,7 +358,7 @@
     {
       "settling_s": 0.772,
       "overshoot_pct": 0.0,
-      "steady_error": 1.2514149520762103e-07,
+      "steady_error": 1.5827658545075284e-14,
       "band": 0.05,
       "cross_coupling_max": 0.0130956424827815,
       "controller": "GSLQR",
@@ -366,11 +366,11 @@
       "step": "speed_+1mps",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 0.04900509470081592,
-      "trajectory_sha256": "2952700bb7ecf01daec09b3760b295527e1b8cbbc52d2b4599499c05c845efec",
+      "trajectory_sha256": "63e0c59e6fd16f758976e0bc93814858cf6002595ecd4588858e5d8a321b2355",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -384,7 +384,7 @@
           "vx": {
             "limit": 50.0,
             "at_limit_steps": 0,
-            "peak_fraction": 0.00011085049988993057
+            "peak_fraction": 0.00011085300855676562
           }
         }
       }
@@ -392,7 +392,7 @@
     {
       "settling_s": 2.968,
       "overshoot_pct": 24.588068477040537,
-      "steady_error": 2.156532451569282e-05,
+      "steady_error": 7.994456726685271e-13,
       "band": 0.05,
       "cross_coupling_max": 0.014829125440996904,
       "controller": "GSLQR",
@@ -400,11 +400,11 @@
       "step": "altitude_+1m",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 0.4209301746116286,
-      "trajectory_sha256": "edf4dd421b419611626646a1dfe80925c464e730cf2d5594929ef8b358d80f55",
+      "trajectory_sha256": "18de09a892c98270363d1847a093ed587f42c7a354a64bae3ac1078d539f23e4",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -426,7 +426,7 @@
     {
       "settling_s": 0.774,
       "overshoot_pct": 0.379832118755985,
-      "steady_error": 7.587733003259847e-07,
+      "steady_error": 3.060581284970651e-14,
       "band": 0.05,
       "cross_coupling_max": 0.00921816197376657,
       "controller": "GSLQR",
@@ -434,11 +434,11 @@
       "step": "speed_-1mps",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 0.03126158042849827,
-      "trajectory_sha256": "3c163f01e5f303c945f2e3e4f02e663be8c7dedf6b1fe1b08c4b1368822721f8",
+      "trajectory_sha256": "d3b33ea7083d7494225e0cb1f4875c9be0a425db2ffec798551aca46528d773c",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -447,12 +447,12 @@
           "z": {
             "limit": 50.0,
             "at_limit_steps": 0,
-            "peak_fraction": 0.0003666490972324353
+            "peak_fraction": 0.00036666477106151607
           },
           "vx": {
             "limit": 50.0,
             "at_limit_steps": 0,
-            "peak_fraction": 0.000132376640857362
+            "peak_fraction": 0.00013239198112538508
           }
         }
       }
@@ -460,7 +460,7 @@
     {
       "settling_s": 7.396,
       "overshoot_pct": 26.642682878207324,
-      "steady_error": 0.005231097879692466,
+      "steady_error": 7.745156914948442e-07,
       "band": 0.05,
       "cross_coupling_max": 6.069908837952705e-12,
       "controller": "CPID",
@@ -468,11 +468,11 @@
       "step": "altitude_+1m",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 7.812576480380048e-12,
-      "trajectory_sha256": "dab1fcc0accda36d0303a0e738657e682d249eff9710766f20330d4b73fba5b2",
+      "trajectory_sha256": "7de71eb354030030ca6dc0e516650cd7d0a7313903090b98243d9f61592d675c",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -499,7 +499,7 @@
     {
       "settling_s": 0.798,
       "overshoot_pct": 4.54975578514516,
-      "steady_error": 0.002245255707707758,
+      "steady_error": 2.8130520686074226e-05,
       "band": 0.05,
       "cross_coupling_max": 0.005839013093538625,
       "controller": "CPID",
@@ -507,11 +507,11 @@
       "step": "speed_+1mps",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 0.8625295447083965,
-      "trajectory_sha256": "415f9c7e2af2abc5b3439a96ba768c78efa63e04cda412ad2bfd19b2dbf27628",
+      "trajectory_sha256": "4be232825d7e5c1253d8c5618020622a862e9e401de6e75120d69504821ff788",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -520,7 +520,7 @@
           "vx": {
             "limit": 9.81,
             "at_limit_steps": 0,
-            "peak_fraction": 0.0013063599258989428
+            "peak_fraction": 0.0014834502919250615
           },
           "vy": {
             "limit": 9.81,
@@ -538,7 +538,7 @@
     {
       "settling_s": 7.513999999999999,
       "overshoot_pct": 28.630144867352314,
-      "steady_error": 0.005725387489290558,
+      "steady_error": 1.0016157698360386e-05,
       "band": 0.05,
       "cross_coupling_max": 0.04409154133754711,
       "controller": "CPID",
@@ -546,11 +546,11 @@
       "step": "altitude_+1m",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 0.05403251154937619,
-      "trajectory_sha256": "2c5d01e37b18ef96293c288c2e052b6f361d1d5cd44d37a9d4b1be952e75322d",
+      "trajectory_sha256": "59e37357a3c9e074bc0d454e777b9a4743cdf5c3a985047aa4c797924868a050",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -559,7 +559,7 @@
           "vx": {
             "limit": 9.81,
             "at_limit_steps": 0,
-            "peak_fraction": 0.15315581255770858
+            "peak_fraction": 0.15381677648409475
           },
           "vy": {
             "limit": 9.81,
@@ -575,9 +575,9 @@
       }
     },
     {
-      "settling_s": null,
+      "settling_s": 15.542000000000002,
       "overshoot_pct": 0.0,
-      "steady_error": 0.06068653914449108,
+      "steady_error": 0.0026521558751550827,
       "band": 0.05,
       "cross_coupling_max": 0.08483664362272947,
       "controller": "CPID",
@@ -585,11 +585,11 @@
       "step": "speed_+1mps",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 0.8246850873730266,
-      "trajectory_sha256": "da3d3b2077bb2eb91a0cebd5a1589425a5fd2b28b757a2fff0f24bac2b81dd6d",
+      "trajectory_sha256": "cf392dab06fee6f1bb51ba47417bbaefba1c649152d77ebb915c9732ea928f6d",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -598,7 +598,7 @@
           "vx": {
             "limit": 9.81,
             "at_limit_steps": 0,
-            "peak_fraction": 0.1787687329799366
+            "peak_fraction": 0.18541980494085536
           },
           "vy": {
             "limit": 9.81,
@@ -608,7 +608,7 @@
           "z": {
             "limit": 9.81,
             "at_limit_steps": 0,
-            "peak_fraction": 0.035137581033686006
+            "peak_fraction": 0.03624033492759661
           }
         }
       }
@@ -616,7 +616,7 @@
     {
       "settling_s": 7.702,
       "overshoot_pct": 30.555733775519656,
-      "steady_error": 0.005717914060440648,
+      "steady_error": 2.4939497827814285e-07,
       "band": 0.05,
       "cross_coupling_max": 0.1025069763592974,
       "controller": "CPID",
@@ -624,11 +624,11 @@
       "step": "altitude_+1m",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 0.1908705978461096,
-      "trajectory_sha256": "b87d8ed524b2c519eb3910ac23863b3dc8ff522e365f19baf9f21b9bd3c263be",
+      "trajectory_sha256": "c14d727ed5b7a3a3ec4c2a6f0a2c4bb8cf6f0e26d24ca3c6a1a03d143f04a860",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
@@ -647,7 +647,7 @@
           "z": {
             "limit": 9.81,
             "at_limit_steps": 0,
-            "peak_fraction": 0.28984826770184713
+            "peak_fraction": 0.2905070182359164
           }
         }
       }
@@ -655,7 +655,7 @@
     {
       "settling_s": 13.414,
       "overshoot_pct": 21.228561125045786,
-      "steady_error": 0.04634496232360174,
+      "steady_error": 0.001796795005973435,
       "band": 0.05,
       "cross_coupling_max": 0.14542457080946036,
       "controller": "CPID",
@@ -663,11 +663,11 @@
       "step": "speed_-1mps",
       "shape": "smooth",
       "stop_reason": null,
-      "simulated_seconds": 15.0,
+      "simulated_seconds": 40.0,
       "max_omega": 0.9278653536519123,
-      "trajectory_sha256": "0e7fad0ce25ffa8d3952ca6cb0103eda7d3ea3795d885fb5fe966beca3cd777e",
+      "trajectory_sha256": "c5875dd99114d1e2a97cdcfaf0422253a71ada23bfaad2cb8e01b2aa53028ed2",
       "integrators": {
-        "steps": 7500,
+        "steps": 20000,
         "at_limit_steps": 0,
         "at_limit_fraction": 0.0,
         "frozen_steps": 0,
