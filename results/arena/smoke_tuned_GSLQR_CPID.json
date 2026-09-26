@@ -1,0 +1,2220 @@
+{
+  "label": "SMOKE",
+  "created_utc": "2026-09-26T16:23:19.884196+00:00",
+  "command": "python -m control.validation_suite --config configs/arena.json --smoke --tuned results/arena/tuning/main120 --only-controllers GSLQR CPID",
+  "config_sha256": "19cd72375ef768d7ef4f8909c9c51f0e5cf11d5aa2299afbf7c48d0f9f63d82f",
+  "git_revision": "ffa417acc0ec07ed2bbf7a03c88fecaeac3d6ffb",
+  "git_dirty": false,
+  "parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807",
+  "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+  "environment": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "machine": "arm64",
+    "cpu": "Apple M4",
+    "python": "3.13.7",
+    "packages": {
+      "numpy": "2.3.3",
+      "scipy": "1.16.3",
+      "casadi": "3.7.2",
+      "matplotlib": "3.10.6"
+    },
+    "threads": {
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1"
+    }
+  },
+  "source_sha256": {
+    "configs/acceptance.example.json": "a73bc12f37bf823a534bcc9fb490e1cd40d72837baf4b7a340a1a6e088f1efb9",
+    "configs/arena.json": "26109cefb1c60092b1f9f474b2bb861c4d3db565ac6b3aedcd9f8dbddef69cad",
+    "configs/gains/cpid.json": "183e703e6d546f850cf1e8d31d7c18dbe0250c675114f2f92ea5d9cfb6846fb6",
+    "configs/gains/gslqr.json": "542d4dd1c61671695f8495ac35a57250d2e52ea4d3ef5034c2d0d8aafdf4fdde",
+    "configs/timing_70mps.json": "b1a082ef63d2b8eab4e55974b1c2e60992082b1249246a1ab999407033539028",
+    "configs/uncertainty.example.json": "713c37accac3e502785867e438b47037f2194626b7d073d09bcf0d41f5bb0b47",
+    "control/__init__.py": "4442b0651dd775b6aed0b5216a778ed3bc19f2e98be79dd5fd525a963285cb9c",
+    "control/acados_fallback_mc.py": "844f72c9d6e76d7143fb2ad4eb95608c75c469f051958e0fa61677e267d982ae",
+    "control/arena.py": "1ee27afdfcacc88fda477ceaee644224229a2049d7432b513e07e9d9428e726a",
+    "control/arena_design_check.py": "96d3244b70b36022bb20e6d979cded288bed43b157a14c271cf2c21328c88bde",
+    "control/arena_factory.py": "3188bf342ba71e1ab426eef7fa821d773d4839043101bede152dbc98e744d94a",
+    "control/arena_feedforward_check.py": "b427db6335002662194e10d0c8b30648856bcbffba45040bd36531af3bdb5c2c",
+    "control/arena_integrators.py": "8ce6980f69bcf6a0753a266a1894eb91cc5e1b0e377c12b6d8bc132d243b6cbb",
+    "control/arena_m17_diagnosis.py": "91a6e8a1bd263529e011028dab41e8c841c8dc28061f3f3c3455121e287247e4",
+    "control/arena_m17_floor_variants.py": "096905fbaeb6d3966631cf5b661b5c209835f0a042522e75459892a5cb672f82",
+    "control/arena_m17_probe.py": "9fe2760261b8d2c42fe4909b9c06cfcbd3c515eb59d433d7ff96009c8dd8b63a",
+    "control/arena_mission_rho.py": "887617104097ef49a4eac69bbf0c9c9fc6f9191eff407acb4f86131e9113163c",
+    "control/arena_reference_merge.py": "ce038c9ecad2f852b9973cd3ae05aa9ca393f43e13abc18881a7cf1fb7371b61",
+    "control/arena_smoke_summary.py": "0f0dc6fbe28cdb17fdfc7b1bb3be6c22dc6486b235d3603b5a69c56bcfb326d2",
+    "control/arena_tune.py": "5e567da2e217e896450da1af67714e42dc3df59fb9d1b4aa672be7ab7787255f",
+    "control/arena_tuning_candidates.py": "bcfc9d71090de3f9dfdda8ce44f97c07597aaadd0a26376c466d6aab27327b9e",
+    "control/arena_tuning_path_check.py": "e575c40617b9f2507d370094e673403697a5f768928305a927abd1ecb2c3f5bd",
+    "control/arena_tuning_report.py": "6e1568d0f6fc8be61ee8280c4a2093a72207ce0d4d35f9fdc649a23c22ca0a36",
+    "control/battery.py": "2cf4f4bed3f761f7c2cbc3d010a500970e260e2e7f539746628e2275784670ee",
+    "control/bench_acados.py": "5a62d0c11aaa21c708b950d814c340e5ede1ebd4e20def954fc12180c5dee1f6",
+    "control/bench_compute.py": "fbbd28df436cd9736d7727c7292d209ac0bbd48a945388ac8d3dc36b65a61499",
+    "control/controller.py": "a2d9bbc362414c49ad112ce0d2ed5dcc14faa3d64f8be0b2f64872cc2446c99b",
+    "control/derive_vl_vh.py": "2d28f20d81914486d22faaede44f59b56905ccb669e1bb9270de72d762d583f9",
+    "control/dynamics.py": "e23014dd64528352d8a5095d8ff413e56b7d29244817de7a6eba57b4da88415f",
+    "control/dynamics_hifi.py": "a407ba9a8fbf88959e0d03e9c721db5f660ebaaba7dd761c93d642ac9bff27b2",
+    "control/ekf_comparison.py": "c8c36f85a608fcc171238e1d84fddc23faa4390df2b8a5e6153b2942c0edfecc",
+    "control/ekf_sim.py": "330ef15ce2f63b93edfc0ae6d05e04c3e7648a49ffec034ff53e62836bbf641d",
+    "control/estimator.py": "3db05205b6458af3c549822d785ed2cda4137097284971e7476e9d6866273752",
+    "control/fair_compare.py": "8b606cbdf1d5994114f18fe885e6ab1697376d5c1b347124b278ea18d6c4224a",
+    "control/fallback_controller.py": "33e13bfbcb1e5ed9e8caf5fa1b64eedf83d8bef59e2c6834994ae29d97282d55",
+    "control/final_config_mission.py": "0963c423d6e3085175c677553e2b8520b04bc7ae3b936ae0a5fa25a46602bac2",
+    "control/flight_envelope.py": "d4e914bc1ae65f0c4ec2eac21bf3c7d13304c304b22d18745101518c345ae06c",
+    "control/gindi.py": "8fabbdfc2e72175cbbe5daca72cc8b6f3e30afeb447ced79bb3e14cfb794c018",
+    "control/gust_comparison.py": "d828eaebff80f7ee8f62f3fa674f87ae2280e42296f046c340e268ee927a1f45",
+    "control/hybrid_comparison.py": "fa5267ee0a9dadd0e97a28d1f84d236348c63d654608b8f945a7cca1db51a9f9",
+    "control/kh_adapter.py": "20c861f7d09a1eaf1635da369a29c72b60204e1459b9ab21c79b477a99ace8c8",
+    "control/kh_discriminate_scenario_vs_warmstart.py": "e87c7da6d87336c8ede19bf534cea5bb6901e7243496fae98c39724800c5f2b6",
+    "control/kh_mission_repro.py": "3013d33642d5e935cd14946e2a27a864cf0ffc40e2a8de96092e129e0f873d54",
+    "control/kh_repro.py": "999351cd9b1cd14f14325efef835dce0dab9ccef0ed22d65499863d39354d0dd",
+    "control/kh_timing_severity_compare.py": "2a4463ba4d1bbf998480749b03fccdb7d2b47ed4a590b4bb7c61c1ba59d2804b",
+    "control/mission_profiles.py": "af474eb83435d5b165e5d75a3ab26dd7ea6890e6a7da41413caca2d0b78b08b3",
+    "control/mission_sim.py": "e969484f274f4593a60f07583f293627a97f42836de46bdf666cbe98cd8bd202",
+    "control/night_current_diag.py": "6a299faa437d414ce43daf930a1fe146c9d2dd5ccf24066128a2bf124e9e033b",
+    "control/night_hifi_branch.py": "2e94abf4c6d37b71ddf2025f9692996f29c7c34a86b7af4baf0d0bcbe4a5cbc1",
+    "control/night_perturbation_robustness.py": "ee981a9df4510c59fd9383873bf1349147a3f544f90e4811ad8b12503a459fef",
+    "control/nmpc.py": "04f7b216f74fcb7203459b8cf6e94f0410986a88821163cb642226dff80b98f9",
+    "control/nmpc_common.py": "a91e518c390c9a9f41818b7ef6e148ee9eb3eae0b65d008d5b6a7996322981fe",
+    "control/nmpc_f13.py": "a43d59ffdee37deb183dc84544d499e3c4f3d17951803d8e9c0b4f58e808a67a",
+    "control/pilot_before_after.py": "7612a78de50d61799daf4f942253788333cee245029251eababb43c15e7198fc",
+    "control/plot_plant_validation.py": "9882944b68877844d6839f4fb06da15d91398e327dcf577e3b081af104310fab",
+    "control/plot_proposal_figures.py": "c60b40c4747c9da2d67b4c81bd29b27bf138c6084ebf69b5fccf35276d8f720e",
+    "control/robustness_crosswind.py": "4d687a8f41e9c7989035fd4717d848e26122ce23ebf52771362afbfaf6f42e12",
+    "control/sensors.py": "099cacd00af5a465a674a3aba6dd37145c28d7e053cf176356516dffffbb8551",
+    "control/test_ablation_s1_c2.py": "2c7562bad899944d345ef9d8bf2cc789a4961023569c0835462838f02be38ef4",
+    "control/test_allocation_a1.py": "3830535c728a944ca2cae0c806e621e09e7de1ce38d92677a57315e26cef394d",
+    "control/test_arena_fairness.py": "506598ec80355e06cc78605b58a9200c0f458c21d0b680b401d3fa348d33416e",
+    "control/test_arena_reference_merge.py": "bd7afa9bb9168af1bf316a0563bbdbc3e3c9e83b9482007bcd072f9b713100e8",
+    "control/test_arena_tuning_report.py": "0bce7d2cba369f963dfe2031fb04b1b576581c72299714019f9612717c839e6b",
+    "control/test_battery.py": "02d0a7b5bc8e6485e56632d7a50bfe74878fc300cf381006caae895abb8a3da1",
+    "control/test_cost_spec_m17_f13.py": "a38de0a6d84eeca5374450b7d0705b969494db82eaa5a0f34bbc6067b072d2aa",
+    "control/test_cpid_thrust_axis.py": "c7c3e9e27ea065b2553e0c41bb84c59aaba4ba348db58f7411d11e0fe0039cac",
+    "control/test_dynamics_hifi.py": "15c52a6367837aa5f884af1f023bbf46005c368a786944006b590f71765cde33",
+    "control/test_f13.py": "10cf94a8a4e16464cbc031ccf67c1aec1468d9eb6a09f76afc78c0713e068a18",
+    "control/test_fair_compare.py": "9d51ea5e4b35301fe8a67af2929ba6334c308d51fccdc7a30c15809acb7a6617",
+    "control/test_fallback.py": "68b7eee0054d0bc3335e6dc40a23f717e06709f93e706cf7e111075ecf5329aa",
+    "control/test_gindi.py": "e9f3441f3398d2f93c61d63cf46fc7891467d693c4f6ce82c9a45cfaed4bf85b",
+    "control/test_h_scenario_vs_h_warmstart.py": "db90207095f76b762c1172607fb0dff97c679a00552609004b89321d98716d91",
+    "control/test_kh_convention_match.py": "b75917e2603006511533b98a5eb36eff2901129eb637379660278c25616a133a",
+    "control/test_nmpc_family_cold_start.py": "13e6e562d8edd99f2f0c5199b8ad71f428fcbfb49fff016810377b325fa135be",
+    "control/test_plant.py": "9a438c69edd06c16ffb138df03ddcc013490a179e2a007c759b31f6bae92a784",
+    "control/test_prop_curve_invariant.py": "e0a29956d31b2f9c355f17c4cf9860f835408c585e8c0ca063517f9566389596",
+    "control/test_safety.py": "757012d5203b30e94ab5845edf058aa9b7acd3863656ce1273d38946238abbeb",
+    "control/test_sensors_delay.py": "228c5a5f55ede16e6a305b34ded60c30de644616af0521fd4275c2cd69ff3263",
+    "control/test_thrust_axis.py": "1bea188fd596dede3fadabb58d243ca2e9e1de22685d2f0bac08a15ea0d8ecd5",
+    "control/test_timing_study.py": "24cea1f5c827f264916c709eb1ff733e40c3cbcf8a8db813f8acfb1a07a17148",
+    "control/test_trim_hifi.py": "dbd88bff399672bcd432efba204cea16e17c41bf218be4e077b8f523a8cc3c01",
+    "control/test_v13_degenerate_first_step.py": "917bb7d27079878013c9f31f16ab09fad1627371edca6870e9de33cbacf06340",
+    "control/test_validation_suite.py": "175fbb467f8017e23da80d3fd859b460a5169e2a62433703cb6d653b4f8b910d",
+    "control/timing_study.py": "7497fd527c4af2a01972cd920b41b1d303c0fd07157eac0eae1374b7aafd26a1",
+    "control/trim.py": "10f88429fb4929dae34a50eb6ad3502235d229da6039e28c3004acc80e4857eb",
+    "control/trim_hifi.py": "cb7657477e8699ac3afaf0fab7f241c6cc687f1323738d87714e19eca0217aad",
+    "control/uncertainty.py": "ecb2faaf47642e1d6b0685e626126b138d908bbc70bd36813e6e59a702f3a7b8",
+    "control/validation_metrics.py": "3b084c2fc36586b7b17e1677e7a7c1dbf56c03af13bd46c15994d6d6bd53ec62",
+    "control/validation_suite.py": "bb77afae38509621e14a685c7cfa898ad0edd1d3273b1a51945374fa6991abf6",
+    "control/vehicle_params.py": "f4ee0e03e1b00d8e4751feb47c506987ad3370c49d8a1202a77f40c807c4ffde",
+    "control/vnmpc_acados.py": "606fe3731d1e4c32738983bd8d939067505091a885e28a6e82640479aa9bf2ae",
+    "models/team_light/control/__init__.py": "0448f8dad13aac955a70724ea443c4e60e5c32d83144e6c662f7bcf6cbfdd766",
+    "models/team_light/control/airframe.py": "52050c1c49d871a33a811ca34ea5678f809c23254251ee3ef190b50e2b9ae4f6",
+    "models/team_light/control/analyze_baseline_log.py": "0555e41776af1ff172849ed51ec48382993a4d2e4991c33937cbb159a54501c8",
+    "models/team_light/control/baseline_v2.py": "bd991756926583ad50413f0173480043a3489288721333abba83272b7abbdcbd",
+    "models/team_light/control/comparison_nmpc.py": "a9480449ba2deb9167610975d714c7c6d09d8c5f2a9b26b8cc68c6dd0e61e782",
+    "models/team_light/control/controller.py": "e2b9dac4a34fddfad35787dc26ad286de36ea54bd30b89a61203d95cf559209d",
+    "models/team_light/control/curve_authority.py": "e06ca891b0f4b25c25739e10955d94e4ebc9bea8e135fa6434ec290a7575a106",
+    "models/team_light/control/dynamics.py": "c7c63c389552f7299a666a34d6fa7db161480fde33bbe79c77f4cc3a06ca88e8",
+    "models/team_light/control/geometry.py": "564bc71a9a9e00c4254b4ba512cab6cfe6715a0aa7a0ee7222b7cfd9e6967a5a",
+    "models/team_light/control/hybrid_comparison.py": "80d5d594cf407a6ddf46acba47fa1d5abb10f9d0509fc7667f6cd159ddba8213",
+    "models/team_light/control/light_aero.py": "87914e522aed5e1ef13ad9591dc7a25366b0d970d1ee0cefcb29889b74da66ce",
+    "models/team_light/control/light_rocket_curve.py": "29a9f21673a7b625f6d36e2a307b2ff552aba56e33aebdbcb467972288680aa0",
+    "models/team_light/control/mission_sim.py": "c4407841f3ce38abe7d20d807a247280b6bef8518cd466a13fab389a4cb1b421",
+    "models/team_light/control/propeller_curve.py": "1e118de4a3713538d067cc3962830cfb7548d04d7045e861d2550f5ac8c2e228",
+    "models/team_light/control/run_baseline_comparison.py": "abfb5bd00a1a2332a8223588d65303a9b5850d20e027e99964a09ab66c1a41db",
+    "models/team_light/control/serialization.py": "cef1131c212c58aa00f1364afbf228d8ab9dc4bbc02c7356011a83d0a14448b6",
+    "models/team_light/control/trim.py": "01406db0ecdeb449458d8ad620906c564fbce5c3a15c408efbd7c648c2f58caa",
+    "models/team_light/control/validate_model.py": "a36593f9fcc5480b276271825ffe5b423bc5ae6faecf421d92f87942dfb4270a",
+    "models/team_light/control/vehicle_params.py": "06eff0a08f33c865c211f0db4ad3c6ef5cd2101141ba02c27313c0bb24c3ca77"
+  },
+  "scenarios": [
+    {
+      "id": "mission_VH",
+      "type": "mission",
+      "window": [
+        3.0,
+        55.0
+      ],
+      "phases": [
+        [
+          "초기호버",
+          0.0,
+          3.0,
+          0,
+          0,
+          20.0,
+          20.0
+        ],
+        [
+          "가속",
+          3.0,
+          15.0,
+          0,
+          85.0,
+          20.0,
+          20.0
+        ],
+        [
+          "순항",
+          18.0,
+          15.0,
+          85.0,
+          85.0,
+          20.0,
+          20.0
+        ],
+        [
+          "감속",
+          33.0,
+          15.0,
+          85.0,
+          0,
+          20.0,
+          20.0
+        ],
+        [
+          "호버링",
+          48.0,
+          7.0,
+          0,
+          0,
+          20.0,
+          20.0
+        ]
+      ],
+      "T_total": 55.0,
+      "gust_interval": null,
+      "meta": {
+        "type": "mission",
+        "cruise_speed": 85.0,
+        "phases": [
+          [
+            "초기호버",
+            0.0,
+            3.0
+          ],
+          [
+            "가속",
+            3.0,
+            18.0
+          ],
+          [
+            "순항",
+            18.0,
+            33.0
+          ],
+          [
+            "감속",
+            33.0,
+            48.0
+          ],
+          [
+            "호버링",
+            48.0,
+            55.0
+          ]
+        ]
+      },
+      "cases": [
+        {
+          "case_id": "mission_VH",
+          "factors": {}
+        }
+      ]
+    },
+    {
+      "id": "gust_lateral_p10_VH",
+      "type": "gust",
+      "window": [
+        0.0,
+        12.0
+      ],
+      "phases": [
+        [
+          "순항",
+          0.0,
+          3.0,
+          85.0,
+          85.0,
+          20.0,
+          20.0
+        ],
+        [
+          "돌풍",
+          3.0,
+          2.0,
+          85.0,
+          85.0,
+          20.0,
+          20.0
+        ],
+        [
+          "회복",
+          5.0,
+          7.0,
+          85.0,
+          85.0,
+          20.0,
+          20.0
+        ]
+      ],
+      "T_total": 12.0,
+      "gust_interval": [
+        3.0,
+        5.0
+      ],
+      "meta": {
+        "type": "gust",
+        "cruise_speed": 85.0,
+        "peak_m_s": 10.0,
+        "direction": "lateral",
+        "flow_angle_deg": 6.7098368077569335
+      },
+      "cases": [
+        {
+          "case_id": "gust_lateral_p10_VH",
+          "factors": {},
+          "gust_direction": "lateral",
+          "gust_peak": 10.0,
+          "wind_reference": "absolute",
+          "flow_angle_deg": 6.7098368077569335
+        }
+      ]
+    },
+    {
+      "id": "gust_vertical_m5_VH",
+      "type": "gust",
+      "window": [
+        0.0,
+        12.0
+      ],
+      "phases": [
+        [
+          "순항",
+          0.0,
+          3.0,
+          85.0,
+          85.0,
+          20.0,
+          20.0
+        ],
+        [
+          "돌풍",
+          3.0,
+          2.0,
+          85.0,
+          85.0,
+          20.0,
+          20.0
+        ],
+        [
+          "회복",
+          5.0,
+          7.0,
+          85.0,
+          85.0,
+          20.0,
+          20.0
+        ]
+      ],
+      "T_total": 12.0,
+      "gust_interval": [
+        3.0,
+        5.0
+      ],
+      "meta": {
+        "type": "gust",
+        "cruise_speed": 85.0,
+        "peak_m_s": -5.0,
+        "direction": "vertical",
+        "flow_angle_deg": -3.3664606634298013
+      },
+      "cases": [
+        {
+          "case_id": "gust_vertical_m5_VH",
+          "factors": {},
+          "gust_direction": "vertical",
+          "gust_peak": -5.0,
+          "wind_reference": "absolute",
+          "flow_angle_deg": -3.3664606634298013
+        }
+      ]
+    },
+    {
+      "id": "ref_accel_0_VH_rho1",
+      "type": "reference",
+      "window": [
+        2.0,
+        11.5
+      ],
+      "phases": [
+        [
+          "유지",
+          0.0,
+          3.0,
+          0.0,
+          0.0,
+          20.0,
+          20.0
+        ],
+        [
+          "기동",
+          3.0,
+          3.5,
+          0.0,
+          85.0,
+          20.0,
+          20.0
+        ],
+        [
+          "정착",
+          6.5,
+          5.0,
+          85.0,
+          85.0,
+          20.0,
+          20.0
+        ]
+      ],
+      "T_total": 11.5,
+      "gust_interval": null,
+      "meta": {
+        "type": "reference",
+        "v0": 0.0,
+        "v1": 85.0,
+        "rho_target": 1.0,
+        "rho_actual": 0.98723915650826,
+        "ramp_s": 3.5,
+        "u_star": 0.65275,
+        "v_star": 70.7954661741607,
+        "a_avail_at_star": 40.90963438259641,
+        "a_avail_table": {
+          "speeds": [
+            0.0,
+            5.0,
+            10.0,
+            15.0,
+            20.0,
+            25.0,
+            30.0,
+            35.0,
+            40.0,
+            45.0,
+            50.0,
+            55.0,
+            60.0,
+            65.0,
+            70.0,
+            75.0,
+            80.0,
+            85.0
+          ],
+          "accel": [
+            68.39844561200579,
+            68.34346637881303,
+            68.1979702461547,
+            67.98683975465862,
+            67.72893566564741,
+            67.38023661565381,
+            66.87817148152278,
+            66.25231882317293,
+            65.49146277027249,
+            64.48377257625506,
+            62.232002344914896,
+            58.83783247282245,
+            54.74584417620105,
+            49.454094180603484,
+            42.151765489600805,
+            34.34419838396628,
+            25.68891036544158,
+            16.639164807200398
+          ],
+          "direction": 1.0
+        }
+      },
+      "cases": [
+        {
+          "case_id": "ref_accel_0_VH_rho1",
+          "factors": {}
+        }
+      ]
+    },
+    {
+      "id": "ref_brake_VH_VL_rho1",
+      "type": "reference",
+      "window": [
+        2.0,
+        52.1
+      ],
+      "phases": [
+        [
+          "유지",
+          0.0,
+          3.0,
+          85.0,
+          85.0,
+          20.0,
+          20.0
+        ],
+        [
+          "기동",
+          3.0,
+          44.1,
+          85.0,
+          20.0,
+          20.0,
+          20.0
+        ],
+        [
+          "정착",
+          47.1,
+          5.0,
+          20.0,
+          20.0,
+          20.0,
+          20.0
+        ]
+      ],
+      "T_total": 52.1,
+      "gust_interval": null,
+      "meta": {
+        "type": "reference",
+        "v0": 85.0,
+        "v1": 20.0,
+        "rho_target": 1.0,
+        "rho_actual": 0.9985437146505189,
+        "ramp_s": 44.1,
+        "u_star": 0.4845,
+        "v_star": 54.97622034686094,
+        "a_avail_at_star": 3.6185788319155634,
+        "a_avail_table": {
+          "speeds": [
+            20.0,
+            25.0,
+            30.0,
+            35.0,
+            40.0,
+            45.0,
+            50.0,
+            55.0,
+            60.0,
+            65.0,
+            70.0,
+            75.0,
+            80.0,
+            85.0
+          ],
+          "accel": [
+            5.533843882607956,
+            8.646631066536045,
+            12.451148735781468,
+            7.450397460438667,
+            4.997859401998409,
+            4.087684508133062,
+            3.6990724104499466,
+            3.618194180665408,
+            3.7573677564485486,
+            4.069493870248001,
+            4.5244976259411915,
+            5.100572111253993,
+            5.780321541891073,
+            6.548869198980574
+          ],
+          "direction": -1.0
+        }
+      },
+      "cases": [
+        {
+          "case_id": "ref_brake_VH_VL_rho1",
+          "factors": {}
+        }
+      ]
+    },
+    {
+      "id": "mission_VH_mass1.3",
+      "type": "mission",
+      "window": [
+        3.0,
+        55.0
+      ],
+      "phases": [
+        [
+          "초기호버",
+          0.0,
+          3.0,
+          0,
+          0,
+          20.0,
+          20.0
+        ],
+        [
+          "가속",
+          3.0,
+          15.0,
+          0,
+          85.0,
+          20.0,
+          20.0
+        ],
+        [
+          "순항",
+          18.0,
+          15.0,
+          85.0,
+          85.0,
+          20.0,
+          20.0
+        ],
+        [
+          "감속",
+          33.0,
+          15.0,
+          85.0,
+          0,
+          20.0,
+          20.0
+        ],
+        [
+          "호버링",
+          48.0,
+          7.0,
+          0,
+          0,
+          20.0,
+          20.0
+        ]
+      ],
+      "T_total": 55.0,
+      "gust_interval": null,
+      "meta": {
+        "type": "mission",
+        "cruise_speed": 85.0,
+        "phases": [
+          [
+            "초기호버",
+            0.0,
+            3.0
+          ],
+          [
+            "가속",
+            3.0,
+            18.0
+          ],
+          [
+            "순항",
+            18.0,
+            33.0
+          ],
+          [
+            "감속",
+            33.0,
+            48.0
+          ],
+          [
+            "호버링",
+            48.0,
+            55.0
+          ]
+        ],
+        "plant_trim_at_cruise": true
+      },
+      "cases": [
+        {
+          "case_id": "mission_VH_mass1.3",
+          "factors": {
+            "mass": 1.3
+          }
+        }
+      ]
+    },
+    {
+      "id": "mission_VH_tau2",
+      "type": "mission",
+      "window": [
+        3.0,
+        55.0
+      ],
+      "phases": [
+        [
+          "초기호버",
+          0.0,
+          3.0,
+          0,
+          0,
+          20.0,
+          20.0
+        ],
+        [
+          "가속",
+          3.0,
+          15.0,
+          0,
+          85.0,
+          20.0,
+          20.0
+        ],
+        [
+          "순항",
+          18.0,
+          15.0,
+          85.0,
+          85.0,
+          20.0,
+          20.0
+        ],
+        [
+          "감속",
+          33.0,
+          15.0,
+          85.0,
+          0,
+          20.0,
+          20.0
+        ],
+        [
+          "호버링",
+          48.0,
+          7.0,
+          0,
+          0,
+          20.0,
+          20.0
+        ]
+      ],
+      "T_total": 55.0,
+      "gust_interval": null,
+      "meta": {
+        "type": "mission",
+        "cruise_speed": 85.0,
+        "phases": [
+          [
+            "초기호버",
+            0.0,
+            3.0
+          ],
+          [
+            "가속",
+            3.0,
+            18.0
+          ],
+          [
+            "순항",
+            18.0,
+            33.0
+          ],
+          [
+            "감속",
+            33.0,
+            48.0
+          ],
+          [
+            "호버링",
+            48.0,
+            55.0
+          ]
+        ],
+        "plant_trim_at_cruise": true
+      },
+      "cases": [
+        {
+          "case_id": "mission_VH_tau2",
+          "factors": {
+            "motor_tau": 2.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "gust_lateral_p10_VL",
+      "type": "gust",
+      "window": [
+        0.0,
+        12.0
+      ],
+      "phases": [
+        [
+          "순항",
+          0.0,
+          3.0,
+          20.0,
+          20.0,
+          20.0,
+          20.0
+        ],
+        [
+          "돌풍",
+          3.0,
+          2.0,
+          20.0,
+          20.0,
+          20.0,
+          20.0
+        ],
+        [
+          "회복",
+          5.0,
+          7.0,
+          20.0,
+          20.0,
+          20.0,
+          20.0
+        ]
+      ],
+      "T_total": 12.0,
+      "gust_interval": [
+        3.0,
+        5.0
+      ],
+      "meta": {
+        "type": "gust",
+        "cruise_speed": 20.0,
+        "peak_m_s": 10.0,
+        "direction": "lateral",
+        "flow_angle_deg": 26.56505117707799
+      },
+      "cases": [
+        {
+          "case_id": "gust_lateral_p10_VL",
+          "factors": {},
+          "gust_direction": "lateral",
+          "gust_peak": 10.0,
+          "wind_reference": "absolute",
+          "flow_angle_deg": 26.56505117707799
+        }
+      ]
+    },
+    {
+      "id": "gust_vertical_m5_VL",
+      "type": "gust",
+      "window": [
+        0.0,
+        12.0
+      ],
+      "phases": [
+        [
+          "순항",
+          0.0,
+          3.0,
+          20.0,
+          20.0,
+          20.0,
+          20.0
+        ],
+        [
+          "돌풍",
+          3.0,
+          2.0,
+          20.0,
+          20.0,
+          20.0,
+          20.0
+        ],
+        [
+          "회복",
+          5.0,
+          7.0,
+          20.0,
+          20.0,
+          20.0,
+          20.0
+        ]
+      ],
+      "T_total": 12.0,
+      "gust_interval": [
+        3.0,
+        5.0
+      ],
+      "meta": {
+        "type": "gust",
+        "cruise_speed": 20.0,
+        "peak_m_s": -5.0,
+        "direction": "vertical",
+        "flow_angle_deg": -14.036243467926479
+      },
+      "cases": [
+        {
+          "case_id": "gust_vertical_m5_VL",
+          "factors": {},
+          "gust_direction": "vertical",
+          "gust_peak": -5.0,
+          "wind_reference": "absolute",
+          "flow_angle_deg": -14.036243467926479
+        }
+      ]
+    }
+  ],
+  "controller_settings": {
+    "GSLQR": {
+      "kind": "GSLQR",
+      "V_table_m_s": [
+        0.0,
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0
+      ],
+      "dropped": [],
+      "Q_diag": [
+        6400.0,
+        81920.0,
+        81920.0,
+        20.0,
+        50.0,
+        50.0,
+        50.0,
+        5.0,
+        5.0,
+        5.0,
+        0.01,
+        0.01,
+        0.01,
+        0.01
+      ],
+      "R_scale": 0.003125,
+      "integral_states": [
+        0,
+        1
+      ],
+      "Q_integral": [
+        3200.0,
+        640.0
+      ],
+      "integral_limit": 50.0,
+      "trims": "controller model, plant hover convention",
+      "reference_feedforward": "window_acceleration",
+      "lookahead_s": 0.05,
+      "feedforward_limits": [
+        [
+          0.0,
+          1.9000000000000001,
+          1.9000000000000001
+        ],
+        [
+          5.0,
+          2.0,
+          1.9000000000000001
+        ],
+        [
+          10.0,
+          2.3000000000000003,
+          1.7000000000000002
+        ],
+        [
+          15.0,
+          1.6,
+          1.4000000000000001
+        ],
+        [
+          20.0,
+          1.7000000000000002,
+          1.6
+        ],
+        [
+          25.0,
+          2.6,
+          2.6
+        ],
+        [
+          30.0,
+          5.9,
+          5.2
+        ],
+        [
+          35.0,
+          5.2,
+          4.9
+        ],
+        [
+          40.0,
+          4.5,
+          4.9
+        ],
+        [
+          45.0,
+          3.9000000000000004,
+          4.7
+        ],
+        [
+          50.0,
+          4.0,
+          4.3
+        ],
+        [
+          55.0,
+          3.9000000000000004,
+          4.7
+        ],
+        [
+          60.0,
+          4.1000000000000005,
+          5.300000000000001
+        ],
+        [
+          65.0,
+          4.4,
+          5.4
+        ],
+        [
+          70.0,
+          4.9,
+          5.7
+        ],
+        [
+          75.0,
+          5.5,
+          6.2
+        ],
+        [
+          80.0,
+          6.2,
+          6.9
+        ],
+        [
+          85.0,
+          6.7,
+          7.800000000000001
+        ]
+      ]
+    },
+    "CPID": {
+      "kind": "CPID",
+      "heading_rad": -3.141592653589793,
+      "Kp_vel": 32.0,
+      "Ki_vel": 0.15,
+      "a_int_max": 9.81,
+      "Kp_z": 16.0,
+      "Kd_z": 4.0,
+      "Ki_z": 0.5,
+      "int_z_max": 5.0,
+      "Kp_att": [
+        200.0,
+        500.0,
+        500.0
+      ],
+      "Kd_att": [
+        20.0,
+        50.0,
+        50.0
+      ],
+      "max_tilt_deg": 45.0,
+      "a_int_z_max": 9.81,
+      "integrator_preload": "controller_model_trim",
+      "preload_acceleration": [
+        4.6424635633110585,
+        8.617968031141399e-16,
+        -2.7728950672621986
+      ],
+      "reference_feedforward": "window_acceleration",
+      "lookahead_s": 0.05
+    }
+  },
+  "rows": [
+    {
+      "scenario_id": "mission_VH",
+      "scenario_type": "mission",
+      "controller": "GSLQR",
+      "label": "SMOKE",
+      "passed": false,
+      "tracking_pass": false,
+      "model_domain_valid": false,
+      "failure_reasons": [
+        "incomplete",
+        "simulation_error",
+        "altitude_error",
+        "velocity_error",
+        "omega_peak",
+        "final_hover_not_settled",
+        "propulsion_model_domain"
+      ],
+      "stop_reason": "body-rate or altitude divergence stop",
+      "simulated_seconds": 46.17,
+      "rmse_z": 13.357118101233885,
+      "rmse_vx": 3.1279014554987614,
+      "rmse_velocity": 4.518747416259725,
+      "max_z_error": 44.1414029770787,
+      "max_velocity_error": 20.3144853539856,
+      "max_omega": 35.54916843285264,
+      "omega_sustained_seconds": 0.018000000000000682,
+      "motor_saturation_fraction": 0.0007580680095299979,
+      "prop_domain_outside_fraction": 0.21789040502490795,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "final_settled": false,
+      "recovered": null,
+      "recovery_seconds": null,
+      "paper_failed": true,
+      "paper_reasons": [
+        "paper_state_limit"
+      ],
+      "paper_recovery_seconds": null,
+      "window": [
+        3.0,
+        55.0
+      ],
+      "window_complete": false,
+      "window_rmse_velocity": 4.673113460972464,
+      "window_rmse_z": 13.813413906268082,
+      "window_max_velocity_error": 20.3144853539856,
+      "window_max_z_error": 44.1414029770787,
+      "window_p95_velocity_error": 12.183742026051664,
+      "window_p95_z_error": 40.547839390864134,
+      "window_max_omega": 35.54916843285264,
+      "command_total_variation": 9.322260452763585,
+      "flow_angle_deg": null,
+      "factors": {},
+      "trajectory_sha256": "1633c9ee40f015e55440740d4cfc423b250070e4583d5f75172e8836a8d8873e",
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807",
+      "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+      "integrators": {
+        "steps": 23085,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 4326,
+        "frozen_fraction": 0.18739441195581547,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.01583834065328558
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.030326414156101857
+          }
+        }
+      },
+      "skipped": null,
+      "skip_reason": null
+    },
+    {
+      "scenario_id": "mission_VH",
+      "scenario_type": "mission",
+      "controller": "CPID",
+      "label": "SMOKE",
+      "passed": null,
+      "tracking_pass": null,
+      "model_domain_valid": null,
+      "failure_reasons": [],
+      "stop_reason": null,
+      "simulated_seconds": null,
+      "rmse_z": null,
+      "rmse_vx": null,
+      "rmse_velocity": null,
+      "max_z_error": null,
+      "max_velocity_error": null,
+      "max_omega": null,
+      "omega_sustained_seconds": null,
+      "motor_saturation_fraction": null,
+      "prop_domain_outside_fraction": null,
+      "optimizer_calls": null,
+      "optimizer_failures": null,
+      "final_settled": null,
+      "recovered": null,
+      "recovery_seconds": null,
+      "paper_failed": null,
+      "paper_reasons": [],
+      "paper_recovery_seconds": null,
+      "window": null,
+      "window_complete": null,
+      "window_rmse_velocity": null,
+      "window_rmse_z": null,
+      "window_max_velocity_error": null,
+      "window_max_z_error": null,
+      "window_p95_velocity_error": null,
+      "window_p95_z_error": null,
+      "window_max_omega": null,
+      "command_total_variation": null,
+      "flow_angle_deg": null,
+      "factors": {},
+      "trajectory_sha256": null,
+      "truth_parameter_sha256": null,
+      "controller_model_sha256": null,
+      "integrators": null,
+      "skipped": true,
+      "skip_reason": "outside design region 0-20 m/s (scenario reaches 85 m/s)"
+    },
+    {
+      "scenario_id": "gust_lateral_p10_VH",
+      "scenario_type": "gust",
+      "controller": "GSLQR",
+      "label": "SMOKE",
+      "passed": true,
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "failure_reasons": [],
+      "stop_reason": null,
+      "simulated_seconds": 12.0,
+      "rmse_z": 0.004283266221988519,
+      "rmse_vx": 0.0044478669159872,
+      "rmse_velocity": 0.15254407615223772,
+      "max_z_error": 0.014630095573487267,
+      "max_velocity_error": 0.609233341318197,
+      "max_omega": 0.19426544289562367,
+      "omega_sustained_seconds": 0.0,
+      "motor_saturation_fraction": 0.0,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "final_settled": null,
+      "recovered": true,
+      "recovery_seconds": 0.0,
+      "paper_failed": false,
+      "paper_reasons": [],
+      "paper_recovery_seconds": 0.0,
+      "window": [
+        0.0,
+        12.0
+      ],
+      "window_complete": true,
+      "window_rmse_velocity": 0.15254407615223772,
+      "window_rmse_z": 0.004283266221988519,
+      "window_max_velocity_error": 0.609233341318197,
+      "window_max_z_error": 0.014630095573487267,
+      "window_p95_velocity_error": 0.4829389837598787,
+      "window_p95_z_error": 0.008568697407241643,
+      "window_max_omega": 0.19426544289562367,
+      "command_total_variation": 0.07426208942097803,
+      "flow_angle_deg": 6.7098368077569335,
+      "factors": {},
+      "trajectory_sha256": "7b4029f0ab79ee059f0891610b1e39b1ca94ba4bbc9371edf51596484154c918",
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807",
+      "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+      "integrators": {
+        "steps": 6000,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0002895078879978653
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.00033805758507772575
+          }
+        }
+      },
+      "skipped": null,
+      "skip_reason": null
+    },
+    {
+      "scenario_id": "gust_lateral_p10_VH",
+      "scenario_type": "gust",
+      "controller": "CPID",
+      "label": "SMOKE",
+      "passed": null,
+      "tracking_pass": null,
+      "model_domain_valid": null,
+      "failure_reasons": [],
+      "stop_reason": null,
+      "simulated_seconds": null,
+      "rmse_z": null,
+      "rmse_vx": null,
+      "rmse_velocity": null,
+      "max_z_error": null,
+      "max_velocity_error": null,
+      "max_omega": null,
+      "omega_sustained_seconds": null,
+      "motor_saturation_fraction": null,
+      "prop_domain_outside_fraction": null,
+      "optimizer_calls": null,
+      "optimizer_failures": null,
+      "final_settled": null,
+      "recovered": null,
+      "recovery_seconds": null,
+      "paper_failed": null,
+      "paper_reasons": [],
+      "paper_recovery_seconds": null,
+      "window": null,
+      "window_complete": null,
+      "window_rmse_velocity": null,
+      "window_rmse_z": null,
+      "window_max_velocity_error": null,
+      "window_max_z_error": null,
+      "window_p95_velocity_error": null,
+      "window_p95_z_error": null,
+      "window_max_omega": null,
+      "command_total_variation": null,
+      "flow_angle_deg": 6.7098368077569335,
+      "factors": {},
+      "trajectory_sha256": null,
+      "truth_parameter_sha256": null,
+      "controller_model_sha256": null,
+      "integrators": null,
+      "skipped": true,
+      "skip_reason": "outside design region 0-20 m/s (scenario reaches 85 m/s)"
+    },
+    {
+      "scenario_id": "gust_vertical_m5_VH",
+      "scenario_type": "gust",
+      "controller": "GSLQR",
+      "label": "SMOKE",
+      "passed": true,
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "failure_reasons": [],
+      "stop_reason": null,
+      "simulated_seconds": 12.0,
+      "rmse_z": 0.08423736645723623,
+      "rmse_vx": 0.004251967897447583,
+      "rmse_velocity": 0.17848563475428947,
+      "max_z_error": 0.3042572969685189,
+      "max_velocity_error": 0.6943227757082587,
+      "max_omega": 0.14200353790070241,
+      "omega_sustained_seconds": 0.0,
+      "motor_saturation_fraction": 0.0,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "final_settled": null,
+      "recovered": true,
+      "recovery_seconds": 0.0,
+      "paper_failed": false,
+      "paper_reasons": [],
+      "paper_recovery_seconds": 0.0,
+      "window": [
+        0.0,
+        12.0
+      ],
+      "window_complete": true,
+      "window_rmse_velocity": 0.17848563475428947,
+      "window_rmse_z": 0.08423736645723623,
+      "window_max_velocity_error": 0.6943227757082587,
+      "window_max_z_error": 0.3042572969685189,
+      "window_p95_velocity_error": 0.49164029435744716,
+      "window_p95_z_error": 0.22502459196530467,
+      "window_max_omega": 0.14200353790070241,
+      "command_total_variation": 0.09659668600432973,
+      "flow_angle_deg": -3.3664606634298013,
+      "factors": {},
+      "trajectory_sha256": "41c5f41e515472a97b3d9a4d75db65dba8b2478cf1e9e5f635eff4611e754596",
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807",
+      "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+      "integrators": {
+        "steps": 6000,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.005028246856983768
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0003498689098462031
+          }
+        }
+      },
+      "skipped": null,
+      "skip_reason": null
+    },
+    {
+      "scenario_id": "gust_vertical_m5_VH",
+      "scenario_type": "gust",
+      "controller": "CPID",
+      "label": "SMOKE",
+      "passed": null,
+      "tracking_pass": null,
+      "model_domain_valid": null,
+      "failure_reasons": [],
+      "stop_reason": null,
+      "simulated_seconds": null,
+      "rmse_z": null,
+      "rmse_vx": null,
+      "rmse_velocity": null,
+      "max_z_error": null,
+      "max_velocity_error": null,
+      "max_omega": null,
+      "omega_sustained_seconds": null,
+      "motor_saturation_fraction": null,
+      "prop_domain_outside_fraction": null,
+      "optimizer_calls": null,
+      "optimizer_failures": null,
+      "final_settled": null,
+      "recovered": null,
+      "recovery_seconds": null,
+      "paper_failed": null,
+      "paper_reasons": [],
+      "paper_recovery_seconds": null,
+      "window": null,
+      "window_complete": null,
+      "window_rmse_velocity": null,
+      "window_rmse_z": null,
+      "window_max_velocity_error": null,
+      "window_max_z_error": null,
+      "window_p95_velocity_error": null,
+      "window_p95_z_error": null,
+      "window_max_omega": null,
+      "command_total_variation": null,
+      "flow_angle_deg": -3.3664606634298013,
+      "factors": {},
+      "trajectory_sha256": null,
+      "truth_parameter_sha256": null,
+      "controller_model_sha256": null,
+      "integrators": null,
+      "skipped": true,
+      "skip_reason": "outside design region 0-20 m/s (scenario reaches 85 m/s)"
+    },
+    {
+      "scenario_id": "ref_accel_0_VH_rho1",
+      "scenario_type": "reference",
+      "controller": "GSLQR",
+      "label": "SMOKE",
+      "passed": false,
+      "tracking_pass": false,
+      "model_domain_valid": false,
+      "failure_reasons": [
+        "incomplete",
+        "simulation_error",
+        "altitude_error",
+        "velocity_error",
+        "final_hover_not_settled",
+        "propulsion_model_domain"
+      ],
+      "stop_reason": "body-rate or altitude divergence stop",
+      "simulated_seconds": 7.498,
+      "rmse_z": 11.893663004648545,
+      "rmse_vx": 38.385473473518935,
+      "rmse_velocity": 43.813932656433465,
+      "max_z_error": 50.0473062912624,
+      "max_velocity_error": 126.25172265932376,
+      "max_omega": 17.551312926849253,
+      "omega_sustained_seconds": 0.0,
+      "motor_saturation_fraction": 0.44305148039477193,
+      "prop_domain_outside_fraction": 0.08748999733262203,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "final_settled": false,
+      "recovered": null,
+      "recovery_seconds": null,
+      "paper_failed": true,
+      "paper_reasons": [
+        "paper_state_limit"
+      ],
+      "paper_recovery_seconds": null,
+      "window": [
+        2.0,
+        11.5
+      ],
+      "window_complete": false,
+      "window_rmse_velocity": 51.163650468896286,
+      "window_rmse_z": 13.88880613699779,
+      "window_max_velocity_error": 126.25172265932376,
+      "window_max_z_error": 50.0473062912624,
+      "window_p95_velocity_error": 111.22712862694718,
+      "window_p95_z_error": 35.27985524263678,
+      "window_max_omega": 17.551312926849253,
+      "command_total_variation": 3.0977123163712155,
+      "flow_angle_deg": null,
+      "factors": {},
+      "trajectory_sha256": "3b16b76618ece2e3b70c3d29a0fbc437f9370b177e3bcde916d1da51e8fc9d06",
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807",
+      "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+      "integrators": {
+        "steps": 3749,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 1702,
+        "frozen_fraction": 0.4539877300613497,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.000849348301743537
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.016598493284823976
+          }
+        }
+      },
+      "skipped": null,
+      "skip_reason": null
+    },
+    {
+      "scenario_id": "ref_accel_0_VH_rho1",
+      "scenario_type": "reference",
+      "controller": "CPID",
+      "label": "SMOKE",
+      "passed": null,
+      "tracking_pass": null,
+      "model_domain_valid": null,
+      "failure_reasons": [],
+      "stop_reason": null,
+      "simulated_seconds": null,
+      "rmse_z": null,
+      "rmse_vx": null,
+      "rmse_velocity": null,
+      "max_z_error": null,
+      "max_velocity_error": null,
+      "max_omega": null,
+      "omega_sustained_seconds": null,
+      "motor_saturation_fraction": null,
+      "prop_domain_outside_fraction": null,
+      "optimizer_calls": null,
+      "optimizer_failures": null,
+      "final_settled": null,
+      "recovered": null,
+      "recovery_seconds": null,
+      "paper_failed": null,
+      "paper_reasons": [],
+      "paper_recovery_seconds": null,
+      "window": null,
+      "window_complete": null,
+      "window_rmse_velocity": null,
+      "window_rmse_z": null,
+      "window_max_velocity_error": null,
+      "window_max_z_error": null,
+      "window_p95_velocity_error": null,
+      "window_p95_z_error": null,
+      "window_max_omega": null,
+      "command_total_variation": null,
+      "flow_angle_deg": null,
+      "factors": {},
+      "trajectory_sha256": null,
+      "truth_parameter_sha256": null,
+      "controller_model_sha256": null,
+      "integrators": null,
+      "skipped": true,
+      "skip_reason": "outside design region 0-20 m/s (scenario reaches 85 m/s)"
+    },
+    {
+      "scenario_id": "ref_brake_VH_VL_rho1",
+      "scenario_type": "reference",
+      "controller": "GSLQR",
+      "label": "SMOKE",
+      "passed": true,
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "failure_reasons": [],
+      "stop_reason": null,
+      "simulated_seconds": 52.1,
+      "rmse_z": 0.008482898335362275,
+      "rmse_vx": 0.006428261022062456,
+      "rmse_velocity": 0.011152760212018708,
+      "max_z_error": 0.03223881087469849,
+      "max_velocity_error": 0.04025107570271628,
+      "max_omega": 0.08823956210620831,
+      "omega_sustained_seconds": 0.0,
+      "motor_saturation_fraction": 0.0,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "final_settled": true,
+      "recovered": null,
+      "recovery_seconds": null,
+      "paper_failed": false,
+      "paper_reasons": [],
+      "paper_recovery_seconds": null,
+      "window": [
+        2.0,
+        52.1
+      ],
+      "window_complete": true,
+      "window_rmse_velocity": 0.0112167842932649,
+      "window_rmse_z": 0.00857743779436042,
+      "window_max_velocity_error": 0.04025107570271628,
+      "window_max_z_error": 0.03223881087469849,
+      "window_p95_velocity_error": 0.02272729416173991,
+      "window_p95_z_error": 0.022003725133235008,
+      "window_max_omega": 0.08823956210620831,
+      "command_total_variation": 2.422752205671446,
+      "flow_angle_deg": null,
+      "factors": {},
+      "trajectory_sha256": "c8dd4741f03c1e2643fde34a2468863956def8d8da932a4978f9ec96f29806d0",
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807",
+      "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+      "integrators": {
+        "steps": 26050,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0017232979059653999
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0018866226866010426
+          }
+        }
+      },
+      "skipped": null,
+      "skip_reason": null
+    },
+    {
+      "scenario_id": "ref_brake_VH_VL_rho1",
+      "scenario_type": "reference",
+      "controller": "CPID",
+      "label": "SMOKE",
+      "passed": null,
+      "tracking_pass": null,
+      "model_domain_valid": null,
+      "failure_reasons": [],
+      "stop_reason": null,
+      "simulated_seconds": null,
+      "rmse_z": null,
+      "rmse_vx": null,
+      "rmse_velocity": null,
+      "max_z_error": null,
+      "max_velocity_error": null,
+      "max_omega": null,
+      "omega_sustained_seconds": null,
+      "motor_saturation_fraction": null,
+      "prop_domain_outside_fraction": null,
+      "optimizer_calls": null,
+      "optimizer_failures": null,
+      "final_settled": null,
+      "recovered": null,
+      "recovery_seconds": null,
+      "paper_failed": null,
+      "paper_reasons": [],
+      "paper_recovery_seconds": null,
+      "window": null,
+      "window_complete": null,
+      "window_rmse_velocity": null,
+      "window_rmse_z": null,
+      "window_max_velocity_error": null,
+      "window_max_z_error": null,
+      "window_p95_velocity_error": null,
+      "window_p95_z_error": null,
+      "window_max_omega": null,
+      "command_total_variation": null,
+      "flow_angle_deg": null,
+      "factors": {},
+      "trajectory_sha256": null,
+      "truth_parameter_sha256": null,
+      "controller_model_sha256": null,
+      "integrators": null,
+      "skipped": true,
+      "skip_reason": "outside design region 0-20 m/s (scenario reaches 85 m/s)"
+    },
+    {
+      "scenario_id": "mission_VH_mass1.3",
+      "scenario_type": "mission",
+      "controller": "GSLQR",
+      "label": "SMOKE",
+      "passed": false,
+      "tracking_pass": false,
+      "model_domain_valid": false,
+      "failure_reasons": [
+        "incomplete",
+        "simulation_error",
+        "altitude_error",
+        "velocity_error",
+        "omega_peak",
+        "final_hover_not_settled",
+        "propulsion_model_domain"
+      ],
+      "stop_reason": "body-rate or altitude divergence stop",
+      "simulated_seconds": 45.51,
+      "rmse_z": 11.834300330486789,
+      "rmse_vx": 3.3574630375868497,
+      "rmse_velocity": 4.415684718585631,
+      "max_z_error": 39.27158984482859,
+      "max_velocity_error": 19.333580308860824,
+      "max_omega": 35.78982908586504,
+      "omega_sustained_seconds": 0.01999999999999602,
+      "motor_saturation_fraction": 0.0007910349373764008,
+      "prop_domain_outside_fraction": 0.24548450889914306,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "final_settled": false,
+      "recovered": null,
+      "recovery_seconds": null,
+      "paper_failed": true,
+      "paper_reasons": [
+        "paper_state_limit"
+      ],
+      "paper_recovery_seconds": null,
+      "window": [
+        3.0,
+        55.0
+      ],
+      "window_complete": false,
+      "window_rmse_velocity": 4.568427846958566,
+      "window_rmse_z": 12.244588833903636,
+      "window_max_velocity_error": 19.333580308860824,
+      "window_max_z_error": 39.27158984482859,
+      "window_p95_velocity_error": 11.477717860074081,
+      "window_p95_z_error": 36.08110461364953,
+      "window_max_omega": 35.78982908586504,
+      "command_total_variation": 8.926925982259643,
+      "flow_angle_deg": null,
+      "factors": {
+        "mass": 1.3
+      },
+      "trajectory_sha256": "d2315d9b91c86eb0e1301a0d19a4e473191c6279a5b15473823cb8c778310993",
+      "truth_parameter_sha256": "2dff1b0079dc0fd185f0035fc8675a095d9dbf7d1d714b27406a8cedbfa460d3",
+      "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+      "integrators": {
+        "steps": 22755,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 4178,
+        "frozen_fraction": 0.18360799824214458,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.017696114745289763
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.03745274439247125
+          }
+        }
+      },
+      "skipped": null,
+      "skip_reason": null
+    },
+    {
+      "scenario_id": "mission_VH_mass1.3",
+      "scenario_type": "mission",
+      "controller": "CPID",
+      "label": "SMOKE",
+      "passed": null,
+      "tracking_pass": null,
+      "model_domain_valid": null,
+      "failure_reasons": [],
+      "stop_reason": null,
+      "simulated_seconds": null,
+      "rmse_z": null,
+      "rmse_vx": null,
+      "rmse_velocity": null,
+      "max_z_error": null,
+      "max_velocity_error": null,
+      "max_omega": null,
+      "omega_sustained_seconds": null,
+      "motor_saturation_fraction": null,
+      "prop_domain_outside_fraction": null,
+      "optimizer_calls": null,
+      "optimizer_failures": null,
+      "final_settled": null,
+      "recovered": null,
+      "recovery_seconds": null,
+      "paper_failed": null,
+      "paper_reasons": [],
+      "paper_recovery_seconds": null,
+      "window": null,
+      "window_complete": null,
+      "window_rmse_velocity": null,
+      "window_rmse_z": null,
+      "window_max_velocity_error": null,
+      "window_max_z_error": null,
+      "window_p95_velocity_error": null,
+      "window_p95_z_error": null,
+      "window_max_omega": null,
+      "command_total_variation": null,
+      "flow_angle_deg": null,
+      "factors": {
+        "mass": 1.3
+      },
+      "trajectory_sha256": null,
+      "truth_parameter_sha256": null,
+      "controller_model_sha256": null,
+      "integrators": null,
+      "skipped": true,
+      "skip_reason": "outside design region 0-20 m/s (scenario reaches 85 m/s)"
+    },
+    {
+      "scenario_id": "mission_VH_tau2",
+      "scenario_type": "mission",
+      "controller": "GSLQR",
+      "label": "SMOKE",
+      "passed": false,
+      "tracking_pass": false,
+      "model_domain_valid": false,
+      "failure_reasons": [
+        "incomplete",
+        "simulation_error",
+        "altitude_error",
+        "velocity_error",
+        "omega_peak",
+        "final_hover_not_settled",
+        "propulsion_model_domain"
+      ],
+      "stop_reason": "body-rate or altitude divergence stop",
+      "simulated_seconds": 46.156,
+      "rmse_z": 13.347638165322094,
+      "rmse_vx": 3.1337079058482584,
+      "rmse_velocity": 4.515296142165271,
+      "max_z_error": 44.12855438400638,
+      "max_velocity_error": 20.22329545996143,
+      "max_omega": 35.42329514223855,
+      "omega_sustained_seconds": 0.021999999999998465,
+      "motor_saturation_fraction": 0.0010182858133287113,
+      "prop_domain_outside_fraction": 0.21765317618511137,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "final_settled": false,
+      "recovered": null,
+      "recovery_seconds": null,
+      "paper_failed": true,
+      "paper_reasons": [
+        "paper_state_limit"
+      ],
+      "paper_recovery_seconds": null,
+      "window": [
+        3.0,
+        55.0
+      ],
+      "window_complete": false,
+      "window_rmse_velocity": 4.66959349684217,
+      "window_rmse_z": 13.803755592673385,
+      "window_max_velocity_error": 20.22329545996143,
+      "window_max_z_error": 44.12855438400638,
+      "window_p95_velocity_error": 12.17629732605822,
+      "window_p95_z_error": 40.54238082056031,
+      "window_max_omega": 35.42329514223855,
+      "command_total_variation": 9.789720748011774,
+      "flow_angle_deg": null,
+      "factors": {
+        "motor_tau": 2.0
+      },
+      "trajectory_sha256": "e4eba5b85ef71ac44ede1994fde567e62ebd5a8b6f60471cbed0c57e000a948f",
+      "truth_parameter_sha256": "1727e05f25f84cb08c37c5045e11a51d141fa7f7f32bea16252e2d4b17f3219f",
+      "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+      "integrators": {
+        "steps": 23078,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 4326,
+        "frozen_fraction": 0.18745125227489384,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.015314823848850785
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.030425723909582644
+          }
+        }
+      },
+      "skipped": null,
+      "skip_reason": null
+    },
+    {
+      "scenario_id": "mission_VH_tau2",
+      "scenario_type": "mission",
+      "controller": "CPID",
+      "label": "SMOKE",
+      "passed": null,
+      "tracking_pass": null,
+      "model_domain_valid": null,
+      "failure_reasons": [],
+      "stop_reason": null,
+      "simulated_seconds": null,
+      "rmse_z": null,
+      "rmse_vx": null,
+      "rmse_velocity": null,
+      "max_z_error": null,
+      "max_velocity_error": null,
+      "max_omega": null,
+      "omega_sustained_seconds": null,
+      "motor_saturation_fraction": null,
+      "prop_domain_outside_fraction": null,
+      "optimizer_calls": null,
+      "optimizer_failures": null,
+      "final_settled": null,
+      "recovered": null,
+      "recovery_seconds": null,
+      "paper_failed": null,
+      "paper_reasons": [],
+      "paper_recovery_seconds": null,
+      "window": null,
+      "window_complete": null,
+      "window_rmse_velocity": null,
+      "window_rmse_z": null,
+      "window_max_velocity_error": null,
+      "window_max_z_error": null,
+      "window_p95_velocity_error": null,
+      "window_p95_z_error": null,
+      "window_max_omega": null,
+      "command_total_variation": null,
+      "flow_angle_deg": null,
+      "factors": {
+        "motor_tau": 2.0
+      },
+      "trajectory_sha256": null,
+      "truth_parameter_sha256": null,
+      "controller_model_sha256": null,
+      "integrators": null,
+      "skipped": true,
+      "skip_reason": "outside design region 0-20 m/s (scenario reaches 85 m/s)"
+    },
+    {
+      "scenario_id": "gust_lateral_p10_VL",
+      "scenario_type": "gust",
+      "controller": "GSLQR",
+      "label": "SMOKE",
+      "passed": true,
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "failure_reasons": [],
+      "stop_reason": null,
+      "simulated_seconds": 12.0,
+      "rmse_z": 0.024623458350186072,
+      "rmse_vx": 0.011624152013240942,
+      "rmse_velocity": 0.1217074433127525,
+      "max_z_error": 0.08106459807775224,
+      "max_velocity_error": 0.476383507647451,
+      "max_omega": 0.43643963109982614,
+      "omega_sustained_seconds": 0.0,
+      "motor_saturation_fraction": 0.0,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "final_settled": null,
+      "recovered": true,
+      "recovery_seconds": 0.0,
+      "paper_failed": false,
+      "paper_reasons": [],
+      "paper_recovery_seconds": 0.0,
+      "window": [
+        0.0,
+        12.0
+      ],
+      "window_complete": true,
+      "window_rmse_velocity": 0.1217074433127525,
+      "window_rmse_z": 0.024623458350186072,
+      "window_max_velocity_error": 0.476383507647451,
+      "window_max_z_error": 0.08106459807775224,
+      "window_p95_velocity_error": 0.36907987674118004,
+      "window_p95_z_error": 0.06314181378098027,
+      "window_max_omega": 0.43643963109982614,
+      "command_total_variation": 0.1928677924668702,
+      "flow_angle_deg": 26.56505117707799,
+      "factors": {},
+      "trajectory_sha256": "66262b19e383cb2d8d3864c0840020cbf5adee21225d42bd811b1f0a800d401d",
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807",
+      "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+      "integrators": {
+        "steps": 6000,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0024202437300514927
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0018136209962449706
+          }
+        }
+      },
+      "skipped": null,
+      "skip_reason": null
+    },
+    {
+      "scenario_id": "gust_lateral_p10_VL",
+      "scenario_type": "gust",
+      "controller": "CPID",
+      "label": "SMOKE",
+      "passed": false,
+      "tracking_pass": false,
+      "model_domain_valid": false,
+      "failure_reasons": [
+        "altitude_error",
+        "velocity_error",
+        "gust_not_recovered",
+        "propulsion_model_domain"
+      ],
+      "stop_reason": null,
+      "simulated_seconds": 12.0,
+      "rmse_z": 5.077093886662088,
+      "rmse_vx": 8.336958097040267,
+      "rmse_velocity": 20.08280174902875,
+      "max_z_error": 15.500598900227521,
+      "max_velocity_error": 67.90591431861205,
+      "max_omega": 11.560290525234834,
+      "omega_sustained_seconds": 0.0,
+      "motor_saturation_fraction": 0.2255,
+      "prop_domain_outside_fraction": 0.307,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "final_settled": null,
+      "recovered": false,
+      "recovery_seconds": null,
+      "paper_failed": true,
+      "paper_reasons": [
+        "paper_state_limit",
+        "paper_tracking_failure"
+      ],
+      "paper_recovery_seconds": 0.0,
+      "window": [
+        0.0,
+        12.0
+      ],
+      "window_complete": true,
+      "window_rmse_velocity": 20.08280174902875,
+      "window_rmse_z": 5.077093886662088,
+      "window_max_velocity_error": 67.90591431861205,
+      "window_max_z_error": 15.500598900227521,
+      "window_p95_velocity_error": 54.05641785390374,
+      "window_p95_z_error": 14.267511227126954,
+      "window_max_omega": 11.560290525234834,
+      "command_total_variation": 66.72763610104708,
+      "flow_angle_deg": 26.56505117707799,
+      "factors": {},
+      "trajectory_sha256": "abcd10d1526abc147b8104e92f3001c1983730232f64967206beb4eff008e134",
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807",
+      "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+      "integrators": {
+        "steps": 6000,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 2206,
+        "frozen_fraction": 0.36766666666666664,
+        "channels": {
+          "vx": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.4732648948984645
+          },
+          "vy": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.001092859485834667
+          },
+          "z": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.28600572122002016
+          }
+        }
+      },
+      "skipped": null,
+      "skip_reason": null
+    },
+    {
+      "scenario_id": "gust_vertical_m5_VL",
+      "scenario_type": "gust",
+      "controller": "GSLQR",
+      "label": "SMOKE",
+      "passed": true,
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "failure_reasons": [],
+      "stop_reason": null,
+      "simulated_seconds": 12.0,
+      "rmse_z": 0.029478088503998936,
+      "rmse_vx": 0.013515054597882423,
+      "rmse_velocity": 0.04831239870224487,
+      "max_z_error": 0.08893110669407633,
+      "max_velocity_error": 0.1480056314511034,
+      "max_omega": 0.1157348980296217,
+      "omega_sustained_seconds": 0.0,
+      "motor_saturation_fraction": 0.0,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "final_settled": null,
+      "recovered": true,
+      "recovery_seconds": 0.0,
+      "paper_failed": false,
+      "paper_reasons": [],
+      "paper_recovery_seconds": 0.0,
+      "window": [
+        0.0,
+        12.0
+      ],
+      "window_complete": true,
+      "window_rmse_velocity": 0.04831239870224487,
+      "window_rmse_z": 0.029478088503998936,
+      "window_max_velocity_error": 0.1480056314511034,
+      "window_max_z_error": 0.08893110669407633,
+      "window_p95_velocity_error": 0.1269477761107304,
+      "window_p95_z_error": 0.07348124561134739,
+      "window_max_omega": 0.1157348980296217,
+      "command_total_variation": 0.22748182848282336,
+      "flow_angle_deg": -14.036243467926479,
+      "factors": {},
+      "trajectory_sha256": "59fcb2e095a4f4335b9668db34965655afb63601d9112f7d9f901152621daf35",
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807",
+      "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+      "integrators": {
+        "steps": 6000,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "z": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0011173770807593165
+          },
+          "vx": {
+            "limit": 50.0,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.0009518836126802968
+          }
+        }
+      },
+      "skipped": null,
+      "skip_reason": null
+    },
+    {
+      "scenario_id": "gust_vertical_m5_VL",
+      "scenario_type": "gust",
+      "controller": "CPID",
+      "label": "SMOKE",
+      "passed": true,
+      "tracking_pass": true,
+      "model_domain_valid": true,
+      "failure_reasons": [],
+      "stop_reason": null,
+      "simulated_seconds": 12.0,
+      "rmse_z": 0.011846981984482481,
+      "rmse_vx": 0.0018688451247442803,
+      "rmse_velocity": 0.02342484742740424,
+      "max_z_error": 0.044130818733354005,
+      "max_velocity_error": 0.08450446003450728,
+      "max_omega": 0.13312701160513188,
+      "omega_sustained_seconds": 0.0,
+      "motor_saturation_fraction": 0.0,
+      "prop_domain_outside_fraction": 0.0,
+      "optimizer_calls": 0,
+      "optimizer_failures": 0,
+      "final_settled": null,
+      "recovered": true,
+      "recovery_seconds": 0.0,
+      "paper_failed": false,
+      "paper_reasons": [],
+      "paper_recovery_seconds": 0.0,
+      "window": [
+        0.0,
+        12.0
+      ],
+      "window_complete": true,
+      "window_rmse_velocity": 0.02342484742740424,
+      "window_rmse_z": 0.011846981984482481,
+      "window_max_velocity_error": 0.08450446003450728,
+      "window_max_z_error": 0.044130818733354005,
+      "window_p95_velocity_error": 0.06858124071887794,
+      "window_p95_z_error": 0.03432765416543759,
+      "window_max_omega": 0.13312701160513188,
+      "command_total_variation": 0.23901415576526866,
+      "flow_angle_deg": -14.036243467926479,
+      "factors": {},
+      "trajectory_sha256": "b63cac6fa8187632e46dad961b8c343b663d41ac885f22ae4c5a7009846c31a8",
+      "truth_parameter_sha256": "13a1dcc6332987eba93ea4653f4d6087741d1ac085701982ed94c22e6658c807",
+      "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+      "integrators": {
+        "steps": 6000,
+        "at_limit_steps": 0,
+        "at_limit_fraction": 0.0,
+        "frozen_steps": 0,
+        "frozen_fraction": 0.0,
+        "channels": {
+          "vx": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.4732378759746237
+          },
+          "vy": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 3.4583377117022945e-16
+          },
+          "z": {
+            "limit": 9.81,
+            "at_limit_steps": 0,
+            "peak_fraction": 0.28338713096568563
+          }
+        }
+      },
+      "skipped": null,
+      "skip_reason": null
+    }
+  ],
+  "tuned": {
+    "run_dir": "results/arena/tuning/main120",
+    "controllers": {
+      "GSLQR": {
+        "record": "results/arena/tuning/main120/GSLQR.record.json",
+        "record_sha256": "779a4a52c09ec5e4911751524fdf251ba9892f731adcf38223baf44cb4b75d1e",
+        "tuning_git_revision": "1225c50eaffda2662973e0bed450b3adad0e8c1d",
+        "best_values": {
+          "q_z": 6400.0,
+          "q_v_h": 81920.0,
+          "q_v_z": 20.0,
+          "q_phi": 50.0,
+          "q_omega": 5.0,
+          "q_n": 0.01,
+          "r": 0.003125,
+          "q_iz": 3200.0,
+          "q_ivx": 640.0
+        },
+        "best_objective": 0.20326943983164436,
+        "prior_objective": 0.48438070105802955,
+        "budget": 120
+      },
+      "CPID": {
+        "record": "results/arena/tuning/main120/CPID.record.json",
+        "record_sha256": "a370b5a1cdfb99d0525133672f1c40bfba2b2b52c2004266ede918a116f97aa1",
+        "tuning_git_revision": "1225c50eaffda2662973e0bed450b3adad0e8c1d",
+        "best_values": {
+          "Kp_vel": 32.0,
+          "Ki_vel": 0.15,
+          "Kp_z": 16.0,
+          "Kd_z": 4.0,
+          "Ki_z": 0.5,
+          "Kp_att": 1.0,
+          "Kd_att": 1.0
+        },
+        "best_objective": 500.02364122891356,
+        "prior_objective": 500.21325190599265,
+        "budget": 120
+      }
+    }
+  }
+}
