@@ -8,5 +8,7 @@
   "R_scale": 0.00625,
   "integral_states": [0, 1],
   "Q_integral": [3200, 640],
-  "integral_limit": 5.0
+  "integral_limit": 50.0,
+  "integral_limit_note": "State limit on the LQI integrals (xi_z in m*s, xi_vx in m), with integration frozen while any rotor command saturates. Class default is 5.0 (unchanged).",
+  "change_record": "2026-09-26 kj decision 6-9: the smoke run hit the 5.0 limit on xi_vx for 10.97% (mass x1.3) and 4.89% (motor tau x2) of the mission (1% rule). With the limit removed, mass x1.3 counts as 'impact' under the pre-registered rule (stop 44.33 -> 44.59 s; over the common window RMSE v 7.96 -> 7.11, z 5.17 -> 4.89; trajectories identical until 37.94 s); tau x2 shows no impact; the divergence outcome is unchanged in both. kj rule: widen if impact. 50 is the smallest candidate (5 -> 50 -> 500) that keeps every GSLQR smoke case at 0% time-at-limit (peak |xi_vx| 5.99). Made AFTER seeing smoke results, OUTSIDE the tuning budget, in GSLQR's FAVOUR (baseline-strengthening). Evidence: results/arena/INTEGRATORS_SMOKE.md."
 }
