@@ -50,8 +50,9 @@ REFERENCE = ROOT/'results'/'arena'/'smoke_reference.json'
 THREADS = {'OMP_NUM_THREADS': '1', 'OPENBLAS_NUM_THREADS': '1',
            'VECLIB_MAXIMUM_THREADS': '1', 'MKL_NUM_THREADS': '1'}
 # 재실행할 사례(짧은 것 위주). --quick은 앞의 일부만.
-RERUN_FULL = [('gust_lateral_p10_VH', c) for c in ('GSLQR', 'CPID', 'V13', 'F13', 'M17')] + \
-             [('mission_VH', c) for c in ('GSLQR', 'CPID')]
+# CPID는 설계 영역(0~20 m/s) 밖 본시험에서 제외라(kj 결정 2026-09-26) V_L 사례로 재실행한다.
+RERUN_FULL = [('gust_lateral_p10_VH', c) for c in ('GSLQR', 'V13', 'F13', 'M17')] + \
+             [('mission_VH', 'GSLQR'), ('gust_lateral_p10_VL', 'CPID')]
 RERUN_QUICK = [('gust_lateral_p10_VH', 'GSLQR'), ('gust_lateral_p10_VH', 'V13')]
 # 교차 머신 비교에 쓰는 수치 지표와 반드시 같아야 하는 판정 지표
 NUMERIC = ('rmse_z', 'rmse_velocity', 'max_omega', 'window_rmse_velocity', 'window_rmse_z',

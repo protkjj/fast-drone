@@ -77,7 +77,13 @@
        "rho": 0.8, "lead_s": 0.5, "tail_s": 1.0},
       {"id": "tune_hold_V50_mass1.1", "type": "gust", "speed": 50.0,
        "direction": "vertical", "peak_m_s": 0.0, "times_s": [1.0, 1.0, 1.0],
-       "perturbation": {"mass": 1.1}}
+       "perturbation": {"mass": 1.1}},
+      {"id": "tune_gust_lateral_p5_V15", "type": "gust", "speed": 15.0,
+       "direction": "lateral", "peak_m_s": 5.0, "times_s": [1.0, 1.0, 2.0]},
+      {"id": "tune_gust_vertical_p3_V20", "type": "gust", "speed": 20.0,
+       "direction": "vertical", "peak_m_s": 3.0, "times_s": [1.0, 1.0, 2.0]},
+      {"id": "tune_ramp_0_15_rho0.1", "type": "reference", "from": 0.0, "to": 15.0,
+       "rho": 0.1, "lead_s": 0.5, "tail_s": 1.0}
     ]
   },
   "reporting": {"integrator_at_limit_fraction": 0.01},
@@ -108,6 +114,10 @@
      "perturbation": {"mass": 1.3}},
     {"id": "mission_VH_tau2", "type": "mission", "speed": "V_H",
      "durations_s": [3.0, 15.0, 15.0, 15.0, 7.0], "evaluation_start_s": 3.0,
-     "perturbation": {"motor_tau": 2.0}}
+     "perturbation": {"motor_tau": 2.0}},
+    {"id": "gust_lateral_p10_VL", "type": "gust", "speed": "V_L",
+     "direction": "lateral", "peak_m_s": 10.0, "times_s": [3.0, 2.0, 7.0]},
+    {"id": "gust_vertical_m5_VL", "type": "gust", "speed": "V_L",
+     "direction": "vertical", "peak_m_s": -5.0, "times_s": [3.0, 2.0, 7.0]}
   ]
 }

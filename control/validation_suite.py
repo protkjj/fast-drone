@@ -346,7 +346,7 @@ ARENA_REFERENCE_FIELDS = (
     'window_rmse_velocity', 'window_rmse_z', 'window_max_velocity_error', 'window_max_z_error',
     'window_p95_velocity_error', 'window_p95_z_error', 'window_max_omega',
     'command_total_variation', 'flow_angle_deg', 'factors', 'trajectory_sha256',
-    'truth_parameter_sha256', 'controller_model_sha256', 'integrators')
+    'truth_parameter_sha256', 'controller_model_sha256', 'integrators', 'skipped', 'skip_reason')
 
 
 def environment_fingerprint():
@@ -404,6 +404,12 @@ def write_arena_report(out, manifest, rows):
                   'Stop / reasons |',
                   '|---|---:|---|---|---|---|---:|---:|---:|---:|---:|---|']
         for r in (r for r in rows if r['scenario_id'] == scenario['id']):
+            if r.get('skipped'):
+                # kj 결정(2026-09-26): 설계 영역 밖 사례는 시뮬레이션하지 않고 제외로만 적는다
+                lines.append(f'| {r["controller"]} | — | excluded | — | — | — | — | — | — | — | — | '
+                             f'{r.get("skip_reason", "")} |')
+                continue
+
             def fmt(key, r=r):
                 value = r.get(key)
                 return '—' if value is None else f'{value:.4g}'
@@ -429,7 +435,8 @@ def write_arena_report(out, manifest, rows):
 
 def run_arena(args, parser):
     """Every scenario in the arena config x every controller, once (SMOKE)."""
-    from control.arena import load_config, config_sha256, check_confirmed_facts, build_scenarios
+    from control.arena import (load_config, config_sha256, check_confirmed_facts, build_scenarios,
+                               excluded_from)
     from control.arena_factory import ArenaFactory
     from control.validation_metrics import PaperCriteria, paper_evaluate
     if not args.smoke:
@@ -451,6 +458,12 @@ def run_arena(args, parser):
     missing = set(args.only_cases or []) - {s.id for s in scenarios}
     if missing:
         parser.error(f'scenario ids not in the arena config: {sorted(missing)}')
+    if args.only_cases and args.only_controllers:
+        # 설계 영역 밖 쌍을 이름으로 콕 집어 요청하면 돌릴 것이 없다 — 조용히 빈 결과를 내지 않고 막는다
+        asked = [(s.id, name, excluded_from(config, name, s)) for s in scenarios for name in labels]
+        refused = [f'{sid}/{name}: {why}' for sid, name, why in asked if why]
+        if refused:
+            parser.error('requested pairs are excluded from the main test: ' + '; '.join(refused))
     limits = Acceptance(**config['acceptance'])
     paper = PaperCriteria(**config['paper_criteria'])
     label = 'SMOKE'
@@ -475,6 +488,17 @@ def run_arena(args, parser):
     for scenario in scenarios:
         for case in scenario.cases:
             for name in labels:
+                skip_reason = excluded_from(config, name, scenario)
+                if skip_reason:
+                    row = dict(case, scenario_id=scenario.id, scenario_type=scenario.type,
+                               controller=name, label=label, skipped=True, skip_reason=skip_reason,
+                               passed=None, tracking_pass=None, failure_reasons=[], paper_reasons=[],
+                               stop_reason=None, simulated_seconds=None)
+                    rows.append(row)
+                    with (out/'trials.jsonl').open('a', encoding='utf-8') as stream:
+                        stream.write(json.dumps(json_safe(row), ensure_ascii=False, allow_nan=False)+'\n')
+                    print(f'Skipping {scenario.id} / {name}: {skip_reason}', flush=True)
+                    continue
                 print(f'Running {scenario.id} / {name}', flush=True)
                 try:
                     metrics, result, log = run_trial(factory, name, scenario.profile, case, limits)

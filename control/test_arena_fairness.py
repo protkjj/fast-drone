@@ -318,6 +318,67 @@ def test_i7_mission_starts_in_hover_at_altitude_without_takeoff(config):
         assert scenario.window[0] == 3.0          # 첫 호버 3초는 평가 제외(논문 §5.9)
 
 
+def test_i7_cpid_is_a_low_speed_baseline_in_the_main_test(config, factory):
+    """kj 결정(2026-09-26): CPID는 설계 영역(0~20 m/s) 밖 본시험에서 빠지고, V_L 돌풍에서만 비교된다.
+    다른 제어기는 어느 본시험에서도 빠지지 않는다."""
+    from control.arena import excluded_from
+    scenarios = build_scenarios(config, factory.cp, factory.p)
+    for s in scenarios:
+        assert (excluded_from(config, 'CPID', s) is None) == (s.profile.cruise_speed <= 20.0), s.id
+        for label in ('V13', 'M17', 'F13', 'GSLQR'):
+            assert excluded_from(config, label, s) is None, (label, s.id)
+    compared = [s.id for s in scenarios if excluded_from(config, 'CPID', s) is None]
+    assert compared == ['gust_lateral_p10_VL', 'gust_vertical_m5_VL']
+    # V_L 돌풍쌍은 V_H 대표쌍과 같은 조건(측풍 10, 수직풍 −5)이다 — CPID에 맞춰 고른 조건이 아니다
+    by_id = {s['id']: s for s in config['scenarios']}
+    for kind in ('gust_lateral_p10', 'gust_vertical_m5'):
+        low, high = by_id[f'{kind}_VL'], by_id[f'{kind}_VH']
+        assert {k: v for k, v in low.items() if k not in ('id', 'speed')} == \
+               {k: v for k, v in high.items() if k not in ('id', 'speed')}
+
+
+def test_i7_explicit_request_of_an_excluded_pair_is_refused(tmp_path):
+    """설계 영역 밖 쌍을 이름으로 요청하면 시뮬레이션 전에 오류로 막는다(조용한 빈 결과 금지)."""
+    with pytest.raises(SystemExit):
+        suite.main(['--config', str(DEFAULT_CONFIG), '--smoke', '--only-cases', 'mission_VH',
+                    '--only-controllers', 'CPID', '--output', str(tmp_path)])
+    assert not any(tmp_path.iterdir())
+
+
+def test_i7_excluded_pair_is_recorded_as_a_skipped_row(config, tmp_path, monkeypatch):
+    """스모크 루프가 설계 영역 밖 쌍을 시뮬레이션 없이 '제외' 행으로 남기는지 — 참조와 보고서까지.
+
+    시뮬레이션은 가짜로 바꾼다. 여기서 보는 것은 루프의 기록 경로다: 제외 행이 참조에 들어가
+    expected_trials와 행 수가 맞는지, 보고서가 None 필드에서 죽지 않는지. 실제 스모크는 ~3시간이라
+    여기서 처음 깨지면 비싸다.
+    """
+    import json
+    import control.validation_metrics as metrics_module
+    ran = []
+
+    def fake_trial(factory, name, profile, case, limits):
+        ran.append(name)
+        return dict(passed=True, tracking_pass=True, failure_reasons=[], stop_reason=None,
+                    simulated_seconds=0.0), None, []
+
+    monkeypatch.setattr(suite, 'run_trial', fake_trial)
+    monkeypatch.setattr(metrics_module, 'paper_evaluate',
+                        lambda *args, **kwargs: dict(paper_failed=False, paper_reasons=[]))
+    suite.main(['--config', str(DEFAULT_CONFIG), '--smoke', '--only-cases', 'mission_VH',
+                '--output', str(tmp_path)])
+    (out,) = tmp_path.iterdir()
+    assert ran == [label for label in config['controllers'] if label != 'CPID']
+    trials = [json.loads(line) for line in (out/'trials.jsonl').read_text(encoding='utf-8').splitlines()]
+    reference = json.loads((out/'arena_reference.json').read_text(encoding='utf-8'))
+    manifest = json.loads((out/'manifest.json').read_text(encoding='utf-8'))
+    for rows in (trials, reference['rows']):
+        (skipped,) = [r for r in rows if r.get('skipped')]
+        assert skipped['controller'] == 'CPID'
+        assert skipped['skip_reason'].startswith('outside design region 0-20 m/s')
+    assert len(reference['rows']) == manifest['expected_trials'] == manifest['recorded_trials'] == 5
+    assert '| CPID | — | excluded |' in (out/'REPORT.md').read_text(encoding='utf-8')
+
+
 # ── I-8 ─────────────────────────────────────────────────────────────
 
 def _plant_trim_points(config, native, step=5.0):
@@ -440,7 +501,7 @@ def _assert_holds(row, attitude, where):
 
 CPID_OUT_OF_REGION = pytest.mark.xfail(
     strict=True,
-    reason='CPID 설계 영역 밖(85 m/s): 기울기 한계 35°(트림 추력축은 수직에서 ~83°)라 '
+    reason='CPID 설계 영역 밖(85 m/s): 기울기 한계 45°(PX4 기본값, 트림 추력축은 수직에서 ~82°)라 '
            '적분기를 트림값으로 채워도(±1 g에서 잘림) 트림 자세를 못 만든다. 작업지시서가 '
            'CPID는 호버·저속만 요구한다. strict — 예상과 달리 통과하면 알린다.')
 
@@ -652,6 +713,16 @@ def test_i11_arena_cpid_uses_acceleration_authority_and_preload(factory, config)
     assert limits == {name: lim for name, (_, lim) in pid.integrator_status()['channels'].items()}
 
 
+def test_i11_arena_cpid_tilt_is_the_px4_default(factory):
+    """kj 결정(2026-09-26): 경기장 CPID 기울기 한계 = PX4 MPC_TILTMAX_AIR 기본값 45°.
+    클래스 기본값(35°)은 그대로다 — 기존 동작 비트 동일."""
+    from control.controller import CascadedPID
+    ctrl = factory.make_for_profile('CPID', GustProfile(20.0, 20.0, 1.0, 1.0, 1.0))
+    assert ctrl.inner.max_tilt == pytest.approx(np.radians(45.0))
+    assert ctrl.settings['max_tilt_deg'] == 45.0
+    assert CascadedPID(factory.cp).max_tilt == pytest.approx(np.radians(35.0))
+
+
 @pytest.mark.parametrize('speed', [0.0, 10.0, 20.0])
 def test_i11_cpid_preload_reproduces_the_trim_thrust_vector(factory, speed):
     """출발값을 채운 CPID는 명목 트림 상태에서 트림과 같은 추력 벡터를 요구하고,
@@ -683,7 +754,7 @@ def test_i11_cpid_integrators_freeze_while_saturated(factory):
         pid.Ki_vel, pid.a_int_z_max = 0.15, a_int_z_max
         before_v, before_z = pid._int_ev.copy(), pid._int_ez
         pid(0.0, x)
-        assert pid._saturated                         # 수평 30 m/s² 요구 → 기울기 35° 한계
+        assert pid._saturated                         # 수평 30 m/s² 요구 → 기울기 한계(클래스 기본 35°)
         np.testing.assert_array_equal(pid._int_ev, before_v)
         assert (pid._int_ez == before_z) == z_frozen
         assert pid.integrator_status()['frozen']
@@ -767,6 +838,22 @@ def test_i4_checker_flags_unfair_records(config, broken, needle):
     records[0].update(broken)
     violations = check_tuning_records(records, config)
     assert any(needle in v for v in violations), violations
+
+
+def test_i4_resume_refuses_records_from_another_config(config, tmp_path):
+    """재개는 지수만 대조한다 — 설정·튜닝 시나리오가 바뀐 run-dir을 이어 쓰면 옛 목적함수가 섞인다.
+    그래서 기록의 설정 해시·시나리오 id가 지금과 다르면 멈춰야 한다."""
+    import json
+    from control.arena import config_sha256
+    from control.arena_tune import check_resume_compatible
+    good = dict(config_sha256=config_sha256(config),
+                scenario_ids=[s['id'] for s in config['tuning']['scenarios']])
+    (tmp_path/'GSLQR.record.json').write_text(json.dumps(good), encoding='utf-8')
+    check_resume_compatible(config, 'GSLQR', tmp_path)                 # 같은 설정 — 통과
+    for broken in (dict(good, config_sha256='0'*64), dict(good, scenario_ids=good['scenario_ids'][:5])):
+        (tmp_path/'GSLQR.record.json').write_text(json.dumps(broken), encoding='utf-8')
+        with pytest.raises(RuntimeError, match='cannot resume'):
+            check_resume_compatible(config, 'GSLQR', tmp_path)
 
 
 def test_i4_committed_pilot_tuning_records_are_fair(config):

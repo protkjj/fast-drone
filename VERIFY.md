@@ -40,8 +40,12 @@ python scripts/verify_arena.py --quick   # CPU 1개·메모리 3 GB에서 20분 
 | 3 확정 사항 | `configs/arena.json`을 작업지시서 1절 확정 사항과 대조한다(기체·질량·해시, 이륙 없음, 15/15/15초, 돌풍 절대 풍속·공통 트림 출발, V_L 20·V_H 85 m/s 등) | 위반 0건 |
 | 4 스모크 재실행 | 커밋된 참조 `results/arena/smoke_reference.json`의 사례 일부를 새 프로세스에서 다시 돌려 비교한다 | 아래 3절 |
 
-재실행 사례는 전체 모드에서 순항 측풍 돌풍(`gust_lateral_p10_VH`) × 5종과 통합 임무(`mission_VH`) ×
-GSLQR·CPID다. `--quick` 모드는 순항 측풍 돌풍 × GSLQR·V13이다.
+재실행 사례는 전체 모드에서 V_H 측풍 돌풍(`gust_lateral_p10_VH`) × V13·M17·F13·GSLQR, 통합 임무(`mission_VH`) ×
+GSLQR, V_L 측풍 돌풍(`gust_lateral_p10_VL`) × CPID다. `--quick` 모드는 V_H 측풍 돌풍 × GSLQR·V13이다.
+
+CPID는 설계 영역(0~20 m/s) 밖 본시험에서 제외된다(kj 결정 2026-09-26). 스모크 결과에 `skipped`
+행(사유 포함)으로 남고 시뮬레이션하지 않는다. 제외된 쌍을 `--only-cases`·`--only-controllers`로
+콕 집어 요청하면 오류로 막는다.
 
 ## 3. 허용 오차
 
@@ -58,6 +62,7 @@ GSLQR·CPID다. `--quick` 모드는 순항 측풍 돌풍 × GSLQR·V13이다.
 
 - 통과는 경기장이 공정성 불변식을 지키고 참조 결과가 재현된다는 뜻이다. 어느 제어기가 낫다는 뜻은 아니다.
 - 스모크 사례의 `passed`(스위트 판정)와 `paper_failed`(논문 §5.10 판정)는 따로 기록된다.
+- `skipped=true` 행은 판정 대상이 아니다(설계 영역 밖이라 돌리지 않은 쌍).
 - GSLQR·CPID 행의 `integrators` 필드는 적분기가 한계에 닿아 있던 스텝과 포화로 적분이 멈춘 스텝이다.
   한계 도달이 시행의 1%를 넘으면 현황 보고서의 결정 필요로 올린다.
 - 참조를 만든 실행 환경은 `smoke_reference.json`의 `environment`에 있다.

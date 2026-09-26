@@ -123,7 +123,28 @@ def validate_config(config):
     fraction = config.get('reporting', {}).get('integrator_at_limit_fraction')
     if fraction is not None and not 0.0 < float(fraction) < 1.0:
         raise ValueError('reporting.integrator_at_limit_fraction must be in (0, 1)')
+    for label, spec in config['controllers'].items():
+        region = spec.get('design_region_m_s')
+        if region is not None and not (len(region) == 2
+                                       and SPEED_RANGE[0] <= float(region[0]) < float(region[1]) <= SPEED_RANGE[1]):
+            raise ValueError(f'{label}: design_region_m_s must be [lo, hi] inside {SPEED_RANGE}')
     return config
+
+
+def excluded_from(config, label, scenario):
+    """kj 결정(2026-09-26): 본시험에서 제어기의 설계 영역 밖 사례는 뺀다(CPID 0~20 m/s).
+
+    시나리오 참조가 닿는 최고 속도(임무·돌풍은 순항 속도, 참조 프로필은 시작·끝 중 큰 값)가
+    `design_region_m_s` 상한을 넘으면 제외 사유 문자열을, 아니면 None을 돌려준다. 튜닝(작업 E)은
+    공통 집합이라 이 필터를 쓰지 않는다(kj 결정 6-10).
+    """
+    region = config['controllers'].get(label, {}).get('design_region_m_s')
+    if region is None:
+        return None
+    top, v_max = float(region[1]), float(scenario.profile.cruise_speed)
+    if v_max > top + 1e-9:
+        return f'outside design region {float(region[0]):g}-{top:g} m/s (scenario reaches {v_max:g} m/s)'
+    return None
 
 
 def integrator_limit_flags(entries, config):

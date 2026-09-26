@@ -184,8 +184,31 @@ def _write_json(path, value):
     tmp.replace(path)
 
 
+def check_resume_compatible(config, label, run_dir):
+    """이어 돌리기 전에, 남은 기록이 **지금 설정**으로 만든 것인지 확인한다.
+
+    재개는 로그의 지수만 대조한다. 튜닝 시나리오나 설정이 바뀐 뒤 같은 run-dir에서 이어 돌리면
+    옛 목적함수를 조용히 재생해 새 기록에 섞는다(2026-09-26 탐색에서 발견). 설정 해시와 튜닝
+    시나리오 id가 다르면 멈추고 새 run-dir을 쓰게 한다.
+    """
+    record_path = Path(run_dir)/f'{label}.record.json'
+    if not record_path.exists():
+        return
+    record = json.loads(record_path.read_text(encoding='utf-8'))
+    now_ids = [s['id'] for s in config['tuning']['scenarios']]
+    problems = []
+    if record.get('config_sha256') != config_sha256(config):
+        problems.append('config sha256 differs')
+    if record.get('scenario_ids') != now_ids:
+        problems.append(f'tuning scenarios differ ({record.get("scenario_ids")} vs {now_ids})')
+    if problems:
+        raise RuntimeError(f'{label}: cannot resume {run_dir} — ' + '; '.join(problems)
+                           + '. Start a new --run-dir.')
+
+
 def tune_controller(config, label, budget, run_dir, native=None, model=None):
     """한 제어기를 예산만큼 튜닝. 같은 run_dir에 로그가 있으면 이어서 한다."""
+    check_resume_compatible(config, label, run_dir)
     from models.team_light.control.baseline_v2 import baseline_params
     native = native if native is not None else baseline_params()
     model = model if model is not None else ControllerModel(native)
