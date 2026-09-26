@@ -177,18 +177,37 @@ def write_markdown(path, rows, meta):
 
 
 def tuned_overrides(config, run_dir, labels=('GSLQR', 'CPID')):
-    """튜닝 기록의 최선값을 팩토리 overrides로 바꾼다(arena_tune.parameter_space와 같은 적용)."""
-    from control.arena_tune import parameter_space
-    gains = ArenaFactory(config).gains
-    overrides, used = {}, {}
+    """튜닝 기록의 최선값을 팩토리 overrides로 바꾼다(arena_tune.parameter_space와 같은 적용).
+
+    설계점검과 경기장 실행(`validation_suite --tuned`)이 같이 쓴다. 기록마다 complete이고 튜닝한
+    경기장 설정(config)과 해시가 같아야 하며, 쓰는 기록끼리 I-4(같은 예산·시나리오·탐색)를 통과해야
+    한다. 아니면 ValueError — 다른 설정이나 다른 예산으로 튜닝한 값을 조용히 섞지 않게 한다.
+    """
+    import hashlib
+    from control.arena import config_sha256
+    from control.arena_tune import parameter_space, check_tuning_records
+    records = {}
     for label in labels:
         path = Path(run_dir)/f'{label}.record.json'
+        if not path.exists():
+            raise ValueError(f'{path}: no tuning record for {label}')
         record = json.loads(path.read_text(encoding='utf-8'))
         if record.get('status') != 'complete':
             raise ValueError(f'{path}: tuning not complete ({record.get("status")})')
+        if record.get('config_sha256') != config_sha256(config):
+            raise ValueError(f'{path}: tuned with config {str(record.get("config_sha256"))[:12]}, '
+                             f'not the current {config_sha256(config)[:12]}')
+        records[label] = (path, record)
+    violations = check_tuning_records([record for _, record in records.values()], config)
+    if violations:
+        raise ValueError('tuning records fail I-4: ' + '; '.join(violations))
+    gains = ArenaFactory(config).gains                  # 검사를 다 통과한 뒤에 짓는다(거부는 빨리)
+    overrides, used = {}, {}
+    for label, (path, record) in records.items():
         _, _, apply = parameter_space(config, label, gains)
         overrides.update(apply(record['best_values']))
-        used[label] = dict(record=str(path), best_values=record['best_values'],
+        used[label] = dict(record=str(path), record_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                           tuning_git_revision=record.get('git_revision'), best_values=record['best_values'],
                            best_objective=record.get('best_objective'),
                            prior_objective=record.get('prior_objective'), budget=record['budget'])
     return overrides, used
@@ -210,10 +229,11 @@ def main(argv=None):
                         help='observation seconds per point (diagnostic; the record uses 15 s)')
     args = parser.parse_args(argv)
     config = load_config(args.config)
+    # 튜닝 기록은 튜닝한 경기장 설정 그대로와 대조한다 — 진단용 설정 변경(--feedforward off)은 그 뒤에
+    overrides, tuned = tuned_overrides(config, args.tuned) if args.tuned else (None, None)
     if args.feedforward == 'off':
         from control.arena_feedforward_check import without_feedforward
         config = without_feedforward(config)
-    overrides, tuned = tuned_overrides(config, args.tuned) if args.tuned else (None, None)
     factory = ArenaFactory(config, overrides=overrides)
     rows = []
     for label, speeds in POINTS.items():

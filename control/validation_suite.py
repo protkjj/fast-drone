@@ -295,6 +295,9 @@ def build_parser():
     arena.add_argument('--only-controllers', nargs='+', help='arena: run only these controllers')
     arena.add_argument('--reference-out', type=Path,
                        help='arena: also write the compact reference summary to this path')
+    arena.add_argument('--tuned', type=Path,
+                       help='arena: use each controller\'s best values from this tuning run-dir '
+                            '(records must be complete, tuned on this config, and pass I-4)')
     return p
 
 
@@ -387,10 +390,16 @@ def source_hashes():
 
 def write_arena_report(out, manifest, rows):
     from control.arena import integrator_limit_flags
+    tuned = manifest.get('tuned')
     lines = [f'# Arena {manifest["label"]} run', '',
              f'**{manifest["label"]}** — pipeline check, not a performance result. '
-             'No superiority or inferiority conclusion is drawn from these numbers.', '',
-             f'Config `{manifest["config_path"]}` sha256 `{manifest["config_sha256"][:12]}`; '
+             'No superiority or inferiority conclusion is drawn from these numbers.', '']
+    if tuned:
+        lines += [f'Gains: **tuned** — best values from `{tuned["run_dir"]}` (same-budget tuning, PILOT): '
+                  + '; '.join(f'{name} record sha256 `{t["record_sha256"][:12]}`'
+                              for name, t in tuned['controllers'].items())
+                  + '. Still one deterministic run per case.', '']
+    lines += [f'Config `{manifest["config_path"]}` sha256 `{manifest["config_sha256"][:12]}`; '
              f'git `{manifest["git_revision"]}` dirty={manifest["git_dirty"]}.', '',
              'Suite pass = tracking/safety (Acceptance) AND propulsion-model domain. '
              'Paper = section 5.10 flags (stricter, reported alongside). '
@@ -433,6 +442,10 @@ def write_arena_report(out, manifest, rows):
     (out/'REPORT.md').write_text('\n'.join(lines), encoding='utf-8')
 
 
+# verify_arena가 대조하는 참조(사전값 게인). 튜닝값 실행이 이것을 덮어쓰면 검증이 엉뚱한 값과 비교한다.
+SMOKE_REFERENCE = ROOT/'results'/'arena'/'smoke_reference.json'
+
+
 def run_arena(args, parser):
     """Every scenario in the arena config x every controller, once (SMOKE)."""
     from control.arena import (load_config, config_sha256, check_confirmed_facts, build_scenarios,
@@ -453,7 +466,18 @@ def run_arena(args, parser):
     unknown = [label for label in labels if label not in config['controllers']]
     if unknown:
         parser.error(f'controllers not in the arena config: {unknown}')
-    factory = ArenaFactory(config, native)
+    tuned, overrides = None, None
+    if args.tuned:
+        # 튜닝값 스모크(보고서 11.5-4): 본시험 캠페인이 아직 정의되지 않아 표기는 여전히 SMOKE다
+        from control.arena_design_check import tuned_overrides
+        if args.reference_out and args.reference_out.resolve() == SMOKE_REFERENCE.resolve():
+            parser.error('--tuned must not overwrite the untuned smoke reference that verify_arena compares against')
+        try:
+            overrides, used = tuned_overrides(config, args.tuned, labels)
+        except (ValueError, OSError, KeyError) as exc:
+            parser.error(f'--tuned: {exc}')
+        tuned = dict(run_dir=str(args.tuned), controllers=used)
+    factory = ArenaFactory(config, native, overrides=overrides)
     scenarios = build_scenarios(config, factory.cp, native, only=args.only_cases)
     missing = set(args.only_cases or []) - {s.id for s in scenarios}
     if missing:
@@ -481,7 +505,7 @@ def run_arena(args, parser):
         git_revision=revision, git_dirty=dirty, source_sha256=source_hashes(),
         environment=environment_fingerprint(), criteria=asdict(limits),
         paper_criteria=asdict(paper), expected_trials=len(scenarios)*len(labels),
-        status='running')
+        status='running', **({} if tuned is None else dict(tuned=tuned)))
     write_json(out/'manifest.json', manifest)
     print(f'Results: {out}', flush=True)
     rows = []
@@ -527,13 +551,15 @@ def run_arena(args, parser):
     write_json(out/'manifest.json', manifest)
     reference = dict(
         label=label, created_utc=datetime.now(timezone.utc).isoformat(),
-        command='python -m control.validation_suite --config '+str(args.config)+' --smoke',
+        command='python -m control.validation_suite --config '+str(args.config)+' --smoke'
+                + ('' if tuned is None else ' --tuned '+str(args.tuned)),
         config_sha256=manifest['config_sha256'], git_revision=revision, git_dirty=dirty,
         parameter_sha256=manifest['parameter_sha256'],
         controller_model_sha256=manifest['controller_model_sha256'],
         environment=manifest['environment'], source_sha256=manifest['source_sha256'],
         scenarios=manifest['scenarios'], controller_settings=factory.settings,
-        rows=[{key: row.get(key) for key in ARENA_REFERENCE_FIELDS} for row in rows])
+        rows=[{key: row.get(key) for key in ARENA_REFERENCE_FIELDS} for row in rows],
+        **({} if tuned is None else dict(tuned=tuned)))
     write_json(out/'arena_reference.json', reference)
     if args.reference_out:
         args.reference_out.parent.mkdir(parents=True, exist_ok=True)

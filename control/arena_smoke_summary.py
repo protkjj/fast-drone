@@ -78,16 +78,23 @@ def v4_check(reference, v4):
     return lines
 
 
-def summarize(reference, previous=None, v4=None, previous_label='이전 참조'):
+def summarize(reference, previous=None, v4=None, previous_label='이전 참조', reference_path=None):
     env = reference.get('environment', {})
+    tuned = reference.get('tuned')
     counts = dict(trials=sum(not r.get('skipped') for r in reference['rows']),
                   skipped=sum(bool(r.get('skipped')) for r in reference['rows']))
-    lines = [f"# 스모크 결과 — {reference['created_utc'][:10]} (SMOKE)", '',
+    # 사전값 참조는 verify가 대조하는 이름 그대로 적는다. 튜닝값 참조는 그 파일을 덮어쓸 수 없으므로
+    # (validation_suite --tuned가 막는다) 실제 경로를 적는다.
+    out_path = reference_path if tuned else 'results/arena/smoke_reference.json'
+    lines = [f"# {'튜닝값 스모크' if tuned else '스모크'} 결과 — {reference['created_utc'][:10]} (SMOKE)", '',
              '**SMOKE** — 경기장 파이프라인이 모든 사례를 끝까지 도는지, 어디서 멈추는지 보는 실행이다. '
              '성능 비교가 아니며 우위·열위 결론을 내리지 않는다.', '',
-             f"재현: `{reference['command']} --reference-out results/arena/smoke_reference.json` · "
-             f"요약: `python -m control.arena_smoke_summary`", '',
-             f"설정 sha256 `{reference['config_sha256'][:12]}` · git `{str(reference.get('git_revision'))[:8]}` "
+             f"재현: `{reference['command']} --reference-out {out_path}` · "
+             f"요약: `python -m control.arena_smoke_summary`", '']
+    if tuned:
+        lines += [f"게인: **튜닝값** — `{tuned['run_dir']}` 기록의 최선값(같은 예산 튜닝, PILOT). 기록 sha256: "
+                  + ', '.join(f"{name} `{t['record_sha256'][:12]}`" for name, t in tuned['controllers'].items()), '']
+    lines += [f"설정 sha256 `{reference['config_sha256'][:12]}` · git `{str(reference.get('git_revision'))[:8]}` "
              f"dirty={reference.get('git_dirty')} · {env.get('system', '')} {env.get('machine', '')} · "
              f"{env.get('cpu', '')} · Python {env.get('python', '')}", '',
              f"시행 {counts['trials']}개" + (f" + 설계 영역 밖 제외 {counts['skipped']}개(kj 결정 2026-09-26: "
@@ -117,7 +124,10 @@ def main(argv=None):
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args(argv)
     load = lambda p: None if p is None else json.loads(Path(p).read_text(encoding='utf-8'))
-    text = summarize(load(args.reference), load(args.previous), load(args.v4), args.previous_label)
+    path = args.reference.resolve()
+    shown = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
+    text = summarize(load(args.reference), load(args.previous), load(args.v4), args.previous_label,
+                     reference_path=shown)
     args.out.write_text(text, encoding='utf-8')
     print(text)
 

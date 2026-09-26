@@ -124,11 +124,15 @@ def plot(config, factory, tables, path):
 def write_markdown(path, data):
     m = data['meta']
     f = lambda x, spec='.3g': '—' if x is None else format(x, spec)
-    lines = ['# 임무 ρ(t) — ρ > 1 구간과 나머지 구간(SMOKE)', '',
+    tuned = m.get('tuned')
+    lines = [f"# 임무 ρ(t) — ρ > 1 구간과 나머지 구간({'튜닝값 ' if tuned else ''}SMOKE)", '',
              '**SMOKE** — kj 결정(2026-09-26 저녁): 임무 감속 프로필은 유지하고 ρ > 1 구간을 분리해 보고한다. 우위 결론 없음.', '',
              f'재현: `{m["command"]}` · 설정 sha256 `{m["config_sha256"][:12]}` · git `{m["git_revision"]}` '
-             f'dirty={m["git_dirty"]} · 스모크 실행 {", ".join(m["runs"])}', '',
-             'ρ(t) = |a_ref| / a_avail(v_ref, 방향). a_ref는 경기장 창과 같은 0.05 s 전진 차분이다. a_avail은 명목 모델이 '
+             f'dirty={m["git_dirty"]} · 스모크 실행 {", ".join(m["runs"])}', '']
+    if tuned:
+        lines += [f"게인: **튜닝값** — `{tuned['run_dir']}` 기록의 최선값. 기록 sha256: "
+                  + ', '.join(f'{name} `{sha[:12]}`' for name, sha in tuned['record_sha256'].items()), '']
+    lines += ['ρ(t) = |a_ref| / a_avail(v_ref, 방향). a_ref는 경기장 창과 같은 0.05 s 전진 차분이다. a_avail은 명목 모델이 '
              '추력 ≥ 0·역유입 없이 낼 수 있는 최대 가·감속(참조 프로필 ρ와 같은 정의)이다. 구간은 평가 창(3 s부터) 안에서 '
              '나눈다. 칸의 "비행 s / 전체 s"는 그 구간 중 시행이 멈추기 전까지 난 시간이다.', '',
              '![mission rho](mission_rho.png)', '']
@@ -160,18 +164,27 @@ def main(argv=None):
     parser.add_argument('--out', type=Path, default=ROOT/'results'/'arena')
     args = parser.parse_args(argv)
     config = load_config(args.config)
+    tuned_runs = []
     for run in args.runs:
         manifest = json.loads((run/'manifest.json').read_text(encoding='utf-8'))
         if manifest['config_sha256'] != config_sha256(config):
             raise SystemExit(f'{run}: smoke run used config {manifest["config_sha256"][:12]}, '
                              f'not the current {config_sha256(config)[:12]}')
+        tuned_runs.append(manifest.get('tuned'))
+    # 한 표 안에서 게인 출처가 섞이면 안 된다 — 사전값 실행과 튜닝값 실행, 또는 다른 튜닝 기록끼리
+    if len({None if t is None else t['run_dir'] for t in tuned_runs}) > 1:
+        raise SystemExit('runs mix gain sources (untuned vs tuned, or different tuning run-dirs)')
+    extra = {} if tuned_runs[0] is None else dict(tuned=dict(
+        run_dir=tuned_runs[0]['run_dir'],
+        record_sha256={name: t['record_sha256'] for block in tuned_runs for name, t in block['controllers'].items()}))
     factory = ArenaFactory(config)
     cases, tables = analyse(config, args.runs, factory)
     revision, dirty = git_state()
     data = dict(meta=dict(label='SMOKE', command='python -m control.arena_mission_rho --runs '
-                          + ' '.join(str(r) for r in args.runs),
+                          + ' '.join(str(r) for r in args.runs)
+                          + ('' if args.out == ROOT/'results'/'arena' else f' --out {args.out}'),
                           created_utc=datetime.now(timezone.utc).isoformat(), config_sha256=config_sha256(config),
-                          git_revision=revision, git_dirty=dirty, runs=[r.name for r in args.runs]),
+                          git_revision=revision, git_dirty=dirty, runs=[r.name for r in args.runs], **extra),
                 a_avail=dict(speeds=GRID.tolist(), **{k: v.tolist() for k, v in tables.items()}), cases=cases)
     args.out.mkdir(parents=True, exist_ok=True)
     write_json(args.out/'mission_rho.json', data)

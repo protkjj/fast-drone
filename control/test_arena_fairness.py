@@ -549,6 +549,7 @@ def test_i7_excluded_pair_is_recorded_as_a_skipped_row(config, tmp_path, monkeyp
         assert skipped['skip_reason'].startswith('outside design region 0-20 m/s')
     assert len(reference['rows']) == manifest['expected_trials'] == manifest['recorded_trials'] == 5
     assert '| CPID | — | excluded |' in (out/'REPORT.md').read_text(encoding='utf-8')
+    assert 'tuned' not in manifest and 'tuned' not in reference      # 튜닝값 없는 실행은 옛 형식 그대로
 
 
 # ── I-8 ─────────────────────────────────────────────────────────────
@@ -1040,6 +1041,90 @@ def test_i4_committed_pilot_tuning_records_are_fair(config):
         records = [json.loads(p.read_text(encoding='utf-8')) for p in sorted(run.glob('*.record.json'))]
         if all(r.get('status') == 'complete' for r in records) and records:
             assert check_tuning_records(records, config) == [], run
+
+
+def _tuned_record(config, factory, label, **extra):
+    """`--tuned`가 받는 합성 기록 — _record에 지금 설정 해시와 최선값(= 사전값)을 더한다."""
+    from control.arena import config_sha256
+    from control.arena_tune import parameter_space
+    _, prior, _ = parameter_space(config, label, factory.gains)
+    fields = dict(config_sha256=config_sha256(config), best_values=dict(prior), git_revision='synthetic')
+    fields.update(extra)
+    return _record(label, **fields)
+
+
+def _write_records(run_dir, *records):
+    import json
+    run_dir.mkdir(parents=True, exist_ok=True)
+    for record in records:
+        (run_dir/f"{record['controller']}.record.json").write_text(json.dumps(record), encoding='utf-8')
+
+
+def _fake_paper(monkeypatch):
+    import control.validation_metrics as metrics_module
+    monkeypatch.setattr(metrics_module, 'paper_evaluate',
+                        lambda *args, **kwargs: dict(paper_failed=False, paper_reasons=[]))
+
+
+def test_i4_tuned_arena_run_applies_and_records_the_best_values(config, factory, tmp_path, monkeypatch):
+    """`validation_suite --tuned`: 기록의 최선값이 그 제어기에만 들어가고, 쓴 기록의 해시가 manifest·참조·
+    보고서에 남는다(튜닝값 스모크, 보고서 11.5-4). 시뮬레이션은 가짜 — 여기서 보는 것은 값의 경로다."""
+    import hashlib
+    import json
+    best = dict(_tuned_record(config, factory, 'CPID')['best_values'], Kp_vel=32.0)
+    _write_records(tmp_path/'run', _tuned_record(config, factory, 'CPID', best_values=best))
+    seen = []
+
+    def fake_trial(factory, name, profile, case, limits):
+        seen.append((name, factory.overrides))
+        return dict(passed=True, tracking_pass=True, failure_reasons=[], stop_reason=None,
+                    simulated_seconds=0.0), None, []
+
+    monkeypatch.setattr(suite, 'run_trial', fake_trial)
+    _fake_paper(monkeypatch)
+    suite.main(['--config', str(DEFAULT_CONFIG), '--smoke', '--only-cases', 'gust_lateral_p10_VL',
+                '--only-controllers', 'CPID', '--tuned', str(tmp_path/'run'), '--output', str(tmp_path/'out')])
+    ((name, overrides),) = seen
+    assert name == 'CPID' and set(overrides) == {'CPID'} and overrides['CPID']['Kp_vel'] == 32.0
+    (out,) = (tmp_path/'out').iterdir()
+    sha = hashlib.sha256((tmp_path/'run'/'CPID.record.json').read_bytes()).hexdigest()
+    for name in ('manifest.json', 'arena_reference.json'):
+        tuned = json.loads((out/name).read_text(encoding='utf-8'))['tuned']['controllers']['CPID']
+        assert tuned['record_sha256'] == sha and tuned['best_values']['Kp_vel'] == 32.0
+    assert 'Gains: **tuned**' in (out/'REPORT.md').read_text(encoding='utf-8')
+
+
+@pytest.mark.parametrize('problem, needle', [
+    ('running', 'tuning not complete'), ('foreign_config', 'tuned with config'),
+    ('budget_mismatch', 'budgets differ'), ('missing', 'no tuning record'),
+    ('smoke_reference', 'untuned smoke reference')])
+def test_i4_tuned_arena_run_refuses_unfair_records(config, factory, tmp_path, monkeypatch, capsys,
+                                                   problem, needle):
+    """`--tuned`는 complete·같은 설정 해시·I-4 통과 기록만 받고, verify_arena의 사전값 참조를 덮어쓰지 않는다.
+    거부는 결과 폴더를 만들기 전(시뮬레이션 전)에 난다."""
+    def must_not_run(*args, **kwargs):
+        raise AssertionError('refusal must happen before any simulation')
+
+    monkeypatch.setattr(suite, 'run_trial', must_not_run)
+    records = {label: _tuned_record(config, factory, label) for label in ('CPID', 'GSLQR')}
+    extra = []
+    if problem == 'running':
+        records['CPID'].update(status='running', spent=10)
+    elif problem == 'foreign_config':
+        records['CPID'].update(config_sha256='0'*64)
+    elif problem == 'budget_mismatch':
+        records['GSLQR'].update(budget=240, spent=240)
+    elif problem == 'missing':
+        del records['GSLQR']
+    else:
+        extra = ['--reference-out', str(suite.SMOKE_REFERENCE)]
+    _write_records(tmp_path/'run', *records.values())
+    with pytest.raises(SystemExit):
+        suite.main(['--config', str(DEFAULT_CONFIG), '--smoke', '--only-cases', 'gust_lateral_p10_VL',
+                    '--only-controllers', 'CPID', 'GSLQR', '--tuned', str(tmp_path/'run'),
+                    '--output', str(tmp_path/'out')] + extra)
+    assert needle in capsys.readouterr().err               # 엉뚱한 이유(인자 오타 등)로 멈춘 것이 아니다
+    assert not (tmp_path/'out').exists()
 
 
 def test_i8_our_state_matches_trim_solver_state(factory):
