@@ -1,0 +1,199 @@
+{
+  "meta": {
+    "label": "PILOT",
+    "command": "python -m control.arena_m17_probe mission_VH",
+    "created_utc": "2026-09-26T09:52:52.423981+00:00",
+    "config_sha256": "19cd72375ef768d7ef4f8909c9c51f0e5cf11d5aa2299afbf7c48d0f9f63d82f",
+    "git_revision": "d5382a540a8a732008b1281e92c5a2f59595a2b7",
+    "git_dirty": true,
+    "environment": {
+      "system": "Darwin",
+      "release": "25.6.0",
+      "machine": "arm64",
+      "cpu": "Apple M4",
+      "python": "3.13.7",
+      "packages": {
+        "numpy": "2.3.3",
+        "scipy": "1.16.3",
+        "casadi": "3.7.2",
+        "matplotlib": "3.10.6"
+      },
+      "threads": {
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "VECLIB_MAXIMUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1"
+      }
+    },
+    "reference_config_sha256": "19cd72375ef768d7ef4f8909c9c51f0e5cf11d5aa2299afbf7c48d0f9f63d82f"
+  },
+  "a_avail": {
+    "speeds": [
+      0.0,
+      5.0,
+      10.0,
+      15.0,
+      20.0,
+      25.0,
+      30.0,
+      35.0,
+      40.0,
+      45.0,
+      50.0,
+      55.0,
+      60.0,
+      65.0,
+      70.0,
+      75.0,
+      80.0,
+      85.0
+    ],
+    "accel": [
+      68.39844561200579,
+      68.34346637881303,
+      68.1979702461547,
+      67.98683975465862,
+      67.72893566564741,
+      67.38023661565381,
+      66.87817148152278,
+      66.25231882317293,
+      65.49146277027249,
+      64.48377257625506,
+      62.232002344914896,
+      58.83783247282245,
+      54.74584417620105,
+      49.454094180603484,
+      42.151765489600805,
+      34.34419838396628,
+      25.68891036544158,
+      16.639164807200398
+    ],
+    "brake": [
+      68.39844561200583,
+      0.3458652427278745,
+      1.3834609707038743,
+      3.112787183997249,
+      5.533843882607956,
+      8.646631066536045,
+      12.451148735781468,
+      7.450397460438667,
+      4.997859401998409,
+      4.087684508133062,
+      3.6990724104499466,
+      3.618194180665408,
+      3.7573677564485486,
+      4.069493870248001,
+      4.5244976259411915,
+      5.100572111253993,
+      5.780321541891073,
+      6.548869198980574
+    ]
+  },
+  "cases": [
+    {
+      "case": "mission_VH",
+      "stop_reason": "5 consecutive optimizer failures",
+      "simulated_seconds": 36.6,
+      "max_omega": 0.2252031205733861,
+      "trajectory_sha256": "2a91b13a29655a8a075fa9f078905e0b96e34ed90829d731afa75dca550944df",
+      "reference_feasibility": {
+        "exceed_fraction": 0.15509090909090908,
+        "intervals": [
+          [
+            36.04,
+            41.49
+          ],
+          [
+            42.660000000000004,
+            45.72
+          ]
+        ],
+        "peak_ratio": 11.976065580679316
+      },
+      "solves": 1831,
+      "failed": 5,
+      "failed_share_plateau_predicted": 0.4,
+      "failed_share_lower_active": 0.6,
+      "succeeded_share_plateau_predicted": 0.0,
+      "succeeded_share_lower_active": 0.07393209200438117,
+      "failed_solves": [
+        {
+          "t": 36.52,
+          "status": "Maximum_Iterations_Exceeded",
+          "iter_count": 30,
+          "plateau_slots_predicted": 0,
+          "plateau_slots_measured": 0,
+          "lower_active_slots": 40,
+          "slots": 80,
+          "axial_speed_measured": 71.94472485943311,
+          "axial_speed_predicted_max": 71.97433476169003,
+          "floor_over_n_max": 0.6950651641615958,
+          "v_ref": 73.96425732020555,
+          "a_ref": -6.0181021149350045,
+          "a_avail": 4.981239125018175
+        },
+        {
+          "t": 36.54,
+          "status": "Maximum_Iterations_Exceeded",
+          "iter_count": 30,
+          "plateau_slots_predicted": 0,
+          "plateau_slots_measured": 0,
+          "lower_active_slots": 24,
+          "slots": 80,
+          "axial_speed_measured": 71.79470704920357,
+          "axial_speed_predicted_max": 71.84492363836736,
+          "floor_over_n_max": 0.6936158271310061,
+          "v_ref": 73.8443074877224,
+          "a_ref": -6.045521032614545,
+          "a_avail": 4.967419117415958
+        },
+        {
+          "t": 36.56,
+          "status": "Maximum_Iterations_Exceeded",
+          "iter_count": 30,
+          "plateau_slots_predicted": 0,
+          "plateau_slots_measured": 0,
+          "lower_active_slots": 24,
+          "slots": 80,
+          "axial_speed_measured": 71.66246791699022,
+          "axial_speed_predicted_max": 71.70515518220947,
+          "floor_over_n_max": 0.692338251682354,
+          "v_ref": 73.72380768997199,
+          "a_ref": -6.072833875958565,
+          "a_avail": 4.953535745622085
+        },
+        {
+          "t": 36.58,
+          "status": "Maximum_Iterations_Exceeded",
+          "iter_count": 30,
+          "plateau_slots_predicted": 2,
+          "plateau_slots_measured": 0,
+          "lower_active_slots": 0,
+          "slots": 80,
+          "axial_speed_measured": 71.55342221482898,
+          "axial_speed_predicted_max": 71.73927813673585,
+          "floor_over_n_max": 0.6912847502752402,
+          "v_ref": 73.6027600412364,
+          "a_ref": -6.100040165737539,
+          "a_avail": 4.939589253233349
+        },
+        {
+          "t": 36.6,
+          "status": "Maximum_Iterations_Exceeded",
+          "iter_count": 30,
+          "plateau_slots_predicted": 2,
+          "plateau_slots_measured": 0,
+          "lower_active_slots": 0,
+          "slots": 80,
+          "axial_speed_measured": 71.4575351695128,
+          "axial_speed_predicted_max": 71.63362931370926,
+          "floor_over_n_max": 0.6903583759646306,
+          "v_ref": 73.48116666540999,
+          "a_ref": -6.127139424591519,
+          "a_avail": 4.925579884954019
+        }
+      ],
+      "reproduces_reference": true
+    }
+  ]
+}
