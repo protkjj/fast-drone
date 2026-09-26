@@ -1,0 +1,36 @@
+{
+  "variant": "predicted_box",
+  "case": "mission_VH",
+  "stop_reason": "5 consecutive optimizer failures",
+  "simulated_seconds": 36.36,
+  "T_total": 55.0,
+  "solves": 1819,
+  "failures": 5,
+  "max_iter_seen": 30,
+  "max_omega": 0.21037043610527037,
+  "trajectory_sha256": "405eb15cedf9ac595e318bcc4395b809118b6313ddbc65b9284299200a762e2d",
+  "config_sha256": "4df58ce33c1c4693e19782a0b84edca19de979f296d9b304c0a2ea2d2e22127a",
+  "created_utc": "2026-09-26T14:12:51.716823+00:00",
+  "git_revision": "16b32deb2a7299db7714b2d4749396b6880f2bce",
+  "git_dirty": true,
+  "environment": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "machine": "arm64",
+    "cpu": "Apple M4",
+    "python": "3.13.7",
+    "packages": {
+      "numpy": "2.3.3",
+      "scipy": "1.16.3",
+      "casadi": "3.7.2",
+      "matplotlib": "3.10.6"
+    },
+    "threads": {
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1"
+    }
+  },
+  "command": "python -m control.arena_m17_floor_variants predicted_box mission_VH"
+}

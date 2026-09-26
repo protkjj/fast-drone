@@ -126,10 +126,13 @@ class _Snapshot:
         self.max_lookahead = ctrl.window.max_lookahead
         nmpc = ctrl.nmpc
         last_lbx = getattr(nmpc, 'last_lbx', None)
+        last_solution = getattr(nmpc, 'last_solution', None)
         self.nlp = None if nmpc is None else SimpleNamespace(
             ubw=np.array(nmpc.ubw, dtype=float).ravel(), lbw=np.array(nmpc.lbw, dtype=float).ravel(),
             N=int(nmpc.N), f_max=getattr(nmpc, 'f_max', None),
             last_lbx=None if last_lbx is None else np.array(last_lbx, dtype=float).ravel(),
+            last_solution=None if last_solution is None else np.array(last_solution, dtype=float).ravel(),
+            rotor_floor=getattr(nmpc, 'rotor_floor', None),
             t_now=float(getattr(nmpc, '_t_now', np.nan)))
 
 
@@ -338,6 +341,23 @@ def test_i3_every_nmpc_forbids_zero_or_negative_thrust_plans(captured_short_runs
     others = np.setdiff1d(np.arange(nlp.lbw.size), u_idx)
     np.testing.assert_array_equal(nlp.last_lbx[others], nlp.lbw[others])
     assert np.all(nlp.lbw[u_idx] == factory.cp['n_min'])
+
+
+def test_i3_m17_symbolic_floor_matches_the_numeric_helper(factory):
+    """NLP 안의 노드별 하한(CasADi 식)이 numpy 도우미와 같은 값인가 — 무작위 상태 1000개.
+
+    음의 축방향 속도(역유입 — 기호식은 음수를 내고 제약으로는 저절로 만족, 도우미는 0으로 자름)와
+    상한(0.999·n_max) 근처를 포함한다.
+    """
+    from control.nmpc import positive_thrust_rate_floor, positive_thrust_floor_function
+    fn = positive_thrust_floor_function(factory.cp)
+    rng = np.random.default_rng(20260926)
+    for _ in range(1000):
+        x = np.zeros(17)
+        x[3:6] = rng.uniform(-40.0, 130.0, 3)
+        x[6:10] = Rotation.random(random_state=int(rng.integers(2**31))).as_quat()
+        assert max(float(fn(x)), 0.0) == pytest.approx(positive_thrust_rate_floor(factory.cp, x),
+                                                       rel=1e-12, abs=1e-9)
 
 
 def test_i3_m17_rotor_floor_is_the_positive_thrust_rate(factory):

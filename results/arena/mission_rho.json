@@ -1,0 +1,407 @@
+{
+  "meta": {
+    "label": "SMOKE",
+    "command": "python -m control.arena_mission_rho --runs results/validation/arena_20260926T074209129719Z",
+    "created_utc": "2026-09-26T13:53:36.767244+00:00",
+    "config_sha256": "19cd72375ef768d7ef4f8909c9c51f0e5cf11d5aa2299afbf7c48d0f9f63d82f",
+    "git_revision": "16b32deb2a7299db7714b2d4749396b6880f2bce",
+    "git_dirty": true,
+    "runs": [
+      "arena_20260926T074209129719Z"
+    ]
+  },
+  "a_avail": {
+    "speeds": [
+      0.0,
+      5.0,
+      10.0,
+      15.0,
+      20.0,
+      25.0,
+      30.0,
+      35.0,
+      40.0,
+      45.0,
+      50.0,
+      55.0,
+      60.0,
+      65.0,
+      70.0,
+      75.0,
+      80.0,
+      85.0
+    ],
+    "accel": [
+      68.39844561200579,
+      68.34346637881303,
+      68.1979702461547,
+      67.98683975465862,
+      67.72893566564741,
+      67.38023661565381,
+      66.87817148152278,
+      66.25231882317293,
+      65.49146277027249,
+      64.48377257625506,
+      62.232002344914896,
+      58.83783247282245,
+      54.74584417620105,
+      49.454094180603484,
+      42.151765489600805,
+      34.34419838396628,
+      25.68891036544158,
+      16.639164807200398
+    ],
+    "brake": [
+      68.39844561200583,
+      0.3458652427278745,
+      1.3834609707038743,
+      3.112787183997249,
+      5.533843882607956,
+      8.646631066536045,
+      12.451148735781468,
+      7.450397460438667,
+      4.997859401998409,
+      4.087684508133062,
+      3.6990724104499466,
+      3.618194180665408,
+      3.7573677564485486,
+      4.069493870248001,
+      4.5244976259411915,
+      5.100572111253993,
+      5.780321541891073,
+      6.548869198980574
+    ]
+  },
+  "cases": [
+    {
+      "case": "mission_VH",
+      "rho_peak": 11.976065580679316,
+      "rho_gt1_spans": [
+        [
+          36.04,
+          41.49
+        ],
+        [
+          42.658,
+          45.726
+        ]
+      ],
+      "rho_gt1_seconds": 8.522,
+      "rest_seconds": 43.478,
+      "controllers": [
+        {
+          "controller": "V13",
+          "run": "arena_20260926T074209129719Z",
+          "stop_reason": null,
+          "simulated_seconds": 55.0,
+          "trajectory_sha256": "6fb754c8a067a32e9260fa4133be3959f0eaa3da5c09cea9849eca3070b0fee5",
+          "rho_gt1": {
+            "seconds": 8.522,
+            "of_seconds": 8.522,
+            "rmse_v": 5.112722560479402,
+            "rmse_z": 0.7155554883500315,
+            "max_z_error": 1.9774383191031184,
+            "max_omega": 13.715091938239441
+          },
+          "rest": {
+            "seconds": 43.480000000000004,
+            "of_seconds": 43.478,
+            "rmse_v": 0.14489793587670174,
+            "rmse_z": 0.03368553567567958,
+            "max_z_error": 0.5697851248427028,
+            "max_omega": 1.8048528197881484
+          }
+        },
+        {
+          "controller": "M17",
+          "run": "arena_20260926T074209129719Z",
+          "stop_reason": "5 consecutive optimizer failures",
+          "simulated_seconds": 36.6,
+          "trajectory_sha256": "2a91b13a29655a8a075fa9f078905e0b96e34ed90829d731afa75dca550944df",
+          "rho_gt1": {
+            "seconds": 0.562,
+            "of_seconds": 8.522,
+            "rmse_v": 0.7958744872450038,
+            "rmse_z": 0.018538796564946152,
+            "max_z_error": 0.03006049649384579,
+            "max_omega": 0.2252031205733861
+          },
+          "rest": {
+            "seconds": 33.04,
+            "of_seconds": 43.478,
+            "rmse_v": 0.1475371899729335,
+            "rmse_z": 0.0419460965029682,
+            "max_z_error": 0.10307860110347278,
+            "max_omega": 0.21037043809638495
+          }
+        },
+        {
+          "controller": "F13",
+          "run": "arena_20260926T074209129719Z",
+          "stop_reason": null,
+          "simulated_seconds": 55.0,
+          "trajectory_sha256": "0b6c2778219ebddae651863b414bd231c89c836871e50a5efc155199bfa6b2a8",
+          "rho_gt1": {
+            "seconds": 8.522,
+            "of_seconds": 8.522,
+            "rmse_v": 2.445847233461551,
+            "rmse_z": 0.8822089692029619,
+            "max_z_error": 3.00655657078077,
+            "max_omega": 9.840619859033177
+          },
+          "rest": {
+            "seconds": 43.480000000000004,
+            "of_seconds": 43.478,
+            "rmse_v": 0.05461826660175926,
+            "rmse_z": 0.03251692669353215,
+            "max_z_error": 0.2335352597268141,
+            "max_omega": 0.9834641664810954
+          }
+        },
+        {
+          "controller": "GSLQR",
+          "run": "arena_20260926T074209129719Z",
+          "stop_reason": "body-rate or altitude divergence stop",
+          "simulated_seconds": 46.112,
+          "trajectory_sha256": "8e4dd2b3f4fd518af35a0fb7281a16f105a3d0812256ed8db84d9d49110b4565",
+          "rho_gt1": {
+            "seconds": 8.522,
+            "of_seconds": 8.522,
+            "rmse_v": 9.20410485555277,
+            "rmse_z": 13.289284028674206,
+            "max_z_error": 23.668477001683733,
+            "max_omega": 2.7956373421836704
+          },
+          "rest": {
+            "seconds": 34.592,
+            "of_seconds": 43.478,
+            "rmse_v": 3.063934178545765,
+            "rmse_z": 3.252734654810926,
+            "max_z_error": 20.567723913741055,
+            "max_omega": 35.08446325407756
+          }
+        }
+      ]
+    },
+    {
+      "case": "mission_VH_mass1.3",
+      "rho_peak": 11.976065580679316,
+      "rho_gt1_spans": [
+        [
+          36.04,
+          41.49
+        ],
+        [
+          42.658,
+          45.726
+        ]
+      ],
+      "rho_gt1_seconds": 8.522,
+      "rest_seconds": 43.478,
+      "controllers": [
+        {
+          "controller": "V13",
+          "run": "arena_20260926T074209129719Z",
+          "stop_reason": null,
+          "simulated_seconds": 55.0,
+          "trajectory_sha256": "735eb4b1625f3f4dee602b552ba8d42536ecb759e5bfde30260ead708c074080",
+          "rho_gt1": {
+            "seconds": 8.522,
+            "of_seconds": 8.522,
+            "rmse_v": 4.604891195575766,
+            "rmse_z": 0.9519896701093445,
+            "max_z_error": 2.810143233693857,
+            "max_omega": 14.168012677560565
+          },
+          "rest": {
+            "seconds": 43.480000000000004,
+            "of_seconds": 43.478,
+            "rmse_v": 0.30734480899210814,
+            "rmse_z": 0.18317687877472286,
+            "max_z_error": 0.28502980067029426,
+            "max_omega": 6.633754475483411
+          }
+        },
+        {
+          "controller": "M17",
+          "run": "arena_20260926T074209129719Z",
+          "stop_reason": "5 consecutive optimizer failures",
+          "simulated_seconds": 36.12,
+          "trajectory_sha256": "87ea62973c356711fdd206726a023f340f7a4f7a944cc7dd3614203b42a9c43a",
+          "rho_gt1": {
+            "seconds": 0.082,
+            "of_seconds": 8.522,
+            "rmse_v": 0.13935811525586617,
+            "rmse_z": 0.4020254064003068,
+            "max_z_error": 0.4066296669771994,
+            "max_omega": 0.1316531952740661
+          },
+          "rest": {
+            "seconds": 33.04,
+            "of_seconds": 43.478,
+            "rmse_v": 0.0904509500983986,
+            "rmse_z": 0.29687582012067926,
+            "max_z_error": 0.43455366923327077,
+            "max_omega": 0.19190760687755334
+          }
+        },
+        {
+          "controller": "F13",
+          "run": "arena_20260926T074209129719Z",
+          "stop_reason": "5 consecutive optimizer failures",
+          "simulated_seconds": 39.9,
+          "trajectory_sha256": "2b1d8d025219b50af50eca4c533a335a00ae03640ecf0821f9c17f3ecf420115",
+          "rho_gt1": {
+            "seconds": 3.862,
+            "of_seconds": 8.522,
+            "rmse_v": 3.675932778896222,
+            "rmse_z": 2.619567419758238,
+            "max_z_error": 4.575093758149187,
+            "max_omega": 9.967488956760311
+          },
+          "rest": {
+            "seconds": 33.04,
+            "of_seconds": 43.478,
+            "rmse_v": 0.10270434512657549,
+            "rmse_z": 0.21550948125868952,
+            "max_z_error": 0.26306352933783117,
+            "max_omega": 0.6684253184344395
+          }
+        },
+        {
+          "controller": "GSLQR",
+          "run": "arena_20260926T074209129719Z",
+          "stop_reason": "body-rate or altitude divergence stop",
+          "simulated_seconds": 44.548,
+          "trajectory_sha256": "4f50caa5327a87fd2a48d32fe1df01e166a293f2df39ad32350569eb62ec673d",
+          "rho_gt1": {
+            "seconds": 7.344,
+            "of_seconds": 8.522,
+            "rmse_v": 17.009425044916462,
+            "rmse_z": 13.263157604015136,
+            "max_z_error": 50.044798344721656,
+            "max_omega": 22.76430312869004
+          },
+          "rest": {
+            "seconds": 34.206,
+            "of_seconds": 43.478,
+            "rmse_v": 1.8463372742644515,
+            "rmse_z": 1.2439065707556398,
+            "max_z_error": 9.878742814416896,
+            "max_omega": 24.487252317162856
+          }
+        }
+      ]
+    },
+    {
+      "case": "mission_VH_tau2",
+      "rho_peak": 11.976065580679316,
+      "rho_gt1_spans": [
+        [
+          36.04,
+          41.49
+        ],
+        [
+          42.658,
+          45.726
+        ]
+      ],
+      "rho_gt1_seconds": 8.522,
+      "rest_seconds": 43.478,
+      "controllers": [
+        {
+          "controller": "V13",
+          "run": "arena_20260926T074209129719Z",
+          "stop_reason": "body-rate or altitude divergence stop",
+          "simulated_seconds": 32.908,
+          "trajectory_sha256": "ef828790eabe2b6d82d48b4581e710d4de83656df54c654099a3b001b2a2467d",
+          "rho_gt1": {
+            "seconds": 0.0,
+            "of_seconds": 8.522,
+            "rmse_v": null,
+            "rmse_z": null,
+            "max_z_error": null,
+            "max_omega": null
+          },
+          "rest": {
+            "seconds": 29.91,
+            "of_seconds": 43.478,
+            "rmse_v": 26.76981970984086,
+            "rmse_z": 7.96435394211307,
+            "max_z_error": 18.640444043752783,
+            "max_omega": 35.03977257065601
+          }
+        },
+        {
+          "controller": "M17",
+          "run": "arena_20260926T074209129719Z",
+          "stop_reason": "5 consecutive optimizer failures",
+          "simulated_seconds": 36.56,
+          "trajectory_sha256": "9e5a4ae388ef5666f07e0d70e5a24f6e8308414bd82dc51f1f4aa9c9af10d9f8",
+          "rho_gt1": {
+            "seconds": 0.522,
+            "of_seconds": 8.522,
+            "rmse_v": 0.7234756002904142,
+            "rmse_z": 0.01696267221133078,
+            "max_z_error": 0.028235699477921372,
+            "max_omega": 0.26705670970506057
+          },
+          "rest": {
+            "seconds": 33.04,
+            "of_seconds": 43.478,
+            "rmse_v": 0.14398509842128931,
+            "rmse_z": 0.04224779189380296,
+            "max_z_error": 0.10274876864841787,
+            "max_omega": 0.21029448431683068
+          }
+        },
+        {
+          "controller": "F13",
+          "run": "arena_20260926T074209129719Z",
+          "stop_reason": "5 consecutive optimizer failures",
+          "simulated_seconds": 21.14,
+          "trajectory_sha256": "2f5146658df5a29fae31b9530a93efdd16a522bdce1175930d7069101b29a47a",
+          "rho_gt1": {
+            "seconds": 0.0,
+            "of_seconds": 8.522,
+            "rmse_v": null,
+            "rmse_z": null,
+            "max_z_error": null,
+            "max_omega": null
+          },
+          "rest": {
+            "seconds": 18.142,
+            "of_seconds": 43.478,
+            "rmse_v": 5.923798951783562,
+            "rmse_z": 0.40514602475690314,
+            "max_z_error": 1.6492654955121466,
+            "max_omega": 16.105432519170964
+          }
+        },
+        {
+          "controller": "GSLQR",
+          "run": "arena_20260926T074209129719Z",
+          "stop_reason": "body-rate or altitude divergence stop",
+          "simulated_seconds": 46.152,
+          "trajectory_sha256": "3f4551be1889d1d7ff4a1ca9a7bf94854429288e19e3d1fc163d86d12285a602",
+          "rho_gt1": {
+            "seconds": 8.522,
+            "of_seconds": 8.522,
+            "rmse_v": 9.206410489511855,
+            "rmse_z": 13.316921402183835,
+            "max_z_error": 23.699446223526884,
+            "max_omega": 3.0847485552101435
+          },
+          "rest": {
+            "seconds": 34.632,
+            "of_seconds": 43.478,
+            "rmse_v": 3.0795398697579177,
+            "rmse_z": 3.263609697621626,
+            "max_z_error": 20.565471621672536,
+            "max_omega": 35.40981138395711
+          }
+        }
+      ]
+    }
+  ]
+}

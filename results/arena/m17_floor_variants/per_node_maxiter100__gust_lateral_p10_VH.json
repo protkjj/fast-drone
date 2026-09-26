@@ -1,0 +1,36 @@
+{
+  "variant": "per_node_maxiter100",
+  "case": "gust_lateral_p10_VH",
+  "stop_reason": null,
+  "simulated_seconds": 12.0,
+  "T_total": 12.0,
+  "solves": 600,
+  "failures": 19,
+  "max_iter_seen": 100,
+  "max_omega": 0.790188513193642,
+  "trajectory_sha256": "c4404d02ccb239321830d35de3b712bdb01f121923d21d477f37b21acf2d0a4c",
+  "config_sha256": "4a54da7f8d8e348c7c01946622df4a8f2b31ebdf5afe7fcebb59c3572d4e4780",
+  "created_utc": "2026-09-26T14:24:25.138682+00:00",
+  "git_revision": "16b32deb2a7299db7714b2d4749396b6880f2bce",
+  "git_dirty": true,
+  "environment": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "machine": "arm64",
+    "cpu": "Apple M4",
+    "python": "3.13.7",
+    "packages": {
+      "numpy": "2.3.3",
+      "scipy": "1.16.3",
+      "casadi": "3.7.2",
+      "matplotlib": "3.10.6"
+    },
+    "threads": {
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1"
+    }
+  },
+  "command": "python -m control.arena_m17_floor_variants per_node_maxiter100 gust_lateral_p10_VH"
+}

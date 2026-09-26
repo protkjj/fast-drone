@@ -56,6 +56,10 @@ class SolveProbe:
         x_meas = np.asarray(kw['p'], dtype=float).ravel()[:nx]
         va_meas = axial_speed(x_meas)
         D, n_max = nmpc.p['D_prop'], float(nmpc.p['n_max'])
+        # 노드별 하한(2026-09-26 저녁)이면 하한은 lbx가 아니라 예측 상태의 floor(X_k)다
+        per_node = getattr(nmpc, 'rotor_floor', None) == 'positive_thrust_per_node'
+        if per_node:
+            from control.nmpc import positive_thrust_rate_floor
         plateau_pred = plateau_meas = active = 0
         va_pred = []
         for k in range(N):
@@ -64,12 +68,16 @@ class SolveProbe:
             va_pred.append(va)
             plateau_pred += int(np.sum(va/(U/(2*np.pi)*D + 1e-8) > self.j0))
             plateau_meas += int(np.sum(va_meas/(U/(2*np.pi)*D + 1e-8) > self.j0))
-            active += int(np.sum(U - lbx[k*stride + nx:k*stride + stride] <= BOUND_TOL*n_max))
+            lower = (positive_thrust_rate_floor(nmpc.p, X, nmpc._floor_j0) if per_node
+                     else lbx[k*stride + nx:k*stride + stride])
+            active += int(np.sum(U - lower <= BOUND_TOL*n_max))
+        floor0 = (positive_thrust_rate_floor(nmpc.p, x_meas, nmpc._floor_j0) if per_node
+                  else float(np.max(lbx[nx:stride])))
         self.records.append(dict(
             t=float(nmpc._t_now), status=stats.get('return_status'), iter_count=stats.get('iter_count'),
             plateau_slots_predicted=plateau_pred, plateau_slots_measured=plateau_meas,
             lower_active_slots=active, slots=N*nu, axial_speed_measured=va_meas,
-            axial_speed_predicted_max=max(va_pred), floor_over_n_max=float(np.max(lbx[nx:stride]))/n_max))
+            axial_speed_predicted_max=max(va_pred), floor_over_n_max=floor0/n_max))
         return sol
 
 

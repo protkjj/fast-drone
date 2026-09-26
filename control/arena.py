@@ -130,9 +130,9 @@ def validate_config(config):
             raise ValueError(f'{label}: design_region_m_s must be [lo, hi] inside {SPEED_RANGE}')
         # kj 결정(2026-09-26 오후): M17 양추력 하한, GSLQR·CPID 참조 가속도 피드포워드
         floor = spec.get('rotor_floor')
-        if floor is not None and (label != 'M17' or floor != 'positive_thrust'):
-            raise ValueError(f"{label}: rotor_floor can only be 'positive_thrust' on M17 "
-                             '(the only NMPC that plans rotor speeds)')
+        if floor is not None and (label != 'M17' or floor not in ('positive_thrust', 'positive_thrust_per_node')):
+            raise ValueError(f"{label}: rotor_floor can only be 'positive_thrust' or 'positive_thrust_per_node' "
+                             'on M17 (the only NMPC that plans rotor speeds)')
         feedforward = spec.get('reference_feedforward')
         if feedforward is not None and (label not in ('GSLQR', 'CPID') or feedforward != 'window_acceleration'):
             raise ValueError(f"{label}: reference_feedforward can only be 'window_acceleration' on "

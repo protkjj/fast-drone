@@ -1,0 +1,36 @@
+{
+  "variant": "per_state",
+  "case": "mission_VH",
+  "stop_reason": "5 consecutive optimizer failures",
+  "simulated_seconds": 36.6,
+  "T_total": 55.0,
+  "solves": 1831,
+  "failures": 5,
+  "max_iter_seen": 30,
+  "max_omega": 0.2252031205733861,
+  "trajectory_sha256": "2a91b13a29655a8a075fa9f078905e0b96e34ed90829d731afa75dca550944df",
+  "config_sha256": "19cd72375ef768d7ef4f8909c9c51f0e5cf11d5aa2299afbf7c48d0f9f63d82f",
+  "created_utc": "2026-09-26T14:13:49.553524+00:00",
+  "git_revision": "16b32deb2a7299db7714b2d4749396b6880f2bce",
+  "git_dirty": true,
+  "environment": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "machine": "arm64",
+    "cpu": "Apple M4",
+    "python": "3.13.7",
+    "packages": {
+      "numpy": "2.3.3",
+      "scipy": "1.16.3",
+      "casadi": "3.7.2",
+      "matplotlib": "3.10.6"
+    },
+    "threads": {
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1"
+    }
+  },
+  "command": "python -m control.arena_m17_floor_variants per_state mission_VH"
+}

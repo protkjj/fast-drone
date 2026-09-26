@@ -57,6 +57,28 @@ def positive_thrust_rate_floor(params, x, j0=None):
     return min(2*np.pi*va/(params['D_prop']*j0)*(1 + ZERO_THRUST_MARGIN), 0.999*float(params['n_max']))
 
 
+def positive_thrust_floor_function(params, j0=None):
+    """positive_thrust_rate_floor의 CasADi 판 — 상태 x(17) → 양추력 회전수. 노드별 하한(NLP)과 테스트가 같이 쓴다.
+
+    kj 결정(2026-09-26 저녁): M17 하한을 예측 노드마다 U_k ≥ floor(X_k)로 둔다(F13의 노드별 f ≥ 0과 대칭).
+    측정 상태 하나로 구간 전체를 고정하던 방식(positive_thrust)은 예측 상태의 축방향 속도가 측정값보다
+    커지면 뒤 노드가 추력 0 평탄 구간에 들어갔다(results/arena/M17_PROBE.md).
+
+    축방향 속도 v_a = R(q)[:,0]·v(쿼터니언 정규화, scalar-last)다. numpy 도우미와 달리 0에서 자르지
+    않는다 — v_a < 0이면 floor < 0이라 U ≥ floor가 저절로 만족해, 제약으로서는 같다. 상한 0.999·n_max로
+    자르는 것은 같다(v_a가 아주 커도 U ≤ n_max와 모순되지 않게).
+    """
+    if j0 is None:
+        j0 = zero_thrust_advance_ratio(params)
+    x = ca.SX.sym('x', NX)
+    q = x[6:10]/ca.sqrt(ca.sumsqr(x[6:10]))
+    qx, qy, qz, qw = q[0], q[1], q[2], q[3]
+    body_x = ca.vertcat(1 - 2*(qy**2 + qz**2), 2*(qx*qy + qz*qw), 2*(qx*qz - qy*qw))
+    va = ca.dot(body_x, x[3:6])
+    floor = ca.fmin(2*np.pi*va/(params['D_prop']*j0)*(1 + ZERO_THRUST_MARGIN), 0.999*float(params['n_max']))
+    return ca.Function('positive_thrust_floor', [x], [floor])
+
+
 class NMPCController:
     """
     Direct Multiple Shooting NMPC.
@@ -74,9 +96,12 @@ class NMPCController:
         """
         Parameters
         ----------
-        rotor_floor : None | 'positive_thrust'
-            'positive_thrust'면 매 풀이마다 회전수 명령의 하한을 현재 상태의 양추력 회전수로
-            올린다(positive_thrust_rate_floor, 논문 모드만). 기본값 None이면 기존과 비트 동일하다.
+        rotor_floor : None | 'positive_thrust' | 'positive_thrust_per_node'
+            양추력 하한(논문 모드만). 기본값 None이면 기존과 비트 동일하다.
+            'positive_thrust'        매 풀이마다 모든 노드의 회전수 하한(lbx)을 **측정 상태**의 양추력
+                                     회전수로 올린다(2026-09-26 오후 — 진단 V4·스모크 e0f3581 재현용).
+            'positive_thrust_per_node' 노드마다 U_k ≥ floor(**예측 상태 X_k**)를 부등식 제약으로 둔다
+                                     (2026-09-26 저녁 kj 결정, F13의 노드별 f ≥ 0과 대칭).
         max_iter, tol, cost_weights : control/nmpc_common.py 참고.
             V13·F13과 같은 함수로 IPOPT 옵션·비용 가중치를 만들고 보관한다
             (경기장 불변식 I-3). 예전엔 max_iter가 30으로 박혀 있어 이 클래스만
@@ -129,13 +154,15 @@ class NMPCController:
             raise ValueError("ref_fn은 cost_spec='paper'에서만 쓸 수 있다.")
         self.cost_spec = cost_spec
         self.ref_fn = ref_fn
-        if rotor_floor not in (None, 'positive_thrust'):
-            raise ValueError(f"rotor_floor must be None or 'positive_thrust', got {rotor_floor!r}")
+        if rotor_floor not in (None, 'positive_thrust', 'positive_thrust_per_node'):
+            raise ValueError("rotor_floor must be None, 'positive_thrust' or 'positive_thrust_per_node', "
+                             f"got {rotor_floor!r}")
         if rotor_floor is not None and cost_spec != 'paper':
             raise ValueError("rotor_floor는 cost_spec='paper'에서만 쓸 수 있다.")
         self.rotor_floor = rotor_floor
         self._floor_j0 = zero_thrust_advance_ratio(params) if rotor_floor else None
         self.last_lbx = None          # 마지막 풀이에 실제로 넘긴 하한(테스트가 읽는다)
+        self.last_solution = None     # 마지막 풀이의 결정변수 w(테스트·계측이 읽는다)
         self._max_iter = max_iter
         self.ipopt_options = ipopt_options(max_iter, tol)
         self.cost_weights = nmpc_cost_weights(cost_weights)
@@ -244,6 +271,8 @@ class NMPCController:
 
         W = self.cost_weights          # 논문 식(14)·(16)·(17) 가중치(nmpc_common)
         U_prev = ca.DM(np.full(nu, n_hov))
+        floor_fn = (positive_thrust_floor_function(params, self._floor_j0)
+                    if self.rotor_floor == 'positive_thrust_per_node' else None)
         for k in range(N):
             e_v = X_k[3:6] - refs[0:3, k]
             e_z = X_k[2] - refs[3, k]
@@ -254,6 +283,10 @@ class NMPCController:
             w.append(U_k)
             lbw.extend([params['n_min']]*nu); ubw.extend([n_max]*nu)
             w0.extend([float(n_hov)]*nu)
+            if floor_fn is not None:
+                # 노드별 양추력 하한: 로터마다 U_k ≥ floor(X_k). X_0은 측정 상태와 같다(아래 등식).
+                g.append(U_k - floor_fn(X_k))
+                lbg.extend([0.0]*nu); ubg.extend([ca.inf]*nu)
 
             J_cost += W['r_dev']*ca.sumsqr((U_k - n_hov)/n_max)
             J_cost += W['r_rate']*ca.sumsqr((U_k - U_prev)/n_max)
@@ -416,7 +449,8 @@ class NMPCController:
             p_val = np.concatenate([x_current, self.v_ref, [self.z_ref], self.u_ref,
                                      [self.V_b]])
 
-        lbx = self.lbw if self.rotor_floor is None else self._rotor_floor_bounds(x_current)
+        # 측정 상태 하한(positive_thrust)만 lbx를 올린다. 노드별 하한은 NLP 안의 부등식 제약이다.
+        lbx = self._rotor_floor_bounds(x_current) if self.rotor_floor == 'positive_thrust' else self.lbw
         self.last_lbx = lbx
         sol = self.solver(
             x0=self.w0, lbx=lbx, ubx=self.ubw,
@@ -424,6 +458,7 @@ class NMPCController:
 
         self._solve_log.append(self.solver.stats().get('return_status', 'unknown'))
         w_opt = np.array(sol['x']).flatten()
+        self.last_solution = w_opt
         stride = self.nu + self.nx   # 21
 
         if self.cost_spec == 'paper':
