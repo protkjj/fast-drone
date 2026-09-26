@@ -4,7 +4,9 @@
 실격이다(하이브리드에 유리한 설정도, 기준선을 약하게 만드는 설정도).
 
   I-1  모든 제어기가 같은 플랜트 팩토리에서 같은 해시의 플랜트를 받는다
-  I-2  모든 제어기가 같은 관측 정보(같은 키, 같은 참조 미리보기 길이)를 받는다
+  I-2  모든 제어기가 같은 관측 정보(같은 키, 같은 참조 미리보기 길이)를 받는다. (kj 결정
+       2026-09-26 오후) 모든 제어기가 참조 가속도 정보를 쓴다 — NMPC는 예측 노드의 참조로,
+       GSLQR·CPID는 같은 창에서 읽은 참조 가속도 피드포워드로
   I-3  NMPC 계열의 예측 단계·간격·반복 상한·허용 오차·웜스타트·소프트 제약·
        비용함수 사양이 모두 같다
   I-4  튜닝 기록의 평가 횟수가 같고, 튜닝 난수·본시험 난수가 겹치지 않는다
@@ -55,6 +57,40 @@ LIVE_NMPC = tuple(label for label in NMPC_LABELS if not (QUICK and label in HEAV
 # 모든 제어기를 한 번씩 돌려 보기 위한 아주 짧은 사례(40 스텝, NMPC 솔브 4회).
 SHORT = GustProfile(85.0, 20.0, 0.04, 0.02, 0.02)
 
+# 참조 가속도 검사(I-2, kj 결정 2026-09-26 오후): CPID 설계 영역 안의 속도에서 일정 가속 램프
+V_ACC, A_ACC = 10.0, 2.0          # m/s, m/s²
+
+
+class _RampProfile:
+    """r(τ) = (V0 + a·τ, 0, 0), 고도 일정 — 참조 가속도만 다른 두 사례를 만들려고 쓴다.
+
+    a = 0이면 유지 프로필이다. 두 프로필은 r(0)이 같아서 출발 상태·웜스타트·적분기 출발값·GSLQR
+    구성이 모두 같고, 앞으로의 참조(가속도)만 다르다. 스위트 프로필 규약을 따른다.
+    """
+
+    DURATION = 0.3
+
+    def __init__(self, V0, a, z):
+        self.V0, self.a, self.z = float(V0), float(a), float(z)
+        self.T_total = self.DURATION
+        self.phases = [('램프', 0.0, self.T_total, self.V0, self.V0 + self.a*self.T_total, self.z, self.z)]
+        self.gust_interval = None
+        self.cruise_start, self.cruise_end = 0.0, self.T_total
+        self.decel_start = self.decel_end = None
+        self.cruise_speed = max(self.V0, self.V0 + self.a*self.T_total)
+
+    def get_ref(self, t):
+        return np.array([self.V0 + self.a*max(float(t), 0.0), 0.0, 0.0]), self.z, '램프'
+
+    def compute_refs(self, ts):
+        ts = np.asarray(ts, dtype=float)
+        v = np.zeros((len(ts), 3))
+        v[:, 0] = self.V0 + self.a*np.maximum(ts, 0.0)
+        return v, np.full(len(ts), self.z)
+
+    def get_phase_boundaries(self):
+        return [(name, t, t + d) for name, t, d, *_ in self.phases]
+
 
 def _case(name, **extra):
     return dict(case_id=name, factors={}, gust_direction='lateral', gust_peak=0.0, **extra)
@@ -89,9 +125,12 @@ class _Snapshot:
         self.horizon_s = ctrl.window.horizon_s
         self.max_lookahead = ctrl.window.max_lookahead
         nmpc = ctrl.nmpc
+        last_lbx = getattr(nmpc, 'last_lbx', None)
         self.nlp = None if nmpc is None else SimpleNamespace(
-            ubw=np.array(nmpc.ubw, dtype=float).ravel(), N=int(nmpc.N),
-            f_max=getattr(nmpc, 'f_max', None))
+            ubw=np.array(nmpc.ubw, dtype=float).ravel(), lbw=np.array(nmpc.lbw, dtype=float).ravel(),
+            N=int(nmpc.N), f_max=getattr(nmpc, 'f_max', None),
+            last_lbx=None if last_lbx is None else np.array(last_lbx, dtype=float).ravel(),
+            t_now=float(getattr(nmpc, '_t_now', np.nan)))
 
 
 @pytest.fixture(scope='module')
@@ -161,11 +200,13 @@ def test_i2_same_observation_keys_and_preview_window(captured_short_runs, config
         assert snap.window_type is ReferenceWindow
         assert snap.horizon_s == H
         assert snap.max_lookahead <= H + 1e-9, label
-    # 같은 창을 받았고, 쓰는 폭은 구조가 정한다: NMPC는 예측 구간 전체, 나머지는 현재만.
+    # 같은 창을 받았고, 쓰는 폭은 구조가 정한다: NMPC는 예측 구간 전체, GSLQR·CPID는 현재 참조와
+    # 참조 가속도 피드포워드를 위한 NMPC 예측 격자의 첫 간격(Δt_pred) 앞까지만(kj 결정 2026-09-26 오후).
     for label in LIVE_NMPC:
         assert captured_short_runs[label][1].max_lookahead == pytest.approx(H, abs=1e-9)
     for label in ('GSLQR', 'CPID'):
-        assert captured_short_runs[label][1].max_lookahead == pytest.approx(0.0, abs=1e-12)
+        assert captured_short_runs[label][1].max_lookahead == pytest.approx(
+            config['nmpc_common']['dt_pred_s'], abs=1e-12)
 
 
 def test_i2_preview_beyond_horizon_is_refused():
@@ -181,6 +222,60 @@ def test_i2_preview_horizon_must_equal_nmpc_prediction_horizon(config):
     bad['preview_horizon_s'] = 2.0
     with pytest.raises(ValueError, match='preview_horizon_s'):
         validate_config(bad)
+
+
+def _first_command_and_final_speed(factory, label, a, alt):
+    row, result, _ = suite.run_trial(factory, label, _RampProfile(V_ACC, a, alt), _case(f'i2acc_{a:g}'),
+                                     Acceptance())
+    assert row['stop_reason'] is None, (label, row['stop_reason'])
+    return np.asarray(result['us'][0], dtype=float), float(result['xs'][-1, 3])
+
+
+@pytest.mark.parametrize('label', LIVE_LABELS)
+def test_i2_every_controller_uses_reference_acceleration(factory, config, label):
+    """kj 결정(2026-09-26 오후): 모든 제어기가 참조 가속도 정보를 쓴다.
+
+    지금 참조 r(0)과 출발 상태가 같고 앞으로의 참조만 다른 두 사례(램프 a = 2 m/s², 유지)를 준다.
+    (1) t = 0의 첫 명령이 같으면 그 제어기는 가속 정보를 안 쓰는 것이다.
+    (2) 부호: 0.3 s 뒤 램프 쪽 전진속도가 유지 쪽보다 빨라야 한다(참조 증가분 0.6 m/s의 10% 이상).
+    """
+    alt = config['altitude_m']
+    u_ramp, v_ramp = _first_command_and_final_speed(factory, label, A_ACC, alt)
+    gc.collect()
+    u_hold, v_hold = _first_command_and_final_speed(factory, label, 0.0, alt)
+    gc.collect()
+    assert not np.array_equal(u_ramp, u_hold), (label, u_ramp, u_hold)
+    assert v_ramp - v_hold > 0.1*A_ACC*_RampProfile.DURATION, (label, v_ramp, v_hold)
+
+
+@pytest.mark.parametrize('label', ['GSLQR', 'CPID'])
+def test_i2_baseline_feedforward_reads_the_same_window(factory, config, label):
+    """GSLQR·CPID의 참조 가속도는 NMPC와 같은 창에서, NMPC 예측 격자의 첫 간격 앞까지만 읽는다."""
+    step = config['nmpc_common']['dt_pred_s']
+    ctrl = factory.make_for_profile(label, _RampProfile(V_ACC, A_ACC, config['altitude_m']))
+    factory.update_at(ctrl, 0.1, None, None)
+    assert ctrl.inner.a_ref[0] == pytest.approx(A_ACC, rel=1e-9)
+    assert ctrl.inner.a_ref[1] == 0.0 and ctrl.inner.a_ref[2] == 0.0
+    assert ctrl.window.max_lookahead == pytest.approx(step, abs=1e-12)
+    assert ctrl.settings['reference_feedforward'] == 'window_acceleration'
+    assert ctrl.settings['lookahead_s'] == step
+
+
+def test_i2_negative_control_baselines_without_feedforward_ignore_acceleration(config, native, factory):
+    """검출력: 피드포워드를 끈 설정(새 팩토리 — GSLQR 원형이 캐시되므로)에서는 GSLQR·CPID의 첫 명령이
+    램프·유지에서 같고, 창에서 현재 참조만 읽는다. 위 검사가 이 차이를 잡는다."""
+    off = deepcopy(config)
+    for label in ('GSLQR', 'CPID'):
+        off['controllers'][label].pop('reference_feedforward')
+    plain = ArenaFactory(off, native, model=factory.model)
+    alt = config['altitude_m']
+    for label in ('GSLQR', 'CPID'):
+        u_ramp, _ = _first_command_and_final_speed(plain, label, A_ACC, alt)
+        u_hold, _ = _first_command_and_final_speed(plain, label, 0.0, alt)
+        np.testing.assert_array_equal(u_ramp, u_hold)
+        ctrl = plain.make_for_profile(label, _RampProfile(V_ACC, A_ACC, alt))
+        plain.update_at(ctrl, 0.1, None, None)
+        assert ctrl.window.max_lookahead == 0.0 and ctrl.settings['lookahead_s'] == 0.0
 
 
 # ── I-3 ─────────────────────────────────────────────────────────────
@@ -215,6 +310,54 @@ def test_i3_nmpc_thrust_bounds_are_symmetric(captured_short_runs):
     f_max_f13 = float(f13.ubw[13])             # 첫 입력 블록 U_0의 로터 1 상한
     assert T_max_v13 == pytest.approx(4*f13.f_max) and f_max_f13 == f13.f_max
     assert all(float(v13.ubw[k*stride + 13]) == T_max_v13 for k in range(v13.N))
+
+
+def test_i3_every_nmpc_forbids_zero_or_negative_thrust_plans(captured_short_runs, factory):
+    """kj 결정(2026-09-26 오후): 세 NMPC가 모두 '추력 ≥ 0'을 계획 제약으로 갖는다.
+
+    V13은 총추력 T ≥ 0, F13은 로터별 f ≥ 0(NLP 상자 제약). M17은 같은 제약을 회전수 좌표로 옮긴
+    양추력 하한(현재 상태 + 명목 모델)이다. SHORT는 85 m/s라 M17 하한이 n_min보다 높다(실제로 걸린다).
+    """
+    from control.nmpc import positive_thrust_rate_floor
+    stride = 13 + 4
+    v13, f13 = captured_short_runs['V13'][1].nlp, captured_short_runs['F13'][1].nlp
+    assert all(float(v13.lbw[k*stride + 13]) == 0.0 for k in range(v13.N))           # T ≥ 0
+    assert all(float(f13.lbw[k*stride + 13 + j]) == 0.0 for k in range(f13.N) for j in range(4))
+    if 'M17' not in captured_short_runs:
+        return                                   # 빠른 모드는 M17 NLP를 짓지 않는다(아래 테스트가 식을 본다)
+    _, snap, result = captured_short_runs['M17']
+    nlp = snap.nlp
+    x = result['xs'][int(round(nlp.t_now/factory.dt))]      # 마지막 풀이에 들어간 관측 상태
+    floor = positive_thrust_rate_floor(factory.cp, x)
+    assert floor > factory.cp['n_min']
+    stride17 = 17 + 4
+    u_lower = np.concatenate([nlp.last_lbx[k*stride17 + 17:k*stride17 + 21] for k in range(nlp.N)])
+    np.testing.assert_array_equal(u_lower, np.full(4*nlp.N, floor))
+    # 상태 칸과 설정의 원래 하한(lbw)은 그대로다 — 하한은 매 풀이 새로 만든 사본에만 들어간다
+    u_idx = np.concatenate([np.arange(k*stride17 + 17, k*stride17 + 21) for k in range(nlp.N)])
+    others = np.setdiff1d(np.arange(nlp.lbw.size), u_idx)
+    np.testing.assert_array_equal(nlp.last_lbx[others], nlp.lbw[others])
+    assert np.all(nlp.lbw[u_idx] == factory.cp['n_min'])
+
+
+def test_i3_m17_rotor_floor_is_the_positive_thrust_rate(factory):
+    """M17 하한 식: 하한 회전수에서 로터 추력은 양수지만 거의 0이고, 그보다 낮으면 추력 0(평탄 구간)이다.
+
+    진단(results/arena/M17_DIAGNOSIS.md)에서 85 m/s 트림의 추력 0 회전수는 ~0.81·n_max였다.
+    호버(축방향 속도 0)에서는 하한이 0이라 원래 하한 n_min이 그대로 쓰인다.
+    """
+    from control.nmpc import positive_thrust_rate_floor, ZERO_THRUST_MARGIN
+    cp, model = factory.cp, factory.model
+    tr = model.trim(85.0)
+    x = tr['state']
+    floor = positive_thrust_rate_floor(cp, x)
+    at_floor = model.rotor_thrusts(np.full(4, floor), x)
+    below = model.rotor_thrusts(np.full(4, floor/(1.0 + ZERO_THRUST_MARGIN)**2), x)
+    trim_thrust = model.rotor_thrusts(tr['control'], x)
+    assert np.all(at_floor > 0.0) and np.all(at_floor < 0.02*trim_thrust.min())
+    assert np.all(below == 0.0)
+    assert 0.78 < floor/cp['n_max'] < 0.84
+    assert positive_thrust_rate_floor(cp, model.trim(0.0)['state']) == 0.0
 
 
 @pytest.mark.parametrize('speed', [0.0, 20.0, 85.0])
@@ -282,6 +425,15 @@ def test_i6_same_case_twice_is_bit_identical(factory, label):
     case = dict(_case('i6'), gust_direction='vertical', gust_peak=-5.0)
     first = suite.run_trial(factory, label, profile, case, Acceptance())[0]
     second = suite.run_trial(factory, label, profile, case, Acceptance())[0]
+    assert first['trajectory_sha256'] == second['trajectory_sha256']
+
+
+@pytest.mark.parametrize('label', ['GSLQR', 'CPID'])
+def test_i6_ramp_case_twice_is_bit_identical(factory, config, label):
+    """참조 가속도 피드포워드 경로도 결정적이다(위 사례는 참조가 일정해 이 경로를 안 탄다)."""
+    profile = _RampProfile(V_ACC, A_ACC, config['altitude_m'])
+    first = suite.run_trial(factory, label, profile, _case('i6_ramp'), Acceptance())[0]
+    second = suite.run_trial(factory, label, profile, _case('i6_ramp'), Acceptance())[0]
     assert first['trajectory_sha256'] == second['trajectory_sha256']
 
 

@@ -46,13 +46,13 @@
   },
   "controllers": {
     "V13": {"kind": "V13", "alloc_mode": "A1", "alloc_feedback": true, "time_align": "S1"},
-    "M17": {"kind": "M17"},
+    "M17": {"kind": "M17", "rotor_floor": "positive_thrust"},
     "F13": {"kind": "F13", "alloc_mode": "A0", "time_align": "S0"},
     "GSLQR": {"kind": "GSLQR", "gains": "configs/gains/gslqr.json",
               "V_table_m_s": [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85],
-              "trim_substep_m_s": 1.0},
+              "trim_substep_m_s": 1.0, "reference_feedforward": "window_acceleration"},
     "CPID": {"kind": "CPID", "gains": "configs/gains/cpid.json", "design_region_m_s": [0, 20],
-             "integrator_preload": "controller_model_trim"}
+             "integrator_preload": "controller_model_trim", "reference_feedforward": "window_acceleration"}
   },
   "seeds": {"main": [1000, 1999], "tuning": [2000, 2999]},
   "tuning": {

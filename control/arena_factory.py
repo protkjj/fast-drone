@@ -178,7 +178,8 @@ class ArenaController:
 
     OBSERVATION_KEYS = ('t', 'x17', 'reference_window')
 
-    def __init__(self, label, inner, window, nmpc=None, warm_start=None, settings=None):
+    def __init__(self, label, inner, window, nmpc=None, warm_start=None, settings=None,
+                 feedforward_step=None):
         self.label = label
         self.inner = inner
         self.window = window
@@ -187,6 +188,8 @@ class ArenaController:
         self.settings = settings or {}
         self._warm_start = warm_start
         self._started = False
+        # 참조 가속도 피드포워드를 쓰는 제어기(GSLQR·CPID)만 값이 있다: 창에서 몇 초 앞을 읽어 차분하는가
+        self.feedforward_step = feedforward_step
         # 적분기가 있는 제어기(GSLQR·CPID)만 계측한다. NMPC 계열은 적분기가 없다.
         self.integrators = IntegratorLog() if hasattr(inner, 'integrator_status') else None
 
@@ -403,6 +406,14 @@ class ArenaFactory:
         target = ctrl.nmpc if ctrl.nmpc is not None else ctrl.inner
         target.v_ref = r[0:3].copy()
         target.z_ref = float(r[3])
+        step = getattr(ctrl, 'feedforward_step', None)     # 대체 빌더(테스트)에는 없을 수 있다
+        if step:
+            # 참조 가속도 피드포워드(GSLQR·CPID, kj 결정 2026-09-26 오후). **같은 창**에서 NMPC 예측
+            # 격자의 첫 간격(Δt_pred) 앞 참조를 읽어 차분한다 — NMPC가 첫 간격에서 보는 가속도와 같은
+            # 정보이고, 창이 H를 넘는 요청은 막는다. 속도 성분만 차분한다(고도 z를 차분하면 고도
+            # 계단이 가속도 펄스가 된다). 참조가 일정하면 두 값이 같아 정확히 0이다.
+            ahead = ctrl.window(t + step)
+            target.a_ref = (ahead[0:3] - r[0:3])/step
 
     def update(self, ctrl, v, z):
         raise NotImplementedError('arena controllers need the time: use update_at')
@@ -471,9 +482,13 @@ class ArenaFactory:
 
     def _build_m17(self, window, v0, z0):
         from control.nmpc import NMPCController
-        nmpc = NMPCController(self.cp, v_ref=v0, z_ref=z0, **self._nmpc_kwargs('M17', window))
+        # 양추력 하한(kj 결정 2026-09-26 오후)은 M17에만 준다. 세 NMPC 공통 dict(_nmpc_kwargs)에
+        # 넣지 않는 이유: V13·F13은 NLP 입력이 추력이라 '추력 ≥ 0'이 이미 상자 제약이다. 이것은 같은
+        # 제약을 회전수 좌표로 옮긴 것이지 M17에만 주는 새 이점이 아니다.
+        nmpc = NMPCController(self.cp, v_ref=v0, z_ref=z0, **self._nmpc_kwargs('M17', window),
+                              rotor_floor=self.config['controllers']['M17'].get('rotor_floor'))
         u_trim = self._trim_input('M17', v0)
-        settings = self._nmpc_settings('M17', nmpc)
+        settings = self._nmpc_settings('M17', nmpc, rotor_floor=nmpc.rotor_floor)
         return ArenaController('M17', nmpc, window, nmpc=nmpc, settings=settings,
                                warm_start=lambda x: trim_warm_start(nmpc, x, u_trim))
 
@@ -491,7 +506,8 @@ class ArenaFactory:
                 R=np.eye(4)*float(g['R_scale']),
                 integral_states=tuple(g['integral_states']),
                 Q_integral=g.get('Q_integral'), dt=self.dt,
-                integral_limit=float(g['integral_limit']), trims=trims)
+                integral_limit=float(g['integral_limit']), trims=trims,
+                acceleration_feedforward=self._feedforward_step('GSLQR') is not None)
         return self._gslqr_proto
 
     def _build_gslqr(self, window, v0, z0):
@@ -500,12 +516,15 @@ class ArenaFactory:
         ctrl.v_ref = v0.copy()
         ctrl.z_ref = z0
         g = self.gains['GSLQR']
+        step = self._feedforward_step('GSLQR')
         settings = dict(kind='GSLQR', V_table_m_s=ctrl.V_table.tolist(),
                         dropped=list(ctrl.dropped), Q_diag=list(g['Q_diag']),
                         R_scale=g['R_scale'], integral_states=list(g['integral_states']),
                         Q_integral=g.get('Q_integral'), integral_limit=g['integral_limit'],
-                        trims='controller model, plant hover convention', preview=False)
-        return ArenaController('GSLQR', ctrl, window, settings=settings)
+                        trims='controller model, plant hover convention',
+                        reference_feedforward=self.config['controllers']['GSLQR'].get('reference_feedforward'),
+                        lookahead_s=step or 0.0, feedforward_limits=ctrl.feedforward_limits())
+        return ArenaController('GSLQR', ctrl, window, settings=settings, feedforward_step=step)
 
     def _build_cpid(self, window, v0, z0):
         from control.controller import CascadedPID
@@ -527,12 +546,23 @@ class ArenaFactory:
         if preload not in (None, 'controller_model_trim'):
             raise ValueError(f'unknown CPID integrator_preload {preload!r}')
         a_ff = self.model.trim_acceleration(float(v0[0])) if preload else None
+        step = self._feedforward_step('CPID')
+        ctrl.acc_feedforward = step is not None
         settings = dict(kind='CPID', heading_rad=heading,
                         **{k: g[k] for k in ('Kp_vel', 'Ki_vel', 'a_int_max', 'Kp_z', 'Kd_z', 'Ki_z', 'int_z_max',
                                               'Kp_att', 'Kd_att', 'max_tilt_deg')},
                         a_int_z_max=ctrl.a_int_z_max, integrator_preload=preload,
                         preload_acceleration=None if a_ff is None else a_ff.tolist(),
-                        preview=False)
-        return ArenaController('CPID', ctrl, window, settings=settings,
+                        reference_feedforward=spec.get('reference_feedforward'),
+                        lookahead_s=step or 0.0)
+        return ArenaController('CPID', ctrl, window, settings=settings, feedforward_step=step,
                                warm_start=None if a_ff is None
                                else (lambda x: ctrl.preload_integrators(a_ff)))
+
+    def _feedforward_step(self, label):
+        """참조 가속도 피드포워드를 켜면 창에서 몇 초 앞을 읽어 차분하는가 — NMPC 예측 격자의 첫 간격
+        (nmpc_common.dt_pred_s)이다. 끄면 None(창에서 현재 참조만 읽는다)."""
+        mode = self.config['controllers'][label].get('reference_feedforward')
+        if mode not in (None, 'window_acceleration'):
+            raise ValueError(f'unknown {label} reference_feedforward {mode!r}')
+        return None if mode is None else float(self.config['nmpc_common']['dt_pred_s'])

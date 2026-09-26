@@ -79,11 +79,19 @@ class CascadedPID:
         self._int_ev = np.zeros(2)
         self._saturated = False     # 이번 스텝에 기울기 한계·로터 한계가 걸렸는가
 
+        # 참조 가속도 피드포워드(kj 결정 2026-09-26 오후). PX4 PositionControl은 궤적 설정점의
+        # 가속도(_acc_sp) 위에 속도 PID 출력을 더한다 — 그것과 같은 구조다. a_ref는 세계 좌표
+        # [m/s²]이고 경기장(arena_factory.update_at)이 참조 창에서 넣는다. 기본값 False면 기존과
+        # 비트 동일하다(a_ref를 읽지 않는다).
+        self.acc_feedforward = False
+        self.a_ref = np.zeros(3)
+
     def reset(self):
-        """적분기 초기화."""
+        """적분기·참조 가속도 초기화."""
         self._int_ez = 0.0
         self._int_ev = np.zeros(2)
         self._saturated = False
+        self.a_ref = np.zeros(3)
 
     def __call__(self, t, x):
         pos, vel = x[0:3], x[3:6]
@@ -104,6 +112,9 @@ class CascadedPID:
         if self.Ki_vel:
             a_des[0:2] -= self.Ki_vel * self._int_ev
         a_des[2]   = -self.Kp_z * e_z - self.Kd_z * vel[2] - self.Ki_z * self._int_ez
+        # 참조가 일정하면 a_ref가 정확히 0이라 더하지 않는다(더해도 같지만, 건너뛰면 비트 동일이 자명하다)
+        if self.acc_feedforward and np.any(self.a_ref):
+            a_des = a_des + self.a_ref
 
         F_des = self.m * (a_des + np.array([0, 0, self.g]))
 
@@ -605,6 +616,81 @@ class ScheduledPID(CascadedPID):
 # 4. Gain-Scheduled LQR (선형 보간)
 # ══════════════════════════════════════════════════════
 
+# ── GSLQR 참조 가속도 피드포워드(kj 결정 2026-09-26 오후) ─────────────────────
+# 유효 범위 규칙은 시뮬레이션 결과를 보기 전에 계획서에 적었다(명목 모델만 쓴다).
+FF_REL_TOL = 0.1       # 선형 목표점에서 명목 모델의 가속도 오차 ≤ 요청의 10% (전진·수직 각각)
+FF_ANG_TOL = 2.0       # 선형 목표점의 각가속도 ≤ 2 rad/s² (I-10의 트림 각가속도 문턱과 같다)
+FF_SCAN_STEP = 0.1     # a를 0.1 m/s² 간격으로 키우며 본다
+FF_SCAN_MAX = 100.0    # 이보다 크게는 보지 않는다(경기장 참조 가속 최대 ~60 m/s², ρ=1)
+_FF_ROWS = [1, 2, 3, 7, 8, 9]      # 오차상태 [δz, δv(3), δφ(3), δω(3), δn(4)]의 δv·δω 행
+_FF_PHI, _FF_N = [4, 5, 6], [10, 11, 12, 13]
+
+
+def feedforward_gain(lqr):
+    """전진(세계 x) 가속 1 m/s²를 정상 상태로 내는 [δφ(3), δn(4)] — 선형 오차상태 모델의 해.
+
+    표준 추종 LQR 피드포워드(참조가 요구하는 상태·입력을 정상 상태 식에서 구한다)를 가속하는
+    참조에 쓴 것이다. 정상 가속 조건(δz = δv = δω = 0, 모터 정상이라 δu = δn):
+      속도 행 3개      A_vφ·δφ + (A_vn + B_v)·δn = [a, 0, 0]
+      각가속도 행 3개  A_ωφ·δφ + (A_ωn + B_ω)·δn = 0
+    미지수 7개, 식 6개라 해가 한 줄로 모인다. 그중 LQR 자기 가중치 W = diag(Q_φ, Q_n + R)로 잰
+    크기가 가장 작은 해를 고른다(최소 가중 노름: W⁻¹Mᵀ(MW⁻¹Mᵀ)⁻¹b). 전진 가속에서는 남는
+    자유도(롤·요) 성분이 0이라 가중치는 결과를 바꾸지 않는다(계획 검토에서 격자 18점 확인).
+    호버에서 1 m/s²당 피치 ≈ 1/g rad(5.84°, 소각), 85 m/s에서 −0.09°·회전수 +0.6~0.7% n_max다.
+    """
+    A, B = lqr.A_r, lqr.B_r
+    M = np.hstack([A[np.ix_(_FF_ROWS, _FF_PHI)], A[np.ix_(_FF_ROWS, _FF_N)] + B[_FF_ROWS, :]])
+    q, r = np.diag(lqr.Q), np.diag(lqr.R_cost)
+    w_inv = 1.0/np.r_[q[_FF_PHI], q[_FF_N] + r]
+    b = np.zeros(len(_FF_ROWS))
+    b[0] = 1.0
+    return w_inv*(M.T @ np.linalg.solve((M*w_inv) @ M.T, b))
+
+
+def feedforward_target(params, x_trim, u_trim, d):
+    """트림에 선형 피드포워드 편차 d = [δφ(3), δn(4)]를 얹은 상태·입력(ω = 0, 모터 정상 n = u).
+
+    자세는 ScheduledLQR._compute_error_state의 규약을 거꾸로 쓴다: q = q_trim ⊗ δq,
+    δq = [δφ/2, √(1 − |δφ/2|²)] (scalar-last) — 그래야 오차상태가 정확히 δφ가 된다.
+    """
+    x = np.array(x_trim, dtype=float)
+    half = 0.5*np.asarray(d[0:3], dtype=float)
+    dq = np.r_[half, np.sqrt(max(1.0 - float(half @ half), 0.0))]
+    q = LQRController._quat_mult(x[6:10], dq)
+    x[6:10] = q/np.linalg.norm(q)
+    x[10:13] = 0.0
+    n = np.clip(np.asarray(u_trim, dtype=float) + np.asarray(d[3:7], dtype=float),
+                params['n_min'], params['n_max'])
+    x[13:17] = n
+    return x, n
+
+
+def feedforward_validity(params, x_trim, u_trim, gain, plant=None):
+    """선형 피드포워드가 맞는 전진 가속 범위 (a⁻, a⁺) [m/s², 크기] — 명목 모델만으로 정한다.
+
+    a를 0.1 m/s²씩 키우며 선형 목표점(feedforward_target)에서 명목 제어기 모델의 가속도를 잰다.
+    |v̇_x − a| ≤ 0.1·|a|, |v̇_z| ≤ 0.1·|a|, |ω̇| ≤ 2 rad/s²가 0부터 이어서 성립하는 가장 큰 |a|가
+    그 방향의 한계다(시뮬레이션 결과로 문턱을 고르지 않는다). 선형 모델은 작은 가속에서만 맞는다 —
+    예: 호버에서 기울여 가속하면 추력의 수직 성분이 줄어(2차 효과) 고도가 빠진다. 이 범위 밖에서
+    남는 차이가 '선형 가정의 한계'다(참조 정보는 다 받았다).
+    """
+    from control.dynamics import AxialDronePlant
+    plant = plant if plant is not None else AxialDronePlant(params, dt=0.001)
+    limits = []
+    for sign in (-1.0, 1.0):
+        a_ok = 0.0
+        for k in range(1, int(round(FF_SCAN_MAX/FF_SCAN_STEP)) + 1):
+            a = sign*k*FF_SCAN_STEP
+            x, n = feedforward_target(params, x_trim, u_trim, gain*a)
+            xd = plant.evaluate_xdot(x, n)
+            if (abs(xd[3] - a) > FF_REL_TOL*abs(a) or abs(xd[5]) > FF_REL_TOL*abs(a)
+                    or np.max(np.abs(xd[10:13])) > FF_ANG_TOL):
+                break
+            a_ok = abs(a)
+        limits.append(a_ok)
+    return limits[0], limits[1]
+
+
 class ScheduledLQR:
     """
     속도별 게인 스케줄링 LQR — np.interp 선형 보간.
@@ -624,8 +710,14 @@ class ScheduledLQR:
 
     def __init__(self, params, v_ref, z_ref=0.0, V_table=None, Q=None, R=None,
                  integral_states=(), Q_integral=None, dt=0.001,
-                 integral_limit=5.0, trims=None):
+                 integral_limit=5.0, trims=None, acceleration_feedforward=False):
         """
+        acceleration_feedforward : bool
+            참조 가속도 피드포워드(kj 결정 2026-09-26 오후). 켜면 격자점마다 전진 가속
+            1 m/s²를 정상 상태로 내는 자세·회전수 편차(feedforward_gain)와 그것이 맞는 가속도
+            범위(feedforward_validity, 명목 모델)를 구해 K처럼 보간한다. 런타임에 a_ref(세계
+            좌표, 경기장이 참조 창에서 넣는다)의 x 성분을 그 범위로 자른 만큼만 쓴다.
+            기본값 False면 계산도 하지 않고 기존과 비트 동일하다(경기장 밖 사용처가 많다).
         integral_states : tuple
             적분 증강(LQI)할 오차상태 인덱스. 기본값 ()이면 순수 LQR로
             기존 동작이 그대로 보존된다. ``(0,)``=고도, ``(0,1)``=고도+전진속도.
@@ -653,6 +745,8 @@ class ScheduledLQR:
         self.integral_limit = float(integral_limit)
         self._x_int = np.zeros(self.n_integral)
         self._saturated = False     # 이번 스텝 회전수 명령이 포화했는가(적분 정지 조건)
+        self.acc_feedforward = bool(acceleration_feedforward)
+        self.a_ref = np.zeros(3)
 
         if V_table is None:
             V_table = np.arange(0, 90, 10).astype(float)
@@ -676,6 +770,11 @@ class ScheduledLQR:
         #   솔버 허용오차 수준(상태 최대 5.8e-8, 수렴 판정 1e-6 보다 작다)에서 같다.
         speeds, K_r_list, x_trim_list, u_trim_list = [], [], [], []
         K_i_list = []
+        ff_gain_list, ff_limit_list = [], []
+        ff_plant = None
+        if self.acc_feedforward:
+            from control.dynamics import AxialDronePlant
+            ff_plant = AxialDronePlant(params, dt=0.001)     # 명목 모델 — 유효 범위 판정용
         dropped, guess = [], None
 
         if trims is not None and len(trims) != len(self.V_table):
@@ -703,6 +802,11 @@ class ScheduledLQR:
                 K_i_list.append(lqr.K_integral.flatten())   # 4×n_i
             x_trim_list.append(trim['state'].copy())
             u_trim_list.append(trim['control'].copy())
+            if self.acc_feedforward:
+                gain = feedforward_gain(lqr)
+                ff_gain_list.append(gain)
+                ff_limit_list.append(feedforward_validity(params, trim['state'], trim['control'],
+                                                          gain, plant=ff_plant))
 
         if len(speeds) < 2:
             raise ValueError(
@@ -717,6 +821,9 @@ class ScheduledLQR:
         self._x_trim_arr = np.array(x_trim_list)  # (N_valid, 17)
         self._u_trim_arr = np.array(u_trim_list)  # (N_valid, 4)
         self._nr = 14  # 축소 상태 차원
+        # 참조 가속도 피드포워드: 1 m/s²당 [δφ(3), δn(4)]와 그것이 맞는 가속도 크기 (a⁻, a⁺)
+        self._ff_gain = np.array(ff_gain_list) if self.acc_feedforward else None    # (N_valid, 7)
+        self._ff_limits = np.array(ff_limit_list) if self.acc_feedforward else None  # (N_valid, 2)
 
         print(f"  ScheduledLQR: {len(speeds)}/{len(V_table)} 속도점 유효"
               f" (격자 {speeds[0]:.0f}~{speeds[-1]:.0f} m/s)")
@@ -803,7 +910,16 @@ class ScheduledLQR:
         x_trim[2] = self.z_ref
 
         dx_r = self._compute_error_state(x, x_trim)
-        u = u_trim - K_r @ dx_r
+        # 참조가 일정하면 a_ref가 정확히 0이라 피드포워드를 건너뛴다(비트 동일이 자명하다)
+        if self.acc_feedforward and np.any(self.a_ref):
+            d_ff = self._feedforward(V)                      # [δφ(3), δn(4)]
+            dx_ff = np.zeros(self._nr)
+            dx_ff[4:7], dx_ff[10:14] = d_ff[0:3], d_ff[3:7]
+            # 표준 추종 형태 u = u_ss − K(x − x_ss): 목표 상태·입력을 가속하는 정상점으로 옮긴다.
+            # dx_ff의 δz·δv 칸은 0이라 적분기 입력(δz, δvx)은 그대로다.
+            u = u_trim + d_ff[3:7] - K_r @ (dx_r - dx_ff)
+        else:
+            u = u_trim - K_r @ dx_r
 
         if self.n_integral:
             K_i = self._interpolate_integral(V)
@@ -837,10 +953,32 @@ class ScheduledLQR:
             channels[name] = (abs(float(self._x_int[k])), self.integral_limit)
         return dict(channels=channels, frozen=bool(self.n_integral) and self._saturated)
 
+    def _feedforward(self, V):
+        """V에서 참조 가속도 피드포워드 [δφ(3), δn(4)] — 이득·유효 범위를 V로 선형 보간한다.
+
+        a_ref의 x 성분을 유효 범위 [−a⁻(V), a⁺(V)]로 자른 만큼만 쓴다. 경기장 참조는 x 성분만
+        변하므로 y·z 성분이 0이 아니면 조용히 버리지 않고 오류로 멈춘다.
+        """
+        if self.a_ref[1] != 0.0 or self.a_ref[2] != 0.0:
+            raise ValueError('GSLQR feedforward covers forward (world x) reference acceleration only, '
+                             f'got a_ref={self.a_ref}')
+        V_c = np.clip(V, self.V_table[0], self.V_table[-1])
+        gain = np.array([np.interp(V_c, self.V_table, self._ff_gain[:, j]) for j in range(7)])
+        lower = np.interp(V_c, self.V_table, self._ff_limits[:, 0])
+        upper = np.interp(V_c, self.V_table, self._ff_limits[:, 1])
+        return gain*float(np.clip(self.a_ref[0], -lower, upper))
+
+    def feedforward_limits(self):
+        """격자점별 유효 범위 표 [(V, a⁻, a⁺)] — 보고서용(피드포워드를 끄면 빈 목록)."""
+        if not self.acc_feedforward:
+            return []
+        return [(float(V), float(lo), float(hi)) for V, (lo, hi) in zip(self.V_table, self._ff_limits)]
+
     def reset(self):
-        """MC 시행 간 독립성 — 적분 상태를 비운다."""
+        """MC 시행 간 독립성 — 적분 상태와 참조 가속도를 비운다."""
         self._x_int = np.zeros(self.n_integral)
         self._saturated = False
+        self.a_ref = np.zeros(3)
 
 
 # ══════════════════════════════════════════════════════

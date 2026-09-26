@@ -22,6 +22,40 @@ import time as timer
 from control.dynamics import build_dynamics, NX, NU, EPS
 from control.nmpc_common import ipopt_options, cost_weights as nmpc_cost_weights
 
+# 양추력 하한의 여유: 하한 회전수에서 전진비가 추력 0 전진비보다 조금 작아 추력이 0이 아니라 양수다
+ZERO_THRUST_MARGIN = 1e-3
+
+
+def zero_thrust_advance_ratio(params):
+    """추력이 0이 되는 전진비 J0 — 팀 곡선이면 양추력 한계(곡선의 근), 옛 선형 모델이면 J_max."""
+    from models.team_light.control.propeller_curve import positive_thrust_j_limit, uses_curve
+    return positive_thrust_j_limit(params) if uses_curve(params) else float(params['J_max'])
+
+
+def positive_thrust_rate_floor(params, x, j0=None):
+    """현재 상태 x에서 명목 모델로 본 **양추력 회전수** [rad/s] — 이보다 느리면 로터 추력이 0이다.
+
+    kj 결정(2026-09-26 오후, 경기장 보고서 8.7-1): M17(로터 회전수 입력) 명령의 하한으로 쓴다.
+    V13·F13은 NLP 입력이 추력이라 '추력 ≥ 0'이 상자 제약이다(V13 총추력 T ≥ 0, F13 로터별 f ≥ 0).
+    M17은 회전수로 계획해서 같은 제약이 추진 곡선의 추력 0 평탄 구간(fmax(Ct,0), 기울기 0)이 되고,
+    계획이 그 구간에 들어가면 IPOPT가 막혔다(results/arena/M17_DIAGNOSIS.md, H4). 이 하한은 그
+    '추력 ≥ 0'을 회전수 좌표로 옮긴 것이다.
+
+    쓰는 정보는 관측 상태(관성 속도 — 바람은 모른다)와 명목 제어기 모델뿐이다.
+      va    = 동체 x축(추력축) 속도, 음수면 0
+      J0    = 추력이 0이 되는 전진비(zero_thrust_advance_ratio)
+      floor = 2π·va/(D·J0)·(1 + 여유), 단 0.999·n_max를 넘지 않는다
+    진단 V4(control/arena_m17_diagnosis.py::SolverProxy)와 같은 식·같은 계산 순서다. 결과를 비트
+    단위로 재현하려고 그대로 옮겼다. 한계: 예측 구간 내내 이 값(현재 상태 기준)으로 고정한다.
+    팀 propeller_curve.supported_rate_bounds는 작동 범위 하한(10k rpm)까지 더하지만, 그것은 모델
+    영역의 한계라(V13·F13에도 없다) 넣지 않는다.
+    """
+    from scipy.spatial.transform import Rotation
+    if j0 is None:
+        j0 = zero_thrust_advance_ratio(params)
+    va = max(float((Rotation.from_quat(x[6:10]).as_matrix().T @ x[3:6])[0]), 0.0)
+    return min(2*np.pi*va/(params['D_prop']*j0)*(1 + ZERO_THRUST_MARGIN), 0.999*float(params['n_max']))
+
 
 class NMPCController:
     """
@@ -36,10 +70,13 @@ class NMPCController:
                  N=20, dt_nmpc=0.05, dt_ctrl=0.02, Q_z=20.0,
                  electrical_constraints=False, V_b=None,
                  cost_spec='paper', ref_fn=None, max_iter=30, tol=1e-4,
-                 cost_weights=None):
+                 cost_weights=None, rotor_floor=None):
         """
         Parameters
         ----------
+        rotor_floor : None | 'positive_thrust'
+            'positive_thrust'면 매 풀이마다 회전수 명령의 하한을 현재 상태의 양추력 회전수로
+            올린다(positive_thrust_rate_floor, 논문 모드만). 기본값 None이면 기존과 비트 동일하다.
         max_iter, tol, cost_weights : control/nmpc_common.py 참고.
             V13·F13과 같은 함수로 IPOPT 옵션·비용 가중치를 만들고 보관한다
             (경기장 불변식 I-3). 예전엔 max_iter가 30으로 박혀 있어 이 클래스만
@@ -92,6 +129,13 @@ class NMPCController:
             raise ValueError("ref_fn은 cost_spec='paper'에서만 쓸 수 있다.")
         self.cost_spec = cost_spec
         self.ref_fn = ref_fn
+        if rotor_floor not in (None, 'positive_thrust'):
+            raise ValueError(f"rotor_floor must be None or 'positive_thrust', got {rotor_floor!r}")
+        if rotor_floor is not None and cost_spec != 'paper':
+            raise ValueError("rotor_floor는 cost_spec='paper'에서만 쓸 수 있다.")
+        self.rotor_floor = rotor_floor
+        self._floor_j0 = zero_thrust_advance_ratio(params) if rotor_floor else None
+        self.last_lbx = None          # 마지막 풀이에 실제로 넘긴 하한(테스트가 읽는다)
         self._max_iter = max_iter
         self.ipopt_options = ipopt_options(max_iter, tol)
         self.cost_weights = nmpc_cost_weights(cost_weights)
@@ -372,8 +416,10 @@ class NMPCController:
             p_val = np.concatenate([x_current, self.v_ref, [self.z_ref], self.u_ref,
                                      [self.V_b]])
 
+        lbx = self.lbw if self.rotor_floor is None else self._rotor_floor_bounds(x_current)
+        self.last_lbx = lbx
         sol = self.solver(
-            x0=self.w0, lbx=self.lbw, ubx=self.ubw,
+            x0=self.w0, lbx=lbx, ubx=self.ubw,
             lbg=self.lbg, ubg=self.ubg, p=p_val)
 
         self._solve_log.append(self.solver.stats().get('return_status', 'unknown'))
@@ -391,6 +437,20 @@ class NMPCController:
             self.w0 = np.concatenate([w_opt[stride:], w_opt[-stride:]])
 
         return np.clip(u_opt, self.p['n_min'], self.p['n_max'])
+
+    def _rotor_floor_bounds(self, x_current):
+        """U 칸 하한을 양추력 회전수로 올린 lbx **사본** — self.lbw는 그대로 둔다.
+
+        제자리에서 고치면 하한이 풀이마다 누적돼 한 번 올라간 값이 내려오지 않는다. 배치는 논문 모드의
+        [X_0, U_0, X_1, U_1, …, U_{N-1}, X_N]이다. 진단 V4와 같은 순서로 만든다(비트 재현).
+        """
+        floor = positive_thrust_rate_floor(self.p, np.asarray(x_current, dtype=float), self._floor_j0)
+        lbx = np.array(self.lbw, dtype=float).ravel()
+        stride = self.nx + self.nu
+        for k in range(self.N):
+            sl = slice(k*stride + self.nx, k*stride + self.nx + self.nu)
+            lbx[sl] = np.maximum(lbx[sl], floor)
+        return lbx
 
     def get_solve_stats(self):
         """IPOPT 풀이 통계."""
