@@ -1,0 +1,139 @@
+{
+  "variant": "V2",
+  "max_iter": 30,
+  "cases": {
+    "gust_lateral_p10_VH": {
+      "stop_reason": "5 consecutive optimizer failures",
+      "completed": false,
+      "simulated_seconds": 3.7600000000000002,
+      "T_total": 12.0,
+      "paper_failed": true,
+      "max_omega": 0.1886714427030235,
+      "window_rmse_velocity": 0.5444992924469009,
+      "window_rmse_z": 0.01556159065621749,
+      "trajectory_sha256": "66f52a6ca089c7a69bde592e2964b10bf18d89984a39ec45090f6f0b4f377510",
+      "reproduces_reference": null,
+      "command_min_frac": 0.8413032899900239,
+      "command_max_frac": 0.9299846824940174,
+      "command_at_n_max_fraction": 0.0,
+      "zero_thrust_fraction": 0.0,
+      "solver": {
+        "solves": 189,
+        "failures": 5,
+        "longest_failure_run": 5,
+        "first_failure_t": 3.68,
+        "iter_median": 5.0,
+        "iter_p95": 8.0,
+        "iter_max": 30,
+        "at_iteration_limit": 5,
+        "failures_with_active_bound": 1,
+        "failures_with_zero_thrust_plan": 5,
+        "succeeded_zero_thrust_fraction": 0.005434782608695652,
+        "failure_statuses": [
+          "Maximum_Iterations_Exceeded"
+        ],
+        "failures_active_upper_mean": 0.2,
+        "failures_active_lower_mean": 0.0,
+        "failures_first_step_active": 0,
+        "failures_u_min_frac": 0.4461048487261386,
+        "failures_u_max_frac": 0.9999862259976082,
+        "failures_inf_pr_median": 0.09346394850884432,
+        "failures_inf_du_median": 2.4232375094489957,
+        "succeeded_active_fraction": 0.043478260869565216
+      }
+    },
+    "gust_vertical_m5_VH": {
+      "stop_reason": "5 consecutive optimizer failures",
+      "completed": false,
+      "simulated_seconds": 4.22,
+      "T_total": 12.0,
+      "paper_failed": true,
+      "max_omega": 0.10607373807740125,
+      "window_rmse_velocity": 0.4419938180740121,
+      "window_rmse_z": 0.18201304895418155,
+      "trajectory_sha256": "b37ba1dac6e17c5153a8da4b322c9243cc41e4240e2ce8f549862767f43d2e51",
+      "reproduces_reference": null,
+      "command_min_frac": 0.8605517483045075,
+      "command_max_frac": 0.9268707462157826,
+      "command_at_n_max_fraction": 0.0,
+      "zero_thrust_fraction": 0.0,
+      "solver": {
+        "solves": 212,
+        "failures": 9,
+        "longest_failure_run": 5,
+        "first_failure_t": 3.92,
+        "iter_median": 5.0,
+        "iter_p95": 21.899999999999977,
+        "iter_max": 30,
+        "at_iteration_limit": 9,
+        "failures_with_active_bound": 0,
+        "failures_with_zero_thrust_plan": 9,
+        "succeeded_zero_thrust_fraction": 0.07881773399014778,
+        "failure_statuses": [
+          "Maximum_Iterations_Exceeded"
+        ],
+        "failures_active_upper_mean": 0.0,
+        "failures_active_lower_mean": 0.0,
+        "failures_first_step_active": 0,
+        "failures_u_min_frac": 0.5085984454158161,
+        "failures_u_max_frac": 0.995657026966561,
+        "failures_inf_pr_median": 0.008037013337621246,
+        "failures_inf_du_median": 0.5146600559858432,
+        "succeeded_active_fraction": 0.059113300492610835
+      }
+    },
+    "ref_brake_VH_VL_rho1": {
+      "stop_reason": "5 consecutive optimizer failures",
+      "completed": false,
+      "simulated_seconds": 23.26,
+      "T_total": 52.1,
+      "paper_failed": true,
+      "max_omega": 0.028520437905876952,
+      "window_rmse_velocity": 0.012567433011744747,
+      "window_rmse_z": 0.016219241197642703,
+      "trajectory_sha256": "e0c9610590266f2849b412efad1461e77f05c18b6cff664fc77d63575e2f2d37",
+      "reproduces_reference": null,
+      "command_min_frac": 0.5466016727928708,
+      "command_max_frac": 0.9103579744347031,
+      "command_at_n_max_fraction": 0.0,
+      "zero_thrust_fraction": 0.0006018916595012897,
+      "solver": {
+        "solves": 1164,
+        "failures": 6,
+        "longest_failure_run": 5,
+        "first_failure_t": 23.14,
+        "iter_median": 5.0,
+        "iter_p95": 5.0,
+        "iter_max": 30,
+        "at_iteration_limit": 6,
+        "failures_with_active_bound": 0,
+        "failures_with_zero_thrust_plan": 6,
+        "succeeded_zero_thrust_fraction": 0.25647668393782386,
+        "failure_statuses": [
+          "Maximum_Iterations_Exceeded"
+        ],
+        "failures_active_upper_mean": 0.0,
+        "failures_active_lower_mean": 0.0,
+        "failures_first_step_active": 0,
+        "failures_u_min_frac": 0.37790019053439183,
+        "failures_u_max_frac": 0.6315765067594581,
+        "failures_inf_pr_median": 0.18948240096727473,
+        "failures_inf_du_median": 0.2071150356909206,
+        "succeeded_active_fraction": 0.0
+      }
+    }
+  },
+  "plant_unchanged_by_patch": true,
+  "curve_difference": {
+    "Ct": {
+      "max_relative": 0.006972091862431603,
+      "max_absolute": 0.0009973785080794606,
+      "J_at_max_relative": 0.43916
+    },
+    "Cp": {
+      "max_relative": 0.01931667185135714,
+      "max_absolute": 0.0025225616896740743,
+      "J_at_max_relative": 0.6855600000000001
+    }
+  }
+}
