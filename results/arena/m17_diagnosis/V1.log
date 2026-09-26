@@ -1,0 +1,6 @@
+== V1 gust_lateral_p10_VH
+{"stop_reason": "5 consecutive optimizer failures", "simulated_seconds": 3.7800000000000002, "reproduces_reference": null, "failures": 5}
+== V1 gust_vertical_m5_VH
+{"stop_reason": "5 consecutive optimizer failures", "simulated_seconds": 4.16, "reproduces_reference": null, "failures": 6}
+== V1 ref_brake_VH_VL_rho1
+{"stop_reason": "5 consecutive optimizer failures", "simulated_seconds": 23.48, "reproduces_reference": null, "failures": 13}
