@@ -16,8 +16,13 @@ kj 질문 두 가지에 답하는 수치를 한 곳에서 재현한다.
                    → 현재(±1 g 두 적분기, 조건부, 출발값 사전 채움)
   (5) --hold       CPID 20 m/s 60초 유지. 고도 적분 기존 방식(상태 한계 → 2.5 m/s², 무조건
                    적분) 대 현재(±1 g, 조건부).
+  (6) --smoke-cases 스모크 사례에서 GSLQR 적분 한계만 바꿔 설정값과 대조한다(kj 결정 6-9: 한계 ∞로
+                   영향부터 보고, 영향이 있으면 넓힌다). 정지 시각이 다르면 창 RMSE는 비교할 수 없어
+                   두 실행이 함께 살아 있던 구간의 RMSE와 궤적이 처음 갈라진 시각을 같이 낸다.
+                   결과는 INTEGRATORS_SMOKE.md(기존 INTEGRATORS.md와 따로).
 
 실행: python -m control.arena_integrators [--binding] [--history] [--hold]
+      python -m control.arena_integrators --smoke-cases [사례 …] [--limits 1e9 50]
 """
 import argparse
 from copy import deepcopy
@@ -183,6 +188,120 @@ def write_markdown(path, data):
     Path(path).write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 
+SMOKE_CASES = ('mission_VH_mass1.3', 'mission_VH_tau2')
+# '영향 있음' 판정(kj 결정 6-9, 결과를 보기 전에 계획서에 적은 규칙): 정지 여부·사유가 바뀌거나,
+# 정지 시각이 0.1 s 넘게 바뀌거나, 창 RMSE(v 또는 z)가 5% 넘게 바뀌거나, 논문 판정이 바뀐다.
+IMPACT_STOP_TIME_S = 0.1
+IMPACT_RMSE_RELATIVE = 0.05
+
+
+def smoke_limit_comparison(config, model, cases=SMOKE_CASES, limits=(None, UNLIMITED)):
+    """스모크 사례에서 GSLQR 적분 한계만 바꿔 돌린다. None = 설정값(참조 재현 확인용)."""
+    import control.validation_suite as suite
+    from control.arena import build_scenarios
+    from control.validation_metrics import Acceptance, PaperCriteria, paper_evaluate
+    reference = json.loads((ROOT/'results'/'arena'/'smoke_reference.json').read_text(encoding='utf-8'))
+    ref_rows = {(r['scenario_id'], r['controller']): r for r in reference['rows']}
+    acceptance, paper = Acceptance(**config['acceptance']), PaperCriteria(**config['paper_criteria'])
+    rows, trajectories = [], {}
+    for limit in limits:
+        fac = ArenaFactory(config, overrides=None if limit is None else {'GSLQR': {'integral_limit': limit}},
+                           model=model)
+        used = float(fac.gains['GSLQR']['integral_limit'])
+        for scenario in build_scenarios(config, fac.cp, fac.p, only=list(cases)):
+            row, result, log = suite.run_trial(fac, 'GSLQR', scenario.profile, scenario.cases[0], acceptance)
+            row.update(paper_evaluate(result, scenario.profile, paper, window=scenario.window,
+                                      solve_log=log, n_max=fac.p['n_max']))
+            trajectories[(scenario.id, used)] = (result, scenario.profile)
+            integ = row.get('integrators') or {}
+            ref = ref_rows.get((scenario.id, 'GSLQR'), {})
+            rows.append(dict(case=scenario.id, integral_limit=used, stop_reason=row['stop_reason'],
+                             simulated_seconds=row['simulated_seconds'], paper_failed=row['paper_failed'],
+                             window_rmse_velocity=row.get('window_rmse_velocity'),
+                             window_rmse_z=row.get('window_rmse_z'), max_omega=row['max_omega'],
+                             at_limit_fraction=integ.get('at_limit_fraction'),
+                             peak_xi={name: ch['peak_fraction']*ch['limit']
+                                      for name, ch in (integ.get('channels') or {}).items()},
+                             trajectory_sha256=row['trajectory_sha256'],
+                             reproduces_reference=(row['trajectory_sha256'] == ref.get('trajectory_sha256')
+                                                   if limit is None else None)))
+    _add_common_window(rows, trajectories)
+    return rows
+
+
+def _add_common_window(rows, trajectories):
+    """설정값 한계 실행과 같은 사례의 다른 한계 실행을 **둘 다 살아 있던 구간**에서 비교한다.
+
+    정지 시각이 다르면 창 RMSE는 평가 구간 길이가 달라 비교할 수 없다(늦게 멈춘 쪽이 발산 중인
+    구간을 더 포함한다 — 2026-09-26 질량 ×1.3에서 실제로 RMSE z가 18% 나빠 보였던 착시).
+    궤적이 처음 갈라지는 시각(한계가 처음 결과를 바꾼 때)도 함께 적는다.
+    """
+    base = {r['case']: r['integral_limit'] for r in rows if r['reproduces_reference'] is not None}
+    for r in rows:
+        a, profile = trajectories[(r['case'], base[r['case']])]
+        b, _ = trajectories[(r['case'], r['integral_limit'])]
+        n = min(len(a['ts']), len(b['ts']))
+        differ = np.any(a['xs'][:n] != b['xs'][:n], axis=1)
+        r['first_difference_t'] = float(a['ts'][int(np.argmax(differ))]) if differ.any() else None
+        ts, xs = b['ts'][:n], b['xs'][:n]
+        vr, zr = profile.compute_refs(ts)
+        w = ts >= 3.0                                   # 통합임무 평가 시작(첫 호버 3 s 제외)
+        r['common_window_end_s'] = float(ts[-1])
+        r['common_window_rmse_velocity'] = float(np.sqrt(np.mean(np.sum((xs[w, 3:6] - vr[w])**2, axis=1))))
+        r['common_window_rmse_z'] = float(np.sqrt(np.mean((xs[w, 2] - zr[w])**2)))
+
+
+def limit_impact(rows):
+    """설정값 한계 대 다른 한계 — 사례마다 미리 정한 '영향 있음' 규칙을 적용한다."""
+    out = {}
+    base = {r['case']: r for r in rows if r['reproduces_reference'] is not None}
+    for r in rows:
+        if r['reproduces_reference'] is not None:
+            continue
+        b = base[r['case']]
+        reasons = []
+        if (b['stop_reason'] is None) != (r['stop_reason'] is None) or b['stop_reason'] != r['stop_reason']:
+            reasons.append(f'stop {b["stop_reason"]} -> {r["stop_reason"]}')
+        if abs(b['simulated_seconds'] - r['simulated_seconds']) > IMPACT_STOP_TIME_S:
+            reasons.append(f'stop time {b["simulated_seconds"]:.2f} -> {r["simulated_seconds"]:.2f} s')
+        for key in ('window_rmse_velocity', 'window_rmse_z'):
+            a, c = b[key], r[key]
+            if a is not None and c is not None and abs(c - a) > IMPACT_RMSE_RELATIVE*abs(a):
+                reasons.append(f'{key} {a:.4g} -> {c:.4g}')
+        if b['paper_failed'] != r['paper_failed']:
+            reasons.append(f'paper_failed {b["paper_failed"]} -> {r["paper_failed"]}')
+        out[f'{r["case"]}@{r["integral_limit"]:g}'] = dict(impact=bool(reasons), reasons=reasons)
+    return out
+
+
+def write_smoke_markdown(path, data):
+    m = data['meta']
+    lines = ['# GSLQR 적분 한계 — 스모크 사례 대조(PILOT)', '',
+             '**PILOT** — kj 결정 6-9: 한계 ∞로 영향부터 대조하고, 영향이 있으면 한계를 넓힌다. 결론 없음.', '',
+             f'재현: `{m["command"]}` · 설정 sha256 `{m["config_sha256"][:12]}` · git `{m["git_revision"]}` '
+             f'dirty={m["git_dirty"]}', '',
+             f'영향 있음 = 정지 여부·사유 변화, 정지 시각 {IMPACT_STOP_TIME_S:g} s 초과 변화, 창 RMSE(v·z) '
+             f'{100*IMPACT_RMSE_RELATIVE:g}% 초과 변화, 논문 판정 변화 중 하나(미리 정한 규칙).', '',
+             '| 사례 | 적분 한계 | 정지 | 시간 s | 창 RMSE v | 창 RMSE z | 공통 구간 RMSE v / z | 처음 갈라진 시각 s | '
+             '\\|ω\\|max | 논문 실패 | 한계 도달 % | ξ 최대(z, vx) | 참조 재현 |',
+             '|---|---:|---|---:|---:|---:|---|---:|---:|---|---:|---|---|']
+    for r in data['rows']:
+        peak = ', '.join(f'{k} {v:.3g}' for k, v in r['peak_xi'].items())
+        lim = '—' if r['at_limit_fraction'] is None else f'{100*r["at_limit_fraction"]:.2f}'
+        first = '—' if r['first_difference_t'] is None else f'{r["first_difference_t"]:.3f}'
+        lines.append(f'| {r["case"]} | {r["integral_limit"]:g} | {r["stop_reason"] or "끝까지"} | '
+                     f'{r["simulated_seconds"]:.2f} | {r["window_rmse_velocity"]:.4g} | {r["window_rmse_z"]:.4g} | '
+                     f'{r["common_window_rmse_velocity"]:.4g} / {r["common_window_rmse_z"]:.4g} '
+                     f'(~{r["common_window_end_s"]:.2f} s) | {first} | '
+                     f'{r["max_omega"]:.3g} | {r["paper_failed"]} | {lim} | {peak} | '
+                     f'{"—" if r["reproduces_reference"] is None else r["reproduces_reference"]} |')
+    lines += ['', '공통 구간 = 두 한계 실행이 모두 살아 있던 [3 s, 먼저 멈춘 시각]. 창 RMSE는 정지 시각이 다르면 '
+              '구간 길이가 달라 직접 비교할 수 없어 함께 적는다.', '', '## 영향 판정(미리 정한 규칙)', '']
+    lines += [f'- {k}: {"영향 있음 — " + "; ".join(v["reasons"]) if v["impact"] else "영향 없음"}'
+              for k, v in data['impact'].items()]
+    Path(path).write_text('\n'.join(lines) + '\n', encoding='utf-8')
+
+
 def main(argv=None):
     from control.validation_suite import write_json, environment_fingerprint, git_state
     parser = argparse.ArgumentParser(description=__doc__,
@@ -192,8 +311,29 @@ def main(argv=None):
     parser.add_argument('--binding', action='store_true', help='rerun the design check with limits removed')
     parser.add_argument('--history', action='store_true', help='CPID fix stages on the design check')
     parser.add_argument('--hold', action='store_true', help='CPID 60 s hold at 20 m/s, altitude integral variants')
+    parser.add_argument('--smoke-cases', nargs='*', metavar='CASE',
+                        help='GSLQR integral limit: configured vs --limits on these smoke cases '
+                             f'(default {" ".join(SMOKE_CASES)}); writes INTEGRATORS_SMOKE.md')
+    parser.add_argument('--limits', nargs='+', type=float, default=[UNLIMITED],
+                        help='limits compared with the configured one (default 1e9 = unlimited)')
     args = parser.parse_args(argv)
     config = load_config(args.config)
+    if args.smoke_cases is not None:
+        cases = args.smoke_cases or list(SMOKE_CASES)
+        model = ArenaFactory(config).model
+        rows = smoke_limit_comparison(config, model, cases, [None] + list(args.limits))
+        revision, dirty = git_state()
+        data = dict(meta=dict(label='PILOT', command='python -m control.arena_integrators --smoke-cases '
+                              + ' '.join(cases) + ' --limits ' + ' '.join(f'{x:g}' for x in args.limits),
+                              created_utc=datetime.now(timezone.utc).isoformat(),
+                              config_sha256=config_sha256(config), git_revision=revision, git_dirty=dirty,
+                              environment=environment_fingerprint()),
+                    rows=rows, impact=limit_impact(rows))
+        args.out.mkdir(parents=True, exist_ok=True)
+        write_json(args.out/'integrators_smoke.json', data)
+        write_smoke_markdown(args.out/'INTEGRATORS_SMOKE.md', data)
+        print((args.out/'INTEGRATORS_SMOKE.md').read_text(encoding='utf-8'))
+        return data
     factory = ArenaFactory(config)
     revision, dirty = git_state()
     flags = [f for f in ('binding', 'history', 'hold') if getattr(args, f)]

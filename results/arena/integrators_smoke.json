@@ -1,0 +1,181 @@
+{
+  "meta": {
+    "label": "PILOT",
+    "command": "python -m control.arena_integrators --smoke-cases mission_VH_mass1.3 mission_VH_tau2 --limits 1e+09 50",
+    "created_utc": "2026-09-26T03:13:12.610232+00:00",
+    "config_sha256": "60fba9acd26db785d5b593f87156f320baad33316a7a4d104e99e9fe37016015",
+    "git_revision": "2bf67e02abeb1dae12c78fbe9d3b2bc6a0b6d30e",
+    "git_dirty": true,
+    "environment": {
+      "system": "Darwin",
+      "release": "25.6.0",
+      "machine": "arm64",
+      "cpu": "Apple M4",
+      "python": "3.13.7",
+      "packages": {
+        "numpy": "2.3.3",
+        "scipy": "1.16.3",
+        "casadi": "3.7.2",
+        "matplotlib": "3.10.6"
+      },
+      "threads": {
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "VECLIB_MAXIMUM_THREADS": "1",
+        "MKL_NUM_THREADS": null
+      }
+    }
+  },
+  "rows": [
+    {
+      "case": "mission_VH_mass1.3",
+      "integral_limit": 5.0,
+      "stop_reason": "body-rate or altitude divergence stop",
+      "simulated_seconds": 44.326,
+      "paper_failed": true,
+      "window_rmse_velocity": 7.95723670800092,
+      "window_rmse_z": 5.172796206753489,
+      "max_omega": 25.971002158571824,
+      "at_limit_fraction": 0.10968731669900285,
+      "peak_xi": {
+        "z": 2.4656194028845992,
+        "vx": 5.0
+      },
+      "trajectory_sha256": "dd990343d8eb32a464e9524d67a16d0bd150188c26894cd5f7c20ceedb059148",
+      "reproduces_reference": true,
+      "first_difference_t": null,
+      "common_window_end_s": 44.326,
+      "common_window_rmse_velocity": 7.95723670800092,
+      "common_window_rmse_z": 5.172796206753489
+    },
+    {
+      "case": "mission_VH_tau2",
+      "integral_limit": 5.0,
+      "stop_reason": "body-rate or altitude divergence stop",
+      "simulated_seconds": 45.776,
+      "paper_failed": true,
+      "window_rmse_velocity": 7.5129782246725405,
+      "window_rmse_z": 6.125595299594217,
+      "max_omega": 33.141807447981776,
+      "at_limit_fraction": 0.04889024816497728,
+      "peak_xi": {
+        "z": 2.7549296495574875,
+        "vx": 5.0
+      },
+      "trajectory_sha256": "f9b2b1c288605af88762c4040bb770703f5561d960f555cc0295f96137e5045e",
+      "reproduces_reference": true,
+      "first_difference_t": null,
+      "common_window_end_s": 45.776,
+      "common_window_rmse_velocity": 7.512978224672541,
+      "common_window_rmse_z": 6.125595299594217
+    },
+    {
+      "case": "mission_VH_mass1.3",
+      "integral_limit": 1000000000.0,
+      "stop_reason": "body-rate or altitude divergence stop",
+      "simulated_seconds": 44.588,
+      "paper_failed": true,
+      "window_rmse_velocity": 8.037650440282357,
+      "window_rmse_z": 6.1162142039089105,
+      "max_omega": 25.97043932629984,
+      "at_limit_fraction": 0.0,
+      "peak_xi": {
+        "z": 2.4678642599168885,
+        "vx": 5.912535657543413
+      },
+      "trajectory_sha256": "5fb75813052db151f27f3971b7635010a3862e4e391a1f37c3d1035ce7d77624",
+      "reproduces_reference": null,
+      "first_difference_t": 37.938,
+      "common_window_end_s": 44.326,
+      "common_window_rmse_velocity": 7.114311287904426,
+      "common_window_rmse_z": 4.892506344582602
+    },
+    {
+      "case": "mission_VH_tau2",
+      "integral_limit": 1000000000.0,
+      "stop_reason": "body-rate or altitude divergence stop",
+      "simulated_seconds": 45.766,
+      "paper_failed": true,
+      "window_rmse_velocity": 7.55556054711446,
+      "window_rmse_z": 6.087095282294332,
+      "max_omega": 34.55576600050304,
+      "at_limit_fraction": 0.0,
+      "peak_xi": {
+        "z": 2.7434566276983263,
+        "vx": 5.788194192377495
+      },
+      "trajectory_sha256": "0e7796ae9e7db4f51ff1967d104c97ae31a27d7e3e6eee0444db578d42ffb0b4",
+      "reproduces_reference": null,
+      "first_difference_t": 43.542,
+      "common_window_end_s": 45.766,
+      "common_window_rmse_velocity": 7.55556054711446,
+      "common_window_rmse_z": 6.087095282294332
+    },
+    {
+      "case": "mission_VH_mass1.3",
+      "integral_limit": 50.0,
+      "stop_reason": "body-rate or altitude divergence stop",
+      "simulated_seconds": 44.588,
+      "paper_failed": true,
+      "window_rmse_velocity": 8.037650440282357,
+      "window_rmse_z": 6.1162142039089105,
+      "max_omega": 25.97043932629984,
+      "at_limit_fraction": 0.0,
+      "peak_xi": {
+        "z": 2.4678642599168885,
+        "vx": 5.912535657543413
+      },
+      "trajectory_sha256": "5fb75813052db151f27f3971b7635010a3862e4e391a1f37c3d1035ce7d77624",
+      "reproduces_reference": null,
+      "first_difference_t": 37.938,
+      "common_window_end_s": 44.326,
+      "common_window_rmse_velocity": 7.114311287904426,
+      "common_window_rmse_z": 4.892506344582602
+    },
+    {
+      "case": "mission_VH_tau2",
+      "integral_limit": 50.0,
+      "stop_reason": "body-rate or altitude divergence stop",
+      "simulated_seconds": 45.766,
+      "paper_failed": true,
+      "window_rmse_velocity": 7.55556054711446,
+      "window_rmse_z": 6.087095282294332,
+      "max_omega": 34.55576600050304,
+      "at_limit_fraction": 0.0,
+      "peak_xi": {
+        "z": 2.7434566276983263,
+        "vx": 5.788194192377495
+      },
+      "trajectory_sha256": "0e7796ae9e7db4f51ff1967d104c97ae31a27d7e3e6eee0444db578d42ffb0b4",
+      "reproduces_reference": null,
+      "first_difference_t": 43.542,
+      "common_window_end_s": 45.766,
+      "common_window_rmse_velocity": 7.55556054711446,
+      "common_window_rmse_z": 6.087095282294332
+    }
+  ],
+  "impact": {
+    "mission_VH_mass1.3@1e+09": {
+      "impact": true,
+      "reasons": [
+        "stop time 44.33 -> 44.59 s",
+        "window_rmse_z 5.173 -> 6.116"
+      ]
+    },
+    "mission_VH_tau2@1e+09": {
+      "impact": false,
+      "reasons": []
+    },
+    "mission_VH_mass1.3@50": {
+      "impact": true,
+      "reasons": [
+        "stop time 44.33 -> 44.59 s",
+        "window_rmse_z 5.173 -> 6.116"
+      ]
+    },
+    "mission_VH_tau2@50": {
+      "impact": false,
+      "reasons": []
+    }
+  }
+}
