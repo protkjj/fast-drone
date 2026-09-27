@@ -122,6 +122,14 @@ python3 -m control.arena_tune --summarize --run-dir results/arena/tuning/retune_
 
 ---
 
+### A.6 맥에서 미리 시험한 결과(2026-09-27)
+
+절 A 전체(clone→venv→pip install→환경변수→`setup_env.py`→작은 튜닝(예산 3)→결과 회수→
+`--summarize`)를 별도 git worktree(가상의 "학교 컴퓨터")로 한 번 돌렸다. `pip install -r
+requirements-lock.txt`가 `python==3.13.7` 줄 때문에 실패하는 버그를 여기서 찾아 고쳤다(락 파일에서
+그 줄을 빼고 `setup_env.py`가 따로 확인하게 바꿈, 커밋 `54ebfe0`). 고친 뒤에는 전 과정이 통과했고,
+사전값 목적함수(0.7847247648921318)가 원래 맥 실행과 정확히 같았다(같은 코드·설정·게인이면 기대되는 값).
+
 ## B. 본 실험 분산 (준비 중 — 4단계 `configs/main_experiment.json` 확정 후 채운다)
 
 `scripts/make_shards.py`(사례 단위로 나누기, 한 사례의 전 제어기는 같은 조각) →
