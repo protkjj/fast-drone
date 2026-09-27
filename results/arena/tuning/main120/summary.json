@@ -1,0 +1,132 @@
+{
+  "label": "PILOT",
+  "run_dir": "results/arena/tuning/main120",
+  "i4_violations": [
+    "F13: status running",
+    "F13: spent 8 != budget 120",
+    "M17: status running",
+    "M17: spent 2 != budget 120",
+    "V13: status running",
+    "V13: spent 11 != budget 120"
+  ],
+  "integrator_limit": {
+    "threshold": 0.01,
+    "flagged": 6,
+    "flags": [
+      {
+        "controller": "CPID",
+        "case": "tune_gust_vertical_p4_V40",
+        "evaluation": 1,
+        "at_limit_fraction": 0.0705,
+        "channels": {
+          "z": 141
+        }
+      },
+      {
+        "controller": "CPID",
+        "case": "tune_gust_vertical_p4_V40",
+        "evaluation": 17,
+        "at_limit_fraction": 0.0705,
+        "channels": {
+          "z": 141
+        }
+      },
+      {
+        "controller": "CPID",
+        "case": "tune_gust_vertical_p4_V40",
+        "evaluation": 18,
+        "at_limit_fraction": 0.07,
+        "channels": {
+          "z": 140
+        }
+      },
+      {
+        "controller": "CPID",
+        "case": "tune_gust_vertical_p4_V40",
+        "evaluation": 23,
+        "at_limit_fraction": 0.1265,
+        "channels": {
+          "z": 253
+        }
+      },
+      {
+        "controller": "CPID",
+        "case": "tune_gust_vertical_p4_V40",
+        "evaluation": 42,
+        "at_limit_fraction": 0.1435,
+        "channels": {
+          "z": 287
+        }
+      },
+      {
+        "controller": "CPID",
+        "case": "tune_gust_vertical_p4_V40",
+        "evaluation": 53,
+        "at_limit_fraction": 0.1825,
+        "channels": {
+          "z": 365
+        }
+      }
+    ]
+  },
+  "controllers": {
+    "CPID": {
+      "budget": 120,
+      "spent": 120,
+      "status": "complete",
+      "prior_objective": 500.21325190599265,
+      "best_objective": 500.02364122891356,
+      "best_values": {
+        "Kp_vel": 32.0,
+        "Ki_vel": 0.15,
+        "Kp_z": 16.0,
+        "Kd_z": 4.0,
+        "Ki_z": 0.5,
+        "Kp_att": 1.0,
+        "Kd_att": 1.0
+      }
+    },
+    "F13": {
+      "budget": 120,
+      "spent": 8,
+      "status": "running",
+      "prior_objective": null,
+      "best_objective": null,
+      "best_values": null
+    },
+    "GSLQR": {
+      "budget": 120,
+      "spent": 120,
+      "status": "complete",
+      "prior_objective": 0.48438070105802955,
+      "best_objective": 0.20326943983164436,
+      "best_values": {
+        "q_z": 6400.0,
+        "q_v_h": 81920.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.01,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      }
+    },
+    "M17": {
+      "budget": 120,
+      "spent": 2,
+      "status": "running",
+      "prior_objective": null,
+      "best_objective": null,
+      "best_values": null
+    },
+    "V13": {
+      "budget": 120,
+      "spent": 11,
+      "status": "running",
+      "prior_objective": null,
+      "best_objective": null,
+      "best_values": null
+    }
+  }
+}
