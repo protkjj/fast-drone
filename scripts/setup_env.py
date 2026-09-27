@@ -33,10 +33,13 @@ LOCK = ROOT / 'requirements-lock.txt'
 THREAD_VARIABLES = ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'VECLIB_MAXIMUM_THREADS', 'MKL_NUM_THREADS')
 # requirements-lock.txt를 실제로 만든 기준 컴퓨터(2026-09-27). 이 값이 바뀌면 락 파일도 새로 만들 것.
 REFERENCE_PLATFORM = ('Darwin', 'arm64')
+# 파이썬 자체는 pip 설치 대상이 아니라 requirements-lock.txt에 안 넣고 여기서 따로 관리한다.
+REFERENCE_PYTHON = '3.13.7'
 
 
 def read_lock(path=LOCK):
-    """requirements-lock.txt를 {패키지: 버전} 으로. '#' 뒤는 주석, python 자체도 한 줄이다."""
+    """requirements-lock.txt를 {패키지: 버전} 으로. '#' 뒤는 주석. 파이썬 자체는 이 파일에 없다
+    (pip 설치 대상이 아니라서) — REFERENCE_PYTHON으로 따로 확인한다."""
     pins = {}
     for line in Path(path).read_text(encoding='utf-8').splitlines():
         line = line.split('#', 1)[0].strip()
@@ -48,15 +51,28 @@ def read_lock(path=LOCK):
 
 
 def check_versions(pins):
-    """(통과여부, 항목별 결과). 파이썬 자체는 pins['python']과 platform.python_version()로.
-    나머지는 importlib.metadata.version. 지금 컴퓨터가 락 파일을 만든 기준 플랫폼과 다르면
-    못 맞아도 WARN(치명적이지 않음)이다 — 같은 플랫폼에서 다르면 FAIL이다."""
+    """(통과여부, 항목별 결과). importlib.metadata.version으로 패키지를 본다.
+
+    파이썬 자체는 따로 본다: **주(main.minor)** 버전이 다르면(3.13 vs 3.12 등) 플랫폼과 무관하게
+    FAIL이다(언어 자체 동작이 달라질 수 있어서). 패치 버전(3.13.7 vs 3.13.2)만 다르면 지금
+    컴퓨터가 기준 플랫폼과 같을 때만 FAIL, 다르면 WARN이다 — 나머지 패키지도 같은 규칙이다.
+    """
     same_platform = (platform.system(), platform.machine()) == REFERENCE_PLATFORM
     rows, ok = [], True
-    installed = dict(python=platform.python_version())
+
+    py_got = platform.python_version()
+    if py_got == REFERENCE_PYTHON:
+        py_severity = 'OK'
+    elif tuple(py_got.split('.')[:2]) != tuple(REFERENCE_PYTHON.split('.')[:2]):
+        py_severity = 'FAIL'                        # 주(main.minor) 버전이 다르면 플랫폼 무관 FAIL
+    else:
+        py_severity = 'FAIL' if same_platform else 'WARN'   # 패치만 다름: 기준 플랫폼에서만 FAIL
+    rows.append(('python', REFERENCE_PYTHON, py_got, py_severity))
+    if py_severity == 'FAIL':
+        ok = False
+
+    installed = {}
     for name in pins:
-        if name == 'python':
-            continue
         try:
             installed[name] = version(name)
         except PackageNotFoundError:
