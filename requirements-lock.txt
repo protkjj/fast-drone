@@ -1,0 +1,14 @@
+# 분산 실행(경기장 튜닝·본 실험) 기준 환경 — 정확히 이 버전만.
+# requirements.txt(팀 온보딩용, >= 느슨한 하한)와는 목적이 다르다: 여기는 여러 컴퓨터가 같은
+# 숫자를 내야 하는 실행(튜닝·본 실험)의 기준점이다. scripts/setup_env.py가 이 파일과 대조한다.
+#
+# 기준 컴퓨터: kj 맥(Darwin arm64, Apple M4), 2026-09-27 고정.
+# 다른 OS/아키텍처(예: 학교 컴퓨터 Ubuntu x86_64)에서 정확히 같은 빌드를 못 구할 수 있다 —
+# 그 경우 setup_env.py는 실패하지 않고 WARN으로 남기고, 최종 판정은 scripts/cross_check.py의
+# 허용오차(rtol 1e-3) 비교가 한다(scripts/verify_arena.py의 기존 방침과 같다. VERIFY.md 참고).
+python==3.13.7
+numpy==2.3.3
+scipy==1.16.3
+casadi==3.7.2
+matplotlib==3.10.6
+pytest==9.0.2
