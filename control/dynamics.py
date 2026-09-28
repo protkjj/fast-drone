@@ -57,22 +57,33 @@ def _quat_derivative(q, omega):
 # 공력
 # ════════════════════════════════════════════════════
 
-def _moment_correction(u_b, v_b, w_b, V, qsd, mc):
+def _moment_correction(u_b, v_b, w_b, V, p, mc):
     """ΔM = q̄·S·d·[0, 피치 다항식(Δα, β²), 요 다항식(β)] — 계수·기준표는 configs/controller_moment_model.json.
 
     Δα = α − α_ref(V), α_ref는 제어기 모델 명목 트림 α의 1 m/s 격자 선형 보간(속도는 격자 범위로 자름).
-    각도는 ±angle_clip_deg로 자른다 — 적합 창(±20°) 밖 다항식 폭주와 역유입(u_b<0) atan2 뒤집힘 방지."""
+    각도는 ±angle_clip_deg로 자른다 — 적합 창(±20°) 밖 다항식 폭주와 역유입(u_b<0) atan2 뒤집힘 방지.
+
+    호버(동체 속도 0): atan2(0,0)·√0의 **미분**이 NaN이라 선형화(GSLQR)·NLP 기울기(M17·F13)가 터졌다
+    (2026-09-28 밤, tune-final-4 첫 평가 전부 실패로 발견 — 값만 보던 시험이 못 잡았다). 속도가 거의 0이면
+    atan2·√의 인자를 안전한 상수로 바꾸고, 크기는 EPS 없는 q̄ = ½ρ(u²+v²+w²)로 곱한다 — 호버에서 값과
+    미분이 모두 정확히 0이다. 적합(control/moment_correction.py)도 EPS 없는 q̄를 썼다."""
     clip = np.radians(float(mc['angle_clip_deg']))
     Vhat = V / float(mc['V_scale'])
     V_grid = [float(v) for v in mc['alpha_ref']['V']]
     a_grid = [float(a) for a in mc['alpha_ref']['alpha']]
+    V2 = u_b**2 + v_b**2 + w_b**2
+    still = V2 < 1e-12                                  # 동체 속도 1e-6 m/s 미만
+    u_s = ca.if_else(still, 1.0, u_b)
+    v_s = ca.if_else(still, 0.0, v_b)
+    w_s = ca.if_else(still, 0.0, w_b)
+    qsd = 0.5 * p['rho'] * V2 * p['S_ref'] * p['d_ref']
     # 보간 위치는 EPS 없는 속력으로 — V(=√(V²+EPS))로 보간하면 격자점 트림에서도 α_ref가 ~1e-11 rad
-    # 어긋나 보정항이 0이 아니었다(2e-12 N·m). V̂(q̄ 쪽)는 기존 V를 그대로 쓴다.
-    V_exact = ca.sqrt(u_b**2 + v_b**2 + w_b**2)
+    # 어긋나 보정항이 0이 아니었다(2e-12 N·m). V̂는 기존 V를 그대로 쓴다.
+    V_exact = ca.sqrt(u_s**2 + v_s**2 + w_s**2)
     Vc = ca.fmin(ca.fmax(V_exact, V_grid[0]), V_grid[-1])
     alpha_ref = ca.interpolant('alpha_ref', 'linear', [V_grid], a_grid)(Vc)
-    d_alpha = ca.fmin(ca.fmax(ca.atan2(w_b, u_b) - alpha_ref, -clip), clip)
-    beta = ca.fmin(ca.fmax(ca.atan2(v_b, u_b), -clip), clip)
+    d_alpha = ca.fmin(ca.fmax(ca.atan2(w_s, u_s) - alpha_ref, -clip), clip)
+    beta = ca.fmin(ca.fmax(ca.atan2(v_s, u_s), -clip), clip)
 
     def poly(block):
         # 항마다 V̂^0..V̂^V_degree 순서(control/moment_correction.py::basis와 같음)
@@ -133,7 +144,7 @@ def _body_aerodynamics(v_body, omega, p):
     if 'moment_correction' in p:
         # 트림 밖 피치·요 모멘트 보정(control/moment_correction.py, kj 결정 2026-09-28 밤). 키가 없으면
         # 이 줄들을 안 지나 기존과 비트 동일하다. Δα = β = 0(명목 트림)에서 정의상 0.
-        M_static = M_static + _moment_correction(u_b, v_b, w_b, V, q_bar * S * d, p['moment_correction'])
+        M_static = M_static + _moment_correction(u_b, v_b, w_b, V, p, p['moment_correction'])
 
     # 감쇠 모멘트: 0.25·ρ·V·S·d²·C_damp·ω
     df = 0.25 * rho * V * S * d**2

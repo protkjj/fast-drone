@@ -64,6 +64,45 @@ def test_correction_changes_only_pitch_and_yaw_moment(factory_v2):
         assert M0[1] != M1[1] and M0[2] != M1[2]
 
 
+def test_linearization_is_finite_at_every_trim_and_near_hover(factory_v2):
+    """2026-09-28 밤 버그: atan2(0,0)·√0의 미분이 호버에서 NaN이라 GSLQR 설계·NLP 기울기가 터졌다
+    (tune-final-4 첫 평가 전 시나리오 실패). 값만 보던 시험이 못 잡아 미분을 직접 본다."""
+    from control.dynamics import build_dynamics
+    fn, xs, us = build_dynamics(factory_v2.cp_pred)
+    J = ca.Function('J', [xs, us], [ca.jacobian(fn(xs, us), xs), ca.jacobian(fn(xs, us), us)])
+    for V in range(0, 86):
+        tr = factory_v2.model.trim(float(V))
+        for m in J(tr['state'], tr['control']):
+            assert np.all(np.isfinite(np.array(m))), V
+    hover = factory_v2.model.trim(0.0)
+    for speed in (1e-9, 1e-7, 1e-4, 1e-2):
+        for direction in ([1, 0, 0], [0, 1, 0], [0, 0, 1], [-1, 0, 0]):
+            x = hover['state'].copy()
+            x[3:6] = speed*np.asarray(direction, dtype=float)
+            for m in J(x, hover['control']):
+                assert np.all(np.isfinite(np.array(m))), (speed, direction)
+
+
+def test_correction_and_its_gradient_are_exactly_zero_at_hover(factory_v2):
+    v, w = ca.SX.sym('v', 3), ca.SX.sym('w', 3)
+    M_new = dynamics._body_aerodynamics(v, w, factory_v2.cp_pred)[1]
+    M_old = dynamics._body_aerodynamics(v, w, factory_v2.cp)[1]
+    f = ca.Function('d', [v, w], [M_new - M_old, ca.jacobian(M_new - M_old, v)])
+    value, grad = (np.array(t) for t in f([0, 0, 0], [0, 0, 0]))
+    assert np.all(value == 0) and np.all(grad == 0)
+
+
+def test_gslqr_actually_designs_under_v2(native, factory):
+    """배선 시험은 생성자를 가로채 실제 설계를 안 돌렸다 — 실제로 짓는다(18개 속도점, 게인 유한).
+    공용 factory_v2에 설계를 캐시하면 배선 시험의 가로채기가 안 불리므로 새 팩토리를 쓴다."""
+    fresh = ArenaFactory(load_config(V2), native, model=factory.model)
+    proto = fresh._gslqr_prototype()
+    assert len(proto.V_table) == 18 and not proto.dropped
+    assert np.all(np.isfinite(proto._K_r_flat)) and np.abs(proto._K_r_flat).max() > 0
+    if proto._K_i_flat is not None:
+        assert np.all(np.isfinite(proto._K_i_flat))
+
+
 def test_correction_vanishes_at_every_nominal_trim(factory_v2):
     old, new = _moment_fn(factory_v2.cp), _moment_fn(factory_v2.cp_pred)
     for V in range(0, 86):
