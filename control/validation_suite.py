@@ -81,6 +81,19 @@ def trajectory_sha256(result):
     return digest.hexdigest()
 
 
+def plant_truth(nominal, case):
+    """시행 하나의 플랜트 파라미터 — run_trial과 본 실험 트림 사전 확인(control/main_experiment.py)이
+    같이 쓴다(둘이 다른 truth를 보면 사전 확인이 뜻이 없다). 제어기는 명목 nominal을 그대로 쓴다."""
+    truth = perturb_params(nominal, case['factors'])
+    extra = case.get('extra_params', {})
+    if 'cg_offset_axis' in extra:
+        # 표7 무게중심 편차 — 곱셈이 아니라 위치벡터 전체의 덧셈 이동이라 update로는 못 담는다.
+        # 플랜트(truth)에만 적용하고, 제어기는 명목 factory.p를 그대로 쓴다. 키가 없으면 안 부른다.
+        truth = cg_offset_arm_fraction(truth, extra['cg_offset_axis'], float(extra['cg_offset_arm_fraction']))
+    truth.update(extra)     # 표7 wrench 훅·관측 지연(곱셈 FACTORS 밖). 무게중심 키는 기록용으로 남는다
+    return truth
+
+
 def run_trial(factory, label, profile, case, limits):
     """Fresh controller state per trial; nominal gains/solver may be cached.
 
@@ -93,13 +106,8 @@ def run_trial(factory, label, profile, case, limits):
     # 프로세스가 6~10 GB). 계산에는 영향이 없다.
     gc.collect()
     nominal_hash = parameter_hash(factory.p)
-    truth = perturb_params(factory.p, case['factors'])
+    truth = plant_truth(factory.p, case)
     extra = case.get('extra_params', {})
-    if 'cg_offset_axis' in extra:
-        # 표7 무게중심 편차 — 곱셈이 아니라 위치벡터 전체의 덧셈 이동이라 update로는 못 담는다.
-        # 플랜트(truth)에만 적용하고, 제어기는 명목 factory.p를 그대로 쓴다. 키가 없으면 안 부른다.
-        truth = cg_offset_arm_fraction(truth, extra['cg_offset_axis'], float(extra['cg_offset_arm_fraction']))
-    truth.update(extra)     # 표7 wrench 훅·관측 지연(곱셈 FACTORS 밖). 무게중심 키는 기록용으로 남는다
     initial_v, initial_z, _ = profile.get_ref(0.)
     if 'cg_offset_axis' in extra:
         # 벤더 find_trim은 평면(좌우 대칭) 탐색기라 CG 편차 트림을 표현하지 못한다(보고서 20절).

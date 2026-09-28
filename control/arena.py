@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = ROOT / 'configs' / 'arena.json'
 SCHEMA = 'arena/1'
 CONTROLLERS = ('V13', 'M17', 'F13', 'GSLQR', 'CPID')
-SCENARIO_TYPES = ('mission', 'gust', 'reference', 'step')
+SCENARIO_TYPES = ('mission', 'gust', 'reference', 'step', 'cruise')
 STEP_AXES = ('altitude', 'speed')
 # extra_params가 받는 키 전체 — 곱셈 FACTORS와 별개인 원값 덮어쓰기(표7 wrench 훅 + 관측 지연 +
 # 무게중심 편차). 무게중심 두 키는 함께 준다(run_trial이 cg_offset_arm_fraction으로 적용).
@@ -139,6 +139,13 @@ def validate_config(config):
                 raise ValueError(f"{s['id']}: give both {CG_OFFSET_KEYS}")
             if extra['cg_offset_axis'] not in CG_OFFSET_AXES:
                 raise ValueError(f"{s['id']}: cg_offset_axis must be one of {sorted(CG_OFFSET_AXES)}")
+        for key in ('ramp_round_s', 'min_total_s'):
+            if key in s and (s['type'] != 'reference' or float(s[key]) <= 0
+                             or not _is_multiple(float(s[key]), dt)):
+                raise ValueError(f"{s['id']}: {key} is a reference-only positive multiple of {dt}")
+        if s['type'] == 'cruise' and 'evaluation_start_s' in s and not (
+                0 <= float(s['evaluation_start_s']) < sum(float(t) for t in s['times_s'])):
+            raise ValueError(f"{s['id']}: evaluation_start_s must lie inside the cruise")
         if s['type'] == 'gust' and s['direction'] not in ('lateral', 'vertical'):
             raise ValueError(f"{s['id']}: gust direction must be lateral or vertical")
         if s['type'] == 'step' and s['axis'] not in STEP_AXES:
@@ -289,7 +296,7 @@ def _our_state(cp, V, theta, n_pos, n_neg):
     return x
 
 
-def available_acceleration(cp, V, direction, guess):
+def available_acceleration(cp, V, direction, guess, inflow_constraint=True, return_inflow=False):
     """명목 제어기 모델로 본, 속도 V에서 ±x 방향으로 낼 수 있는 최대 가속도.
 
     논문 §5.5: "a_avail은 해당 속도와 방향에서 최대 회전수로 낼 수 있는
@@ -307,6 +314,15 @@ def available_acceleration(cp, V, direction, guess):
     취급한다 — 모델이 틀리는 영역의 값이었다. 팀 플랜트의 도메인 판정
     (propeller_curve.domain_status)도 역유입을 무효로 본다. 그래서 a_avail은
     '명목 모델이 유효한 영역'에서만 잰다.
+
+    **정의(kj 결정 2026-09-28)**: 트림 자세 ±0.3 rad에서 출발하는 국소 탐색이고, 그 결과를
+    '공력 모델이 유효한 작은 받음각 범위 안의 가용 가속도'로 정의한다. 출발점을 넓히면 34~50 m/s
+    제동에서 받음각 약 90°(기수를 흐름에 거의 수직으로 세운 자세)의 해가 2~9배 큰 감속을 내지만,
+    공력 모델의 유효 범위 밖으로 보고 고려하지 않는다(보고서 21절). 튜닝 시나리오도 같은 정의다.
+
+    inflow_constraint=False, return_inflow=True는 분석용이다(본 실험 제동@V_L 끝점 규칙, 보고서 21절):
+    제약 없이 최대 제동 자세를 찾고 그 자세의 u_b를 함께 돌려준다 — u_b<0이면 그 속도에서 제약이
+    걸린다는 뜻이다. 기본값(제약 켜짐, 값 하나 반환)은 지금까지와 같은 코드 경로다.
     """
     from control.dynamics import AxialDronePlant
     plant = AxialDronePlant(cp, dt=0.001)
@@ -326,22 +342,25 @@ def available_acceleration(cp, V, direction, guess):
     theta0, n_eq, dn = guess
     bounds = [(-np.pi, np.pi), (cp['n_min'], cp['n_max']), (cp['n_min'], cp['n_max'])]
     cons = [{'type': 'eq', 'fun': lambda z: xdot(z)[5]},
-            {'type': 'eq', 'fun': lambda z: xdot(z)[11]},
-            {'type': 'ineq', 'fun': axial_inflow}]
-    best = None
+            {'type': 'eq', 'fun': lambda z: xdot(z)[11]}]
+    if inflow_constraint:
+        cons.append({'type': 'ineq', 'fun': axial_inflow})
+    best, best_inflow = None, None
     for dtheta in (0.0, 0.3, -0.3):
         z0 = [theta0 + dtheta, n_eq + dn, n_eq - dn]
         res = minimize(lambda z: -direction*xdot(z)[3], z0, method='SLSQP',
                        bounds=bounds, constraints=cons,
                        options={'ftol': 1e-12, 'maxiter': 500})
         xd = xdot(res.x)
-        if abs(xd[5]) > 1e-6 or abs(xd[11]) > 1e-6 or axial_inflow(res.x) < -1e-9:
+        if abs(xd[5]) > 1e-6 or abs(xd[11]) > 1e-6 or (inflow_constraint and axial_inflow(res.x) < -1e-9):
             continue                       # 제약 미충족 해는 버린다
         a = direction*xd[3]
         if best is None or a > best:
-            best = a
+            best, best_inflow = a, axial_inflow(res.x)
     if best is None:
         raise ValueError(f'available acceleration not found at V={V} (direction {direction:+.0f})')
+    if return_inflow:
+        return max(float(best), 0.0), float(best_inflow)
     return max(float(best), 0.0)
 
 
@@ -443,6 +462,15 @@ def build_scenarios(config, cp=None, native_params=None, only=None, scenarios=No
             window = (0.0, profile.T_total)
             meta.update(cruise_speed=V, peak_m_s=peak, direction=s['direction'],
                         flow_angle_deg=case['flow_angle_deg'])
+        elif s['type'] == 'cruise':
+            # 표7 기준 순항(2026-09-28 e). 돌풍 크기 0인 GustProfile을 쓴다 — (정착, 교란, 회복) =
+            # times_s. gust_interval이 외력·모멘트 인가 구간(t=3~8 s)과 겹쳐, 평가 코드가 '교란 해제 뒤
+            # 회복' 지표를 그대로 계산한다. 모델 섭동 행에서는 그 구간에 아무 일도 없어 해가 없다.
+            V = resolve_speed(s['speed'], config)
+            settle, pulse, recovery = (float(t) for t in s['times_s'])
+            profile = GustProfile(V, alt, settle, pulse, recovery)
+            window = (float(s.get('evaluation_start_s', 0.0)), profile.T_total)
+            meta.update(cruise_speed=V, disturbance_interval=profile.gust_interval)
         elif s['type'] == 'step':
             # 설계점검(control/arena_design_check.py)과 같은 StepProfile이다 — 크기(size)·관찰 시간만
             # 여기 설정에서 받는다. 매끄러운 계단(식(32), 1 s 전이)으로 고정한다 — 옛 원계단 옵션은
@@ -473,9 +501,18 @@ def build_scenarios(config, cp=None, native_params=None, only=None, scenarios=No
             T_raw, where = ramp_duration_for_rho(v0, v1, float(s['rho']), a_avail)
             # 스위트는 구간 길이가 플랜트 스텝의 배수여야 한다. 0.1 s 단위로
             # 올림해 ρ가 목표보다 커지지 않게 한다(실제 ρ는 meta에 남긴다).
-            T_r = _round_up(T_raw, max(0.1, dt))
-            profile = SmoothstepProfile(v0, v1, alt, float(s['lead_s']), T_r, float(s['tail_s']))
+            # ramp_round_s(본 실험, kj 결정 2026-09-28): 짧은 램프에서 0.1 s 올림이 ρ를 뭉갠다
+            # (가속@V_L ρ 1.0·1.2 → 0.90·1.03). 키가 없으면 옛 0.1 s 그대로 — 튜닝 시나리오 불변.
+            T_r = _round_up(T_raw, float(s['ramp_round_s']) if 'ramp_round_s' in s else max(0.1, dt))
+            tail = float(s['tail_s'])
+            if 'min_total_s' in s:
+                # 표7 외란(t=3~8 s)과 해제 뒤 7 s를 담도록 꼬리를 늘린다(dt 단위 올림). 이 시나리오의
+                # 평가 창은 섭동 없는 참조 프로필 시험과 길이가 다르다 — 같은 표에서 비교하지 않는다.
+                tail = max(tail, _round_up(float(s['min_total_s']) - float(s['lead_s']) - T_r, dt))
+            profile = SmoothstepProfile(v0, v1, alt, float(s['lead_s']), T_r, tail)
             window = (profile.ramp_start - 1.0, profile.ramp_end + 5.0)
+            if 'min_total_s' in s:
+                window = (window[0], max(window[1], float(s['min_total_s'])))
             meta.update(v0=v0, v1=v1, rho_target=float(s['rho']),
                         rho_actual=float(s['rho'])*T_raw/T_r, ramp_s=T_r, **where,
                         a_avail_table=dict(speeds=speeds.tolist(), accel=accels.tolist(),
