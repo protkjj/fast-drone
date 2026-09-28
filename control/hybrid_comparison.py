@@ -680,6 +680,9 @@ class ProperHybrid:
                                               # mg≠0이라 0에서 시작하면 INDI가
                                               # 없는 추력 부족을 크게 본다)
         self.last_alloc = None                 # 식(27) 배분 결과 (보고·피드백용)
+        # 원고 식(29) 계측(2026-09-28 밤): 이번 호출의 요청 ν_d와 명목 배분 ν_alloc. **기록 전용** —
+        # 반환 명령·필터 상태·피드백에 쓰지 않는다. 실제 입력 ν_act는 플랜트 쪽(run_trial)이 계산한다.
+        self.probe = None
         _, self._TM_to_f = compute_allocation_matrix(params)
 
     def _lpf_coeff(self, actual_dt):
@@ -695,6 +698,7 @@ class ProperHybrid:
         self._initialized = False
         self._f_prev = None
         self._f_filt = None
+        self.probe = None
         # VirtualNMPC 완전 리셋 (타이밍 + warm start + w0)
         if hasattr(self.nmpc, 'reset'):
             self.nmpc.reset()
@@ -710,12 +714,14 @@ class ProperHybrid:
         # 측정 NaN 가드 (리뷰 3d): _omega_dot_filt는 자기참조 LPF라 NaN이
         # 한 번 들어가면 영구 고착 — 갱신을 건너뛰고 모델 기반 폴백으로.
         if not (np.all(np.isfinite(omega)) and np.all(np.isfinite(n_actual))):
+            self.probe = dict(nu_d=np.r_[T_cmd, omega_dot_des], nu_alloc=None, path='fallback_nan')
             return self._fallback(T_cmd, omega_dot_des)
 
         if not self._initialized:
             self._omega_prev = omega.copy()
             self._prev_t = t
             self._initialized = True
+            self.probe = dict(nu_d=np.r_[T_cmd, omega_dot_des], nu_alloc=None, path='fallback_init')
             return self._fallback(T_cmd, omega_dot_des)
 
         # 2. ω̇ 측정 (LPF) — 하드코딩 dt 대신 실제 경과시간 사용
@@ -795,15 +801,23 @@ class ProperHybrid:
             # (VirtualNMPC.set_prev_input 참조) — 여기선 항상 통지만 한다.
             if hasattr(self.nmpc, 'set_prev_input'):
                 self.nmpc.set_prev_input(self.last_alloc)
+            self.probe = dict(nu_d=np.r_[T_cmd, omega_dot_des], nu_alloc=self.last_alloc.copy(), path='A1')
             return n_cmd
 
         # A0 (기존 동작 그대로 — 회귀 가드 겸 표6의 A0 비교항)
         try:
             dn = np.linalg.solve(G, dv)
         except np.linalg.LinAlgError:
+            self.probe = dict(nu_d=np.r_[T_cmd, omega_dot_des], nu_alloc=None, path='fallback_singular')
             return self._fallback(T_cmd, omega_dot_des)
 
-        return np.clip(n_actual + dn, self.p['n_min'], self.p['n_max'])
+        n_cmd = np.clip(n_actual + dn, self.p['n_min'], self.p['n_max'])
+        # 기록 전용: 사후 clip된 명령이 내는 명목 입력 효과(식(27)과 같은 선형화, A0에는 피드백이 없다)
+        dn_eff = n_cmd - n_actual
+        self.probe = dict(nu_d=np.r_[T_cmd, omega_dot_des],
+                          nu_alloc=np.r_[T_meas + G[0] @ dn_eff, self._omega_dot_filt + G[1:4] @ dn_eff],
+                          path='A0')
+        return n_cmd
 
     def _rotor_thrust_cap(self, V_axial):
         """현재 유속·명목 최대 회전수에서 로터별 추력 상한 f_max,i (식A2)."""

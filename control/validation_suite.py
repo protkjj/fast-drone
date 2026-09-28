@@ -81,6 +81,56 @@ def trajectory_sha256(result):
     return digest.hexdigest()
 
 
+# 원고 식(29)·(37) 계측(2026-09-28 밤). 정규화는 NMPC 비용함수(식 15·17)의 입력 정규화 행렬
+# D_ν = diag(m·g, 100, 100, 100)을 그대로 쓴다(control/hybrid_comparison.py VirtualNMPC, m은 명목 질량) —
+# kj 결정: 모든 제어기에 같은 D_ν. 원문 식(37)의 정규화와 다를 수 있어 원고 갱신 목록에 올렸다.
+NU_ALPHA_SCALE = 100.0
+
+
+def nu_scale(cp):
+    """D_ν 대각 = [명목 m·g, 100, 100, 100]."""
+    return np.array([cp['mass']*cp['g']] + [NU_ALPHA_SCALE]*3)
+
+
+def actual_input_function(truth):
+    """플랜트(팀원 모델, 참 파라미터)의 실제 가상입력 ν_act = [총추력, J⁻¹·M_rotor]. ω = 0으로 불러
+    자이로 결합항을 뺀다 — 제어기의 명목 배분(G)과 같은 '로터 추력·반토크가 만드는 입력 효과' 정의."""
+    import casadi as ca
+    from models.team_light.control.dynamics import _rotor_forces_moments
+    from models.team_light.control.geometry import thrust_axis
+    v, n = ca.SX.sym('v', 3), ca.SX.sym('n', 4)
+    F, M = _rotor_forces_moments(v, n, ca.SX.zeros(3), truth)
+    axis = ca.DM(thrust_axis(truth))
+    J = ca.vertcat(truth['Ixx'], truth['Iyy'], truth['Izz'])
+    return ca.Function('nu_act', [v, n], [ca.vertcat(ca.dot(axis, F), M/J)])
+
+
+def nu_decomposition(nu_d, nu_alloc, nu_act, dt, scale):
+    """식(29): r_ν = ν_alloc − ν_d(배분 잔차), ε_ν = ν_act − ν_alloc(실현 오차). D_ν로 나눈 뒤 성분별
+    [총추력, α_x, α_y, α_z]과 합친 노름의 적분(Σ|·|dt)·최댓값. ν_alloc이 없는 스텝(초기화·NaN 예비 경로)은
+    세고 합계에서 뺀다.
+
+    해석 주의(kj): ε_ν에는 모터 지연과 함께 **제어기 추진 모델 대 플랜트 추진 모델의 차이**가 섞인다
+    (ν_alloc은 제어기 명목 맵, ν_act는 플랜트 참 맵 — 명목 조건에서 I-8 기준 ±5% 이내). 섭동 시험에서는
+    추력 계수·질량 섭동도 여기에 들어간다."""
+    nu_d, nu_alloc, nu_act = (np.asarray(a, dtype=float).reshape(-1, 4) for a in (nu_d, nu_alloc, nu_act))
+    ok = np.all(np.isfinite(nu_alloc), axis=1)
+    r = (nu_alloc[ok] - nu_d[ok])/scale
+    e = (nu_act[ok] - nu_alloc[ok])/scale
+
+    def summary(a):
+        if not len(a):
+            return dict(components=['thrust', 'alpha_x', 'alpha_y', 'alpha_z'],
+                        integral=[0.0]*4, max=[0.0]*4, norm_integral=0.0, norm_max=0.0)
+        norm = np.linalg.norm(a, axis=1)
+        return dict(components=['thrust', 'alpha_x', 'alpha_y', 'alpha_z'],
+                    integral=(np.abs(a).sum(axis=0)*dt).tolist(), max=np.abs(a).max(axis=0).tolist(),
+                    norm_integral=float(norm.sum()*dt), norm_max=float(norm.max()))
+    return dict(applicable=True, normalization='D_nu = diag(m*g, 100, 100, 100)', scale=list(map(float, scale)),
+                steps=int(len(ok)),
+                steps_without_alloc=int((~ok).sum()), allocation_residual=summary(r), realization_error=summary(e))
+
+
 def plant_truth(nominal, case):
     """시행 하나의 플랜트 파라미터 — run_trial과 본 실험 트림 사전 확인(control/main_experiment.py)이
     같이 쓴다(둘이 다른 truth를 보면 사전 확인이 뜻이 없다). 제어기는 명목 nominal을 그대로 쓴다."""
@@ -132,6 +182,12 @@ def run_trial(factory, label, profile, case, limits):
     observer.reset()
     wind = gust_wind(profile, case)
     ts, xs, us, winds = [0.], [x.copy()], [], []
+    # 식(29) 계측 — 가상입력 인터페이스가 있는 제어기(V13 사다리·F13의 ProperHybrid)만. 기록 전용.
+    probe_owner = getattr(ctrl, 'inner', None)
+    nu_rec = None
+    if probe_owner is not None and hasattr(probe_owner, 'probe'):
+        nu_act_fn = actual_input_function(truth)
+        nu_rec = dict(d=[], alloc=[], act=[])
     outside, reason = 0, None
     started = perf_counter()
     for k in range(round(profile.T_total/dt)):
@@ -160,6 +216,13 @@ def run_trial(factory, label, profile, case, limits):
             break
         us.append(u.copy())
         winds.append(w)
+        if nu_rec is not None:
+            probe = probe_owner.probe or {}
+            vb_act = Rotation.from_quat(x[6:10]).as_matrix().T @ (x[3:6] - w)     # 이 스텝의 참 상태·바람
+            nu_rec['d'].append(np.asarray(probe.get('nu_d', [np.nan]*4), dtype=float))
+            alloc = probe.get('nu_alloc')
+            nu_rec['alloc'].append(np.full(4, np.nan) if alloc is None else np.asarray(alloc, dtype=float))
+            nu_rec['act'].append(np.array(nu_act_fn(vb_act, x[13:17])).ravel())
         xs.append(xn.copy())
         ts.append((k+1)*dt)
         x = xn
@@ -175,6 +238,10 @@ def run_trial(factory, label, profile, case, limits):
     vr, zr = profile.compute_refs(ts)
     result = dict(ts=ts, xs=xs, us=np.asarray(us).reshape(-1, 4),
                   v_refs=vr, z_refs=zr, wind=np.asarray(winds).reshape(-1, 3), error=reason)
+    if nu_rec is not None:
+        # 궤적 해시(ts·xs·us)에는 안 들어간다 — 기록을 더해도 trajectory_sha256은 그대로다
+        for key in ('d', 'alloc', 'act'):
+            result[f'nu_{key}'] = np.asarray(nu_rec[key], dtype=float).reshape(-1, 4)
     metrics = evaluate(result, profile, limits, truth['n_max'])
     log = deepcopy(solver.solve_log) if solver is not None else []
     metrics.update(tracking_pass=metrics['passed'],
@@ -185,6 +252,11 @@ def run_trial(factory, label, profile, case, limits):
                    wall_seconds=perf_counter()-started, stop_reason=reason,
                    truth_parameter_sha256=parameter_hash(truth),
                    trajectory_sha256=trajectory_sha256(result))
+    if nu_rec is not None:
+        metrics['nu_decomposition'] = nu_decomposition(result['nu_d'], result['nu_alloc'], result['nu_act'],
+                                                       dt, nu_scale(factory.cp))
+    else:
+        metrics['nu_decomposition'] = dict(applicable=False)       # 가상입력 인터페이스 없음(M17·GSLQR·CPID)
     if 'condition' in trim:
         metrics['plant_trim_condition'] = trim['condition']     # CG 사례에만 — 기본 경로 필드는 그대로
     if hasattr(factory, 'controller_model_sha256'):

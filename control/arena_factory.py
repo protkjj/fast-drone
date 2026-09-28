@@ -27,6 +27,7 @@
 from copy import deepcopy
 import json
 from pathlib import Path
+from time import perf_counter
 import weakref
 
 import numpy as np
@@ -93,7 +94,12 @@ class SolverMonitor:
 
         def monitored(x):
             nmpc = target()
+            started = perf_counter()
             u = solve(nmpc, x)
+            # 솔브 1회 벽시계(원고 5.12절). 기록만 한다 — 제어 경로·시행 지표에는 안 들어가고, 이 기록은
+            # 컴퓨터·부하마다 달라서 결정적 비교(재현 도구·스모크 기준)에 쓰지 않는다. 원고의 P50·P99는
+            # 분산 본 실험이 아니라 한 컴퓨터의 전용 벤치마크로 잰다(NEXT_STEPS).
+            solve_s = perf_counter() - started
             stats = nmpc.solver.stats()
             status = stats.get('return_status', 'unknown')
             accepted = status in self.ACCEPTED
@@ -103,7 +109,7 @@ class SolverMonitor:
             elif self._ever_converged:
                 self.consec_fail += 1
             self.solve_log.append(dict(t=float(nmpc._t_now), status=status, accepted=accepted,
-                                       iter_count=stats.get('iter_count'),
+                                       iter_count=stats.get('iter_count'), solve_s=solve_s,
                                        finite=bool(np.all(np.isfinite(u)))))
             return u
 
