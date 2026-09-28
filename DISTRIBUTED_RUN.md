@@ -8,7 +8,7 @@
 셸을 export한 뒤에만 유지되므로, 새 터미널을 열면 그 export부터 다시 한다.
 
 **두 갈래**: **A. 튜닝 분산**(지금 필요 — F13·M17, 학교 컴퓨터는 **Windows**)과
-**B. 본 실험 분산**(튜닝 확정·`configs/main_experiment.json` 가드 통과 뒤, 태그 `<MAIN_TAG>`)이다.
+**B. 본 실험 분산**(튜닝 확정·`configs/main_experiment.json` 가드 통과·control 병합 뒤, 태그 `main-exp-v1`)이다.
 **A절은 Windows(PowerShell) 기준으로 준비부터 마무리까지 자체 완결이다 — 0절(Linux/맥용)은 건너뛴다.**
 
 ---
@@ -296,7 +296,7 @@ requirements-lock.txt`가 `python==3.13.7` 줄 때문에 실패하는 버그를 
 그 줄을 빼고 `setup_env.py`가 따로 확인하게 바꿈, 커밋 `54ebfe0`). 고친 뒤에는 전 과정이 통과했고,
 사전값 목적함수(0.7847247648921318)가 원래 맥 실행과 정확히 같았다(같은 코드·설정·게인이면 기대되는 값).
 
-## B. 본 실험 분산 — 학교 Windows 컴퓨터들, 태그 `<MAIN_TAG>`(튜닝 확정 뒤 kj가 정함)
+## B. 본 실험 분산 — 학교 Windows 컴퓨터들, 태그 `main-exp-v1`(튜닝 확정·control 병합 뒤에 단다)
 
 > **재시작·로그오프 뒤 이어 돌리기**
 > PowerShell을 새로 열고 아래 세 줄을 실행한 다음 **B.6의 시작 명령을 그대로 다시 실행**한다.
@@ -328,7 +328,7 @@ requirements-lock.txt`가 `python==3.13.7` 줄 때문에 실패하는 버그를 
    ```bash
    python3 -m control.main_distributed make-shards --n N --out results/main/shards.json
    ```
-3. `results/main/shards.json`을 커밋하고 태그 `<MAIN_TAG>`를 단다. 컴퓨터마다 맡을 조각 번호를 정해 둔다.
+3. `results/main/shards.json`을 커밋하고, control 병합 뒤 태그 `main-exp-v1`을 단다(kj 확인 후 push). 컴퓨터마다 맡을 조각 번호를 정해 둔다.
 
 ### B.1 받기
 ```powershell
@@ -338,7 +338,7 @@ Set-PSReadLineOption -HistorySaveStyle SaveNothing
 cd $HOME
 ```
 ```powershell
-git clone --branch <MAIN_TAG> --depth 1 https://<READ_ONLY_TOKEN>@github.com/protkjj/fast-drone.git fast-drone-main
+git clone --branch main-exp-v1 --depth 1 https://<READ_ONLY_TOKEN>@github.com/protkjj/fast-drone.git fast-drone-main
 ```
 ```powershell
 cd fast-drone-main
@@ -349,7 +349,7 @@ git config credential.helper ""
 ```powershell
 git describe --tags --exact-match
 ```
-마지막 명령은 `<MAIN_TAG>`를 출력해야 한다.
+마지막 명령은 `main-exp-v1`를 출력해야 한다.
 
 ### B.2 파이썬 환경
 A.2와 같다(`py -3.13 -m venv .venv` → `Set-ExecutionPolicy -Scope Process Bypass` → `.\.venv\Scripts\Activate.ps1` →

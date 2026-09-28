@@ -32,7 +32,7 @@
 - 승계: CPID 완료(`configs/tuning_carryover.json`). **V13은 retune_v3이 끝나면** `python3 -m control.tuning_carryover --controller V13 --run-dir results/arena/tuning/retune_v3`.
 - 맥 V13 retune_v3(arena.json)은 그대로 둔다 — V13은 보정 대상이 아니라 승계로 쓴다.
 - **학교 태그는 `tune-final-6`**(실행 코드 = `tune-final-5`, A.3이 제어기 모델을 계수 rtol 1e-8로 비교 — 리눅스 sha 불일치 대응, 보고서 23.8절). 결과 폴더 `tune5`. 맥 GSLQR `tune5`는 `tune-final-5`로 진행 중.
-- ⚠️ **`tune-final-4`(push됨)는 무효**: 보정항이 호버에서 미분 NaN → GSLQR 설계 실패(맥 `tune4` GSLQR 120회 전부 벌점, 쓰지 않음). 고친 코드는 `tune-final-5`(kj 확인 후 태그), 결과 폴더는 `tune5`. `tune4` 폴더는 격리(`tune4_invalid_nan`) 제안 — kj 확인 후.
+- ⚠️ **`tune-final-4`(push됨)는 무효**: 보정항이 호버에서 미분 NaN → GSLQR 설계 실패(맥 `tune4` GSLQR 120회 전부 벌점, 쓰지 않음). 고친 코드는 `tune-final-5`(kj 확인 후 태그), 결과 폴더는 `tune5`. `tune4` 폴더는 `tune4_invalid_nan`으로 격리 완료(kj 승인).
 
 ## 우선순위 목록
 
@@ -104,7 +104,7 @@
 ### e2. 본 실험 분산 도구 + `DISTRIBUTED_RUN.md` B절(PowerShell) — [x] 완료(보고서 24절)
 - `control/main_distributed.py`: make-shards(LPT) · run-shard(시행별 원자 저장, 이어 돌리기, 해시 다르면 거부) · status · merge(누락·중복·해시·지문·플랫폼·코드 상태) · cross-select/compare(5%, 다른 컴퓨터, rtol 1e-3 + 판정).
 - 맥 전 과정 점검 통과(`results/arena/e2_maccheck/REPORT.md`). **Windows에서는 아직 안 돌려 봄** — 첫 컴퓨터의 B.4·B.6이 절차 시험.
-- 본 실험 태그 `<MAIN_TAG>`는 튜닝 확정·가드 통과 뒤 kj가 정한다. 그 전에 맥에서 `make-shards`로 `results/main/shards.json`을 만들어 태그에 넣는다.
+- 본 실험 태그는 **`main-exp-v1`**(kj 결정) — 튜닝 확정·가드 통과·control 병합 뒤에 단다. 그 전에 맥에서 `make-shards`로 `results/main/shards.json`을 만들어 태그에 넣는다.
 
 ### 팀원 확인 항목
 - [x] **공력 모델의 받음각 유효 범위**(공력 담당, 2026-09-28 답): 큰 받음각에서도 신뢰할 수 있다 → 21.2절 근거 정정, 가용 가속도 계산·설정은 그대로.
