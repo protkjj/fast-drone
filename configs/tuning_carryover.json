@@ -5,7 +5,9 @@
    "record": "results/arena/tuning/retune_v3/CPID.record.json",
    "record_sha256": "bdb6085c5f31eff86ba4873939d2b938604548c929aebba276e9ca141795f691",
    "record_git_revision": "8911ee17dcaa029189d5a6c7b8d64167624d7bd8",
-   "proved_utc": "2026-09-28T10:24:26.075424+00:00",
+   "proved_at_revision": "08e35972075bc38544f5caf7e39b0801cfd877f6",
+   "proved_git_dirty": false,
+   "proved_utc": "2026-09-28T12:11:12.977968+00:00",
    "proofs": {
     "evaluation_0": {
      "index": 0,
@@ -14,7 +16,7 @@
      "bit_identical": true,
      "differing_fields": [],
      "model_sha256_equal": true,
-     "wall_s": 60.7
+     "wall_s": 76.4
     },
     "best": {
      "index": 115,
@@ -23,7 +25,7 @@
      "bit_identical": true,
      "differing_fields": [],
      "model_sha256_equal": true,
-     "wall_s": 70.5
+     "wall_s": 85.4
     }
    }
   }
