@@ -59,8 +59,8 @@
 - `arena_tune --summarize`: I-4 확인, 적분기 1%
 - 설계점검: `arena_design_check --tuned …`
 - 튜닝값 스모크
-- 튜닝 기록 분석: `control/tuning_analysis.py`. A·B·C·first_nonfailed를 함께 인용한다([[improvement-fraction-flatters-failed-priors]]).
-- retune_v3 전체와 로그 커밋
+- 튜닝 기록 분석: `control/tuning_analysis.py`. A·B·C·first_nonfailed를 함께 인용한다(개선폭 비율만 쓰면 실패한 첫 평가에 유리하게 보인다).
+- retune_v3 폴더 커밋(stdout 로그 *.log 는 관례대로 제외)
 
 ### g. 관문 통과 후 — [ ]
 - control 브랜치로 병합, 태그 `main-exp-v1`. 병합과 태그 push 전에 kj 확인을 받는다.
