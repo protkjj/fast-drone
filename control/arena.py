@@ -24,6 +24,7 @@ from scipy.spatial.transform import Rotation
 
 from control.mission_profiles import MissionProfile, GustProfile, SmoothstepProfile, StepProfile
 from control.uncertainty import FACTORS, perturb_params
+from control.arena_plant_wrench import WRENCH_KEYS
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = ROOT / 'configs' / 'arena.json'
@@ -31,6 +32,8 @@ SCHEMA = 'arena/1'
 CONTROLLERS = ('V13', 'M17', 'F13', 'GSLQR', 'CPID')
 SCENARIO_TYPES = ('mission', 'gust', 'reference', 'step')
 STEP_AXES = ('altitude', 'speed')
+# extra_params가 받는 키 전체 — 곱셈 FACTORS와 별개인 원값 덮어쓰기(표7 wrench 훅 + 관측 지연).
+EXTRA_PARAM_KEYS = WRENCH_KEYS + ('state_delay_s', 'rotor_delay_s')
 # 팀 기체의 명목 트림 확인 범위(docs/VALIDATION.md). 이 밖의 속도는 팀
 # 문서가 검증하지 않았으므로 설정 단계에서 막는다.
 SPEED_RANGE = (0.0, 85.0)
@@ -119,6 +122,9 @@ def validate_config(config):
         for factor in s.get('perturbation', {}):
             if factor not in FACTORS:
                 raise ValueError(f"{s['id']}: unknown perturbation factor {factor!r}")
+        for key in s.get('extra_params', {}):
+            if key not in EXTRA_PARAM_KEYS:
+                raise ValueError(f"{s['id']}: unknown extra_params key {key!r}")
         if s['type'] == 'gust' and s['direction'] not in ('lateral', 'vertical'):
             raise ValueError(f"{s['id']}: gust direction must be lateral or vertical")
         if s['type'] == 'step' and s['axis'] not in STEP_AXES:
@@ -400,7 +406,9 @@ def build_scenarios(config, cp=None, native_params=None, only=None, scenarios=No
             continue
         meta = dict(type=s['type'])
         factors = dict(s.get('perturbation', {}))
-        case = dict(case_id=s['id'], factors=factors)
+        # extra_params: perturb_params의 곱셈 FACTORS와 별개인 원값 덮어쓰기(표7의 wrench 훅·
+        # 지연 키 등). run_trial이 perturb_params 뒤에 그대로 합친다. 기본은 없음(비트 동일).
+        case = dict(case_id=s['id'], factors=factors, extra_params=dict(s.get('extra_params', {})))
         if s['type'] == 'mission':
             V = resolve_speed(s['speed'], config)
             profile = MissionProfile(V, alt, tuple(float(d) for d in s['durations_s']))

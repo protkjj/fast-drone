@@ -42,6 +42,7 @@ from control.arena_factory import (ArenaFactory, ARENA_LABELS, NMPC_LABELS, Prev
 from control.mission_profiles import GustProfile
 from control.uncertainty import perturb_params
 from control.validation_metrics import Acceptance
+import control.arena_plant_wrench as plant_wrench
 import control.validation_suite as suite
 from models.team_light.control.baseline_v2 import baseline_params, parameter_hash
 from models.team_light.control.trim import find_trim as plant_trim
@@ -161,15 +162,17 @@ def captured_short_runs(factory):
 # ── I-1 ─────────────────────────────────────────────────────────────
 
 def test_i1_same_plant_factory_hash_and_initial_state(factory, native, monkeypatch):
+    # run_trial은 plant_wrench.build_plant(truth, dt)로 플랜트를 짓는다(표7 wrench 훅이 꺼져
+    # 있으면 그 안에서 그대로 AxialDronePlant를 돌려준다) — 그 지점에서 감시한다.
     seen = []
-    real = suite.AxialDronePlant
+    real = plant_wrench.AxialDronePlant
 
     class Spy(real):
         def __init__(self, params, dt=0.001):
             seen.append((parameter_hash(params), float(dt), real.__module__))
             super().__init__(params, dt=dt)
 
-    monkeypatch.setattr(suite, 'AxialDronePlant', Spy)
+    monkeypatch.setattr(plant_wrench, 'AxialDronePlant', Spy)
     for factors in ({}, {'mass': 1.3}):
         seen.clear()
         case = dict(_case('i1'), factors=factors)

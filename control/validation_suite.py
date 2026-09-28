@@ -25,6 +25,8 @@ from control.mission_profiles import (MissionProfile, GustProfile, DEFAULT_GUST_
 from control.validation_metrics import Acceptance, evaluate
 from control.uncertainty import (DEFAULT_RANGES, validate_ranges, perturb_params,
                                  sweep_cases, monte_carlo_cases)
+from control.arena_observation_delay import DelayedObservation
+from control.arena_plant_wrench import build_plant
 from models.team_light.control.baseline_v2 import baseline_params, parameter_hash
 from models.team_light.control.dynamics import AxialDronePlant
 from models.team_light.control.trim import find_trim
@@ -91,6 +93,7 @@ def run_trial(factory, label, profile, case, limits):
     gc.collect()
     nominal_hash = parameter_hash(factory.p)
     truth = perturb_params(factory.p, case['factors'])
+    truth.update(case.get('extra_params', {}))     # 표7 wrench 훅·관측 지연(곱셈 FACTORS 밖)
     initial_v, initial_z, _ = profile.get_ref(0.)
     trim = find_trim(truth, float(initial_v[0]))
     x = trim['state'].copy()
@@ -103,7 +106,10 @@ def run_trial(factory, label, profile, case, limits):
     solver = factory.solver_of(ctrl) if hasattr(factory, 'solver_of') else solver_of(ctrl)
     update_at = getattr(factory, 'update_at', None)
     dt = getattr(factory, 'dt', DT)
-    plant = AxialDronePlant(truth, dt=dt)
+    plant = build_plant(truth, dt=dt)
+    # 관측 지연(kj 결정: 측정값 공급 지점, 모든 컨트롤러에 같은 지연). 둘 다 0이면 원본 x 그대로.
+    observer = DelayedObservation(dt, truth.get('state_delay_s', 0.0), truth.get('rotor_delay_s', 0.0))
+    observer.reset()
     wind = gust_wind(profile, case)
     ts, xs, us, winds = [0.], [x.copy()], [], []
     outside, reason = 0, None
@@ -117,7 +123,8 @@ def run_trial(factory, label, profile, case, limits):
                 update_at(ctrl, t, v, z)
             else:
                 factory.update(ctrl, v, z)
-            u = np.asarray(ctrl(t, x), dtype=float)
+            x_obs = observer.observe(x)
+            u = np.asarray(ctrl(t, x_obs), dtype=float)
             if u.shape != (4,) or not np.all(np.isfinite(u)):
                 reason = 'nonfinite or malformed motor command'
                 break
