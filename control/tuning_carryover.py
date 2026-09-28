@@ -65,6 +65,11 @@ def record_hash_problems(records, config, table):
 def prove(label, run_dir, target=DEFAULT_TARGET, table_path=DEFAULT_TABLE, scenario_workers=1):
     """평가 0과 최종 최선 평가를 target 설정에서 다시 계산. 둘 다 비트 동일이면 표에 넣는다."""
     from control.arena_tune_repro import reproduce, best_index, carryover_allowed
+    from control.validation_suite import git_state
+    revision, dirty = git_state()
+    if dirty:
+        # 증명은 커밋된 코드에서만 만든다 — 어느 코드가 비트 동일을 보였는지 표에 남기려고(kj 2026-09-28).
+        raise SystemExit('refusing to prove on a dirty working tree — commit first')
     config = load_config(target)
     if carryover_allowed(config, label) is None:
         raise SystemExit(f'{label}: not eligible for carry-over under {target}')
@@ -93,6 +98,7 @@ def prove(label, run_dir, target=DEFAULT_TARGET, table_path=DEFAULT_TABLE, scena
                  target_config_sha256=config_sha256(config), moment_model_sha256=moment['sha256'])
     table['entries'][label] = dict(record=str(record_path.resolve().relative_to(ROOT)),
                                    record_sha256=_sha(record_path), record_git_revision=record.get('git_revision'),
+                                   proved_at_revision=revision, proved_git_dirty=dirty,
                                    proved_utc=datetime.now(timezone.utc).isoformat(), proofs=proofs)
     Path(table_path).write_text(json.dumps(table, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
     print(f'{label}: carried over → {table_path}', flush=True)
