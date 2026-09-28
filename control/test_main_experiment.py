@@ -1,7 +1,7 @@
 """본 실험 캠페인(`control/main_experiment.py`, `configs/main_experiment.json`) — kj 결정(2026-09-28) 시험.
 
   1) arena.json은 바뀌지 않는다(파일 바이트·정규화 해시가 spec 기록과 같다).
-  2) 가드: 튜닝 해시가 비면 거부, 기준 해시가 다르면 거부, 기록 파일 sha256이 맞으면 통과. --run은 가드에서 멈춘다.
+  2) 가드: 튜닝 해시가 비면 거부, 기준 해시가 다르면 거부, 기록 파일 sha256이 맞으면 통과(실행 거부는 test_main_distributed).
   3) 묶음 구성: 참조 15, 표7 기준 5, 표7 17×5, 돌풍 8, 임무 V_H 1, 사다리(V13×nominal 중복 제외).
   4) 규칙 → 숫자: 0.7g·1.4g × 명목 질량, 호버 최대 피치 모멘트 × 25%·50%, 면내 항력 계수 = V_H 보정값.
   5) 사다리 파생 설정은 controllers.V13의 세 항목만 다르다.
@@ -73,14 +73,6 @@ def test_guard_passes_matching_record_hashes_and_catches_a_changed_file(spec, tm
     assert me.guard_problems(good) == []
     (run_dir/'V13.record.json').write_text('{"controller": "V13", "edited": true}', encoding='utf-8')
     assert any(p.startswith('V13: record sha256') for p in me.guard_problems(good))
-
-
-def test_run_stops_at_the_guard_before_any_trial(spec, tmp_path, monkeypatch):
-    import control.validation_suite as suite
-    monkeypatch.setattr(suite, 'run_trial', lambda *a, **k: pytest.fail('a trial ran despite the guard'))
-    with pytest.raises(SystemExit, match='refusing to run'):
-        me.run(spec, 'reference', tmp_path)
-    assert not any(tmp_path.iterdir())
 
 
 def test_batch_composition(batches, spec):

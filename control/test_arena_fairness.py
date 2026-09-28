@@ -778,35 +778,16 @@ def test_i9_hover_quat_trims_are_equilibria_in_the_plant_convention(factory, nat
 #   F13        로터추력 입력 13상태 모델 — 입력은 플랜트의 실제 로터 추력, γ는 측정값
 #   V13        가상입력 모델 — T = 플랜트 총추력(각가속도는 입력 ν라 비교 대상 아님)
 # 관문(kj 결정): 병진 ≤ 0.05 g(트림+섭동), 트림 각가속도 ≤ 2 rad/s², 트림 일치.
-# 트림 밖(자세 ±10°) 각가속도 불일치는 관문이 아니라 보고 대상이다(집중정수 한계).
+# 트림 밖 각가속도 불일치는 관문이 아니라 보고 대상이다(집중정수 한계). ±30°까지의 측정은
+# control/arena_model_mismatch.py → results/arena/model_mismatch/ (정보용, 2026-09-28).
 I10_TRANS = 0.05*9.81
 I10_ANG_TRIM = 2.0
 
 
 def _model_accelerations(factory, x):
-    import casadi as ca
-    from control.dynamics import AxialDronePlant, reaction_torque_ratio, axial_airspeed
-    from control.hybrid_comparison import build_virtual_dynamics
-    from control.nmpc_f13 import build_f13_dynamics
-    from models.team_light.control.dynamics import AxialDronePlant as TeamPlant
-    from models.team_light.control.geometry import rotor_thrusts
-    cache = factory.__dict__.setdefault('_i10_cache', {})
-    if not cache:
-        cache['ours'] = AxialDronePlant(factory.cp)
-        cache['plant'] = TeamPlant(factory.p)
-        cache['v13'] = build_virtual_dynamics(factory.cp)[0]
-        cache['f13'] = build_f13_dynamics(factory.cp, torque_ratio=ca.SX.sym('g', 4))[0]
-    u = x[13:17]
-    plant = cache['plant'].evaluate_xdot(x, u)
-    ours = cache['ours'].evaluate_xdot(x, u)
-    v_body = Rotation.from_quat(x[6:10]).as_matrix().T @ x[3:6]
-    T = rotor_thrusts(factory.p, u, v_body)
-    x13 = np.concatenate([x[0:10], x[10:13]])
-    gamma = reaction_torque_ratio(factory.cp, u, axial_airspeed(factory.cp, x))
-    f13 = np.array(cache['f13'](x13, T, gamma)).ravel()
-    v13 = np.array(cache['v13'](x13, np.r_[T.sum(), plant[10:13]])).ravel()
-    return plant, {'M17/GSLQR': (ours[3:6], ours[10:13]), 'F13': (f13[3:6], f13[10:13]),
-                   'V13': (v13[3:6], None)}
+    # 계산은 control/arena_model_mismatch.py로 옮겼다(±30° 정보용 측정과 같은 정의를 쓰려고, 2026-09-28).
+    from control.arena_model_mismatch import model_accelerations
+    return model_accelerations(factory, x)
 
 
 def _perturbed_states(native, speed):

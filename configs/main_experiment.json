@@ -9,33 +9,109 @@
   "tuned": {
     "run_dir": "",
     "records": {
-      "V13": {"sha256": "", "tag": "tune-final"},
-      "GSLQR": {"sha256": "", "tag": "tune-final"},
-      "CPID": {"sha256": "", "tag": "tune-final"},
-      "F13": {"sha256": "", "tag": "tune-final-3"},
-      "M17": {"sha256": "", "tag": "tune-final-3"}
+      "V13": {
+        "sha256": "",
+        "tag": "tune-final"
+      },
+      "GSLQR": {
+        "sha256": "",
+        "tag": "tune-final"
+      },
+      "CPID": {
+        "sha256": "",
+        "tag": "tune-final"
+      },
+      "F13": {
+        "sha256": "",
+        "tag": "tune-final-3"
+      },
+      "M17": {
+        "sha256": "",
+        "tag": "tune-final-3"
+      }
     },
     "note": "재튜닝(f)이 끝나고 A.10으로 합친 run_dir과 각 <제어기>.record.json의 sha256을 채운다. 비어 있거나 다르면 실행 거부."
   },
-  "controllers": ["V13", "M17", "F13", "GSLQR", "CPID"],
+  "controllers": [
+    "V13",
+    "M17",
+    "F13",
+    "GSLQR",
+    "CPID"
+  ],
   "common": {
-    "reference": {"lead_s": 3.0, "tail_s": 5.0, "ramp_round_s": 0.002},
-    "rho_levels": [0.5, 0.8, 1.0, 1.2, 1.5],
-    "maneuvers": [
-      {"name": "accel_VL", "from": 0.0, "to": "V_L"},
-      {"name": "accel_VH", "from": 0.0, "to": "V_H"},
-      {"name": "brake_VH", "from": "V_H", "to": "V_L"}
+    "reference": {
+      "lead_s": 3.0,
+      "tail_s": 5.0,
+      "ramp_round_s": 0.002
+    },
+    "rho_levels": [
+      0.5,
+      0.8,
+      1.0,
+      1.2,
+      1.5
     ],
-    "maneuver_note": "제동@V_L(20→호버)은 제외(kj 결정 2026-09-28). 호버 근처 제동은 프로펠러 데이터의 역유입 영역 밖이라 모델을 신뢰할 수 없다 — 역유입 금지 제약이 1~33 m/s 전 구간에서 활성이라 a_avail이 항력 수준(5 m/s에서 0.35 m/s²)이 되고 전이 시간이 78~235 s가 됐다.",
-    "ramp_round_note": "전이 시간 올림 단위를 0.1 s → dt(0.002 s)로(본 실험만). 0.1 s면 가속@V_L ρ 1.0·1.2가 실제 0.90·1.03으로 뭉갰다."
+    "maneuvers": [
+      {
+        "name": "accel_VL",
+        "from": 0.0,
+        "to": "V_L"
+      },
+      {
+        "name": "accel_VH",
+        "from": 0.0,
+        "to": "V_H"
+      },
+      {
+        "name": "brake_VH",
+        "from": "V_H",
+        "to": "V_L"
+      }
+    ],
+    "maneuver_note": "제동@V_L(20→호버)은 제외(kj 결정 2026-09-28). 호버 근처 제동은 프로펠러 데이터의 역유입 영역 밖이라 모델을 신뢰할 수 없다 — 역유입 금지 제약이 1~33 m/s 전 구간에서 활성이라 a_avail이 항력 수준(5 m/s에서 0.35 m/s²)이 되고 전이 시간이 78~235 s가 됐다. (공력 모델 신뢰 여부와 별개로 프로펠러 역유입 데이터 문제라 제외를 유지한다.)",
+    "ramp_round_note": "전이 시간 올림 단위를 0.1 s → dt(0.002 s)로(본 실험만). 0.1 s면 가속@V_L ρ 1.0·1.2가 실제 0.90·1.03으로 뭉갰다.",
+    "rho_definition_note": "ρ는 트림 자세 근처(±0.3 rad)의 가용 가속도(control.arena.available_acceleration) 기준이다. 공력 모델은 큰 받음각에서도 신뢰할 수 있어(공력 담당 확인), 큰 받음각 제동까지 쓰면 34~50 m/s에서 실제 가용 감속은 2~9배 크다 — 제동 프로필의 ρ는 보수적이다. 정의를 넓히지 않는 이유: 튜닝 시나리오와 같은 정의를 유지하려고. 55 m/s 이상은 넓은 출발 탐색에서도 큰 감속 해를 못 찾았으나 출발점 32개라 없다고 확정할 수 없다."
   },
   "table7": {
     "bases": [
-      {"name": "cruise_VL", "type": "cruise", "speed": "V_L", "times_s": [3.0, 5.0, 7.0], "evaluation_start_s": 3.0},
-      {"name": "cruise_VH", "type": "cruise", "speed": "V_H", "times_s": [3.0, 5.0, 7.0], "evaluation_start_s": 3.0},
-      {"name": "accel_VL_rho1", "maneuver": "accel_VL", "rho": 1.0},
-      {"name": "accel_VH_rho1", "maneuver": "accel_VH", "rho": 1.0},
-      {"name": "brake_VH_rho1", "maneuver": "brake_VH", "rho": 1.0}
+      {
+        "name": "cruise_VL",
+        "type": "cruise",
+        "speed": "V_L",
+        "times_s": [
+          3.0,
+          5.0,
+          7.0
+        ],
+        "evaluation_start_s": 3.0
+      },
+      {
+        "name": "cruise_VH",
+        "type": "cruise",
+        "speed": "V_H",
+        "times_s": [
+          3.0,
+          5.0,
+          7.0
+        ],
+        "evaluation_start_s": 3.0
+      },
+      {
+        "name": "accel_VL_rho1",
+        "maneuver": "accel_VL",
+        "rho": 1.0
+      },
+      {
+        "name": "accel_VH_rho1",
+        "maneuver": "accel_VH",
+        "rho": 1.0
+      },
+      {
+        "name": "brake_VH_rho1",
+        "maneuver": "brake_VH",
+        "rho": 1.0
+      }
     ],
     "bases_note": "정상 상태(순항 V_L·V_H) + 가용 한계 기동(ρ=1.0의 가속@V_L·가속@V_H·제동@V_H). 섭동이 정상 비행과 가용 가속도 한계 기동에 각각 어떻게 작용하는지 본다.",
     "reference_min_total_s": 15.0,
@@ -43,55 +119,223 @@
     "disturbance_start_s": 3.0,
     "disturbance_duration_s": 5.0,
     "rows": [
-      {"name": "mass_0.7", "perturbation": {"mass": 0.7}},
-      {"name": "mass_1.3", "perturbation": {"mass": 1.3}},
-      {"name": "thrust_0.7", "perturbation": {"thrust": 0.7}},
-      {"name": "thrust_1.3", "perturbation": {"thrust": 1.3}},
-      {"name": "aero_1.5", "perturbation": {"aero": 1.5}},
-      {"name": "aero_2.0", "perturbation": {"aero": 2.0}},
-      {"name": "cg_y_0.1", "cg_offset": {"axis": "y", "arm_fraction": 0.1}},
-      {"name": "cg_z_0.1", "cg_offset": {"axis": "z", "arm_fraction": 0.1}},
-      {"name": "inplane_drag_1x", "rotor_inplane_drag": {"calibrate_at": "V_H", "multiple": 1.0}},
-      {"name": "force_0.7g", "force_world": {"direction": [0.0, 1.0, 0.0], "g_multiple": 0.7}},
-      {"name": "force_1.4g", "force_world": {"direction": [0.0, 1.0, 0.0], "g_multiple": 1.4}},
-      {"name": "moment_25", "moment_body": {"axis": [0.0, 1.0, 0.0], "hover_max_pitch_fraction": 0.25}},
-      {"name": "moment_50", "moment_body": {"axis": [0.0, 1.0, 0.0], "hover_max_pitch_fraction": 0.5}},
-      {"name": "state_delay_10ms", "extra_params": {"state_delay_s": 0.01}},
-      {"name": "state_delay_30ms", "extra_params": {"state_delay_s": 0.03}},
-      {"name": "motor_tau_2", "perturbation": {"motor_tau": 2.0}},
-      {"name": "rotor_delay_5ms", "extra_params": {"rotor_delay_s": 0.005}}
+      {
+        "name": "mass_0.7",
+        "perturbation": {
+          "mass": 0.7
+        }
+      },
+      {
+        "name": "mass_1.3",
+        "perturbation": {
+          "mass": 1.3
+        }
+      },
+      {
+        "name": "thrust_0.7",
+        "perturbation": {
+          "thrust": 0.7
+        }
+      },
+      {
+        "name": "thrust_1.3",
+        "perturbation": {
+          "thrust": 1.3
+        }
+      },
+      {
+        "name": "aero_1.5",
+        "perturbation": {
+          "aero": 1.5
+        }
+      },
+      {
+        "name": "aero_2.0",
+        "perturbation": {
+          "aero": 2.0
+        }
+      },
+      {
+        "name": "cg_y_0.1",
+        "cg_offset": {
+          "axis": "y",
+          "arm_fraction": 0.1
+        }
+      },
+      {
+        "name": "cg_z_0.1",
+        "cg_offset": {
+          "axis": "z",
+          "arm_fraction": 0.1
+        }
+      },
+      {
+        "name": "inplane_drag_1x",
+        "rotor_inplane_drag": {
+          "calibrate_at": "V_H",
+          "multiple": 1.0
+        }
+      },
+      {
+        "name": "force_0.7g",
+        "force_world": {
+          "direction": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "g_multiple": 0.7
+        }
+      },
+      {
+        "name": "force_1.4g",
+        "force_world": {
+          "direction": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "g_multiple": 1.4
+        }
+      },
+      {
+        "name": "moment_25",
+        "moment_body": {
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "hover_max_pitch_fraction": 0.25
+        }
+      },
+      {
+        "name": "moment_50",
+        "moment_body": {
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "hover_max_pitch_fraction": 0.5
+        }
+      },
+      {
+        "name": "state_delay_10ms",
+        "extra_params": {
+          "state_delay_s": 0.01
+        }
+      },
+      {
+        "name": "state_delay_30ms",
+        "extra_params": {
+          "state_delay_s": 0.03
+        }
+      },
+      {
+        "name": "motor_tau_2",
+        "perturbation": {
+          "motor_tau": 2.0
+        }
+      },
+      {
+        "name": "rotor_delay_5ms",
+        "extra_params": {
+          "rotor_delay_s": 0.005
+        }
+      }
     ],
     "rows_note": "원고 표 7의 18행 중 17행. 자이로 진동 1배는 d3 보류(샘플링 500 Hz 에일리어싱 문제, 보고서 20.5절)로 빠졌다. 부호(외력 세계 +y, 모멘트 동체 +M_y = 기수 듦)는 결과를 보기 전에 정했다. 회전수 지연 5 ms는 dt=2 ms라 4 ms(2스텝)로 반올림된다. 섭동은 한 번에 하나씩 플랜트에만 건다(제어기는 명목 모델).",
     "saturation_note": "무게중심 y 편차는 85 m/s 트림에서 최대 회전수가 n_max의 94.1%(여유 5.9%)다 — 포화 경계 사례로 해석할 것(보고서 20.3절)."
   },
   "gust": {
-    "speeds": ["V_L", "V_H"],
-    "cases": [
-      {"direction": "lateral", "peak_m_s": 5.0},
-      {"direction": "lateral", "peak_m_s": 10.0},
-      {"direction": "vertical", "peak_m_s": 5.0},
-      {"direction": "vertical", "peak_m_s": -5.0}
+    "speeds": [
+      "V_L",
+      "V_H"
     ],
-    "times_s": [3.0, 2.0, 7.0]
+    "cases": [
+      {
+        "direction": "lateral",
+        "peak_m_s": 5.0
+      },
+      {
+        "direction": "lateral",
+        "peak_m_s": 10.0
+      },
+      {
+        "direction": "vertical",
+        "peak_m_s": 5.0
+      },
+      {
+        "direction": "vertical",
+        "peak_m_s": -5.0
+      }
+    ],
+    "times_s": [
+      3.0,
+      2.0,
+      7.0
+    ]
   },
   "mission": {
-    "speeds": ["V_H"],
-    "durations_s": [3.0, 15.0, 15.0, 15.0, 7.0],
+    "speeds": [
+      "V_H"
+    ],
+    "durations_s": [
+      3.0,
+      15.0,
+      15.0,
+      15.0,
+      7.0
+    ],
     "evaluation_start_s": 3.0,
     "note": "통합 임무는 V_H만(kj 결정 2026-09-28). 저속 비교는 V_L 돌풍·참조 프로필·설계점검이 맡는다. V_L 임무는 감속 구간 대부분이 역유입 제약 영역(1~33 m/s)에 걸린다. 임무 프로필은 바꾸지 않고, ρ(t) 분리 보고(control/arena_mission_rho.py)에 '역유입 제약이 지배하는 구간'을 따로 표시한다."
   },
   "ladder": {
     "variants": {
-      "V13-0": {"alloc_mode": "A0", "alloc_feedback": false, "time_align": "S0"},
-      "V13-1": {"alloc_mode": "A1", "alloc_feedback": false, "time_align": "S0"},
-      "V13-2": {"alloc_mode": "A1", "alloc_feedback": true, "time_align": "S0"},
-      "V13": {"alloc_mode": "A1", "alloc_feedback": true, "time_align": "S1"}
+      "V13-0": {
+        "alloc_mode": "A0",
+        "alloc_feedback": false,
+        "time_align": "S0"
+      },
+      "V13-1": {
+        "alloc_mode": "A1",
+        "alloc_feedback": false,
+        "time_align": "S0"
+      },
+      "V13-2": {
+        "alloc_mode": "A1",
+        "alloc_feedback": true,
+        "time_align": "S0"
+      },
+      "V13": {
+        "alloc_mode": "A1",
+        "alloc_feedback": true,
+        "time_align": "S1"
+      }
     },
     "conditions": [
-      {"name": "nominal"},
-      {"name": "motor_tau_2", "perturbation": {"motor_tau": 2.0}},
-      {"name": "rotor_delay_5ms", "extra_params": {"rotor_delay_s": 0.005}},
-      {"name": "state_delay_30ms", "extra_params": {"state_delay_s": 0.03}}
+      {
+        "name": "nominal"
+      },
+      {
+        "name": "motor_tau_2",
+        "perturbation": {
+          "motor_tau": 2.0
+        }
+      },
+      {
+        "name": "rotor_delay_5ms",
+        "extra_params": {
+          "rotor_delay_s": 0.005
+        }
+      },
+      {
+        "name": "state_delay_30ms",
+        "extra_params": {
+          "state_delay_s": 0.03
+        }
+      }
     ],
     "note": "V13-0/1/2도 V13의 튜닝값을 그대로 쓴다(표준 제거 실험). 변형마다 따로 튜닝하지 않았다는 한계를 기록한다. 변형은 경기장 설정의 controllers.V13 항목만 바꾼 파생 설정으로 만든다(팩토리 무수정). V13 × nominal은 참조 묶음의 V13과 같은 시행이라 다시 돌리지 않고 그 결과를 쓴다."
   },
@@ -101,8 +345,19 @@
     "design_region": "CPID는 설계 영역(0~20 m/s) 밖 시나리오에서 빠진다(arena.excluded_from).",
     "vehicle_limit": "시나리오의 시작·끝 속도에서 섭동된 플랜트의 트림이 없으면 vehicle_limit으로 따로 분류하고 돌리지 않는다(제어기 실패로 세지 않는다). CG 행은 6자유도 트림(control/arena_trim.py), 나머지는 벤더 find_trim."
   },
+  "interpretation": {
+    "authority_boundary": {
+      "speed": "V_H",
+      "max_n_fraction": 0.93
+    },
+    "note": "85 m/s 트림의 최대 회전수가 n_max의 93% 이상인 섭동 사례는 결과에 '권한 경계'로 표시한다(kj 2026-09-28). 계획 기준: 공력 2배 0.969, 추력 0.7배 0.946, 공력 1.5배·CG y 0.941."
+  },
   "timing_mac_wall_per_sim_s": {
-    "V13": 3.53, "GSLQR": 0.25, "CPID": 0.35, "F13": 4.8, "M17": 10.0,
+    "V13": 3.53,
+    "GSLQR": 0.25,
+    "CPID": 0.35,
+    "F13": 4.8,
+    "M17": 10.0,
     "note": "맥 실측(V13·GSLQR·CPID: retune_v3 평가 0 재현, 시뮬레이션 132.7 s, V13 튜닝과 동시 실행). F13·M17은 NMPC 솔브 시간 비율(130 ms, 210~320 ms 대 V13 95 ms)로 추정. Windows 속도는 미측정 — --plan에 --speed-ratio(학교/맥)를 주어 보정한다."
   }
 }

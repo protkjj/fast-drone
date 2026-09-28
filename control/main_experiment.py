@@ -2,7 +2,8 @@
 해시 가드를 통과할 때만 실행한다(kj 결정 2026-09-28, 보고서 21절).
 
     python3 -m control.main_experiment --plan [--speed-ratio 1.3]
-    python3 -m control.main_experiment --run --batch table7 --output results/main [--shard 0/4]
+
+실행(조각 배분·이어 돌리기·합치기·교차 확인)은 `control/main_distributed.py`가 한다(DISTRIBUTED_RUN.md B절).
 
 설계
   - `configs/arena.json`(기준 설정)은 바꾸지 않는다. 묶음마다 기준 설정을 깊은 복사해 'scenarios'만
@@ -244,6 +245,15 @@ def trim_status(native, scenario, cache=None):
     return ('vehicle_limit' if limited else None), detail
 
 
+def authority_boundary(detail, spec, base):
+    """해석 표시(kj 2026-09-28): 기준 속도(V_H) 트림의 최대 회전수가 문턱(0.93 n_max) 이상이면 True.
+    결과를 버리지 않고 '권한 경계' 사례로 표시만 한다."""
+    rule = spec['interpretation']['authority_boundary']
+    V = resolve_speed(rule['speed'], base)
+    d = detail.get(V)
+    return bool(d is not None and d.get('max_n_fraction', 0.0) >= float(rule['max_n_fraction']))
+
+
 # ══════════════════════════════════════════════════════════════════
 # 계획
 # ══════════════════════════════════════════════════════════════════
@@ -331,96 +341,15 @@ def print_plan(result):
         print('통과')
 
 
-# ══════════════════════════════════════════════════════════════════
-# 실행
-# ══════════════════════════════════════════════════════════════════
-
-def run(spec, batch_name, output, shard=(0, 1), spec_path=DEFAULT_SPEC, root=ROOT):
-    """가드 통과 시에만. 묶음 하나(사다리는 'ladder:V13-0' 등)를 shard로 나눠 돌린다."""
-    problems = guard_problems(spec, root)
-    if problems:
-        raise SystemExit('refusing to run the main experiment:\n  - ' + '\n  - '.join(problems))
-    from control.arena_design_check import tuned_overrides
-    from control.arena_factory import ArenaFactory
-    from control.validation_metrics import Acceptance, PaperCriteria, paper_evaluate
-    from control.validation_suite import (baseline_params, run_trial, json_safe, write_json,
-                                          git_state, environment_fingerprint, parameter_hash)
-    base = load_config(root/spec['base_config']['path'])
-    native = baseline_params()
-    overrides, used = tuned_overrides(base, root/spec['tuned']['run_dir'], spec['controllers'])
-    batches = {b.name: b for b in build_batches(spec, base, native)}
-    if batch_name not in batches:
-        raise SystemExit(f'unknown batch {batch_name!r}; choose from {sorted(batches)}')
-    batch = batches[batch_name]
-    index, count = shard
-    factory = ArenaFactory(batch.config, native, overrides=overrides)
-    scenarios = build_scenarios(batch.config, factory.cp, native)[index::count]
-    limits = Acceptance(**batch.config['acceptance'])
-    paper = PaperCriteria(**batch.config['paper_criteria'])
-    out = Path(output)/f"{batch_name.replace(':', '_')}_shard{index}of{count}"
-    out.mkdir(parents=True, exist_ok=False)
-    revision, dirty = git_state()
-    write_json(out/'manifest.json', dict(
-        mode='main_experiment', batch=batch_name, variant=batch.variant, shard=[index, count],
-        spec_path=str(spec_path), spec_sha256=_sha256_file(spec_path),
-        base_config_sha256=config_sha256(base), derived_config_sha256=config_sha256(batch.config),
-        derived_config=batch.config, tuned=used, controllers=batch.controllers,
-        parameter_sha256=parameter_hash(native), controller_model_sha256=factory.controller_model_sha256,
-        git_revision=revision, git_dirty=dirty, environment=environment_fingerprint(),
-        scenarios=[dict(id=s.id, type=s.type, window=s.window, T_total=s.profile.T_total,
-                        meta=s.meta, cases=s.cases) for s in scenarios]))
-    cache = {}
-    for s in scenarios:
-        status, detail = trim_status(native, s, cache)
-        for label in batch.controllers:
-            row = dict(scenario_id=s.id, scenario_type=s.type, controller=label, variant=batch.variant,
-                       case=s.cases[0])
-            reason = excluded_from(batch.config, label, s)
-            if reason or status:
-                row.update(skipped=True, skip_reason=reason or 'vehicle_limit', trim_detail=detail)
-            else:
-                try:
-                    metrics, result, log = run_trial(factory, label, s.profile, s.cases[0], limits)
-                    metrics.update(paper_evaluate(result, s.profile, paper, window=s.window,
-                                                  solve_log=log, n_max=native['n_max']))
-                except (ValueError, RuntimeError, np.linalg.LinAlgError) as exc:
-                    metrics = dict(passed=False, failure_reasons=['setup_error'],
-                                   stop_reason=f'{type(exc).__name__}: {exc}')
-                    result = None
-                row.update(skipped=False, **metrics)
-                if result is not None:
-                    tag = f"{s.id}_{label}".replace(':', '_')
-                    np.savez_compressed(out/(tag+'.npz'), **{k: v for k, v in result.items() if k != 'error'})
-            with (out/'trials.jsonl').open('a', encoding='utf-8') as stream:
-                stream.write(json.dumps(json_safe(row), ensure_ascii=False, allow_nan=False)+'\n')
-            print(f"{s.id} / {label}: {'SKIP '+row['skip_reason'] if row['skipped'] else row.get('passed')}",
-                  flush=True)
-    return out
-
-
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--spec', type=Path, default=DEFAULT_SPEC)
-    mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument('--plan', action='store_true')
-    mode.add_argument('--run', action='store_true')
+    parser.add_argument('--plan', action='store_true', required=True)
     parser.add_argument('--speed-ratio', type=float, default=1.0,
                         help='(학교 Windows 벽시계)/(맥 벽시계). env_check 재현 시간으로 잰다')
-    parser.add_argument('--no-trim-check', action='store_true', help='--plan에서 트림 사전 확인 생략(빠름)')
-    parser.add_argument('--batch')
-    parser.add_argument('--output', type=Path)
-    parser.add_argument('--shard', default='0/1', help='i/n — 시나리오를 n개로 나눈 i번째')
+    parser.add_argument('--no-trim-check', action='store_true', help='트림 사전 확인 생략(빠름)')
     args = parser.parse_args(argv)
-    spec = load_spec(args.spec)
-    if args.plan:
-        print_plan(plan(spec, speed_ratio=args.speed_ratio, check_trims=not args.no_trim_check))
-        return 0
-    if not args.batch or not args.output:
-        parser.error('--run needs --batch and --output')
-    i, n = (int(v) for v in args.shard.split('/'))
-    if not 0 <= i < n:
-        parser.error('--shard must be i/n with 0 <= i < n')
-    run(spec, args.batch, args.output, (i, n), spec_path=args.spec)
+    print_plan(plan(load_spec(args.spec), speed_ratio=args.speed_ratio, check_trims=not args.no_trim_check))
     return 0
 
 
