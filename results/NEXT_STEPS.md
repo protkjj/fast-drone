@@ -31,6 +31,7 @@
 - 재튜닝: **M17·F13·GSLQR → `tune-final-5`, 설정 `configs/arena_v2.json`**(태그는 검증·커밋 뒤, kj 확인 후 단다).
 - 승계: CPID 완료(`configs/tuning_carryover.json`). **V13은 retune_v3이 끝나면** `python3 -m control.tuning_carryover --controller V13 --run-dir results/arena/tuning/retune_v3`.
 - 맥 V13 retune_v3(arena.json)은 그대로 둔다 — V13은 보정 대상이 아니라 승계로 쓴다.
+- **학교 태그는 `tune-final-6`**(실행 코드 = `tune-final-5`, A.3이 제어기 모델을 계수 rtol 1e-8로 비교 — 리눅스 sha 불일치 대응, 보고서 23.8절). 결과 폴더 `tune5`. 맥 GSLQR `tune5`는 `tune-final-5`로 진행 중.
 - ⚠️ **`tune-final-4`(push됨)는 무효**: 보정항이 호버에서 미분 NaN → GSLQR 설계 실패(맥 `tune4` GSLQR 120회 전부 벌점, 쓰지 않음). 고친 코드는 `tune-final-5`(kj 확인 후 태그), 결과 폴더는 `tune5`. `tune4` 폴더는 격리(`tune4_invalid_nan`) 제안 — kj 확인 후.
 
 ## 우선순위 목록

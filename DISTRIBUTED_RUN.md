@@ -1,6 +1,6 @@
 # 분산 실행 — 학교 컴퓨터에서 절차 (kj 작업지시서 5단계)
 
-> **이 문서는 GitHub의 `protkjj/arena-completion` 브랜치 최신본을 보고 따라 한다.** 태그 `tune-final-5`로 받은
+> **이 문서는 GitHub의 `protkjj/arena-completion` 브랜치 최신본을 보고 따라 한다.** 태그 `tune-final-6`으로 받은
 > 폴더 안의 DISTRIBUTED_RUN.md는 태그를 단 뒤 고친 이 절차가 아니라 옛 Linux용 절차다. 코드는 태그 것을 쓰고,
 > 절차는 이 최신본을 쓴다.
 
@@ -60,7 +60,7 @@ clone이 다른 브랜치/커밋(git revision FAIL), pip install이 일부만 �
 
 ---
 
-## A. 튜닝 분산 — F13·M17(·GSLQR)을 학교 컴퓨터(Windows)에서, 태그 `tune-final-5`, 설정 `configs/arena_v2.json`
+## A. 튜닝 분산 — F13·M17(·GSLQR)을 학교 컴퓨터(Windows)에서, 태그 `tune-final-6`, 설정 `configs/arena_v2.json`
 
 > **2026-09-28 밤 변경(보고서 23절)**: 제어기 모델에 트림 밖 피치·요 모멘트 보정이 들어갔다(`configs/arena_v2.json`).
 > 보정을 쓰는 M17·F13·GSLQR은 **다시 튜닝**한다. `tune-final-3`(옛 모델)으로 돌던 F13·M17 튜닝은 중단했고 결과는 쓰지 않는다
@@ -68,6 +68,10 @@ clone이 다른 브랜치/커밋(git revision FAIL), pip install이 일부만 �
 > **튜닝 명령에는 반드시 `--config configs/arena_v2.json`을 준다.** 빠뜨리면 옛 모델로 돈다.
 > **`tune-final-4`는 쓰지 않는다**(보고서 23.7절): 보정항이 호버에서 미분 NaN을 내 GSLQR 설계·NLP 기울기가 깨졌다.
 > 고친 코드가 `tune-final-5`다. 결과 폴더도 새로 `results/arena/tuning/tune5`를 쓴다(`tune4`는 무효 결과).
+> **`tune-final-6`(최신)**: `tune-final-5`와 실행 코드가 같다. 바뀐 것은 A.3 점검(`scripts/setup_env.py` — 제어기 모델을
+> sha 정확 일치 대신 적합 계수 rtol 1e-8로 비교), 시험, 비교용 기준 파일(`configs/controller_model_reference.json`),
+> 승계 증명 도구뿐이다. 튜닝 결과에 영향이 없으므로 **결과 폴더는 `tune5` 그대로** 쓰고, `tune-final-5`로 이미 시작한
+> 튜닝은 그대로 둔다(보고서 23.8절).
 
 > **재시작·로그오프 뒤 이어 돌리기 (학교 정책으로 컴퓨터가 꺼졌을 때)**
 > PowerShell을 새로 열고 아래 세 줄을 실행한 다음 **A.6의 시작 명령을 그대로 다시 실행**한다.
@@ -98,14 +102,14 @@ clone이 다른 브랜치/커밋(git revision FAIL), pip install이 일부만 �
 | 제어기 | 태그 | 설정 | 튜닝 플랫폼 | 컴퓨터 |
 |---|---|---|---|---|
 | V13·CPID | `tune-final` (`8911ee1`) — **승계** | `arena.json` 기록을 `arena_v2`에서 비트 동일로 증명 | macOS (Darwin arm64) | kj 맥(retune_v3) |
-| F13·M17 | `tune-final-5` | `arena_v2` | Windows | 학교 |
-| GSLQR | `tune-final-5` | `arena_v2` | kj 결정 | 맥 또는 학교 |
+| F13·M17 | `tune-final-6` (실행 코드 = `tune-final-5`) | `arena_v2` | Windows | 학교 |
+| GSLQR | `tune-final-5` | `arena_v2` | macOS (Darwin arm64) | kj 맥(tune5) |
 
 V13·CPID 승계: `arena.json`으로 튜닝한 retune_v3 기록의 평가 0과 최종 최선 평가를 `arena_v2`에서 다시 계산해
 전 필드가 비트 동일할 때만 승계 표에 오른다(CPID 완료, V13은 retune_v3 종료 뒤 — 보고서 23.5절). `arena.json`
 기본 경로가 모멘트 보정 뒤에도 비트 동일한 것도 재현 도구로 확인했다(23.6절).
 
-기준값(tune-final-5, `configs/arena_v2.json` — 튜닝 기록의 config_sha256이 이 값이어야 한다):
+기준값(tune-final-5·6, `configs/arena_v2.json` — 튜닝 기록의 config_sha256이 이 값이어야 한다):
 - config_sha256 = `9729aec6ff8b54499c96d38c850fedf305970caad5bb2256e948dfa667ea32ca` (`configs/arena_v2.json`, 정규화 해시)
 - controller_model_sha256 = `2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d`
   (명목 제어기 모델 — 모멘트 보정은 이 sha에 안 들어가고 config_sha256이 모멘트 모델 파일 sha까지 묶는다)
@@ -124,7 +128,7 @@ Set-PSReadLineOption -HistorySaveStyle SaveNothing
 cd $HOME
 ```
 ```powershell
-git clone --branch tune-final-5 --depth 1 https://<READ_ONLY_TOKEN>@github.com/protkjj/fast-drone.git fast-drone-shard
+git clone --branch tune-final-6 --depth 1 https://<READ_ONLY_TOKEN>@github.com/protkjj/fast-drone.git fast-drone-shard
 ```
 ```powershell
 cd fast-drone-shard
@@ -135,7 +139,7 @@ git config credential.helper ""
 ```powershell
 git describe --tags --exact-match
 ```
-마지막 명령은 `tune-final-5`를 출력해야 한다.
+마지막 명령은 `tune-final-6`을 출력해야 한다.
 
 ### A.2 파이썬 환경
 ```powershell
@@ -159,11 +163,14 @@ $env:OMP_NUM_THREADS="1"; $env:OPENBLAS_NUM_THREADS="1"; $env:VECLIB_MAXIMUM_THR
 
 ### A.3 설정·모델 점검
 ```powershell
-python scripts\setup_env.py --commit $(git rev-parse HEAD) --config configs/arena_v2.json --expect-config-sha256 9729aec6ff8b54499c96d38c850fedf305970caad5bb2256e948dfa667ea32ca --expect-controller-model-sha256 2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d
+python scripts\setup_env.py --commit $(git rev-parse HEAD) --config configs/arena_v2.json --expect-config-sha256 9729aec6ff8b54499c96d38c850fedf305970caad5bb2256e948dfa667ea32ca --expect-controller-model-sha256 2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d 2>&1 | Tee-Object -FilePath setup_env_A3.txt
 ```
 - 종료코드(`$LASTEXITCODE`)가 0이 아니면 멈추고 표를 kj에게 보낸다.
 - 패키지 버전 WARN은 괜찮다. 기준이 맥이라 Windows에서는 같은 빌드가 없을 수 있고, 최종 판정은 A.4가 한다.
 - 스레드 FAIL은 A.2의 환경변수 줄을 빠뜨린 것이다. git FAIL은 받은 코드가 수정됐거나 다른 커밋이라는 뜻이다.
+- 제어기 모델은 **계수**로 판정한다(`model C_Na` … `model x_cp_poly` 8줄, 맥 기준 rtol 1e-8). 이 컴퓨터에서 다시 적합한
+  계수라 맥과 비트가 같지 않을 수 있다(리눅스 실측 sha 10b40c8c…). 그래서 `controller_model sha256` 줄은 **INFO**(기록만)이고,
+  그 값은 결과 회수(A.9) 때 `.zip`에 함께 보낸다. 계수 줄 하나라도 FAIL이면 멈추고 표를 kj에게 보낸다.
 
 ### A.4 환경 점검 — V13 기록 재현 (FAIL이면 이 컴퓨터에서 튜닝을 시작하지 않는다)
 맥 기록(retune_v3 V13 평가 0, 저장소의 `results/arena/tuning/env_check/`)을 이 컴퓨터에서 다시 계산해 비교한다.
@@ -252,7 +259,7 @@ taskkill /PID (Get-Content tune_M17.pid) /T /F
 Select-String '"spent"|"status"' results\arena\tuning\tune5\M17.record.json
 ```
 ```powershell
-Compress-Archive -Path results\arena\tuning\tune5\M17.record.json, results\arena\tuning\tune5\M17.jsonl, env_check_V13.txt, tune5_M17_*.log, tune5_M17_*.err -DestinationPath "tune5_M17_$env:COMPUTERNAME.zip"
+Compress-Archive -Path results\arena\tuning\tune5\M17.record.json, results\arena\tuning\tune5\M17.jsonl, env_check_V13.txt, setup_env_A3.txt, tune5_M17_*.log, tune5_M17_*.err -DestinationPath "tune5_M17_$env:COMPUTERNAME.zip"
 ```
 이 `.zip` 하나를 kj에게 보낸다.
 

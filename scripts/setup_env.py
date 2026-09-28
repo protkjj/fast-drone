@@ -14,8 +14,12 @@
   1) 파이썬·패키지 버전 — requirements-lock.txt와 대조(다르면 WARN, 같은 OS·아키텍처면 FAIL)
   2) 스레드 환경변수 4개가 전부 '1'로 설정돼 있는지 (FAIL)
   3) git 커밋이 --commit(또는 결과 폴더 manifest의 git_revision)과 같고 dirty가 아닌지 (FAIL)
-  4) --config가 있으면: 설정 sha256이 --expect-config-sha256과 같은지,
-     제어기 모델(게인) sha256이 --expect-controller-model-sha256과 같은지 (FAIL)
+  4) --config가 있으면: 설정 sha256이 --expect-config-sha256과 같은지 (FAIL),
+     그 컴퓨터에서 적합한 제어기 모델 집중정수 계수(C_Na·C_dc·C_A0·C_Aa2·x_cp·C_lp·C_mq, x_cp(V) 다항식)가
+     맥 기준값(configs/controller_model_reference.json)과 rtol 1e-8 안인지 (FAIL).
+     제어기 모델 sha256(--expect-controller-model-sha256)은 **기록만** 한다(INFO) — 2026-09-28 리눅스 실측:
+     계수 적합의 부동소수 차이로 sha가 달라졌다(2582197d… → 10b40c8c…). 실행 경로는 여전히 그 컴퓨터에서
+     적합한 값을 쓴다 — 기준 파일은 비교 전용이다.
 
 실행: python3 scripts/setup_env.py --commit <sha> [--config configs/arena.json
         --expect-config-sha256 <sha> --expect-controller-model-sha256 <sha>]
@@ -35,6 +39,51 @@ THREAD_VARIABLES = ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'VECLIB_MAXIMUM_T
 REFERENCE_PLATFORM = ('Darwin', 'arm64')
 # 파이썬 자체는 pip 설치 대상이 아니라 requirements-lock.txt에 안 넣고 여기서 따로 관리한다.
 REFERENCE_PYTHON = '3.13.7'
+MODEL_REFERENCE = ROOT/'configs'/'controller_model_reference.json'
+MODEL_KEYS = ('C_Na', 'C_dc', 'C_A0', 'C_Aa2', 'x_cp', 'C_lp', 'C_mq')      # fit_lumped_aero가 적합하는 값
+MODEL_RTOL = 1e-8
+
+
+def model_coefficients(cp):
+    """그 컴퓨터에서 적합한 제어기 모델 계수(비교 대상). x_cp_poly는 fit_cp_schedule 결과."""
+    out = {k: float(cp[k]) for k in MODEL_KEYS}
+    out['x_cp_poly'] = [float(c) for c in cp['x_cp_poly']]
+    return out
+
+
+def write_model_reference(path=MODEL_REFERENCE):
+    """기준 컴퓨터(REFERENCE_PLATFORM)에서만 만든다. 실행 경로는 이 파일을 읽지 않는다."""
+    import json
+    sys.path.insert(0, str(ROOT))
+    from control.arena_factory import ControllerModel
+    from control.validation_suite import baseline_params
+    model = ControllerModel(baseline_params())
+    doc = dict(schema='controller_model_reference/1', purpose=(
+        '비교 전용 — scripts/setup_env.py가 다른 컴퓨터의 적합 계수를 rtol 1e-8로 대조한다. 실행 경로는 이 파일을 '
+        '읽지 않고 그 컴퓨터에서 적합한 값을 쓴다.'),
+        made_on=list(REFERENCE_PLATFORM), controller_model_sha256=model.sha256,
+        coefficients=model_coefficients(model.cp))
+    Path(path).write_text(json.dumps(doc, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+    return doc
+
+
+def compare_model(cp, reference):
+    """(합격, 행 목록). 계수마다 상대오차 = |a−b| / max(|a|,|b|) (0 대 0은 0)."""
+    import numpy as np
+    got, ref = model_coefficients(cp), reference['coefficients']
+    rows, ok = [], True
+    for key in MODEL_KEYS + ('x_cp_poly',):
+        a, b = np.atleast_1d(np.asarray(got[key], float)), np.atleast_1d(np.asarray(ref[key], float))
+        if a.shape != b.shape:
+            rows.append((f'model {key}', f'{b.size}개', f'{a.size}개', 'FAIL'))
+            ok = False
+            continue
+        scale = np.maximum(np.abs(a), np.abs(b))
+        rel = float(np.max(np.where(scale > 0, np.abs(a - b)/np.where(scale > 0, scale, 1.0), 0.0)))
+        good = rel <= MODEL_RTOL
+        ok = ok and good
+        rows.append((f'model {key}', f'맥 기준 ±rtol {MODEL_RTOL:g}', f'최대 상대오차 {rel:.2e}', 'OK' if good else 'FAIL'))
+    return ok, rows
 
 
 def read_lock(path=LOCK):
@@ -120,12 +169,16 @@ def check_config(config_path, expect_config_sha256, expect_controller_model_sha2
     rows = [('config sha256', expect_config_sha256 or '(not given, not checked)', got_config,
              'OK' if (not expect_config_sha256 or got_config == expect_config_sha256) else 'FAIL')]
     ok = not expect_config_sha256 or got_config == expect_config_sha256
-    if expect_controller_model_sha256:
-        got_model = ArenaFactory(config).controller_model_sha256
-        match = got_model == expect_controller_model_sha256
-        rows.append(('controller_model sha256', expect_controller_model_sha256, got_model,
-                     'OK' if match else 'FAIL'))
-        ok = ok and match
+    import json
+    factory = ArenaFactory(config)          # 모멘트 보정 설정이면 모델 파일 sha도 여기서 확인된다
+    reference = json.loads(MODEL_REFERENCE.read_text(encoding='utf-8'))
+    ok_model, rows_model = compare_model(factory.cp, reference)
+    rows += rows_model
+    ok = ok and ok_model
+    got_model = factory.controller_model_sha256
+    expect = expect_controller_model_sha256 or reference['controller_model_sha256']
+    rows.append(('controller_model sha256(기록만)', expect, got_model,
+                 'INFO' if got_model != expect else 'OK'))
     return ok, rows
 
 
@@ -134,8 +187,16 @@ def main(argv=None):
     parser.add_argument('--commit', help='expected git revision (40-char sha); omit to skip this check')
     parser.add_argument('--config', help='arena config to check (e.g. configs/arena.json)')
     parser.add_argument('--expect-config-sha256')
-    parser.add_argument('--expect-controller-model-sha256')
+    parser.add_argument('--expect-controller-model-sha256', help='기록만 한다(INFO) — 판정은 계수 비교')
+    parser.add_argument('--write-model-reference', action='store_true',
+                        help='기준 컴퓨터에서만: configs/controller_model_reference.json을 새로 만든다')
     args = parser.parse_args(argv)
+    if args.write_model_reference:
+        if (platform.system(), platform.machine()) != REFERENCE_PLATFORM:
+            parser.error(f'the model reference is made only on {REFERENCE_PLATFORM}')
+        doc = write_model_reference()
+        print(f"wrote {MODEL_REFERENCE} (controller_model_sha256 {doc['controller_model_sha256'][:12]}…)")
+        return 0
 
     pins = read_lock()
     ok_v, rows_v = check_versions(pins)

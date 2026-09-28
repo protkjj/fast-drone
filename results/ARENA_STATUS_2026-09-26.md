@@ -2034,3 +2034,17 @@ kj 판단(22절 뒤): 이 모멘트 불일치는 고친다. V13은 INDI가 측�
 - 전체 회귀 **326 passed, 1 xfailed**(새 시험 3개 포함), `control.test_plant` ALL TESTS PASSED.
 - `arena.json` 기본 경로 재현(retune_v3 평가 0): GSLQR·CPID·V13 모두 **PASS·비트 동일**.
 - **태그**: `tune-final-4`는 이미 push돼 있다. 태그는 옮기지 않는 원칙이라 **새 태그 `tune-final-5`**로 다시 낸다(kj 승인). 학교에서는 `tune-final-4`를 쓰지 않는다. 결과 폴더도 새로 `tune5`를 쓴다.
+
+### 23.8 리눅스 검증 결과와 `tune-final-6`(실행 코드는 `tune-final-5`와 같음)
+- kj가 `tune-final-5`를 리눅스에서 검증한 결과
+  - **시험 2개 실패**: 트림 보정항 0 검사(24 m/s에서 3.08e-15 > 1e-15), 재적합 계수의 정확 일치(1e-11 수준 차이).
+  - **A.3 FAIL**: 제어기 모델 sha 불일치(기대 2582197d…, 실측 10b40c8c…). 설정 해시·커밋·스레드는 모두 일치.
+- 원인(코드로 확인): **실행 중에 모멘트 보정 계수를 다시 적합하는 경로는 없다.** 제어기는 `configs/controller_moment_model.json`만 읽는다(`arena_factory.moment_corrected_params` → `moment_correction.load`, sha 확인). `fit`은 그 모듈의 `main`과 시험에서만 부른다.
+  - 대신 **기존 집중정수 계수**(C_Na 등, x_cp(V))는 `ControllerModel`을 만들 때마다 그 컴퓨터에서 다시 적합한다(`arena_factory.py:263·270`, 예전부터 있던 설계).
+  - 그 부동소수 차이가 (1) 제어기 모델 sha, (2) 트림 α와 기준표의 ulp 차이, (3) 재적합 계수의 1e-11 차이로 나타났다.
+- 조치(실행 코드 무변경)
+  - 시험(`control/test_moment_correction.py`): 트림 보정항은 **≤ 1e-12 N·m**(맥 8.3e-17, 리눅스 3.1e-15, 보정항 크기 0.01~0.1 N·m). 재적합은 **rtol 1e-9** 비교이고, 비트 일치는 계수를 만든 플랫폼(Darwin arm64)에서만 요구한다.
+  - A.3(`scripts/setup_env.py`): 제어기 모델은 그 컴퓨터에서 적합한 **계수 8종을 맥 기준값과 rtol 1e-8로 비교**해 판정한다. 기준값은 비교 전용 파일 `configs/controller_model_reference.json`(실행 경로는 읽지 않음, `--write-model-reference`로 기준 컴퓨터에서만 생성)이다. sha 일치 여부는 **INFO(기록만)**다. 시험은 `control/test_setup_env_model.py` 7개(1e-7 차이는 FAIL, 1e-9는 PASS, 길이 불일치 FAIL, sha 불일치는 판정 무관).
+  - 승계 증명 도구: 작업 트리가 깨끗할 때만 증명하고 `proved_at_revision`을 기록한다. CPID 증명을 깨끗한 커밋 `08e3597`에서 다시 만들었다(평가 0·최선 115 모두 비트 동일).
+- 새 태그 **`tune-final-6`**. 결과 폴더는 **`tune5` 그대로**다(튜닝 결과에 영향이 없는 변경). `tune-final-5`로 이미 시작한 튜닝은 그대로 둔다.
+- 맥 GSLQR `tune5`(tune-final-5)는 그대로 진행한다.
