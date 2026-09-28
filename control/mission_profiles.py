@@ -125,6 +125,58 @@ class SmoothstepProfile(MissionProfile):
         return velocities, altitudes
 
 
+class StepProfile:
+    """트림 속도·고도에서 t=STEP_TIME부터 계단 하나. 스위트 profile 규약을 따른다.
+
+    ramp_s > 0이면 식(32) smoothstep으로 ramp_s초에 걸쳐 바뀌는 매끄러운 계단, 0이면 옛 원계단이다.
+    `control/arena_design_check.py`(설계점검)와 `control/arena.py`의 'step' 튜닝 시나리오가 같이 쓴다
+    — 두 모듈이 서로를 참조하면 순환 임포트가 나서(arena.py → arena_design_check.py → arena.py)
+    여기(둘 다 임포트하는 하위 모듈)로 옮겼다. `control/arena_design_check.py`의 `STEP_TIME`(같은 값
+    0.5)은 `step_metrics`가 따로 쓰므로 중복해 둔다.
+    """
+
+    STEP_TIME = 0.5
+
+    def __init__(self, V, z, dv, dz, duration=15.0, ramp_s=1.0):
+        self.V, self.z, self.dv, self.dz = float(V), float(z), float(dv), float(dz)
+        self.ramp_s = float(ramp_s)
+        self.T_total = float(duration)
+        t0 = self.STEP_TIME
+        self.phases = [('트림', 0.0, t0, V, V, z, z),
+                       ('계단', t0, duration - t0, V + dv, V + dv, z + dz, z + dz)]
+        self.gust_interval = None
+        self.cruise_start, self.cruise_end = 0.0, self.T_total
+        self.decel_start = self.decel_end = None
+
+    def _progress(self, ts):
+        """계단 진행도 s ∈ [0, 1] — 원계단이면 0/1, 매끄러운 계단이면 smoothstep((t−0.5)/전이 시간)."""
+        ts = np.asarray(ts, dtype=float)
+        return SmoothstepProfile.shape(np.clip((ts - self.STEP_TIME)/self.ramp_s, 0.0, 1.0))
+
+    def get_ref(self, t):
+        if not self.ramp_s:                         # 옛 원계단 — 기록을 비트 단위로 재현하려고 그대로 둔다
+            after = t >= self.STEP_TIME
+            return (np.array([self.V + self.dv*after, 0.0, 0.0]), self.z + self.dz*after,
+                    '계단' if after else '트림')
+        s = float(self._progress(t))
+        return (np.array([self.V + self.dv*s, 0.0, 0.0]), self.z + self.dz*s,
+                '계단' if t >= self.STEP_TIME else '트림')
+
+    def compute_refs(self, ts):
+        if not self.ramp_s:
+            after = np.asarray(ts) >= self.STEP_TIME
+            v = np.zeros((len(after), 3))
+            v[:, 0] = self.V + self.dv*after
+            return v, self.z + self.dz*after
+        s = self._progress(ts)
+        v = np.zeros((len(s), 3))
+        v[:, 0] = self.V + self.dv*s
+        return v, self.z + self.dz*s
+
+    def get_phase_boundaries(self):
+        return [(name, t, t + d) for name, t, d, *_ in self.phases]
+
+
 class GustProfile(MissionProfile):
     """Start at cruise trim, establish flight, apply a gust, then recover."""
 

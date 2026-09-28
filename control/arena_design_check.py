@@ -38,9 +38,11 @@ import numpy as np
 
 from control.arena import load_config, DEFAULT_CONFIG, ROOT
 from control.arena_factory import ArenaFactory
+from control.mission_profiles import StepProfile
 from control.validation_metrics import Acceptance
 
-STEP_TIME = 0.5
+STEP_TIME = 0.5          # StepProfile.STEP_TIME과 같은 값이다(control/mission_profiles.py로 옮김,
+                         # 순환 임포트 회피). step_metrics가 여기서 따로 쓴다
 DURATION = 15.0          # 적분기(GSLQR LQI, CPID 속도 적분)의 정상오차 제거까지 보려면 8초는 짧다
 BAND = 0.05                    # 계단 크기의 ±5%
 POINTS = {'GSLQR': (0.0, 20.0, 40.0, 60.0, 85.0), 'CPID': (0.0, 10.0, 20.0)}
@@ -51,52 +53,6 @@ STEPS = {'altitude_+1m': (0.0, 1.0), 'speed_+1mps': (1.0, 0.0)}   # (Δvx, Δz)
 REGION_TOP = {'GSLQR': 85.0, 'CPID': 20.0}
 SMOOTH_S = 1.0                 # 매끄러운 계단의 전이 시간(논문 식(32) smoothstep)
 SHAPES = {'smooth': SMOOTH_S, 'step': 0.0}
-
-
-class StepProfile:
-    """트림 속도·고도에서 t=STEP_TIME부터 계단 하나. 스위트 profile 규약을 따른다.
-
-    ramp_s > 0이면 식(32) smoothstep으로 ramp_s초에 걸쳐 바뀌는 매끄러운 계단, 0이면 옛 원계단이다.
-    """
-
-    def __init__(self, V, z, dv, dz, duration=DURATION, ramp_s=SMOOTH_S):
-        self.V, self.z, self.dv, self.dz = float(V), float(z), float(dv), float(dz)
-        self.ramp_s = float(ramp_s)
-        self.T_total = float(duration)
-        self.phases = [('트림', 0.0, STEP_TIME, V, V, z, z),
-                       ('계단', STEP_TIME, duration - STEP_TIME, V + dv, V + dv, z + dz, z + dz)]
-        self.gust_interval = None
-        self.cruise_start, self.cruise_end = 0.0, self.T_total
-        self.decel_start = self.decel_end = None
-
-    def _progress(self, ts):
-        """계단 진행도 s ∈ [0, 1] — 원계단이면 0/1, 매끄러운 계단이면 smoothstep((t−0.5)/전이 시간)."""
-        from control.mission_profiles import SmoothstepProfile
-        ts = np.asarray(ts, dtype=float)
-        return SmoothstepProfile.shape(np.clip((ts - STEP_TIME)/self.ramp_s, 0.0, 1.0))
-
-    def get_ref(self, t):
-        if not self.ramp_s:                         # 옛 원계단 — 기록을 비트 단위로 재현하려고 그대로 둔다
-            after = t >= STEP_TIME
-            return (np.array([self.V + self.dv*after, 0.0, 0.0]), self.z + self.dz*after,
-                    '계단' if after else '트림')
-        s = float(self._progress(t))
-        return (np.array([self.V + self.dv*s, 0.0, 0.0]), self.z + self.dz*s,
-                '계단' if t >= STEP_TIME else '트림')
-
-    def compute_refs(self, ts):
-        if not self.ramp_s:
-            after = np.asarray(ts) >= STEP_TIME
-            v = np.zeros((len(after), 3))
-            v[:, 0] = self.V + self.dv*after
-            return v, self.z + self.dz*after
-        s = self._progress(ts)
-        v = np.zeros((len(s), 3))
-        v[:, 0] = self.V + self.dv*s
-        return v, self.z + self.dz*s
-
-    def get_phase_boundaries(self):
-        return [(name, t, t + d) for name, t, d, *_ in self.phases]
 
 
 def step_metrics(ts, y, y0, target):

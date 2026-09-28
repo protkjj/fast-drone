@@ -22,14 +22,15 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.spatial.transform import Rotation
 
-from control.mission_profiles import MissionProfile, GustProfile, SmoothstepProfile
+from control.mission_profiles import MissionProfile, GustProfile, SmoothstepProfile, StepProfile
 from control.uncertainty import FACTORS, perturb_params
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = ROOT / 'configs' / 'arena.json'
 SCHEMA = 'arena/1'
 CONTROLLERS = ('V13', 'M17', 'F13', 'GSLQR', 'CPID')
-SCENARIO_TYPES = ('mission', 'gust', 'reference')
+SCENARIO_TYPES = ('mission', 'gust', 'reference', 'step')
+STEP_AXES = ('altitude', 'speed')
 # 팀 기체의 명목 트림 확인 범위(docs/VALIDATION.md). 이 밖의 속도는 팀
 # 문서가 검증하지 않았으므로 설정 단계에서 막는다.
 SPEED_RANGE = (0.0, 85.0)
@@ -120,6 +121,8 @@ def validate_config(config):
                 raise ValueError(f"{s['id']}: unknown perturbation factor {factor!r}")
         if s['type'] == 'gust' and s['direction'] not in ('lateral', 'vertical'):
             raise ValueError(f"{s['id']}: gust direction must be lateral or vertical")
+        if s['type'] == 'step' and s['axis'] not in STEP_AXES:
+            raise ValueError(f"{s['id']}: step axis must be one of {STEP_AXES}")
     fraction = config.get('reporting', {}).get('integrator_at_limit_fraction')
     if fraction is not None and not 0.0 < float(fraction) < 1.0:
         raise ValueError('reporting.integrator_at_limit_fraction must be in (0, 1)')
@@ -418,6 +421,17 @@ def build_scenarios(config, cp=None, native_params=None, only=None, scenarios=No
             window = (0.0, profile.T_total)
             meta.update(cruise_speed=V, peak_m_s=peak, direction=s['direction'],
                         flow_angle_deg=case['flow_angle_deg'])
+        elif s['type'] == 'step':
+            # 설계점검(control/arena_design_check.py)과 같은 StepProfile이다 — 크기(size)·관찰 시간만
+            # 여기 설정에서 받는다. 매끄러운 계단(식(32), 1 s 전이)으로 고정한다 — 옛 원계단 옵션은
+            # 튜닝에 쓸 일이 없어서 스키마에 안 넣었다.
+            V = resolve_speed(s['speed'], config)
+            size = float(s['size'])
+            dv, dz = (0.0, size) if s['axis'] == 'altitude' else (size, 0.0)
+            duration = float(s['durations_s'][0])
+            profile = StepProfile(V, alt, dv, dz, duration=duration, ramp_s=1.0)
+            window = (0.0, profile.T_total)
+            meta.update(cruise_speed=V, axis=s['axis'], size=size)
         else:
             if cp is None:
                 raise ValueError('reference profiles need the nominal controller model (cp)')
