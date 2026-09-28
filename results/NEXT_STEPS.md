@@ -143,20 +143,14 @@
   3. 제어기별 결정변수 수, 평균 반복 수, `solve_s`의 P50·P99, 50 Hz(20 ms) 대비 비율을 표 12로 만든다. CPU·OS·솔버 버전·허용오차·반복 상한을 함께 적는다.
   4. 첫 호출(콜드 스타트)은 따로 보고한다. 벤치마크 스크립트는 튜닝 확정 뒤 작성한다(아직 없음).
 
-### 맥 튜닝 작업자 배분(센서 설정 재튜닝용, kj 2026-09-28) — V13·GSLQR·CPID 모두 처음부터 `--scenario-workers`
-- 맥: 성능 코어 4 + 효율 코어 6, 메모리 16 GB. 무거운 계산 프로세스가 5개를 넘으면 약 2배 느려진다(실측, mac-has-four-performance-cores 메모).
-  `--scenario-workers N`이면 부모 프로세스는 대부분 기다리고 **작업자 N개가 계산**한다 — 세는 것은 작업자 수다.
-- 실측 근거(센서 없음, 보고서 18·19·21절): 평가 1회(시나리오 18개) 순차 V13 약 13분, GSLQR 33~42 s, CPID 46~61 s. V13 작업자 3개면 약 2배(393 s). 작업자 1개당 V13 약 0.6 GiB.
-- 배분(합계 작업자 4 이하로 시작):
-  1. **1단계**: V13 `N=2` + GSLQR `N=1` + CPID `N=1` 동시 시작(작업자 4). GSLQR·CPID는 120회에 각 약 1~2시간(센서 비용 추가 전 추정).
-  2. **2단계**(GSLQR·CPID **둘 다** 끝난 뒤): V13을 멈추고 같은 run-dir로 `N=4`로 재개한다(재개는 끝난 평가를 재생하고 이어 가며 작업자 수와 무관하게 비트 동일 — 18·19절). **kj 사전 승인(2026-09-28 밤): 확인 없이 진행**하고, 멈추기 직전의 `spent`와 재개 시각만 기록한다. 멈출 때는 `caffeinate` 부모까지 끝낸다.
-  3. 효율 코어까지 쓰는 `N≥5`는 **평가 1~2회 시간을 재서 N=4보다 빨라질 때만** 쓴다(kj). 비교 결과를 기록한다.
-- 첫 평가 시간을 보고 전체 예상 시간을 다시 계산한다(센서 모델 계산 비용이 아직 없다). 참고 추정: V13 120회 ≈ 1단계 2시간 + 2단계 약 9~10시간.
-- 명령(맥, 설정·폴더 이름은 센서 설정이 정해지면 채운다):
-  ```bash
-  caffeinate -dims env OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 MKL_NUM_THREADS=1 python3 -m control.arena_tune --controllers V13 --budget 120 --config <센서 설정> --run-dir results/arena/tuning/<폴더> --scenario-workers 2 > results/arena/tuning/<폴더>_V13.log 2>&1 &
-  ```
-  GSLQR·CPID는 `--controllers GSLQR`/`CPID`, `--scenario-workers 1`, 로그 이름만 바꾼다. 진행 확인: `tail -1 results/arena/tuning/<폴더>_V13.log`.
+### 센서 설정 재튜닝 = 학교 Windows 4대에서 다섯 제어기 모두(kj 결정 2026-09-28 밤, `DISTRIBUTED_RUN.md` A절)
+- 배분: 컴퓨터 1 = M17(작업자당 2.0 GiB), 2 = F13(1.2), 3 = V13(0.6), 4 = GSLQR + CPID(각 0.6, 작업자 수를 반씩).
+- 규칙 개정: **한 제어기는 한 컴퓨터에서 끝까지**(재개·180회 연장도 같은 컴퓨터), 한 컴퓨터가 여러 제어기 가능, F13과 M17은 다른 컴퓨터.
+- 이유(kj): 튜닝 플랫폼 = 본 실험 플랫폼(Windows)으로 통일, 맥은 코드·분석용. 맥은 Windows 첫 실행이 막힐 때의 예비.
+- 결과 폴더 `results/arena/tuning/tune7`, 태그 `tune-final-7`(센서 설정). A절의 `<센서 설정>`·`<설정 해시>`는 태그 전에 채운다.
+- 시간 추정(맥 실측 기준): M17이 일정을 정한다 — 작업자 4개면 120회에 약 1.5일, 180회 연장 시 약 50% 더. 첫 평가 시간으로 다시 추정.
+- 맥 작업자 배분(V13 2 + GSLQR 1 + CPID 1 → V13 4) 계획과 2단계 사전 승인은 **폐기**(맥에서 튜닝하지 않음).
+- V13 `retune_v3`(센서 없음)은 **66/120회에서 중단**(2026-09-28 22:36, kj) — '센서 없음, 부분 결과'로 보관(`retune_v3/V13_PARTIAL_NOTE.md`). 승계 절차(`tuning_carryover`)는 쓰지 않는다.
 
 ### 튜닝 예산 연장 규칙(센서 재튜닝 전에 확정, kj 2026-09-28 밤 — 결과를 보기 전)
 - **보완판(현행)**: 판정 도구 `python3 -m control.tuning_extension --run-dirs <폴더들>`(시험 `control/test_tuning_extension.py`).

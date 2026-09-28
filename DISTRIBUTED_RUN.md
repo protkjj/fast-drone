@@ -1,6 +1,6 @@
 # 분산 실행 — 학교 컴퓨터에서 절차 (kj 작업지시서 5단계)
 
-> **이 문서는 GitHub의 `protkjj/arena-completion` 브랜치 최신본을 보고 따라 한다.** 태그 `tune-final-6`으로 받은
+> **이 문서는 GitHub의 `protkjj/arena-completion` 브랜치 최신본을 보고 따라 한다.** 태그 `tune-final-7`로 받은
 > 폴더 안의 DISTRIBUTED_RUN.md는 태그를 단 뒤 고친 이 절차가 아니라 옛 Linux용 절차다. 코드는 태그 것을 쓰고,
 > 절차는 이 최신본을 쓴다.
 
@@ -60,21 +60,13 @@ clone이 다른 브랜치/커밋(git revision FAIL), pip install이 일부만 �
 
 ---
 
-## A. 튜닝 분산 — F13·M17(·GSLQR)을 학교 컴퓨터(Windows)에서, 태그 `tune-final-6`, 설정 `configs/arena_v2.json`
+## A. 튜닝 분산 — 다섯 제어기를 학교 Windows 4대에서, 태그 `tune-final-7`(센서 설정)
 
-> **2026-09-28 밤 변경(보고서 23절)**: 제어기 모델에 트림 밖 피치·요 모멘트 보정이 들어갔다(`configs/arena_v2.json`).
-> 보정을 쓰는 M17·F13·GSLQR은 **다시 튜닝**한다. `tune-final-3`(옛 모델)으로 돌던 F13·M17 튜닝은 중단했고 결과는 쓰지 않는다
-> (중단 전 진행 횟수만 보고서에 기록). V13·CPID는 옛 기록을 **승계**한다(`configs/tuning_carryover.json`, 비트 동일 증명).
-> **튜닝 명령에는 반드시 `--config configs/arena_v2.json`을 준다.** 빠뜨리면 옛 모델로 돈다.
-> **`tune-final-4`는 쓰지 않는다**(보고서 23.7절): 보정항이 호버에서 미분 NaN을 내 GSLQR 설계·NLP 기울기가 깨졌다.
-> 고친 코드가 `tune-final-5`다. 결과 폴더도 새로 `results/arena/tuning/tune5`를 쓴다(`tune4`는 무효 결과).
-> **`tune-final-6`(최신)**: `tune-final-5`와 실행 코드가 같다. 바뀐 것은 A.3 점검(`scripts/setup_env.py` — 제어기 모델을
-> sha 정확 일치 대신 적합 계수 rtol 1e-8로 비교), 시험, 비교용 기준 파일(`configs/controller_model_reference.json`),
-> 승계 증명 도구뿐이다. 튜닝 결과에 영향이 없으므로 **결과 폴더는 `tune5` 그대로** 쓰고, `tune-final-5`로 이미 시작한
-> 튜닝은 그대로 둔다(보고서 23.8절).
+> **⚠️ 태그 전 자리표시**: `<센서 설정>`(설정 파일 경로)과 `<설정 해시>`는 센서 모델이 들어간 설정이 정해지면 `tune-final-7`을
+> 달기 전에 채운다(Claude). 이 상자가 남아 있으면 아직 학교에서 시작하지 않는다.
 
 > **재시작·로그오프 뒤 이어 돌리기 (학교 정책으로 컴퓨터가 꺼졌을 때)**
-> PowerShell을 새로 열고 아래 세 줄을 실행한 다음 **A.6의 시작 명령을 그대로 다시 실행**한다.
+> PowerShell을 새로 열고 아래 세 줄을 실행한 다음, 이 컴퓨터가 맡은 제어기마다 **A.6의 시작 명령을 그대로 다시 실행**한다.
 > 기록된 평가는 재생하고 이어 간다. 같은 컴퓨터에서만 한다.
 > ```powershell
 > cd $HOME\fast-drone-shard
@@ -82,9 +74,9 @@ clone이 다른 브랜치/커밋(git revision FAIL), pip install이 일부만 �
 > $env:OMP_NUM_THREADS="1"; $env:OPENBLAS_NUM_THREADS="1"; $env:VECLIB_MAXIMUM_THREADS="1"; $env:MKL_NUM_THREADS="1"; $env:PYTHONUTF8="1"
 > ```
 >
-> **진행 확인**(언제든)
+> **진행 확인**(언제든, `<제어기>`를 맡은 제어기 이름으로)
 > ```powershell
-> Select-String '"spent"|"status"' results\arena\tuning\tune5\M17.record.json; (Get-Item results\arena\tuning\tune5\M17.jsonl).LastWriteTime
+> Select-String '"spent"|"status"' results\arena\tuning\tune7\<제어기>.record.json; (Get-Item results\arena\tuning\tune7\<제어기>.jsonl).LastWriteTime
 > ```
 > `spent`는 끝난 평가 수다. 마지막 기록 시각이 평가 1회 시간(M17은 수십 분)보다 훨씬 오래전이면
 > 멈춘 것이다. 이 경우 A.7로 프로세스가 살아 있는지 보고, 없으면 위 절차로 재개한다.
@@ -93,26 +85,32 @@ clone이 다른 브랜치/커밋(git revision FAIL), pip install이 일부만 �
 제어기를 맡을지 정하는 것뿐이다. "합치기"는 결과 파일 두 개(`<제어기>.record.json`, `<제어기>.jsonl`)를
 한 폴더에 모으는 것뿐이다.
 
-**규칙(kj)**
-- **제어기 1개 = 컴퓨터 1대, 끝까지.** 도중에 다른 컴퓨터로 옮기지 않는다. 재개는 같은 컴퓨터에서만 한다.
-- **F13과 M17은 같은 컴퓨터에서 돌리지 않는다.**
-- 결과 폴더 이름은 모든 컴퓨터에서 `results/arena/tuning/tune5`로 쓴다. 합칠 때 복사만 하면 된다.
+**규칙(kj, 2026-09-28 밤 개정)**
+- **한 제어기는 한 컴퓨터에서 끝까지**(이어 돌리기와 180회 연장도 같은 컴퓨터). 도중에 다른 컴퓨터로 옮기지 않는다.
+- 한 컴퓨터가 **여러 제어기**를 맡을 수 있다(제어기마다 프로세스 하나).
+- **F13과 M17은 다른 컴퓨터**에서 돌린다.
+- 작업자 수와 동시 실행은 결과를 바꾸지 않는다(순차와 비트 동일, 보고서 18·19절) — 속도만 달라진다.
+- 결과 폴더 이름은 모든 컴퓨터에서 `results/arena/tuning/tune7`로 쓴다. 합칠 때 복사만 하면 된다.
+- 참여하는 모든 컴퓨터는 먼저 A.4(재현 점검)를 통과해야 한다.
 
-**제어기별 튜닝 태그** (보고서 19.1절)
-| 제어기 | 태그 | 설정 | 튜닝 플랫폼 | 컴퓨터 |
-|---|---|---|---|---|
-| V13·CPID | `tune-final` (`8911ee1`) — **승계** | `arena.json` 기록을 `arena_v2`에서 비트 동일로 증명 | macOS (Darwin arm64) | kj 맥(retune_v3) |
-| F13·M17 | `tune-final-6` (실행 코드 = `tune-final-5`) | `arena_v2` | Windows | 학교 |
-| GSLQR | `tune-final-5` | `arena_v2` | macOS (Darwin arm64) | kj 맥(tune5) |
+**배분(4대, kj 결정 2026-09-28 밤)**
+| 컴퓨터 | 맡는 제어기 | 작업자 1개당 메모리(A.6) | 이유 |
+|---|---|---|---|
+| 1 | M17 | 2.0 GiB | 가장 무겁다(평가 1회가 V13의 약 3배) — 한 대를 통째로 |
+| 2 | F13 | 1.2 GiB | 두 번째로 무겁다. M17과 떨어뜨린다 |
+| 3 | V13 | 0.6 GiB | |
+| 4 | GSLQR + CPID | 각 0.6 GiB로 계산(실측 없음) | 둘 다 가볍다(맥 기준 평가 1회 30~60 s) — 두 프로세스를 동시에 |
 
-V13·CPID 승계: `arena.json`으로 튜닝한 retune_v3 기록의 평가 0과 최종 최선 평가를 `arena_v2`에서 다시 계산해
-전 필드가 비트 동일할 때만 승계 표에 오른다(CPID 완료, V13은 retune_v3 종료 뒤 — 보고서 23.5절). `arena.json`
-기본 경로가 모멘트 보정 뒤에도 비트 동일한 것도 재현 도구로 확인했다(23.6절).
+- 시간 추정(맥 실측 기준, Windows 속도와 센서 계산 비용은 모름): M17이 일정을 정한다 — 순차 평가 1회 약 35~40분,
+  작업자 4개면 120회에 약 1.5일. 예산 연장(180회, A.10)이 걸리면 약 50% 더. 첫 평가 시간을 재서 kj에게 알린다.
 
-기준값(tune-final-5·6, `configs/arena_v2.json` — 튜닝 기록의 config_sha256이 이 값이어야 한다):
-- config_sha256 = `9729aec6ff8b54499c96d38c850fedf305970caad5bb2256e948dfa667ea32ca` (`configs/arena_v2.json`, 정규화 해시)
-- controller_model_sha256 = `2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d`
-  (명목 제어기 모델 — 모멘트 보정은 이 sha에 안 들어가고 config_sha256이 모멘트 모델 파일 sha까지 묶는다)
+기준값(`tune-final-7`, `<센서 설정>` — 튜닝 기록의 config_sha256이 이 값이어야 한다):
+- config_sha256 = `<설정 해시>`
+- 제어기 모델은 A.3이 **계수**로 판정한다(맥 기준 `configs/controller_model_reference.json`, rtol 1e-8). sha는 기록만 한다.
+
+**이력**(쓰지 않는 태그): `tune-final-3`(옛 모델, 실행하지 않음), `tune-final-4`(모멘트 보정 호버 NaN — 무효),
+`tune-final-5`·`6`(센서 없는 `arena_v2` — 맥의 GSLQR `tune5`·V13 `retune_v3`·CPID 승계는 비교 자료).
+센서 설정으로 다섯 제어기를 모두 새로 튜닝하므로 V13·CPID 승계 절차(`configs/tuning_carryover.json`)는 쓰지 않는다(보고서 23·25절).
 
 **미리 알아 둘 것**
 - 아래 명령은 전부 **PowerShell**에서 한 줄씩 실행한다(cmd 아님).
@@ -128,7 +126,7 @@ Set-PSReadLineOption -HistorySaveStyle SaveNothing
 cd $HOME
 ```
 ```powershell
-git clone --branch tune-final-6 --depth 1 https://<READ_ONLY_TOKEN>@github.com/protkjj/fast-drone.git fast-drone-shard
+git clone --branch tune-final-7 --depth 1 https://<READ_ONLY_TOKEN>@github.com/protkjj/fast-drone.git fast-drone-shard
 ```
 ```powershell
 cd fast-drone-shard
@@ -139,7 +137,7 @@ git config credential.helper ""
 ```powershell
 git describe --tags --exact-match
 ```
-마지막 명령은 `tune-final-6`을 출력해야 한다.
+마지막 명령은 `tune-final-7`을 출력해야 한다.
 
 ### A.2 파이썬 환경
 ```powershell
@@ -163,7 +161,7 @@ $env:OMP_NUM_THREADS="1"; $env:OPENBLAS_NUM_THREADS="1"; $env:VECLIB_MAXIMUM_THR
 
 ### A.3 설정·모델 점검
 ```powershell
-python scripts\setup_env.py --commit $(git rev-parse HEAD) --config configs/arena_v2.json --expect-config-sha256 9729aec6ff8b54499c96d38c850fedf305970caad5bb2256e948dfa667ea32ca --expect-controller-model-sha256 2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d 2>&1 | Tee-Object -FilePath setup_env_A3.txt
+python scripts\setup_env.py --commit $(git rev-parse HEAD) --config <센서 설정> --expect-config-sha256 <설정 해시> 2>&1 | Tee-Object -FilePath setup_env_A3.txt
 ```
 - 종료코드(`$LASTEXITCODE`)가 0이 아니면 멈추고 표를 kj에게 보낸다.
 - 패키지 버전 WARN은 괜찮다. 기준이 맥이라 Windows에서는 같은 빌드가 없을 수 있고, 최종 판정은 A.4가 한다.
@@ -216,30 +214,32 @@ Start-Sleep 15; Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Sele
 Remove-Item -Recurse -Force orphan_check
 ```
 
-### A.6 시작 (맡은 제어기 하나만)
-작업자 수를 먼저 계산한다. 인자는 작업자 1개당 메모리[GiB]로, **M17은 2.0**(kj 기준), **F13은 1.2**다. F13 값은 맥 실측 0.84 GiB에 여유를 둔 것이다(보고서 19.5절).
+### A.6 시작 (이 컴퓨터가 맡은 제어기마다)
+작업자 수를 먼저 계산한다. 인자는 작업자 1개당 메모리[GiB](위 배분표: M17 2.0, F13 1.2, V13 0.6, GSLQR·CPID 0.6).
 ```powershell
 python -m control.arena_suggest_workers 2.0
 ```
 - 계산식: (가용 메모리 × 0.7) / 작업자당 메모리, CPU − 1, 18 가운데 가장 작은 값이다.
 - 하이퍼스레딩 컴퓨터는 논리 CPU가 물리 코어의 2배로 잡힌다. 작업 관리자 > 성능 > CPU의 **'코어'** 값을 `--physical-cores`로 주면 그 값으로 계산한다. 예: `python -m control.arena_suggest_workers 2.0 --physical-cores 6`
 - 다른 프로그램을 끈 상태에서 튜닝 직전에 잰다.
+- **컴퓨터 4(GSLQR + CPID)**: `python -m control.arena_suggest_workers 0.6`으로 나온 수를 두 제어기에 **반씩** 나눈다(예: 6이면 3·3).
 
-M17 시작 명령이다(아래 N을 위에서 나온 수로 바꾼다). F13을 맡은 컴퓨터는 `M17`을 `F13`으로 바꾼다. 인자 안과 파일 이름에 모두 들어 있다.
+시작 명령이다. `<제어기>`(3곳)를 M17·F13·V13·GSLQR·CPID 중 맡은 것으로, `N`을 위에서 나온 수로 바꾼다. 컴퓨터 4는 GSLQR과 CPID로 두 번 실행한다.
 ```powershell
-$stamp = Get-Date -Format yyyyMMdd_HHmm; $p = Start-Process .\.venv\Scripts\python.exe -ArgumentList '-m','control.arena_tune','--controllers','M17','--budget','120','--config','configs/arena_v2.json','--run-dir','results/arena/tuning/tune5','--scenario-workers','N' -PassThru -WindowStyle Hidden -RedirectStandardOutput "tune5_M17_$stamp.log" -RedirectStandardError "tune5_M17_$stamp.err"; $p.Id | Out-File -Encoding ascii tune_M17.pid; $p.Id
+$c = '<제어기>'; $stamp = Get-Date -Format yyyyMMdd_HHmm; $p = Start-Process .\.venv\Scripts\python.exe -ArgumentList '-m','control.arena_tune','--controllers',$c,'--budget','120','--config','<센서 설정>','--run-dir','results/arena/tuning/tune7','--scenario-workers','N' -PassThru -WindowStyle Hidden -RedirectStandardOutput "tune7_${c}_$stamp.log" -RedirectStandardError "tune7_${c}_$stamp.err"; $p.Id | Out-File -Encoding ascii "tune_$c.pid"; $p.Id
 ```
 - 창을 닫아도 계속 돈다(`-WindowStyle Hidden`으로 따로 띄운 프로세스라서).
 - 튜닝이 도는 동안 **시스템 절전은 코드가 막는다**(Windows `SetThreadExecutionState`, 화면 꺼짐은 막지 않음, 끝나면 자동 해제). 단, 학교 정책의 강제 재시작, Windows 업데이트, 야간 종료, 자동 로그오프는 막지 못한다. 그때는 맨 위 상자대로 재개한다.
-- 재개할 때도 같은 명령을 쓴다. 로그 파일 이름에 시각이 붙어 이전 로그를 덮어쓰지 않는다.
-- `--scenario-workers`는 결과를 바꾸지 않는다(순차와 비트 동일, 보고서 18·19절). 재개할 때 N을 바꿔도 된다.
+- 재개할 때도 같은 명령을 쓴다(`$c`만 맞게). 로그 파일 이름에 시각이 붙어 이전 로그를 덮어쓰지 않는다.
+- `--scenario-workers`는 결과를 바꾸지 않는다. 재개할 때 N을 바꿔도 된다.
+- 첫 평가가 끝나면(`spent` 1) 걸린 시간을 kj에게 알린다 — 전체 시간을 다시 추정한다.
 
-### A.7 살아 있는지·메모리 확인
+### A.7 살아 있는지·메모리 확인 (`<제어기>`마다)
 ```powershell
-Get-Process -Id (Get-Content tune_M17.pid)
+Get-Process -Id (Get-Content tune_<제어기>.pid)
 ```
 ```powershell
-Get-Content (Get-ChildItem tune5_M17_*.log | Sort-Object LastWriteTime | Select-Object -Last 1) -Tail 1
+Get-Content (Get-ChildItem tune7_<제어기>_*.log | Sort-Object LastWriteTime | Select-Object -Last 1) -Tail 1
 ```
 ```powershell
 [math]::Round((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1MB, 1)
@@ -250,35 +250,37 @@ Get-Content (Get-ChildItem tune5_M17_*.log | Sort-Object LastWriteTime | Select-
 ### A.8 멈추기
 중계 프로세스까지 **트리 전체**를 끝낸다. venv의 python.exe는 진짜 인터프리터를 자식으로 띄우는 중계 프로그램이라, `Stop-Process`로 그 PID만 죽이면 튜닝이 계속 돈다.
 ```powershell
-taskkill /PID (Get-Content tune_M17.pid) /T /F
+taskkill /PID (Get-Content tune_<제어기>.pid) /T /F
 ```
 
-### A.9 결과 회수 (학교 컴퓨터 → kj)
-끝났는지 확인한다. `"status": "complete"`와 `"spent": 120`이 나와야 한다.
+### A.9 결과 회수 (학교 컴퓨터 → kj, 맡은 제어기마다)
+끝났는지 확인한다. `"status": "complete"`와 `"spent": 120`(연장했으면 180)이 나와야 한다.
 ```powershell
-Select-String '"spent"|"status"' results\arena\tuning\tune5\M17.record.json
+Select-String '"spent"|"status"' results\arena\tuning\tune7\<제어기>.record.json
 ```
 ```powershell
-Compress-Archive -Path results\arena\tuning\tune5\M17.record.json, results\arena\tuning\tune5\M17.jsonl, env_check_V13.txt, setup_env_A3.txt, tune5_M17_*.log, tune5_M17_*.err -DestinationPath "tune5_M17_$env:COMPUTERNAME.zip"
+Compress-Archive -Path results\arena\tuning\tune7\<제어기>.record.json, results\arena\tuning\tune7\<제어기>.jsonl, env_check_V13.txt, setup_env_A3.txt, tune7_<제어기>_*.log, tune7_<제어기>_*.err -DestinationPath "tune7_<제어기>_$env:COMPUTERNAME.zip"
 ```
-이 `.zip` 하나를 kj에게 보낸다.
+이 `.zip`을 kj에게 보낸다(컴퓨터 4는 GSLQR·CPID 두 개).
 
-### A.10 합치기 + I-4 검사 (맥에서, V13·F13·M17이 모두 끝난 뒤)
-```bash
-unzip -j tune5_M17_<컴퓨터이름>.zip M17.record.json M17.jsonl -d results/arena/tuning/tune5/
-```
-F13(·GSLQR)도 같은 방식으로 푼다. 승계하는 V13·CPID 기록은 retune_v3에서 **복사**한다(바이트 그대로 —
-승계 규칙이 기록 파일 sha256을 본다). V13 승계 증명(`python3 -m control.tuning_carryover --controller V13 --run-dir results/arena/tuning/retune_v3`)이 먼저 끝나 있어야 한다.
-```bash
-cp results/arena/tuning/retune_v3/V13.record.json results/arena/tuning/retune_v3/V13.jsonl results/arena/tuning/retune_v3/CPID.record.json results/arena/tuning/retune_v3/CPID.jsonl results/arena/tuning/tune5/
-```
-그다음 검사한다(설정은 arena_v2 — 승계 표에 있는 V13·CPID만 옛 설정 해시가 허용된다).
-```bash
-python3 -m control.arena_tune --summarize --config configs/arena_v2.json --run-dir results/arena/tuning/tune5
-```
-- `i4_violations`가 빈 목록이어야 한다. 예산, 시나리오, 목적함수, 탐색 방식이 5종 모두 같다는 뜻이다. 위반이 있으면 보고서에 그대로 적고 멈춘다.
-- `integrator_limit.flagged`는 보고서의 '결정 필요' 항목으로 올린다.
-- 로그와 `env_check_V13.txt`는 커밋하지 않는다(관례). 그 안의 bit_identical과 실측 시간은 보고서에 옮긴다.
+### A.10 합치기 + 예산 연장 판정 + I-4 검사 (맥, 다섯 제어기가 모두 120회를 마친 뒤)
+1. 받은 `.zip`을 푼다(다섯 개 모두):
+   ```bash
+   unzip -j tune7_<제어기>_<컴퓨터이름>.zip '<제어기>.record.json' '<제어기>.jsonl' -d results/arena/tuning/tune7/
+   ```
+2. **예산 연장 판정**(센서 재튜닝 전에 정한 규칙, NEXT_STEPS·보고서 25.6절):
+   ```bash
+   python3 -m control.tuning_extension --run-dirs results/arena/tuning/tune7
+   ```
+   - `판정: 다섯 모두 180회까지 이어서`면 각 컴퓨터에서 **같은 제어기를 같은 컴퓨터에서** A.6 명령의 `'120'`만 `'180'`으로 바꿔 다시 실행한다(처음 120회는 기록을 재생하고 121회부터 새로 계산). 끝나면 1~2를 다시 하고 3으로 간다.
+   - `판정: 120회에서 끝냄`이면 3으로 간다. 판정 결과(제어기별 개선율·실패 수)는 보고서에 옮긴다.
+3. I-4 검사:
+   ```bash
+   python3 -m control.arena_tune --summarize --config <센서 설정> --run-dir results/arena/tuning/tune7
+   ```
+   - `i4_violations`가 빈 목록이어야 한다. 예산, 시나리오, 목적함수, 탐색 방식이 5종 모두 같다는 뜻이다. 위반이 있으면 보고서에 그대로 적고 멈춘다.
+   - `integrator_limit.flagged`는 보고서의 '결정 필요' 항목으로 올린다.
+- 로그와 `env_check_V13.txt`·`setup_env_A3.txt`는 커밋하지 않는다(관례). 그 안의 bit_identical, 실측 시간, 제어기 모델 sha(INFO)는 보고서에 옮긴다.
 
 ### A.11 마무리 (학교 컴퓨터)
 ```powershell
@@ -357,7 +359,7 @@ A.2와 같다(`py -3.13 -m venv .venv` → `Set-ExecutionPolicy -Scope Process B
 
 ### B.3 설정·모델 점검
 ```powershell
-python scripts\setup_env.py --commit $(git rev-parse HEAD) --config configs/arena_v2.json --expect-config-sha256 9729aec6ff8b54499c96d38c850fedf305970caad5bb2256e948dfa667ea32ca 2>&1 | Tee-Object -FilePath setup_env_B3.txt
+python scripts\setup_env.py --commit $(git rev-parse HEAD) --config <센서 설정> --expect-config-sha256 <설정 해시> 2>&1 | Tee-Object -FilePath setup_env_B3.txt
 ```
 - 종료코드(`$LASTEXITCODE`)가 0이 아니면 멈추고 `setup_env_B3.txt`를 kj에게 보낸다. 판정 기준은 A.3과 같다(제어기 모델은 계수 rtol 1e-8, sha는 기록만).
 
