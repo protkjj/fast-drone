@@ -22,8 +22,10 @@
   python -m control.arena_tune --summarize --run-dir results/arena/tuning/pilot24
 """
 import argparse
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -97,6 +99,9 @@ class Evaluator:
     scenario_workers > 1이면 시나리오를 별도 프로세스에서 나눠 돌린다. 시나리오끼리 상태를
     나누지 않으므로(NLP는 시행마다 새로 짓고, 트림 캐시는 호출 순서와 무관) 순차와 비트 동일해야
     한다 — test_arena_tune_parallel.py가 확인한다. 결과 목록은 항상 시나리오 순서다.
+
+    병렬일 때 작업 배정 순서: 직전 평가에서 오래 걸린 시나리오부터 보낸다(가장 긴 시나리오가 끝을
+    붙잡지 않게). 잰 시간은 배정 순서에만 쓰고 결과·로그에는 넣지 않는다(결과에 벽시계 없음).
     """
 
     def __init__(self, config, native, model, label, scenario_workers=1):
@@ -110,14 +115,23 @@ class Evaluator:
         self.penalty = float(config['tuning']['objective']['failure_penalty'])
         self.scenario_workers = int(scenario_workers)
         self._pool = None
+        self._durations = {}          # 시나리오 인덱스 → 직전 평가의 소요 시간[s] (배정 순서용)
+        self.last_order = None
 
     def __call__(self, overrides):
         if self.scenario_workers == 1:
             factory = ArenaFactory(self.config, self.native, overrides=overrides, model=self.model)
             scores = [self.score(factory, scenario) for scenario in self.scenarios]
         else:
-            tasks = [(overrides, i) for i in range(len(self.scenarios))]
-            scores = list(self._scenario_pool().map(_score_in_worker, tasks))
+            pool = self._scenario_pool()
+            # sorted는 안정 정렬이라 첫 평가(시간 기록 없음)는 인덱스 순서 그대로다.
+            order = sorted(range(len(self.scenarios)), key=lambda i: -self._durations.get(i, 0.0))
+            futures = {i: pool.submit(_score_in_worker, (overrides, i)) for i in order}
+            scores = []
+            for i in range(len(self.scenarios)):
+                entry, self._durations[i] = futures[i].result()
+                scores.append(entry)
+            self.last_order = order
         return float(np.mean([e['score'] for e in scores])), scores
 
     def score(self, factory, scenario):
@@ -144,8 +158,8 @@ class Evaluator:
         return entry
 
     def _scenario_pool(self):
-        # spawn 고정: 리눅스 기본 fork는 부모의 CasADi·BLAS 상태를 복제한다. 맥(기본 spawn)과
-        # 학교 리눅스에서 같은 방식으로 돌게 한다.
+        # spawn 고정: 리눅스 기본 fork는 부모의 CasADi·BLAS 상태를 복제한다. 맥·Windows(기본 spawn)와
+        # 리눅스에서 같은 방식으로 돌게 한다.
         if self._pool is None:
             import multiprocessing
             from concurrent.futures import ProcessPoolExecutor
@@ -165,8 +179,20 @@ class Evaluator:
 _WORKER = {}
 
 
+def _exit_when_parent_dies():
+    # 작업자는 작업 대기열에서 막혀 기다리므로 부모가 kill되면 고아로 남아 메모리를 쥔다(M17은 개당 약 2 GiB).
+    import multiprocessing
+    import os
+    parent = multiprocessing.parent_process()
+    if parent is not None:
+        parent.join()
+        os._exit(1)
+
+
 def _init_scenario_worker(config, native, label, model_sha256):
     """작업자 프로세스마다 한 번: 제어기 모델을 다시 적합하고 부모와 같은지 확인한다."""
+    import threading
+    threading.Thread(target=_exit_when_parent_dies, daemon=True).start()
     model = ControllerModel(native)
     if model.sha256 != model_sha256:
         raise RuntimeError(f'scenario worker built a different controller model '
@@ -175,11 +201,15 @@ def _init_scenario_worker(config, native, label, model_sha256):
 
 
 def _score_in_worker(task):
+    """(채점 항목, 소요 시간[s]). 시간은 부모가 다음 평가의 배정 순서를 정하는 데만 쓴다."""
+    import time
     overrides, index = task
     evaluator = _WORKER['evaluator']
+    started = time.perf_counter()
     factory = ArenaFactory(evaluator.config, evaluator.native, overrides=overrides,
                            model=evaluator.model)
-    return evaluator.score(factory, evaluator.scenarios[index])
+    entry = evaluator.score(factory, evaluator.scenarios[index])
+    return entry, time.perf_counter() - started
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -374,6 +404,27 @@ def _evaluation_entries(run_dir):
     return entries
 
 
+ES_CONTINUOUS = 0x80000000
+ES_SYSTEM_REQUIRED = 0x00000001
+
+
+@contextmanager
+def keep_system_awake():
+    """Windows에서 튜닝 동안 시스템 절전만 막는다(화면 꺼짐은 막지 않음). 관리자 권한이 필요 없고,
+    이 스레드가 끝나거나 되돌리면 풀린다. 다른 OS에서는 아무것도 하지 않는다. 계산에는 관여하지 않는다.
+    학교 정책의 강제 재시작·로그오프는 막지 못한다 — DISTRIBUTED_RUN.md의 재개 절차로 이어 간다."""
+    if os.name != 'nt':
+        yield
+        return
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    kernel32.SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)
+    try:
+        yield
+    finally:
+        kernel32.SetThreadExecutionState(ES_CONTINUOUS)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -411,10 +462,11 @@ def main(argv=None):
     from models.team_light.control.baseline_v2 import baseline_params
     native = baseline_params()
     model = ControllerModel(native)
-    for label in args.controllers:
-        print(f'== {LABEL} tuning {label}: budget {budget} ==', flush=True)
-        tune_controller(config, label, budget, args.run_dir, native=native, model=model,
-                        scenario_workers=args.scenario_workers)
+    with keep_system_awake():
+        for label in args.controllers:
+            print(f'== {LABEL} tuning {label}: budget {budget} ==', flush=True)
+            tune_controller(config, label, budget, args.run_dir, native=native, model=model,
+                            scenario_workers=args.scenario_workers)
     return 0
 
 

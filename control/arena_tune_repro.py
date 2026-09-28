@@ -1,4 +1,4 @@
-"""튜닝 기록 재현 검사 — 기록(<제어기>.jsonl)의 평가 하나를 지금 코드·환경에서 다시 계산해 비트 비교한다.
+"""튜닝 기록 재현 검사 — 기록(<제어기>.jsonl)의 평가 하나를 지금 코드·환경에서 다시 계산해 비교한다.
 
 쓰임:
   - 코드가 바뀐 뒤에도 튜닝 경로 결과가 그대로인지(tune-final → tune-final-2)
@@ -8,7 +8,12 @@
   python3 -m control.arena_tune_repro --controller V13 \
       --run-dir results/arena/tuning/retune_v3 --index 0 --scenario-workers 3
 
-일치하면 0, 다르면 1로 끝난다. 기록이 캐시 적중(scenarios 없음)이면 비교할 수 없어 멈춘다.
+합격 기준(kj 결정 2026-09-28, 다른 컴퓨터는 비트 일치가 아닐 수 있다 — `scripts/verify_arena.py`와 같은 규칙):
+  - 판정 일치: 시나리오 id·순서, failed, stop_reason, paper_reasons, 적분기 1% 규칙 판정이 정확히 같다
+  - 수치: 목적함수와 시나리오별 score·window_rmse_velocity·window_rmse_z·max_omega가
+    |a−b| ≤ rtol·max(|a|,|b|) + 1e-9 (rtol 기본 1e-3)
+비트 일치 여부(궤적 sha256 포함 전 필드)와 제어기 모델 sha256 일치 여부는 **기록만** 한다.
+합격이면 0, 아니면 1로 끝난다. 기록이 캐시 적중(scenarios 없음)이면 비교할 수 없어 멈춘다.
 """
 import argparse
 import json
@@ -18,7 +23,7 @@ import sys
 import threading
 import time
 
-from control.arena import load_config, config_sha256, DEFAULT_CONFIG
+from control.arena import load_config, config_sha256, integrator_limit_flags, DEFAULT_CONFIG
 from control.arena_factory import ArenaFactory, ControllerModel, ARENA_LABELS
 from control.arena_tune import Evaluator, parameter_space
 
@@ -29,8 +34,11 @@ def _rss_sampler(evaluator, peaks, stop):
         pool = evaluator._pool
         pids = [str(p) for p in list(getattr(pool, '_processes', None) or {})]
         if pids:
-            out = subprocess.run(['ps', '-o', 'pid=,rss=', '-p', ','.join(pids)],
-                                 capture_output=True, text=True).stdout
+            try:
+                out = subprocess.run(['ps', '-o', 'pid=,rss=', '-p', ','.join(pids)],
+                                     capture_output=True, text=True).stdout
+            except OSError:              # Windows에는 ps가 없다 — 메모리는 기록 없이 넘어간다
+                return
             total = 0
             for line in out.splitlines():
                 if line.strip():
@@ -41,7 +49,38 @@ def _rss_sampler(evaluator, peaks, stop):
         stop.wait(3.0)
 
 
-def reproduce(config, label, run_dir, index, scenario_workers):
+VERDICT_KEYS = ('id', 'failed', 'stop_reason', 'paper_reasons')
+NUMERIC_KEYS = ('score', 'window_rmse_velocity', 'window_rmse_z', 'max_omega')
+
+
+def _close(a, b, rtol):
+    if a is None or b is None:
+        return a == b
+    return abs(a - b) <= rtol*max(abs(a), abs(b)) + 1e-9
+
+
+def tolerance_problems(scores, reference, objective, reference_objective, config, rtol):
+    """판정 일치 + 수치 rtol 검사. 문제 목록(빈 목록이면 합격)."""
+    problems = []
+    if [e['id'] for e in scores] != [e['id'] for e in reference]:
+        return ['scenario ids or order differ']
+    if not _close(objective, reference_objective, rtol):
+        problems.append(f'objective: {reference_objective:.6g} -> {objective:.6g}')
+    for new, ref in zip(scores, reference):
+        for key in VERDICT_KEYS:
+            if new.get(key) != ref.get(key):
+                problems.append(f"{ref['id']} {key}: {ref.get(key)!r} -> {new.get(key)!r}")
+        for key in NUMERIC_KEYS:
+            if not _close(new.get(key), ref.get(key), rtol):
+                problems.append(f"{ref['id']} {key}: {ref.get(key)} -> {new.get(key)}")
+    flagged = [sorted(f['case'] for f in integrator_limit_flags(side, config)[1])
+               for side in (scores, reference)]
+    if flagged[0] != flagged[1]:
+        problems.append(f'integrator 1% flags: {flagged[1]} -> {flagged[0]}')
+    return problems
+
+
+def reproduce(config, label, run_dir, index, scenario_workers, rtol=1e-3):
     from control.validation_suite import json_safe
     from models.team_light.control.baseline_v2 import baseline_params
     run_dir = Path(run_dir)
@@ -76,7 +115,10 @@ def reproduce(config, label, run_dir, index, scenario_workers):
              for key in sorted(set(a) | set(b)) if a.get(key) != b.get(key)]
     if [e['id'] for e in scores] != [e['id'] for e in ref['scenarios']]:
         diffs.append(('<order>', 'scenario ids differ'))
-    return dict(controller=label, index=index, scenario_workers=scenario_workers,
+    problems = tolerance_problems(scores, ref['scenarios'], objective, ref['objective'], config, rtol)
+    return dict(controller=label, index=index, scenario_workers=scenario_workers, rtol=rtol,
+                passed=not problems, tolerance_problems=problems,
+                bit_identical=objective == ref['objective'] and not diffs,
                 record_git_revision=record.get('git_revision'),
                 model_sha256_equal=model.sha256 == record['controller_model_sha256'],
                 objective=objective, reference_objective=ref['objective'],
@@ -93,13 +135,17 @@ def main(argv=None):
     parser.add_argument('--run-dir', type=Path, required=True)
     parser.add_argument('--index', type=int, default=0)
     parser.add_argument('--scenario-workers', type=int, default=1)
+    parser.add_argument('--rtol', type=float, default=1e-3)
     args = parser.parse_args(argv)
     result = reproduce(load_config(args.config), args.controller, args.run_dir, args.index,
-                       args.scenario_workers)
+                       args.scenario_workers, rtol=args.rtol)
     print(json.dumps(result, indent=2, ensure_ascii=False))
-    ok = result['objective_equal'] and not result['differing_fields'] and result['model_sha256_equal']
-    print('REPRODUCED' if ok else 'MISMATCH')
-    return 0 if ok else 1
+    if result['passed']:
+        print(f"PASS (rtol {args.rtol:g} + identical verdicts); bit-identical: {result['bit_identical']}")
+    else:
+        print(f"FAIL — {len(result['tolerance_problems'])} problem(s) beyond rtol {args.rtol:g} "
+              'or differing verdicts. Do not start tuning on this computer; send this output to kj.')
+    return 0 if result['passed'] else 1
 
 
 if __name__ == '__main__':

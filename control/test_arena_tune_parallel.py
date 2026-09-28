@@ -60,6 +60,29 @@ def test_parallel_evaluation_is_bit_identical(setup, label, candidate):
 
 
 @slow
+@pytest.mark.parametrize('label', ['CPID', 'GSLQR'])
+def test_longest_first_reordering_is_bit_identical(setup, label):
+    """같은 평가기로 두 번: 두 번째는 직전 소요 시간이 긴 시나리오부터 배정한다."""
+    config, native, model = setup
+    seq = _run(setup, label, {}, workers=1)
+    shifted = _shifted_overrides(setup, label)
+    seq_shifted = _run(setup, label, shifted, workers=1)
+    evaluator = Evaluator(config, native, model, label, scenario_workers=3)
+    try:
+        first = evaluator({})
+        assert evaluator.last_order == list(range(len(evaluator.scenarios)))
+        second = evaluator(shifted)
+        reordered = evaluator.last_order
+    finally:
+        evaluator.close()
+    assert reordered != sorted(reordered), 'second evaluation was not reordered — test proves nothing'
+    for got, want in ((first, seq), (second, seq_shifted)):
+        assert got[0] == want[0]
+        assert json.dumps(got[1], sort_keys=True, default=str) == \
+            json.dumps(want[1], sort_keys=True, default=str)
+
+
+@slow
 def test_shifted_candidate_actually_differs(setup):
     """위 시험의 'shifted'가 사전값과 같은 결과를 냈다면 overrides 전달을 확인하지 못한 것이다."""
     prior_obj, _ = _run(setup, 'GSLQR', {}, workers=1)
@@ -84,3 +107,34 @@ def test_scenario_workers_must_be_positive(setup):
     config, native, model = setup
     with pytest.raises(ValueError):
         Evaluator(config, native, model, 'GSLQR', scenario_workers=0)
+
+
+def test_keep_system_awake_windows_branch(monkeypatch):
+    """Windows 분기: 들어갈 때 CONTINUOUS|SYSTEM_REQUIRED, 나올 때(예외여도) CONTINUOUS만. 화면 플래그 없음."""
+    import ctypes
+    import control.arena_tune as tune
+    calls = []
+
+    class Kernel32:
+        def SetThreadExecutionState(self, flags):
+            calls.append(flags)
+            return 1
+
+    class WinDLL:
+        kernel32 = Kernel32()
+
+    monkeypatch.setattr(tune.os, 'name', 'nt')
+    monkeypatch.setattr(ctypes, 'windll', WinDLL(), raising=False)
+    with pytest.raises(RuntimeError):
+        with tune.keep_system_awake():
+            assert calls == [0x80000000 | 0x00000001]
+            raise RuntimeError('tuning crashed')
+    assert calls == [0x80000001, 0x80000000]
+    assert not any(flag & 0x00000002 for flag in calls)   # ES_DISPLAY_REQUIRED는 쓰지 않는다
+
+
+def test_keep_system_awake_is_noop_elsewhere(monkeypatch):
+    import control.arena_tune as tune
+    monkeypatch.setattr(tune.os, 'name', 'posix')
+    with tune.keep_system_awake():
+        pass
