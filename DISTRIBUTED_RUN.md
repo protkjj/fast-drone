@@ -88,10 +88,10 @@ clone이 다른 브랜치/커밋(git revision FAIL), pip install이 일부만 �
 - 결과 폴더 이름은 맥과 같은 `results/arena/tuning/retune_v3`로 쓴다. 합칠 때 복사만 하면 된다.
 
 **제어기별 튜닝 태그** (보고서 19.1절)
-| 제어기 | 태그 | 컴퓨터 |
-|---|---|---|
-| V13·GSLQR·CPID | `tune-final` (`8911ee1`) | 맥 |
-| F13·M17 | `tune-final-3` | 학교(Windows) |
+| 제어기 | 태그 | 튜닝 플랫폼 | 컴퓨터 |
+|---|---|---|---|
+| V13·GSLQR·CPID | `tune-final` (`8911ee1`) | macOS (Darwin arm64) | kj 맥 |
+| F13·M17 | `tune-final-3` (`7fe1948`) | Windows | 학교 |
 
 두 태그 사이에서 튜닝 결과는 비트 동일하다. `control/arena_tune_repro.py`로 `8911ee1`의 기록(V13·GSLQR·CPID
 평가 0)을 뒤 커밋에서 다시 계산해 전 필드가 일치했다. 근거는 보고서 18.2·19.6절에 있다.
