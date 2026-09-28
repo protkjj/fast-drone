@@ -1507,3 +1507,39 @@ dt=0.002s에서 5ms는 정수 스텝이 아니다(2.5) — round()로 2스텝(4m
   control/test_arena_fairness.py control/test_arena_step_scenario.py control/test_arena_plant_wrench.py
   control/test_cg_offset.py control/test_arena_observation_delay.py control/test_arena_tuning_report.py
   control/test_arena_reference_merge.py control/test_validation_suite.py -q -p no:cacheprovider`
+
+## 18. 튜닝 시나리오 병렬화(`--scenario-workers`)와 tune-final-2 확인
+
+kj 결정(2026-09-28): 평가 1회 안의 튜닝 시나리오 18개를 병렬로 돌리는 옵션을 넣는다(기본값은 순차). 순차와 비트 동일한지 시험한다.
+retune_v3 시작 커밋에 태그 `tune-final`을 달고, 결과에 영향이 없음을 확인하면 `tune-final-2`를 단다.
+
+### 18.1 구현 (`control/arena_tune.py`, `643b24e`)
+- `Evaluator(scenario_workers=N)`: N=1이면 기존 코드 경로 그대로다. 채점 본문만 `score()`로 떼어냈다.
+- N>1이면 spawn 작업자 풀을 튜닝 동안 유지한다. 작업자는 제어기 모델을 다시 적합하고, 그 sha256을 부모와 대조한다.
+- 순서 독립성 근거(코드로 확인):
+  - `ControllerModel.trim`의 연속법 초기값은 항상 "0에서 1 m/s 정수 격자 바로 아래 칸"이다. 따라서 호출 순서와 무관하다.
+  - GSLQR 원형은 결정적 설계를 한 번 만들고 `deepcopy`한 뒤 `reset`한다.
+  - NMPC는 시행마다 NLP를 새로 짓는다(I-6).
+  - `run_trial`에는 난수가 없다.
+
+### 18.2 비트 동일 — 세 겹
+| 확인 | 결과 |
+|---|---|
+| `control/test_arena_tune_parallel.py`: CPID·GSLQR의 18개 전부, 후보 두 가지(사전값, 사전값에서 좌표 하나 ×2), 순차 대 작업자 3개 | 7 passed. `.jsonl` 바이트 동일 |
+| `control/arena_tune_repro.py`: retune_v3 평가 0(`8911ee1`, 순차)을 HEAD와 작업자 N개로 재현 | V13(N=3), GSLQR(N=2), CPID(N=2) **모두 REPRODUCED**. 목적함수와 18개 시나리오 전 필드(서로 다른 궤적 sha256 18개)가 일치 |
+| 반대 방향: 기록 사본의 궤적 sha 하나를 0으로 조작 | MISMATCH, exit 1. 조작한 시나리오를 정확히 지목 |
+
+→ `8911ee1` 이후 들어온 `build_plant`(wrench 훅)·관측 지연·CG 편차 코드는 **기본값에서 튜닝 경로 결과를 바꾸지 않는다**(V13·GSLQR·CPID 실측). 병렬화도 바꾸지 않는다.
+F13·M17은 retune_v3 기록이 없어 이 방법으로는 확인하지 않았다. 둘은 같은 `run_trial`·`Evaluator` 경로를 쓴다.
+
+### 18.3 속도·메모리 (맥, V13 튜닝과 동시 실행)
+| 제어기 | 순차 | 병렬 |
+|---|---|---|
+| V13 평가 1회 | 약 13분(retune_v3 로그) | 작업자 3개, 393 s(작업자 기동 포함). **약 2배** |
+| GSLQR | 33.5~41.9 s | 작업자 3개, 첫 호출 47.7 s(기동 포함), 둘째 호출 20.8 s |
+
+- V13 작업자 1개의 최대 RSS는 약 530~560 MiB, 3개 합은 1.6 GiB다.
+- 3배가 안 되는 이유(추정, 따로 분리 측정하지 않음): 가장 긴 시나리오가 끝을 붙잡는다. 작업자는 시나리오마다 factory를 새로 짓는다. V13 튜닝과 성능 코어를 나눠 쓴다.
+- 주의: spawn 방식이라 `python3 - <<EOF`처럼 표준입력으로 넣은 스크립트에서는 작업자가 뜨지 않는다(FileNotFoundError `<stdin>`). `-m` 모듈 실행이나 파일 스크립트로 돌릴 것.
+
+재현: `python3 -m control.arena_tune_repro --controller V13 --run-dir results/arena/tuning/retune_v3 --index 0 --scenario-workers 3`
