@@ -8,6 +8,8 @@
   5) 펄스 시간창 — duration_s가 지나면 꺼진다.
   6) 로터 면내 항력 — 호버(v=ω=0)에서 정확히 0, 면내 속도가 있으면 반대 방향으로 작용.
   7) 항력 계수 보정 — 그 V_ref 트림에서 실제로 "동체 횡력 1배"가 나오는지.
+  8) (2026-09-28 d1) 시작 시각 — [start, start+duration) 스텝에만 켜진다. 시작 0이면 옛 판정과
+     같은 스텝이다. 세계좌표 힘 — 자세와 무관하게 Δv̇ = F/m(R을 안 거친다).
 """
 import numpy as np
 import pytest
@@ -185,3 +187,57 @@ def test_hover_max_pitch_moment_saturates_a_rotor_and_stays_in_bounds(params):
         f = TM_to_f @ np.array([T_total, 0.0, sign*my, 0.0])
         assert np.all(f >= -1e-9) and np.all(f <= f_max + 1e-9)
         assert np.any(np.abs(f) < 1e-6) or np.any(np.abs(f - f_max) < 1e-6)
+
+
+@pytest.mark.parametrize('start_s, duration_s', [(0.0, 5*DT), (3.0, 5.0), (0.1, 0.02)])
+def test_pulse_window_is_start_to_start_plus_duration_in_whole_steps(params, start_s, duration_s):
+    """켜지는 스텝 = round(start/dt) ≤ k < round((start+duration)/dt). 시작 3 s(1500스텝)에서도
+    부동소수 누적 없이 정확히 그 스텝에서 켜지고 꺼져야 한다. 적분은 필요 없어서 _pulse만 본다."""
+    plant = build_plant(dict(params, extra_force_world=(0.0, 1.0, 0.0), extra_force_start_s=start_s,
+                             extra_force_duration_s=duration_s,
+                             extra_moment_body=(0.0, 1.0, 0.0), extra_moment_start_s=start_s,
+                             extra_moment_duration_s=duration_s), dt=DT)
+    k_on, k_off = round(start_s/DT), round((start_s + duration_s)/DT)
+    for k in range(k_off + 3):
+        plant._steps = k
+        _, M, F_world = plant._pulse()
+        assert bool(np.any(F_world != 0.0)) == (k_on <= k < k_off), k
+        assert bool(np.any(M != 0.0)) == (k_on <= k < k_off), k
+
+
+def test_zero_start_keeps_the_old_elapsed_rule(params, hover_state):
+    """시작 키가 없을 때 옛 규칙(elapsed < duration - 1e-12)과 같은 스텝에서 켜지고 꺼진다 —
+    이미 쓰던 동체 힘 설정의 동작이 바뀌지 않았다는 확인. 실제 step()으로 진행한다."""
+    duration_s = 7*DT
+    plant = build_plant(dict(params, extra_force_body=(5.0, 0.0, 0.0), extra_force_duration_s=duration_s),
+                        dt=DT)
+    x, u_trim = hover_state.copy(), hover_state[13:17]
+    for k in range(10):
+        old_rule = k*DT < duration_s - 1e-12
+        assert bool(np.any(plant._pulse()[0] != 0.0)) == old_rule, k
+        x = plant.step(x, u_trim.copy())
+
+
+def test_world_force_is_not_rotated_by_attitude(params, hover_state):
+    """세계좌표 +y 힘은 자세가 무엇이든 세계 +y 가속 F/m이다(호버 자세는 R ≠ I라 동체 힘이었다면
+    다른 축으로 갔을 것이다). 정지 상태 차분이라 다른 항은 지워진다."""
+    F_world = np.array([0.0, 8.0, 0.0])
+    on = build_plant(dict(params, extra_force_world=tuple(F_world), extra_force_duration_s=10.0), dt=DT)
+    off = AxialDronePlant(params, dt=DT)
+    u_trim = hover_state[13:17]
+    dv = (on.step(hover_state.copy(), u_trim.copy())[3:6]
+          - off.step(hover_state.copy(), u_trim.copy())[3:6])/DT
+    np.testing.assert_allclose(dv, F_world/params['mass'], rtol=1e-4, atol=1e-8)
+
+
+def test_world_force_waits_for_its_start(params, hover_state):
+    """시작 전 스텝은 꺼짐 플랜트와 비트 동일(힘 0을 더해도 값이 안 바뀐다)."""
+    on = build_plant(dict(params, extra_force_world=(0.0, 8.0, 0.0), extra_force_start_s=3*DT,
+                          extra_force_duration_s=5*DT), dt=DT)
+    off = AxialDronePlant(params, dt=DT)
+    x_on, x_off, u_trim = hover_state.copy(), hover_state.copy(), hover_state[13:17]
+    for _ in range(3):
+        x_on, x_off = on.step(x_on, u_trim.copy()), off.step(x_off, u_trim.copy())
+    assert np.array_equal(x_on, x_off)
+    x_on, x_off = on.step(x_on, u_trim.copy()), off.step(x_off, u_trim.copy())
+    assert x_on[4] - x_off[4] > 0.5*8.0/params['mass']*DT

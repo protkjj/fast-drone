@@ -23,7 +23,7 @@ from scipy.optimize import minimize
 from scipy.spatial.transform import Rotation
 
 from control.mission_profiles import MissionProfile, GustProfile, SmoothstepProfile, StepProfile
-from control.uncertainty import FACTORS, perturb_params
+from control.uncertainty import FACTORS, perturb_params, CG_OFFSET_AXES
 from control.arena_plant_wrench import WRENCH_KEYS
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,8 +32,13 @@ SCHEMA = 'arena/1'
 CONTROLLERS = ('V13', 'M17', 'F13', 'GSLQR', 'CPID')
 SCENARIO_TYPES = ('mission', 'gust', 'reference', 'step')
 STEP_AXES = ('altitude', 'speed')
-# extra_params가 받는 키 전체 — 곱셈 FACTORS와 별개인 원값 덮어쓰기(표7 wrench 훅 + 관측 지연).
-EXTRA_PARAM_KEYS = WRENCH_KEYS + ('state_delay_s', 'rotor_delay_s')
+# extra_params가 받는 키 전체 — 곱셈 FACTORS와 별개인 원값 덮어쓰기(표7 wrench 훅 + 관측 지연 +
+# 무게중심 편차). 무게중심 두 키는 함께 준다(run_trial이 cg_offset_arm_fraction으로 적용).
+CG_OFFSET_KEYS = ('cg_offset_axis', 'cg_offset_arm_fraction')
+EXTRA_PARAM_KEYS = WRENCH_KEYS + ('state_delay_s', 'rotor_delay_s') + CG_OFFSET_KEYS
+# 시간창 키 — 플랜트가 정수 스텝으로 판정하므로 dt의 배수여야 한다(0 허용).
+WINDOW_KEYS = ('extra_force_start_s', 'extra_force_duration_s',
+               'extra_moment_start_s', 'extra_moment_duration_s')
 # 팀 기체의 명목 트림 확인 범위(docs/VALIDATION.md). 이 밖의 속도는 팀
 # 문서가 검증하지 않았으므로 설정 단계에서 막는다.
 SPEED_RANGE = (0.0, 85.0)
@@ -122,9 +127,18 @@ def validate_config(config):
         for factor in s.get('perturbation', {}):
             if factor not in FACTORS:
                 raise ValueError(f"{s['id']}: unknown perturbation factor {factor!r}")
-        for key in s.get('extra_params', {}):
+        extra = s.get('extra_params', {})
+        for key in extra:
             if key not in EXTRA_PARAM_KEYS:
                 raise ValueError(f"{s['id']}: unknown extra_params key {key!r}")
+        for key in WINDOW_KEYS:
+            if key in extra and (float(extra[key]) < 0 or not _is_multiple(float(extra[key]), dt)):
+                raise ValueError(f"{s['id']}: {key} must be a nonnegative multiple of {dt}")
+        if any(k in extra for k in CG_OFFSET_KEYS):
+            if not all(k in extra for k in CG_OFFSET_KEYS):
+                raise ValueError(f"{s['id']}: give both {CG_OFFSET_KEYS}")
+            if extra['cg_offset_axis'] not in CG_OFFSET_AXES:
+                raise ValueError(f"{s['id']}: cg_offset_axis must be one of {sorted(CG_OFFSET_AXES)}")
         if s['type'] == 'gust' and s['direction'] not in ('lateral', 'vertical'):
             raise ValueError(f"{s['id']}: gust direction must be lateral or vertical")
         if s['type'] == 'step' and s['axis'] not in STEP_AXES:

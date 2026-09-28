@@ -24,9 +24,10 @@ from control.mission_profiles import (MissionProfile, GustProfile, DEFAULT_GUST_
                                       DEFAULT_MISSION_DURATIONS)
 from control.validation_metrics import Acceptance, evaluate
 from control.uncertainty import (DEFAULT_RANGES, validate_ranges, perturb_params,
-                                 sweep_cases, monte_carlo_cases)
+                                 sweep_cases, monte_carlo_cases, cg_offset_arm_fraction)
 from control.arena_observation_delay import DelayedObservation
 from control.arena_plant_wrench import build_plant
+from control.arena_trim import find_trim_6dof
 from models.team_light.control.baseline_v2 import baseline_params, parameter_hash
 from models.team_light.control.dynamics import AxialDronePlant
 from models.team_light.control.trim import find_trim
@@ -93,9 +94,20 @@ def run_trial(factory, label, profile, case, limits):
     gc.collect()
     nominal_hash = parameter_hash(factory.p)
     truth = perturb_params(factory.p, case['factors'])
-    truth.update(case.get('extra_params', {}))     # 표7 wrench 훅·관측 지연(곱셈 FACTORS 밖)
+    extra = case.get('extra_params', {})
+    if 'cg_offset_axis' in extra:
+        # 표7 무게중심 편차 — 곱셈이 아니라 위치벡터 전체의 덧셈 이동이라 update로는 못 담는다.
+        # 플랜트(truth)에만 적용하고, 제어기는 명목 factory.p를 그대로 쓴다. 키가 없으면 안 부른다.
+        truth = cg_offset_arm_fraction(truth, extra['cg_offset_axis'], float(extra['cg_offset_arm_fraction']))
+    truth.update(extra)     # 표7 wrench 훅·관측 지연(곱셈 FACTORS 밖). 무게중심 키는 기록용으로 남는다
     initial_v, initial_z, _ = profile.get_ref(0.)
-    trim = find_trim(truth, float(initial_v[0]))
+    if 'cg_offset_axis' in extra:
+        # 벤더 find_trim은 평면(좌우 대칭) 탐색기라 CG 편차 트림을 표현하지 못한다(보고서 20절).
+        # 6자유도 트림: 롤 0 → 옆미끄럼 0 순서, 둘 다 없으면 'vehicle limit' ValueError.
+        # 플랜트 출발 상태에만 쓴다 — 제어기는 명목 모델 트림만 받는다.
+        trim = find_trim_6dof(truth, float(initial_v[0]))
+    else:
+        trim = find_trim(truth, float(initial_v[0]))
     x = trim['state'].copy()
     x[2] = initial_z
     # make() resets the NMPC solution/timing/history and creates a new INDI
@@ -165,6 +177,8 @@ def run_trial(factory, label, profile, case, limits):
                    wall_seconds=perf_counter()-started, stop_reason=reason,
                    truth_parameter_sha256=parameter_hash(truth),
                    trajectory_sha256=trajectory_sha256(result))
+    if 'condition' in trim:
+        metrics['plant_trim_condition'] = trim['condition']     # CG 사례에만 — 기본 경로 필드는 그대로
     if hasattr(factory, 'controller_model_sha256'):
         metrics['controller_model_sha256'] = factory.controller_model_sha256
     integrator_report = getattr(ctrl, 'integrator_report', None)

@@ -7,8 +7,15 @@ kj 결정(2026-09-27 밤, control-model-options-v2 병합 대신): "팀원 파�
 
 이 훅 하나로 표7(원고 v5.3) 세 항목을 담는다:
   - 로터 면내 항력       상태 의존(v_body·ω·n), 늘 켜져 있음 — params['rotor_inplane_drag_enabled']
-  - 일정 외력(5 s)       고정, 시간창 — params['extra_force_body'/'extra_force_duration_s']
-  - 외부 모멘트(5 s)     고정, 시간창 — params['extra_moment_body'/'extra_moment_duration_s']
+  - 일정 외력(5 s)       고정, 시간창 — params['extra_force_body'/'extra_force_world'/
+                         'extra_force_start_s'/'extra_force_duration_s']
+  - 외부 모멘트(5 s)     고정, 시간창 — params['extra_moment_body'/'extra_moment_start_s'/
+                         'extra_moment_duration_s']
+
+시간창은 [start, start+duration)이다(시작 기본 0). kj 결정(2026-09-28): 외력·모멘트는 돌풍과
+같은 규칙으로 t=3 s(3초 정착 뒤)에 켜서 5초 건다. 외력 방향은 **세계** 좌표 횡방향(+y, 측풍
+돌풍과 같은 축·부호)이라 동체좌표 키와 별도로 세계좌표 키를 둔다 — 세계 힘은 R 없이 Δv̇ = F/m.
+부호(외력 세계 +y, 모멘트 동체 +M_y)는 제어기 결과를 보기 전에 정한 값이다.
 
 무게중심 편차(표7 4행)는 이 훅으로 못 담는다 — 힘의 덧셈이 아니라 기존 힘들의 모멘트 팔(r_cp 등)이
 바뀌는 것이라 구조가 다르다. 따로 구현해야 한다(결정 필요로 보고).
@@ -29,8 +36,8 @@ from models.team_light.control.dynamics import (
     AxialDronePlant, _compute_xdot, _quat_to_rotmat, NX, NU)
 
 WRENCH_KEYS = ('rotor_inplane_drag_enabled', 'rotor_inplane_drag_coeff',
-              'extra_force_body', 'extra_force_duration_s',
-              'extra_moment_body', 'extra_moment_duration_s')
+              'extra_force_body', 'extra_force_world', 'extra_force_start_s', 'extra_force_duration_s',
+              'extra_moment_body', 'extra_moment_start_s', 'extra_moment_duration_s')
 
 
 def _rotor_inplane_drag_delta(x_sym, params):
@@ -148,13 +155,15 @@ class _ExtraWrenchPlant:
         w_sym = ca.SX.sym('w', 3)
         F_ext_sym = ca.SX.sym('F_ext', 3)     # 늘 있는 파라미터. 안 쓰면 값이 정확히 0 벡터라
         M_ext_sym = ca.SX.sym('M_ext', 3)     # R@0=0, xdot+0=xdot — 그래프에 남아도 비트에 영향 없음
+        F_world_sym = ca.SX.sym('F_world', 3)  # 세계좌표 힘 — R을 안 거친다(Δv̇ = F/m)
         drag_delta = _rotor_inplane_drag_delta(x_sym, params) if drag_on else None
 
         xdot_wind = _compute_xdot(x_sym, u_sym, params, w_sym)
         if drag_delta is not None:
             xdot_wind = xdot_wind + drag_delta
         xdot_wind = xdot_wind + _wrench_to_xdot_delta(F_ext_sym, M_ext_sym, x_sym[6:10], params)
-        p_sim = ca.vertcat(u_sym, w_sym, F_ext_sym, M_ext_sym)
+        xdot_wind = xdot_wind + ca.vertcat(ca.SX.zeros(3), F_world_sym/params['mass'], ca.SX.zeros(11))
+        p_sim = ca.vertcat(u_sym, w_sym, F_ext_sym, M_ext_sym, F_world_sym)
         self.integrator = ca.integrator('plant_wrench', 'rk', {'x': x_sym, 'p': p_sim, 'ode': xdot_wind},
                                         0.0, dt, {'number_of_finite_elements': 4})
 
@@ -162,32 +171,48 @@ class _ExtraWrenchPlant:
         if drag_delta is not None:
             xdot_still = xdot_still + drag_delta
         self.f = ca.Function('f_wrench', [x_sym, u_sym], [xdot_still])
-        self._elapsed = 0.0
+        self._steps = 0                    # 지금까지 진행한 step() 횟수 — 시간창 판정은 이 정수로
+        self._elapsed = 0.0                # (기록용) = _steps·dt
         self._force = np.asarray(params.get('extra_force_body', (0., 0., 0.)), dtype=float)
-        self._force_duration = float(params.get('extra_force_duration_s', 0.0))
+        self._force_world = np.asarray(params.get('extra_force_world', (0., 0., 0.)), dtype=float)
+        self._force_window = self._step_window(params.get('extra_force_start_s', 0.0),
+                                               params.get('extra_force_duration_s', 0.0))
         self._moment = np.asarray(params.get('extra_moment_body', (0., 0., 0.)), dtype=float)
-        self._moment_duration = float(params.get('extra_moment_duration_s', 0.0))
+        self._moment_window = self._step_window(params.get('extra_moment_start_s', 0.0),
+                                                params.get('extra_moment_duration_s', 0.0))
+
+    def _step_window(self, start_s, duration_s):
+        """[start, start+duration) 초 → [k_on, k_off) 스텝 번호. 부동소수 시간을 1500번 더해
+        (t=3 s) 경계에서 비교하면 누적 반올림 오차가 켜지는 스텝을 하나 밀 수 있다 — 정수로 판정한다.
+        경기장 설정은 두 값을 dt의 배수로 검사하므로(arena.validate_config) round는 정확하다."""
+        k_on = int(round(float(start_s)/self.dt))
+        return k_on, k_on + int(round(float(duration_s)/self.dt))
 
     def _pulse(self):
-        """지금 스텝(elapsed → elapsed+dt) 동안 켜져 있는 외력·외부모멘트. RK 4단계 전체가 이
+        """지금 스텝(k → k+1) 동안 켜져 있는 외력(동체·세계)·외부모멘트. RK 4단계 전체가 이
         dt 안에서 일어나므로 한 번 고른 값이 이번 step() 호출의 모든 하위단계에 그대로 쓰인다
         (CasADi 적분기 파라미터는 한 번의 step 호출 동안 상수라서 — u·w와 같은 방식)."""
-        F = self._force if self._elapsed < self._force_duration - 1e-12 else np.zeros(3)
-        M = self._moment if self._elapsed < self._moment_duration - 1e-12 else np.zeros(3)
-        return F, M
+        k = self._steps
+        force_on = self._force_window[0] <= k < self._force_window[1]
+        moment_on = self._moment_window[0] <= k < self._moment_window[1]
+        F = self._force if force_on else np.zeros(3)
+        F_world = self._force_world if force_on else np.zeros(3)
+        M = self._moment if moment_on else np.zeros(3)
+        return F, M, F_world
 
     def step(self, x, u, w=None):
         if w is None:
             w = np.zeros(3)
-        F, M = self._pulse()
-        p = np.concatenate([u, w, F, M])
+        F, M, F_world = self._pulse()
+        p = np.concatenate([u, w, F, M, F_world])
         xn = np.array(self.integrator(x0=x, p=p)['xf']).flatten()
         q = xn[6:10]
         qn = np.linalg.norm(q)
         if qn > 1e-10:
             xn[6:10] = q/qn
         xn[13:17] = np.clip(xn[13:17], self.params['n_min'], self.params['n_max'])
-        self._elapsed += self.dt
+        self._steps += 1
+        self._elapsed = self._steps*self.dt
         return xn
 
     def evaluate_xdot(self, x, u, w=None):
