@@ -27,7 +27,7 @@
 
 ## ⚠️ 2026-09-28 밤: 제어기 모델 모멘트 보정 — 튜닝 계획이 바뀌었다(보고서 23절)
 - 제어기 집중정수 모델의 트림 밖 피치·요 모멘트가 플랜트와 크게 달랐고(85 m/s ±20°에서 181 rad/s², 40 m/s 부호 반대), M17·F13·GSLQR만 이 모델을 써서 V13 쪽으로 기울어져 있었다 → 보정항 추가(`configs/arena_v2.json`).
-- **학교 F13·M17 `tune-final-3`은 옛 모델(arena.json)이라 본 실험에 쓸 수 없다.** 진행 상황은 kj가 학교에서 A.7로 확인해 보고, **중단은 kj가 확인한 뒤에** 한다(맥에서는 볼 수 없음).
+- **학교 F13·M17 `tune-final-3`은 실행하지 않았다**(kj 확인). 학교 튜닝은 **목요일**에 `tune-final-6`으로 한다. 진행 상황은 kj가 학교에서 A.7로 확인해 보고, **중단은 kj가 확인한 뒤에** 한다(맥에서는 볼 수 없음).
 - 재튜닝: **M17·F13·GSLQR → `tune-final-5`, 설정 `configs/arena_v2.json`**(태그는 검증·커밋 뒤, kj 확인 후 단다).
 - 승계: CPID 완료(`configs/tuning_carryover.json`). **V13은 retune_v3이 끝나면** `python3 -m control.tuning_carryover --controller V13 --run-dir results/arena/tuning/retune_v3`.
 - 맥 V13 retune_v3(arena.json)은 그대로 둔다 — V13은 보정 대상이 아니라 승계로 쓴다.
