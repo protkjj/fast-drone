@@ -7,14 +7,16 @@
      팀원 쪽 규약이 바뀌면 이 시험이 깨진다.
   5) 펄스 시간창 — duration_s가 지나면 꺼진다.
   6) 로터 면내 항력 — 호버(v=ω=0)에서 정확히 0, 면내 속도가 있으면 반대 방향으로 작용.
+  7) 항력 계수 보정 — 그 V_ref 트림에서 실제로 "동체 횡력 1배"가 나오는지.
 """
 import numpy as np
 import pytest
 
-from control.arena_plant_wrench import build_plant, wrench_enabled, _ExtraWrenchPlant
-from models.team_light.control.dynamics import AxialDronePlant
+from control.arena_plant_wrench import (build_plant, wrench_enabled, _ExtraWrenchPlant,
+                                        reference_inplane_drag_coefficient)
+from models.team_light.control.dynamics import AxialDronePlant, _body_aerodynamics
 from models.team_light.control.vehicle_params import vehicle_params
-from models.team_light.control.geometry import hover_quaternion
+from models.team_light.control.geometry import hover_quaternion, thrust_axis
 
 DT = 0.002
 
@@ -143,3 +145,29 @@ def test_wrench_keys_documented_in_module_are_the_ones_read():
     source = inspect.getsource(m)
     for key in m.WRENCH_KEYS:
         assert f"'{key}'" in source, key
+
+
+@pytest.mark.parametrize('V_ref', [20.0, 40.0, 60.0, 85.0])
+def test_calibrated_drag_coefficient_gives_exactly_one_body_x_lateral_force(params, V_ref):
+    """정의(표7 5행) 그대로: 그 계수로 켠 항력이 그 트림에서 동체 공력의 면내 성분과 크기가
+    같아야 한다."""
+    from models.team_light.control.trim import find_trim
+    import casadi as ca
+
+    coeff = reference_inplane_drag_coefficient(params, V_ref)
+    assert coeff > 0
+    trim = find_trim(params, V_ref)
+    v_body, omega, n_vec = trim['v_body'], np.zeros(3), trim['control']
+    axis = np.asarray(thrust_axis(params))
+
+    v_sym, w_sym = ca.SX.sym('v', 3), ca.SX.sym('w', 3)
+    f_aero = ca.Function('f_aero', [v_sym, w_sym], [_body_aerodynamics(v_sym, w_sym, params)[0]])
+    F_aero = np.array(f_aero(v_body, omega)).flatten()
+    lateral = np.linalg.norm(F_aero - axis*np.dot(axis, F_aero))
+
+    drag_force = np.zeros(3)
+    for i in range(params['num_rotors']):
+        v_local = v_body + np.cross(omega, np.asarray(params['rotor_positions'][i]))
+        v_plane = v_local - axis*np.dot(axis, v_local)
+        drag_force += -coeff*abs(n_vec[i])*v_plane
+    np.testing.assert_allclose(np.linalg.norm(drag_force), lateral, rtol=1e-9)

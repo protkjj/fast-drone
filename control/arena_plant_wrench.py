@@ -68,6 +68,36 @@ def _wrench_to_xdot_delta(F_body, M_body, quat, params):
     return ca.vertcat(ca.SX.zeros(3), dv, ca.SX.zeros(4), dw, ca.SX.zeros(4))
 
 
+def reference_inplane_drag_coefficient(params, V_ref):
+    """표7 5행 "동체 횡력의 1배" 계수 역산. V_ref 트림에서 로터 면내 항력 합력 크기가 동체
+    공력의 면내(추력축 수직) 성분 크기와 같아지는 coeff. team_light의 find_trim·
+    _body_aerodynamics를 그대로 불러와 쓴다(재구현 아님)."""
+    from models.team_light.control.trim import find_trim
+    from models.team_light.control.dynamics import _body_aerodynamics
+    from models.team_light.control.geometry import thrust_axis
+    trim = find_trim(params, V_ref)
+    if not trim['converged']:
+        raise ValueError(f'no converged trim at V={V_ref}')
+    v_body, omega = trim['v_body'], np.zeros(3)
+    axis = np.asarray(thrust_axis(params))
+    # _body_aerodynamics는 심볼릭 함수라(light_aerodynamics가 ca.SX.zeros(3)로 시작한다) 숫자를
+    # 그대로 넣어도 SX가 나온다 — AxialDronePlant.f처럼 ca.Function으로 감싸 수치로 뽑는다.
+    v_sym, w_sym = ca.SX.sym('v', 3), ca.SX.sym('w', 3)
+    f_aero = ca.Function('f_aero', [v_sym, w_sym], [_body_aerodynamics(v_sym, w_sym, params)[0]])
+    F_aero = np.array(f_aero(v_body, omega)).flatten()
+    lateral = np.linalg.norm(F_aero - axis*np.dot(axis, F_aero))
+
+    n_vec = trim['control']
+    scale = 0.0
+    for i in range(params['num_rotors']):
+        v_local = v_body + np.cross(omega, np.asarray(params['rotor_positions'][i]))
+        v_plane = v_local - axis*np.dot(axis, v_local)
+        scale += abs(n_vec[i])*np.linalg.norm(v_plane)
+    if scale < 1e-9:
+        raise ValueError(f'rotor in-plane relative velocity ~0 at V={V_ref} — pick another V_ref')
+    return float(lateral/scale)
+
+
 def wrench_enabled(params):
     """params에 이 훅이 켤 것이 있는지 — 하나도 없으면 build_plant가 순정 AxialDronePlant를 준다."""
     return (bool(params.get('rotor_inplane_drag_enabled', False))
