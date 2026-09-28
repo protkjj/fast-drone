@@ -98,6 +98,34 @@ def reference_inplane_drag_coefficient(params, V_ref):
     return float(lateral/scale)
 
 
+def hover_max_pitch_moment(params):
+    """호버에서 낼 수 있는 최대 |M_y|(피치) — 표7 외부모멘트(25%·50%) 정의(kj 권고, 2026-09-27
+    밤: "선행 기체 관성을 모르니 호버 최대 피치모멘트의 25%·50%로"). T_total=mass·g 유지,
+    M_x=M_z=0(순수 피치)로 두고 로터별 추력 한계 안에서 최대화한다.
+
+    `compute_allocation_matrix`는 곡선 추진모델에서 `static_reference=True`만 허용한다(선형
+    k_T·n² 근사, "Variable-Q/T profiles have NO exact constant matrix" — team_light 자신의
+    docstring). 이 함수는 그 근사를 그대로 받는다 — 정확한 한계가 아니라 표7 정의용 참고값이다.
+    """
+    from models.team_light.control.dynamics import compute_allocation_matrix
+    _, TM_to_f = compute_allocation_matrix(params, static_reference=True)
+    T_total = params['mass']*params['g']
+    f_min, f_max = 0.0, params['k_T']*params['n_max']**2
+    base = TM_to_f @ np.array([T_total, 0., 0., 0.])
+    slope = TM_to_f @ np.array([0., 0., 1., 0.])       # d(로터별 추력)/d(My)
+    lo_bounds, hi_bounds = [], []
+    for b, s in zip(base, slope):
+        if abs(s) < 1e-12:
+            continue
+        a, c = (f_min - b)/s, (f_max - b)/s
+        lo_bounds.append(min(a, c))
+        hi_bounds.append(max(a, c))
+    my_lo, my_hi = max(lo_bounds), min(hi_bounds)
+    if my_lo > my_hi:
+        raise ValueError('no feasible pitch moment at this hover thrust')
+    return float(min(-my_lo, my_hi))       # 대칭(보수적으로 더 작은 쪽)
+
+
 def wrench_enabled(params):
     """params에 이 훅이 켤 것이 있는지 — 하나도 없으면 build_plant가 순정 AxialDronePlant를 준다."""
     return (bool(params.get('rotor_inplane_drag_enabled', False))

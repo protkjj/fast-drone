@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from control.arena_plant_wrench import (build_plant, wrench_enabled, _ExtraWrenchPlant,
-                                        reference_inplane_drag_coefficient)
+                                        reference_inplane_drag_coefficient, hover_max_pitch_moment)
 from models.team_light.control.dynamics import AxialDronePlant, _body_aerodynamics
 from models.team_light.control.vehicle_params import vehicle_params
 from models.team_light.control.geometry import hover_quaternion, thrust_axis
@@ -171,3 +171,17 @@ def test_calibrated_drag_coefficient_gives_exactly_one_body_x_lateral_force(para
         v_plane = v_local - axis*np.dot(axis, v_local)
         drag_force += -coeff*abs(n_vec[i])*v_plane
     np.testing.assert_allclose(np.linalg.norm(drag_force), lateral, rtol=1e-9)
+
+
+def test_hover_max_pitch_moment_saturates_a_rotor_and_stays_in_bounds(params):
+    """그 My에서 로터별 추력을 다시 계산하면 전부 [0, f_max] 안이고 적어도 하나는 경계에
+    닿아야 한다(이게 아니면 '최대'가 아니다)."""
+    from models.team_light.control.dynamics import compute_allocation_matrix
+    my = hover_max_pitch_moment(params)
+    _, TM_to_f = compute_allocation_matrix(params, static_reference=True)
+    T_total = params['mass']*params['g']
+    f_max = params['k_T']*params['n_max']**2
+    for sign in (+1.0, -1.0):
+        f = TM_to_f @ np.array([T_total, 0.0, sign*my, 0.0])
+        assert np.all(f >= -1e-9) and np.all(f <= f_max + 1e-9)
+        assert np.any(np.abs(f) < 1e-6) or np.any(np.abs(f - f_max) < 1e-6)
