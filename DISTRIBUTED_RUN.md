@@ -8,7 +8,7 @@
 셸을 export한 뒤에만 유지되므로, 새 터미널을 열면 그 export부터 다시 한다.
 
 **두 갈래**: **A. 튜닝 분산**(지금 필요 — F13·M17, 학교 컴퓨터는 **Windows**)과
-**B. 본 실험 분산**(4단계 `configs/main_experiment.json`이 나온 뒤, 지금은 준비 중)이다.
+**B. 본 실험 분산**(튜닝 확정·`configs/main_experiment.json` 가드 통과 뒤, 태그 `<MAIN_TAG>`)이다.
 **A절은 Windows(PowerShell) 기준으로 준비부터 마무리까지 자체 완결이다 — 0절(Linux/맥용)은 건너뛴다.**
 
 ---
@@ -296,12 +296,149 @@ requirements-lock.txt`가 `python==3.13.7` 줄 때문에 실패하는 버그를 
 그 줄을 빼고 `setup_env.py`가 따로 확인하게 바꿈, 커밋 `54ebfe0`). 고친 뒤에는 전 과정이 통과했고,
 사전값 목적함수(0.7847247648921318)가 원래 맥 실행과 정확히 같았다(같은 코드·설정·게인이면 기대되는 값).
 
-## B. 본 실험 분산 (준비 중 — 4단계 `configs/main_experiment.json` 확정 후 채운다)
+## B. 본 실험 분산 — 학교 Windows 컴퓨터들, 태그 `<MAIN_TAG>`(튜닝 확정 뒤 kj가 정함)
 
-`scripts/make_shards.py`(사례 단위로 나누기, 한 사례의 전 제어기는 같은 조각) →
-`scripts/run_shard.py`(조각 하나 실행, 중간저장·재개, 컴퓨터 지문 기록) →
-`scripts/merge_results.py`(누락·중복·해시 불일치 검사) →
-`scripts/cross_check.py`(무작위 5% 사례를 다른 컴퓨터에서 재실행, rtol 1e-3 + 판정 일치 비교).
+> **재시작·로그오프 뒤 이어 돌리기**
+> PowerShell을 새로 열고 아래 세 줄을 실행한 다음 **B.6의 시작 명령을 그대로 다시 실행**한다.
+> 끝난 시행은 건너뛰고, 끊긴 시행은 처음부터 다시 돈다(시행마다 결과 파일 하나, 임시 파일 → 이름 바꾸기로 저장).
+> 같은 컴퓨터에서 같은 조각 번호로만 한다.
+> ```powershell
+> cd $HOME\fast-drone-main
+> Set-ExecutionPolicy -Scope Process Bypass; .\.venv\Scripts\Activate.ps1
+> $env:OMP_NUM_THREADS="1"; $env:OPENBLAS_NUM_THREADS="1"; $env:VECLIB_MAXIMUM_THREADS="1"; $env:MKL_NUM_THREADS="1"; $env:PYTHONUTF8="1"
+> ```
+>
+> **진행 확인**(언제든)
+> ```powershell
+> python -m control.main_distributed status --shards results/main/shards.json --output results/main/runs
+> ```
+> 조각마다 `끝난 수/전체`와 남은 예상 시간(맥 기준)이 나온다. 숫자가 오래 그대로면 B.7로 프로세스가 살아 있는지 본다.
 
-이 절은 4단계가 끝나면 A절과 같은 형식(clone → 환경 점검 → 조각 실행 → 회수 → 합치기 → 교차 확인
-→ 마무리)으로 채운다.
+**규칙(kj)**
+- 본 실험은 **전부 Windows**에서 돌린다. 맥 결과와 섞지 않는다(합치기가 플랫폼을 검사해 거부한다).
+- **참여하는 모든 컴퓨터는 먼저 B.4(= A.4 재현 점검)를 통과**해야 한다.
+- 시행 하나 = (묶음, 시나리오, 제어기). **한 시행은 한 컴퓨터에서 끝까지** 돈다. 조각은 맥에서 예상 시간 기준으로 고르게 나눠 태그에 넣어 둔다(`results/main/shards.json`).
+- 조각 하나 = 프로세스 하나(시행을 순차로 돈다). 한 컴퓨터가 조각 여러 개를 맡으려면 프로세스를 여러 개 띄운다 — 개수는 B.5의 작업자 수 계산을 넘기지 않는다(M17 시행이 들어 있어 **프로세스당 2.0 GiB**로 계산).
+- 코드는 태그로 받은 깨끗한 트리 그대로 쓴다. 조각 실행 중에 코드를 바꾸면 합치기가 '코드 상태가 섞임'으로 거부한다.
+- 교차 확인은 **다른 Windows 컴퓨터**에서 한다(같은 컴퓨터면 거부).
+
+**맥에서 미리 할 일(kj, 태그 전)**
+1. `configs/main_experiment.json`의 튜닝 해시·승계 표 해시를 채우고 `python3 -m control.main_experiment --plan`의 가드가 '통과'인지 본다.
+2. 조각을 만든다(N = 참여 컴퓨터들의 프로세스 수 합계):
+   ```bash
+   python3 -m control.main_distributed make-shards --n N --out results/main/shards.json
+   ```
+3. `results/main/shards.json`을 커밋하고 태그 `<MAIN_TAG>`를 단다. 컴퓨터마다 맡을 조각 번호를 정해 둔다.
+
+### B.1 받기
+```powershell
+Set-PSReadLineOption -HistorySaveStyle SaveNothing
+```
+```powershell
+cd $HOME
+```
+```powershell
+git clone --branch <MAIN_TAG> --depth 1 https://<READ_ONLY_TOKEN>@github.com/protkjj/fast-drone.git fast-drone-main
+```
+```powershell
+cd fast-drone-main
+```
+```powershell
+git config credential.helper ""
+```
+```powershell
+git describe --tags --exact-match
+```
+마지막 명령은 `<MAIN_TAG>`를 출력해야 한다.
+
+### B.2 파이썬 환경
+A.2와 같다(`py -3.13 -m venv .venv` → `Set-ExecutionPolicy -Scope Process Bypass` → `.\.venv\Scripts\Activate.ps1` →
+`python -m pip install -r requirements-lock.txt` → 환경변수 한 줄).
+
+### B.3 설정·모델 점검
+```powershell
+python scripts\setup_env.py --commit $(git rev-parse HEAD) --config configs/arena_v2.json --expect-config-sha256 9729aec6ff8b54499c96d38c850fedf305970caad5bb2256e948dfa667ea32ca 2>&1 | Tee-Object -FilePath setup_env_B3.txt
+```
+- 종료코드(`$LASTEXITCODE`)가 0이 아니면 멈추고 `setup_env_B3.txt`를 kj에게 보낸다. 판정 기준은 A.3과 같다(제어기 모델은 계수 rtol 1e-8, sha는 기록만).
+
+### B.4 환경 점검 — V13 기록 재현 (**참여 조건**, FAIL이면 이 컴퓨터는 본 실험에 참여하지 않는다)
+A.4와 같은 명령이다. 이미 A.4를 통과한 컴퓨터라도 이 태그로 한 번 더 한다.
+```powershell
+python -m control.arena_tune_repro --controller V13 --run-dir results/arena/tuning/env_check --index 0 --scenario-workers N 2>&1 | Tee-Object -FilePath env_check_V13.txt
+```
+- 마지막 줄이 `PASS (rtol 0.001 + identical verdicts)`이면 참여한다. 이 명령의 소요 시간(맥 순차 약 13분)은 예상 시간 보정에 쓴다:
+  `speed_ratio = (이 컴퓨터 순차 소요) / (맥 순차 소요)` → 맥에서 `python3 -m control.main_experiment --plan --speed-ratio <값>`.
+
+### B.5 작업자 수(이 컴퓨터가 띄울 프로세스 수)
+```powershell
+python -m control.arena_suggest_workers 2.0
+```
+- 다른 프로그램을 끈 상태에서 잰다. 하이퍼스레딩 컴퓨터는 `--physical-cores <코어 수>`를 준다(A.6과 같다).
+
+### B.6 시작 (맡은 조각 번호 I마다 한 번씩)
+아래 `I`를 맡은 조각 번호로 바꾼다. 파일 이름에도 들어 있다.
+```powershell
+$stamp = Get-Date -Format yyyyMMdd_HHmm; $p = Start-Process .\.venv\Scripts\python.exe -ArgumentList '-m','control.main_distributed','run-shard','--shards','results/main/shards.json','--index','I','--output','results/main/runs' -PassThru -WindowStyle Hidden -RedirectStandardOutput "main_shardI_$stamp.log" -RedirectStandardError "main_shardI_$stamp.err"; $p.Id | Out-File -Encoding ascii main_shardI.pid; $p.Id
+```
+- 재개할 때도 같은 명령이다(끝난 시행은 건너뛴다). 로그 이름에 시각이 붙어 덮어쓰지 않는다.
+- 시작하자마자 거부되면(`refusing to run the shard`) 가드 사유가 `.err`에 있다 — 설정·튜닝 해시가 조각 파일과 다르다는 뜻이니 kj에게 보낸다.
+
+### B.7 살아 있는지·메모리 확인
+```powershell
+Get-Process -Id (Get-Content main_shardI.pid)
+```
+```powershell
+[math]::Round((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1MB, 1)
+```
+- 프로세스가 없으면 `.err` 끝을 kj에게 보내고 맨 위 상자대로 재개한다. 남은 메모리가 1 GiB 밑이면 B.8로 하나를 멈춘다.
+
+### B.8 멈추기
+```powershell
+taskkill /PID (Get-Content main_shardI.pid) /T /F
+```
+멈춘 시행은 결과 파일이 없어서, 재개하면 처음부터 다시 돈다.
+
+### B.9 결과 회수 (학교 컴퓨터 → kj)
+진행 확인에서 맡은 조각이 모두 `끝난 수 = 전체`인지 본 뒤 묶는다(맡은 조각마다 `shardI` 폴더를 넣는다).
+```powershell
+Compress-Archive -Path results\main\runs\shardI, setup_env_B3.txt, env_check_V13.txt, main_shardI_*.log, main_shardI_*.err -DestinationPath "main_shardI_$env:COMPUTERNAME.zip"
+```
+
+### B.10 합치기 (맥, 모든 조각이 모인 뒤)
+컴퓨터마다 받은 `.zip`을 `results/main/runs_in/<컴퓨터이름>/`에 푼다. 그다음:
+```bash
+python3 -m control.main_distributed merge --shards results/main/shards.json --inputs results/main/runs_in/* --out results/main/merged
+```
+- 마지막 줄이 `MERGED`여야 한다. `MERGE REFUSED`면 사유 목록(누락·중복·모르는 시행·해시 불일치·지문 누락·플랫폼·코드 상태)을 보고서에 적고, 누락 시행은 그 조각을 맡은 컴퓨터에서 재개한다.
+- 플랫폼 기본값이 Windows다. 맥 결과가 섞이면 거부된다.
+
+### B.11 교차 확인 (맥 → 다른 Windows 컴퓨터 → 맥)
+1. 맥에서 뽑는다(합친 결과에서 돌린 시행의 5%, 고정 시드):
+   ```bash
+   python3 -m control.main_distributed cross-select --shards results/main/shards.json --merged results/main/merged --out results/main/cross_shards.json
+   ```
+2. `cross_shards.json`을 **그 시행들을 돌리지 않은 Windows 컴퓨터**로 보낸다(같은 태그로 받은 폴더의 `results\main\`에 넣는다). 그 컴퓨터에서:
+   ```powershell
+   python -m control.main_distributed run-shard --shards results/main/cross_shards.json --index 0 --output results/main/cross
+   ```
+   ```powershell
+   Compress-Archive -Path results\main\cross -DestinationPath "main_cross_$env:COMPUTERNAME.zip"
+   ```
+3. 맥에서 `results/main/cross_in/`에 풀고 비교한다:
+   ```bash
+   python3 -m control.main_distributed cross-compare --cross-shards results/main/cross_shards.json --merged results/main/merged --rerun results/main/cross_in
+   ```
+   - `CROSS-CHECK PASS`(판정 일치 + rtol 1e-3)여야 한다. 시행마다 `bit_identical`도 기록된다(다른 컴퓨터라 False여도 합격).
+   - 같은 컴퓨터가 원래 돌린 시행이 섞이면 그 시행은 'same computer'로 실패한다 — 그 시행만 다른 컴퓨터에서 다시 돌린다.
+
+### B.12 마무리 (학교 컴퓨터)
+```powershell
+cd $HOME; Remove-Item -Recurse -Force fast-drone-main
+```
+B.1의 읽기 전용 토큰을 GitHub에서 폐기한다.
+
+### B.13 맥에서 미리 시험한 결과(2026-09-28 밤)
+`results/arena/e2_maccheck/REPORT.md` — 조각 실행 → `kill -9` 중단 → 이어 돌리기 → 합치기 → 교차 확인을 실제 시행 46개로 돌렸다.
+합치기는 Windows 요구에서 맥 결과를 거부했고, 코드 상태가 섞인 조각도 실제로 잡아 거부했다. 깨끗한 코드로 다시 돌려 46/46 합쳤고,
+교차 확인은 같은 컴퓨터라 거부, 맥 점검 전용 옵션으로는 2/2 비트 동일 PASS였다. **Windows에서는 아직 돌려 보지 않았다** —
+첫 컴퓨터에서 B.4·B.6이 이 절차 자체의 시험이다.

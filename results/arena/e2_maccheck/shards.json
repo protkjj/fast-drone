@@ -1,0 +1,446 @@
+{
+ "schema": "main_shards/1",
+ "created_utc": "2026-09-28T11:02:39.191409+00:00",
+ "spec_path": "results/arena/e2_maccheck/spec_maccheck.json",
+ "spec_sha256": "c33191159fd7b46eb371049f6b25d5da20e7ac66735cb3a7aeb662b52ccbed36",
+ "base_config_sha256": "1376310bd08e4466da61d87b57af9b13274c198cfdfc2e7c3077ceb19bad8903",
+ "tuned_record_sha256": {
+  "GSLQR": "9532204f80b7dab4f4646d0070759c3c680ce485cd4e615d06752eb1386e7a80",
+  "CPID": "bdb6085c5f31eff86ba4873939d2b938604548c929aebba276e9ca141795f691"
+ },
+ "only_batches": [
+  "gust",
+  "reference"
+ ],
+ "n_shards": 2,
+ "trials": {
+  "reference/main_ref_accel_VL_rho0.5/GSLQR": {
+   "trial_id": "reference/main_ref_accel_VL_rho0.5/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VL_rho0.5",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 2.3609999999999998
+  },
+  "reference/main_ref_accel_VL_rho0.5/CPID": {
+   "trial_id": "reference/main_ref_accel_VL_rho0.5/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VL_rho0.5",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 3.3053999999999997
+  },
+  "reference/main_ref_accel_VL_rho0.8/GSLQR": {
+   "trial_id": "reference/main_ref_accel_VL_rho0.8/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VL_rho0.8",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 2.226
+  },
+  "reference/main_ref_accel_VL_rho0.8/CPID": {
+   "trial_id": "reference/main_ref_accel_VL_rho0.8/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VL_rho0.8",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 3.1163999999999996
+  },
+  "reference/main_ref_accel_VL_rho1/GSLQR": {
+   "trial_id": "reference/main_ref_accel_VL_rho1/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VL_rho1",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 2.1805
+  },
+  "reference/main_ref_accel_VL_rho1/CPID": {
+   "trial_id": "reference/main_ref_accel_VL_rho1/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VL_rho1",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 3.0526999999999997
+  },
+  "reference/main_ref_accel_VL_rho1.2/GSLQR": {
+   "trial_id": "reference/main_ref_accel_VL_rho1.2/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VL_rho1.2",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 2.1505
+  },
+  "reference/main_ref_accel_VL_rho1.2/CPID": {
+   "trial_id": "reference/main_ref_accel_VL_rho1.2/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VL_rho1.2",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 3.0107
+  },
+  "reference/main_ref_accel_VL_rho1.5/GSLQR": {
+   "trial_id": "reference/main_ref_accel_VL_rho1.5/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VL_rho1.5",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 2.1205
+  },
+  "reference/main_ref_accel_VL_rho1.5/CPID": {
+   "trial_id": "reference/main_ref_accel_VL_rho1.5/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VL_rho1.5",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 2.9686999999999997
+  },
+  "reference/main_ref_accel_VH_rho0.5/GSLQR": {
+   "trial_id": "reference/main_ref_accel_VH_rho0.5/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VH_rho0.5",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 3.7279999999999998
+  },
+  "reference/main_ref_accel_VH_rho0.5/CPID": {
+   "trial_id": "reference/main_ref_accel_VH_rho0.5/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VH_rho0.5",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 0.0
+  },
+  "reference/main_ref_accel_VH_rho0.8/GSLQR": {
+   "trial_id": "reference/main_ref_accel_VH_rho0.8/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VH_rho0.8",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 3.08
+  },
+  "reference/main_ref_accel_VH_rho0.8/CPID": {
+   "trial_id": "reference/main_ref_accel_VH_rho0.8/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VH_rho0.8",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 0.0
+  },
+  "reference/main_ref_accel_VH_rho1/GSLQR": {
+   "trial_id": "reference/main_ref_accel_VH_rho1/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VH_rho1",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 2.864
+  },
+  "reference/main_ref_accel_VH_rho1/CPID": {
+   "trial_id": "reference/main_ref_accel_VH_rho1/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VH_rho1",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 0.0
+  },
+  "reference/main_ref_accel_VH_rho1.2/GSLQR": {
+   "trial_id": "reference/main_ref_accel_VH_rho1.2/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VH_rho1.2",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 2.7199999999999998
+  },
+  "reference/main_ref_accel_VH_rho1.2/CPID": {
+   "trial_id": "reference/main_ref_accel_VH_rho1.2/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VH_rho1.2",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 0.0
+  },
+  "reference/main_ref_accel_VH_rho1.5/GSLQR": {
+   "trial_id": "reference/main_ref_accel_VH_rho1.5/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VH_rho1.5",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 2.576
+  },
+  "reference/main_ref_accel_VH_rho1.5/CPID": {
+   "trial_id": "reference/main_ref_accel_VH_rho1.5/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_accel_VH_rho1.5",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 0.0
+  },
+  "reference/main_ref_brake_VH_rho0.5/GSLQR": {
+   "trial_id": "reference/main_ref_brake_VH_rho0.5/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_brake_VH_rho0.5",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 24.018
+  },
+  "reference/main_ref_brake_VH_rho0.5/CPID": {
+   "trial_id": "reference/main_ref_brake_VH_rho0.5/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_brake_VH_rho0.5",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 0.0
+  },
+  "reference/main_ref_brake_VH_rho0.8/GSLQR": {
+   "trial_id": "reference/main_ref_brake_VH_rho0.8/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_brake_VH_rho0.8",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 15.7615
+  },
+  "reference/main_ref_brake_VH_rho0.8/CPID": {
+   "trial_id": "reference/main_ref_brake_VH_rho0.8/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_brake_VH_rho0.8",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 0.0
+  },
+  "reference/main_ref_brake_VH_rho1/GSLQR": {
+   "trial_id": "reference/main_ref_brake_VH_rho1/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_brake_VH_rho1",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 13.009
+  },
+  "reference/main_ref_brake_VH_rho1/CPID": {
+   "trial_id": "reference/main_ref_brake_VH_rho1/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_brake_VH_rho1",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 0.0
+  },
+  "reference/main_ref_brake_VH_rho1.2/GSLQR": {
+   "trial_id": "reference/main_ref_brake_VH_rho1.2/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_brake_VH_rho1.2",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 11.1745
+  },
+  "reference/main_ref_brake_VH_rho1.2/CPID": {
+   "trial_id": "reference/main_ref_brake_VH_rho1.2/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_brake_VH_rho1.2",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 0.0
+  },
+  "reference/main_ref_brake_VH_rho1.5/GSLQR": {
+   "trial_id": "reference/main_ref_brake_VH_rho1.5/GSLQR",
+   "batch": "reference",
+   "scenario_id": "main_ref_brake_VH_rho1.5",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 9.339500000000001
+  },
+  "reference/main_ref_brake_VH_rho1.5/CPID": {
+   "trial_id": "reference/main_ref_brake_VH_rho1.5/CPID",
+   "batch": "reference",
+   "scenario_id": "main_ref_brake_VH_rho1.5",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 0.0
+  },
+  "gust/main_gust_lateral_+5_V_L/GSLQR": {
+   "trial_id": "gust/main_gust_lateral_+5_V_L/GSLQR",
+   "batch": "gust",
+   "scenario_id": "main_gust_lateral_+5_V_L",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 3.0
+  },
+  "gust/main_gust_lateral_+5_V_L/CPID": {
+   "trial_id": "gust/main_gust_lateral_+5_V_L/CPID",
+   "batch": "gust",
+   "scenario_id": "main_gust_lateral_+5_V_L",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 4.199999999999999
+  },
+  "gust/main_gust_lateral_+10_V_L/GSLQR": {
+   "trial_id": "gust/main_gust_lateral_+10_V_L/GSLQR",
+   "batch": "gust",
+   "scenario_id": "main_gust_lateral_+10_V_L",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 3.0
+  },
+  "gust/main_gust_lateral_+10_V_L/CPID": {
+   "trial_id": "gust/main_gust_lateral_+10_V_L/CPID",
+   "batch": "gust",
+   "scenario_id": "main_gust_lateral_+10_V_L",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 4.199999999999999
+  },
+  "gust/main_gust_vertical_+5_V_L/GSLQR": {
+   "trial_id": "gust/main_gust_vertical_+5_V_L/GSLQR",
+   "batch": "gust",
+   "scenario_id": "main_gust_vertical_+5_V_L",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 3.0
+  },
+  "gust/main_gust_vertical_+5_V_L/CPID": {
+   "trial_id": "gust/main_gust_vertical_+5_V_L/CPID",
+   "batch": "gust",
+   "scenario_id": "main_gust_vertical_+5_V_L",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 4.199999999999999
+  },
+  "gust/main_gust_vertical_-5_V_L/GSLQR": {
+   "trial_id": "gust/main_gust_vertical_-5_V_L/GSLQR",
+   "batch": "gust",
+   "scenario_id": "main_gust_vertical_-5_V_L",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 3.0
+  },
+  "gust/main_gust_vertical_-5_V_L/CPID": {
+   "trial_id": "gust/main_gust_vertical_-5_V_L/CPID",
+   "batch": "gust",
+   "scenario_id": "main_gust_vertical_-5_V_L",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 4.199999999999999
+  },
+  "gust/main_gust_lateral_+5_V_H/GSLQR": {
+   "trial_id": "gust/main_gust_lateral_+5_V_H/GSLQR",
+   "batch": "gust",
+   "scenario_id": "main_gust_lateral_+5_V_H",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 3.0
+  },
+  "gust/main_gust_lateral_+5_V_H/CPID": {
+   "trial_id": "gust/main_gust_lateral_+5_V_H/CPID",
+   "batch": "gust",
+   "scenario_id": "main_gust_lateral_+5_V_H",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 0.0
+  },
+  "gust/main_gust_lateral_+10_V_H/GSLQR": {
+   "trial_id": "gust/main_gust_lateral_+10_V_H/GSLQR",
+   "batch": "gust",
+   "scenario_id": "main_gust_lateral_+10_V_H",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 3.0
+  },
+  "gust/main_gust_lateral_+10_V_H/CPID": {
+   "trial_id": "gust/main_gust_lateral_+10_V_H/CPID",
+   "batch": "gust",
+   "scenario_id": "main_gust_lateral_+10_V_H",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 0.0
+  },
+  "gust/main_gust_vertical_+5_V_H/GSLQR": {
+   "trial_id": "gust/main_gust_vertical_+5_V_H/GSLQR",
+   "batch": "gust",
+   "scenario_id": "main_gust_vertical_+5_V_H",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 3.0
+  },
+  "gust/main_gust_vertical_+5_V_H/CPID": {
+   "trial_id": "gust/main_gust_vertical_+5_V_H/CPID",
+   "batch": "gust",
+   "scenario_id": "main_gust_vertical_+5_V_H",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 0.0
+  },
+  "gust/main_gust_vertical_-5_V_H/GSLQR": {
+   "trial_id": "gust/main_gust_vertical_-5_V_H/GSLQR",
+   "batch": "gust",
+   "scenario_id": "main_gust_vertical_-5_V_H",
+   "controller": "GSLQR",
+   "variant": null,
+   "est_seconds": 3.0
+  },
+  "gust/main_gust_vertical_-5_V_H/CPID": {
+   "trial_id": "gust/main_gust_vertical_-5_V_H/CPID",
+   "batch": "gust",
+   "scenario_id": "main_gust_vertical_-5_V_H",
+   "controller": "CPID",
+   "variant": null,
+   "est_seconds": 0.0
+  }
+ },
+ "shards": [
+  {
+   "index": 0,
+   "est_hours_mac": 0.02162230555555555,
+   "trials": [
+    "reference/main_ref_brake_VH_rho0.5/GSLQR",
+    "reference/main_ref_brake_VH_rho1.2/GSLQR",
+    "gust/main_gust_lateral_+10_V_L/CPID",
+    "gust/main_gust_vertical_+5_V_L/CPID",
+    "reference/main_ref_accel_VH_rho0.5/GSLQR",
+    "reference/main_ref_accel_VL_rho0.8/CPID",
+    "reference/main_ref_accel_VL_rho1/CPID",
+    "gust/main_gust_lateral_+10_V_H/GSLQR",
+    "gust/main_gust_lateral_+5_V_H/GSLQR",
+    "gust/main_gust_vertical_+5_V_H/GSLQR",
+    "gust/main_gust_vertical_-5_V_H/GSLQR",
+    "reference/main_ref_accel_VL_rho1.5/CPID",
+    "reference/main_ref_accel_VH_rho1.2/GSLQR",
+    "reference/main_ref_accel_VL_rho0.5/GSLQR",
+    "reference/main_ref_accel_VL_rho1/GSLQR",
+    "reference/main_ref_accel_VL_rho1.5/GSLQR"
+   ]
+  },
+  {
+   "index": 1,
+   "est_hours_mac": 0.02158961111111111,
+   "trials": [
+    "reference/main_ref_brake_VH_rho0.8/GSLQR",
+    "reference/main_ref_brake_VH_rho1/GSLQR",
+    "reference/main_ref_brake_VH_rho1.5/GSLQR",
+    "gust/main_gust_lateral_+5_V_L/CPID",
+    "gust/main_gust_vertical_-5_V_L/CPID",
+    "reference/main_ref_accel_VL_rho0.5/CPID",
+    "reference/main_ref_accel_VH_rho0.8/GSLQR",
+    "reference/main_ref_accel_VL_rho1.2/CPID",
+    "gust/main_gust_lateral_+10_V_L/GSLQR",
+    "gust/main_gust_lateral_+5_V_L/GSLQR",
+    "gust/main_gust_vertical_+5_V_L/GSLQR",
+    "gust/main_gust_vertical_-5_V_L/GSLQR",
+    "reference/main_ref_accel_VH_rho1/GSLQR",
+    "reference/main_ref_accel_VH_rho1.5/GSLQR",
+    "reference/main_ref_accel_VL_rho0.8/GSLQR",
+    "reference/main_ref_accel_VL_rho1.2/GSLQR",
+    "gust/main_gust_lateral_+10_V_H/CPID",
+    "gust/main_gust_lateral_+5_V_H/CPID",
+    "gust/main_gust_vertical_+5_V_H/CPID",
+    "gust/main_gust_vertical_-5_V_H/CPID",
+    "reference/main_ref_accel_VH_rho0.5/CPID",
+    "reference/main_ref_accel_VH_rho0.8/CPID",
+    "reference/main_ref_accel_VH_rho1.2/CPID",
+    "reference/main_ref_accel_VH_rho1.5/CPID",
+    "reference/main_ref_accel_VH_rho1/CPID",
+    "reference/main_ref_brake_VH_rho0.5/CPID",
+    "reference/main_ref_brake_VH_rho0.8/CPID",
+    "reference/main_ref_brake_VH_rho1.2/CPID",
+    "reference/main_ref_brake_VH_rho1.5/CPID",
+    "reference/main_ref_brake_VH_rho1/CPID"
+   ]
+  }
+ ]
+}

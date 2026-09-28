@@ -1,0 +1,12 @@
+{
+ "created_utc": "2026-09-28T12:06:06.706315+00:00",
+ "shards_file": "results/arena/e2_maccheck/shards.json",
+ "inputs": [
+  "results/arena/e2_maccheck/runs_b",
+  "results/arena/e2_maccheck/runs/shard1"
+ ],
+ "require_platform": "Darwin",
+ "expected": 46,
+ "found": 46,
+ "problems": []
+}
