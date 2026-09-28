@@ -1446,3 +1446,64 @@ kj 결정: `models/team_light`(팀원 벤더 코드)는 무수정 유지. 대신
 2. 로터 면내 항력 계수를 어떻게 정할지 — control-model-options-v2의 트림-매칭 보정을 다시
    구현할지, 아니면 다른 기준을 쓸지.
 3. 트림-항력 부정합의 크기(순항 트림에서 얼마나 벗어나는지) 확인이 필요한지.
+
+## 17. B — 항력 계수 보정·호버 최대 피치모멘트·관측 지연 배선
+
+### 17.1 로터 면내 항력 계수(표7 5행)
+
+`reference_inplane_drag_coefficient(params, V_ref)`(`control/arena_plant_wrench.py`) — team_light의
+`find_trim`·`_body_aerodynamics`를 그대로 불러와 그 V_ref 트림에서 로터 항력 합력 크기가 동체
+공력의 면내(추력축 수직) 성분 크기와 같아지는 계수를 역산한다. V_ref 20·40·60·85에서
+8.4e-5~1.0e-4(N/((rad/s)(m/s))) — 어느 정도 일관됨. 정의 그대로("그 계수로 켜면 정확히 1배")를
+4개 V_ref에서 검증했다.
+
+### 17.2 호버 최대 피치모멘트(표7 외부모멘트 25%·50% 정의용)
+
+`hover_max_pitch_moment(params)` — T_total=mass·g 유지, 순수 피치(Mx=Mz=0)로 두고 로터별 추력
+한계 안에서 최대화(곡선 추진모델의 `static_reference=True` 선형 근사, team_light 자신의 제약).
+값 0.9366 N·m → 25%=0.234, 50%=0.468 N·m. 그 My로 로터 배분을 다시 계산하면 적어도 하나가 추력
+경계(0 또는 최대)에 닿는지로 "최대"임을 확인했다.
+
+### 17.3 관측 지연 — 센서(측정값 공급) 수준(kj 결정)
+
+`control/arena_observation_delay.py::DelayedObservation`. 경기장이 매 스텝 컨트롤러에 주는 x를
+가로챈다 — 컨트롤러별로 다르게 주지 않는다. 상태(x[0:13])와 회전수(x[13:17])를 독립 지연.
+`run_trial`(`control/validation_suite.py`)에 배선: `x_obs = observer.observe(x); u = ctrl(t, x_obs)`.
+지연은 시나리오의 새 필드 `extra_params`(곱셈 FACTORS와 별개, `truth.update`로 합침)의
+`state_delay_s`·`rotor_delay_s`로 준다. 둘 다 0(기본)이면 원본 x 그대로(비트 동일).
+
+dt=0.002s에서 5ms는 정수 스텝이 아니다(2.5) — round()로 2스텝(4ms)이 된다. 근사임을 여기 남긴다.
+
+**회전수 사용처 표**(5종 전부 `__call__(t, x)`의 그 `x`를 직접 읽는다 — 캐시된 자기 명령값을
+쓰는 비대칭 경로는 없었다, 코드로 확인):
+
+| 제어기 | 회전수를 쓰는 곳 | 역할 |
+|---|---|---|
+| V13 | `hybrid_comparison.py` INDI 내부루프 | 각가속도 추정·배분(핵심 제어법칙) |
+| F13 | `nmpc_f13.py` γ(J) 계산 | 반토크/추력 비 — NLP 예측구간 동안 고정해서 씀 |
+| M17 | `nmpc.py` NLP 초기상태 x0 | 매 솔브의 경계조건(예측 자체는 자기 모델로 진행) |
+| CPID | `controller.py` `_allocate`의 γ(J) | 배분(곡선 추진모델일 때만 — 지금 경기장은 항상 이 모델) |
+| GSLQR | `controller.py` 오차상태 `dn` | LQR 선형 피드백 항 하나(원래 짐작과 달리 여기도 씀) |
+
+→ **CPID·GSLQR도 회전수를 쓴다.** kj 결정대로 다섯 다 같은 지연을 받으므로(모든 제어기가 같은
+`x_obs`를 받는다) 이 표는 "누가 영향받는지"가 아니라 "그 영향이 각자 어디로 들어가는지"의
+기록이다 — 구현에는 영향 없음(원래 물었던 "제어기별로 다르게 줄지"는 kj가 이미 "다르게 안 준다"로
+답했다).
+
+### 17.4 시험·회귀
+
+- `control/test_arena_observation_delay.py` 5개: 지연 0=비트 동일, 지연>0=정확히 k스텝 전(예열
+  구간은 가장 오래된 실측값 유지 — "그 전엔 뭐였나"가 정의 안 돼 있어서), 상태·회전수 독립,
+  기록 버퍼 크기 제한.
+- `control/arena_plant_wrench.py`·`control/uncertainty.py`(CG 편차)·`control/test_arena_step_scenario.py`
+  포함 전체 재검증. **회귀 1건 발견·수정**: `test_i1_same_plant_factory_hash_and_initial_state`가
+  `suite.AxialDronePlant`를 monkeypatch로 감시했는데, `run_trial`이 이제 `build_plant`(래퍼)를
+  거쳐 플랜트를 지어 그 감시가 안 걸렸다(시뮬레이션 자체는 안 바뀜, 시험의 감시 지점만 낡음) —
+  `plant_wrench.AxialDronePlant`를 감시하도록 고쳤다.
+- 퀵 공정성 스위트 113개 회귀 없음(수정 후).
+- 전체 회귀(ARENA_QUICK 미설정 = 공정성 전체 모드, M17 포함): **213 passed, 1 xfailed, exit 0**
+  (446 s, 2026-09-28 13:31 종료, xfail은 기존 `CPID_OUT_OF_REGION`). 재현:
+  `OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 python3 -m pytest
+  control/test_arena_fairness.py control/test_arena_step_scenario.py control/test_arena_plant_wrench.py
+  control/test_cg_offset.py control/test_arena_observation_delay.py control/test_arena_tuning_report.py
+  control/test_arena_reference_merge.py control/test_validation_suite.py -q -p no:cacheprovider`
