@@ -142,6 +142,7 @@ def tuned_overrides(config, run_dir, labels=('GSLQR', 'CPID')):
     import hashlib
     from control.arena import config_sha256
     from control.arena_tune import parameter_space, check_tuning_records
+    from control.tuning_carryover import load_table, record_hash_problems
     records = {}
     for label in labels:
         path = Path(run_dir)/f'{label}.record.json'
@@ -150,10 +151,13 @@ def tuned_overrides(config, run_dir, labels=('GSLQR', 'CPID')):
         record = json.loads(path.read_text(encoding='utf-8'))
         if record.get('status') != 'complete':
             raise ValueError(f'{path}: tuning not complete ({record.get("status")})')
-        if record.get('config_sha256') != config_sha256(config):
-            raise ValueError(f'{path}: tuned with config {str(record.get("config_sha256"))[:12]}, '
-                             f'not the current {config_sha256(config)[:12]}')
         records[label] = (path, record)
+    # 해시 규칙: 기록의 설정 해시 = 현재 설정. 예외는 승계 표에 증명과 함께 오른 기록뿐(설정에 모멘트
+    # 보정 절이 있을 때만 표를 본다 — 없으면 예전처럼 엄격히 같아야 한다).
+    table = load_table() if 'moment_correction' in config['controller_model'] else None
+    problems = record_hash_problems([(r, p) for p, r in records.values()], config, table)
+    if problems:
+        raise ValueError('; '.join(problems))
     violations = check_tuning_records([record for _, record in records.values()], config)
     if violations:
         raise ValueError('tuning records fail I-4: ' + '; '.join(violations))

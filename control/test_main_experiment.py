@@ -46,13 +46,24 @@ def test_arena_json_is_untouched_by_the_main_experiment(spec, base, native):
     before = hashlib.sha256(path.read_bytes()).hexdigest()
     me.build_batches(spec, base, native)
     assert hashlib.sha256(path.read_bytes()).hexdigest() == before
-    assert config_sha256(load_config()) == spec['base_config']['config_sha256']
+    # 본 실험 기준은 arena_v2(= arena.json + 모멘트 보정 절, 보고서 23절). arena.json 자체는 그대로다.
+    assert spec['base_config']['path'] == 'configs/arena_v2.json'
+    assert config_sha256(load_config(ROOT/'configs'/'arena_v2.json')) == spec['base_config']['config_sha256']
+    assert config_sha256(load_config()) == '1376310bd08e4466da61d87b57af9b13274c198cfdfc2e7c3077ceb19bad8903'
+
+
+def test_guard_checks_the_moment_model_file(spec):
+    bad = deepcopy(spec)
+    bad['moment_model']['sha256'] = '0'*64
+    assert any(p.startswith('moment_model:') for p in me.guard_problems(bad))
+    assert not any(p.startswith('moment_model:') for p in me.guard_problems(spec))
 
 
 def test_guard_refuses_while_tuning_hashes_are_empty(spec):
     problems = me.guard_problems(spec)
+    assert any(p.startswith('carryover: sha256 is empty') for p in problems)
     assert any('run_dir is empty' in p for p in problems)
-    assert sum('sha256 is empty' in p for p in problems) == len(spec['controllers'])
+    assert sum('tuning record sha256 is empty' in p for p in problems) == len(spec['controllers'])
 
 
 def test_guard_refuses_a_wrong_base_hash(spec):
@@ -70,7 +81,13 @@ def test_guard_passes_matching_record_hashes_and_catches_a_changed_file(spec, tm
         (run_dir/f'{label}.record.json').write_text(json.dumps({'controller': label}), encoding='utf-8')
         good['tuned']['records'][label]['sha256'] = hashlib.sha256(
             (run_dir/f'{label}.record.json').read_bytes()).hexdigest()
+    table = tmp_path/'carry.json'
+    table.write_text('{"schema": "tuning_carryover/1"}', encoding='utf-8')
+    good['carryover'] = dict(path=str(table), sha256=hashlib.sha256(table.read_bytes()).hexdigest())
     assert me.guard_problems(good) == []
+    table.write_text('{"schema": "tuning_carryover/1", "edited": 1}', encoding='utf-8')
+    assert any(p.startswith('carryover:') for p in me.guard_problems(good))
+    table.write_text('{"schema": "tuning_carryover/1"}', encoding='utf-8')
     (run_dir/'V13.record.json').write_text('{"controller": "V13", "edited": true}', encoding='utf-8')
     assert any(p.startswith('V13: record sha256') for p in me.guard_problems(good))
 

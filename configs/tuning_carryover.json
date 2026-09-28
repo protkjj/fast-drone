@@ -1,0 +1,36 @@
+{
+ "schema": "tuning_carryover/1",
+ "entries": {
+  "CPID": {
+   "record": "results/arena/tuning/retune_v3/CPID.record.json",
+   "record_sha256": "bdb6085c5f31eff86ba4873939d2b938604548c929aebba276e9ca141795f691",
+   "record_git_revision": "8911ee17dcaa029189d5a6c7b8d64167624d7bd8",
+   "proved_utc": "2026-09-28T10:24:26.075424+00:00",
+   "proofs": {
+    "evaluation_0": {
+     "index": 0,
+     "objective": 333.6569611859732,
+     "passed": true,
+     "bit_identical": true,
+     "differing_fields": [],
+     "model_sha256_equal": true,
+     "wall_s": 60.7
+    },
+    "best": {
+     "index": 115,
+     "objective": 333.5874753775251,
+     "passed": true,
+     "bit_identical": true,
+     "differing_fields": [],
+     "model_sha256_equal": true,
+     "wall_s": 70.5
+    }
+   }
+  }
+ },
+ "base_config": "configs/arena.json",
+ "base_config_sha256": "1376310bd08e4466da61d87b57af9b13274c198cfdfc2e7c3077ceb19bad8903",
+ "target_config": "configs/arena_v2.json",
+ "target_config_sha256": "9729aec6ff8b54499c96d38c850fedf305970caad5bb2256e948dfa667ea32ca",
+ "moment_model_sha256": "a8f49d3f546ac6d0ba03127ddcb5d4524763718e1966dda8bbb74632e6b02ae6"
+}

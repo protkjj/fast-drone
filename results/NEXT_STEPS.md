@@ -25,6 +25,13 @@
   - 단 d 뒤에는 기본값에서 결과가 그대로인지 `arena_tune_repro`로 확인한다.
 - **학교 튜닝이 도는 동안 `configs/arena.json`을 바꾸지 않는다.** 설정 해시가 바뀌면 재개 가드와 I-4가 깨진다. 본 실험 설정은 별도 파일(e)로 만든다.
 
+## ⚠️ 2026-09-28 밤: 제어기 모델 모멘트 보정 — 튜닝 계획이 바뀌었다(보고서 23절)
+- 제어기 집중정수 모델의 트림 밖 피치·요 모멘트가 플랜트와 크게 달랐고(85 m/s ±20°에서 181 rad/s², 40 m/s 부호 반대), M17·F13·GSLQR만 이 모델을 써서 V13 쪽으로 기울어져 있었다 → 보정항 추가(`configs/arena_v2.json`).
+- **학교 F13·M17 `tune-final-3`은 옛 모델(arena.json)이라 본 실험에 쓸 수 없다.** 진행 상황은 kj가 학교에서 A.7로 확인해 보고, **중단은 kj가 확인한 뒤에** 한다(맥에서는 볼 수 없음).
+- 재튜닝: **M17·F13·GSLQR → `tune-final-4`, 설정 `configs/arena_v2.json`**(태그는 검증·커밋 뒤, kj 확인 후 단다).
+- 승계: CPID 완료(`configs/tuning_carryover.json`). **V13은 retune_v3이 끝나면** `python3 -m control.tuning_carryover --controller V13 --run-dir results/arena/tuning/retune_v3`.
+- 맥 V13 retune_v3(arena.json)은 그대로 둔다 — V13은 보정 대상이 아니라 승계로 쓴다.
+
 ## 우선순위 목록
 
 ### a. 튜닝 평가 안의 시나리오 병렬화 `--scenario-workers N` — [x] 구현·시험 완료 (V13 속도 실측은 b에서)
@@ -99,14 +106,19 @@
 
 ### 팀원 확인 항목
 - [x] **공력 모델의 받음각 유효 범위**(공력 담당, 2026-09-28 답): 큰 받음각에서도 신뢰할 수 있다 → 21.2절 근거 정정, 가용 가속도 계산·설정은 그대로.
-- [ ] **kj 판단**: 제어기 모델 대 플랜트 트림 밖 각가속도 불일치(22절)가 제어기마다 다르게 작용하는지. M17·F13(NMPC 예측)·GSLQR(선형화)은 이 모델 모멘트를 쓰고, V13(가상입력 ν + INDI 측정)·CPID는 안 쓴다.
+- [x] **kj 판단**(2026-09-28 밤): 기울어진 경로가 맞다 → 보정항으로 고침(23절, arena_v2). M17·F13·GSLQR 재튜닝, V13·CPID 승계.
 
 ### 분석 단계에서 할 것
 - 임무 ρ(t) 분리 보고(`control/arena_mission_rho.py`)에 '역유입 제약이 지배하는 구간(1~33 m/s 감속)'을 따로 표시한다. 임무 프로필은 바꾸지 않는다.
 - 포화 경계 사례(공력 2배 0.969, 추력 0.7배 0.946, 공력 1.5배·CG y 0.941 — V_H)를 해석할 때 함께 인용한다.
 
+### f0. tune-final-4 준비(M17·F13·GSLQR, arena_v2) — [ ]
+- DISTRIBUTED_RUN.md A절을 tune-final-4·`--config configs/arena_v2.json`·새 run-dir 기준으로 고친다(설정 해시 `arena_v2`).
+- env_check 기준 기록은 arena.json(V13) 그대로 쓸 수 있다(V13은 보정 대상 아님). 단 튜닝 명령은 반드시 `--config configs/arena_v2.json`.
+- GSLQR도 재튜닝 대상이다(retune_v3 GSLQR 기록은 arena_v2에서 거부되는 것이 정상).
+
 ### f. V13·F13·M17 재튜닝이 끝난 뒤 — [ ]
-- `configs/main_experiment.json`의 `tuned.run_dir`과 제어기별 `sha256`을 채운다(합친 run_dir 기준). 채운 뒤 `--plan`의 가드가 '통과'인지 확인한다.
+- `configs/main_experiment.json`의 `tuned.run_dir`과 제어기별 `sha256`, `carryover.sha256`(V13 승계 뒤)을 채운다. V13·CPID는 retune_v3 기록, M17·F13·GSLQR은 tune-final-4 기록. 채운 뒤 `--plan`의 가드가 '통과'인지 확인한다.
 - `arena_tune --summarize`: I-4 확인, 적분기 1%
 - 설계점검: `arena_design_check --tuned …`
 - 튜닝값 스모크

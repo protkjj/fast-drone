@@ -57,6 +57,37 @@ def _quat_derivative(q, omega):
 # 공력
 # ════════════════════════════════════════════════════
 
+def _moment_correction(u_b, v_b, w_b, V, qsd, mc):
+    """ΔM = q̄·S·d·[0, 피치 다항식(Δα, β²), 요 다항식(β)] — 계수·기준표는 configs/controller_moment_model.json.
+
+    Δα = α − α_ref(V), α_ref는 제어기 모델 명목 트림 α의 1 m/s 격자 선형 보간(속도는 격자 범위로 자름).
+    각도는 ±angle_clip_deg로 자른다 — 적합 창(±20°) 밖 다항식 폭주와 역유입(u_b<0) atan2 뒤집힘 방지."""
+    clip = np.radians(float(mc['angle_clip_deg']))
+    Vhat = V / float(mc['V_scale'])
+    V_grid = [float(v) for v in mc['alpha_ref']['V']]
+    a_grid = [float(a) for a in mc['alpha_ref']['alpha']]
+    # 보간 위치는 EPS 없는 속력으로 — V(=√(V²+EPS))로 보간하면 격자점 트림에서도 α_ref가 ~1e-11 rad
+    # 어긋나 보정항이 0이 아니었다(2e-12 N·m). V̂(q̄ 쪽)는 기존 V를 그대로 쓴다.
+    V_exact = ca.sqrt(u_b**2 + v_b**2 + w_b**2)
+    Vc = ca.fmin(ca.fmax(V_exact, V_grid[0]), V_grid[-1])
+    alpha_ref = ca.interpolant('alpha_ref', 'linear', [V_grid], a_grid)(Vc)
+    d_alpha = ca.fmin(ca.fmax(ca.atan2(w_b, u_b) - alpha_ref, -clip), clip)
+    beta = ca.fmin(ca.fmax(ca.atan2(v_b, u_b), -clip), clip)
+
+    def poly(block):
+        # 항마다 V̂^0..V̂^V_degree 순서(control/moment_correction.py::basis와 같음)
+        coeffs = [float(c) for c in block['coeffs']]
+        total, k = 0.0, 0
+        for name, power in block['terms']:
+            ang = d_alpha if name == 'alpha' else beta
+            for i in range(int(mc['V_degree']) + 1):
+                total = total + coeffs[k] * Vhat**i * ang**int(power)
+                k += 1
+        return total
+
+    return ca.vertcat(0.0, qsd * poly(mc['pitch']), qsd * poly(mc['yaw']))
+
+
 def _body_aerodynamics(v_body, omega, p):
     """
     축대칭 동체 공력 (z-down 동체).
@@ -99,6 +130,10 @@ def _body_aerodynamics(v_body, omega, p):
     else:
         xcp = p['x_cp']
     M_static = ca.vertcat(0.0, -xcp * Fz, xcp * Fy)
+    if 'moment_correction' in p:
+        # 트림 밖 피치·요 모멘트 보정(control/moment_correction.py, kj 결정 2026-09-28 밤). 키가 없으면
+        # 이 줄들을 안 지나 기존과 비트 동일하다. Δα = β = 0(명목 트림)에서 정의상 0.
+        M_static = M_static + _moment_correction(u_b, v_b, w_b, V, q_bar * S * d, p['moment_correction'])
 
     # 감쇠 모멘트: 0.25·ρ·V·S·d²·C_damp·ω
     df = 0.25 * rho * V * S * d**2

@@ -847,6 +847,63 @@ def test_i10_constant_pressure_centre_would_fail_the_trim_gate(factory, native):
     assert np.abs(d[10:13]).max() > 5*I10_ANG_TRIM
 
 
+# I-10 확장(kj 결정 2026-09-28 밤): 트림 밖 ±20°에서 제어기 모델(보정 모델, configs/arena_v2.json)의
+# 피치·요 각가속도가 플랜트와 부호가 같고 상대오차가 기준 안인지. 기준은 측정 뒤 여유를 둬서 정했다:
+# 측정 최대 상대오차(분모 하한 5 rad/s²) 피치 흔들기 0.726·요 흔들기 0.522 → 기준 1.0. 부호는 플랜트
+# |ω̇| > 1 rad/s²인 곳만 본다(0 근처는 부호가 뜻이 없다). ±30°는 정보용(results/arena/model_mismatch_v2).
+# 기존 관문(병진·트림 각가속도·트림 일치)은 그대로 둔다.
+I10_OFFTRIM_DEG = (-20, -15, -10, -5, 5, 10, 15, 20)
+I10_OFFTRIM_SPEEDS = [float(v) for v in range(5, 86, 5)]
+I10_SIGN_FLOOR = 1.0
+I10_REL_FLOOR = 5.0
+I10_REL_MAX = 1.0
+
+
+@pytest.fixture(scope='module')
+def factory_v2(native, factory):
+    from control.arena import ROOT
+    return ArenaFactory(load_config(ROOT/'configs'/'arena_v2.json'), native, model=factory.model)
+
+
+def _offtrim_violations(fac, native, axis, speed):
+    bad = []
+    x0 = plant_trim(native, speed)['state'].copy()
+    x0[2] = 20.0
+    for deg in I10_OFFTRIM_DEG:
+        x = x0.copy()
+        x[6:10] = (Rotation.from_quat(x0[6:10])*Rotation.from_euler(axis, deg, degrees=True)).as_quat()
+        plant, models = _model_accelerations_fresh(fac, x)
+        for name in ('M17/GSLQR', 'F13'):
+            w = models[name][1]
+            for k, comp in ((1, 'pitch'), (2, 'yaw')):
+                p_, m_ = plant[10+k], w[k]
+                if abs(p_) > I10_SIGN_FLOOR and np.sign(p_) != np.sign(m_):
+                    bad.append(f'{name} {comp} @ {speed} m/s {axis}{deg:+d}°: sign plant {p_:.2f} model {m_:.2f}')
+                rel = abs(m_ - p_)/max(abs(p_), I10_REL_FLOOR)
+                if rel > I10_REL_MAX:
+                    bad.append(f'{name} {comp} @ {speed} m/s {axis}{deg:+d}°: rel {rel:.2f}')
+    return bad
+
+
+def _model_accelerations_fresh(fac, x):
+    from control.arena_model_mismatch import model_accelerations
+    cache = fac.__dict__.setdefault('_i10_offtrim_cache', {})
+    return model_accelerations(fac, x, cache=cache)
+
+
+@pytest.mark.parametrize('axis', ['y', 'z'])
+@pytest.mark.parametrize('speed', I10_OFFTRIM_SPEEDS)
+def test_i10_offtrim_angular_acceleration_matches_plant(factory_v2, native, axis, speed):
+    bad = _offtrim_violations(factory_v2, native, axis, speed)
+    assert not bad, bad
+
+
+def test_i10_offtrim_gate_rejects_the_uncorrected_model(factory, native):
+    """판별력: 보정 전 모델(arena.json)은 같은 관문에서 떨어진다(측정: 피치 부호 불일치 5건 이상)."""
+    bad = [v for s in I10_OFFTRIM_SPEEDS for axis in 'yz' for v in _offtrim_violations(factory, native, axis, s)]
+    assert sum('sign' in b for b in bad) >= 5 and len(bad) >= 20
+
+
 # ── I-11 ────────────────────────────────────────────────────────────
 # 적분기 기준(kj 결정 2026-09-26). 근거 실측(설계점검, PILOT):
 #   - CPID 속도 적분을 상태 크기 5 m로 자르면 Ki 0.15에서 0.75 m/s²뿐이라 10·20 m/s

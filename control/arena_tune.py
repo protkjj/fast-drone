@@ -440,9 +440,13 @@ def main(argv=None):
     args = parser.parse_args(argv)
     config = load_config(args.config)
     if args.summarize:
-        records = [json.loads(p.read_text(encoding='utf-8'))
-                   for p in sorted(args.run_dir.glob('*.record.json'))]
+        paths = sorted(args.run_dir.glob('*.record.json'))
+        records = [json.loads(p.read_text(encoding='utf-8')) for p in paths]
         violations = check_tuning_records(records, config)
+        # 설정 해시 규칙(2026-09-28 밤): 승계 표(모멘트 보정 설정일 때만)에 있는 기록만 옛 해시를 허용한다.
+        from control.tuning_carryover import load_table, record_hash_problems
+        table = load_table() if 'moment_correction' in config['controller_model'] else None
+        violations += record_hash_problems(list(zip(records, paths)), config, table)
         threshold, flags = integrator_limit_flags(_evaluation_entries(args.run_dir), config)
         summary = dict(label=LABEL, run_dir=str(args.run_dir), i4_violations=violations,
                        integrator_limit=dict(threshold=threshold, flagged=len(flags), flags=flags),

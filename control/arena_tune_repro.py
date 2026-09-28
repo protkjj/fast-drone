@@ -80,18 +80,53 @@ def tolerance_problems(scores, reference, objective, reference_objective, config
     return problems
 
 
-def reproduce(config, label, run_dir, index, scenario_workers, rtol=1e-3):
+def best_index(run_dir, label):
+    """최종 최선 평가의 번호. 최선이 캐시 적중(시나리오 없음)이면 같은 지수를 처음 실제로 계산한 평가."""
+    lines = [json.loads(l) for l in (Path(run_dir)/f'{label}.jsonl').read_text(encoding='utf-8').splitlines() if l]
+    best = min(lines, key=lambda e: (e['objective'], e['index']))
+    if best.get('scenarios'):
+        return best['index']
+    for e in lines:
+        if e.get('scenarios') and e['exponents'] == best['exponents']:
+            return e['index']
+    raise ValueError(f'{label}: no computed evaluation with the best exponents')
+
+
+def carryover_allowed(config, label):
+    """승계 검증 모드: 이 설정이 기준 설정(arena.json)과 controller_model.moment_correction 절만 다르고
+    label이 보정 대상이 아니면 기준 설정 해시를 돌려준다(그 해시의 기록을 이 설정에서 다시 계산해도 된다)."""
+    from copy import deepcopy
+    from control.arena import DEFAULT_CONFIG
+    spec = config['controller_model'].get('moment_correction')
+    if spec is None or label in spec['applies_to']:
+        return None
+    base = load_config(DEFAULT_CONFIG)
+    stripped = deepcopy(config)
+    del stripped['controller_model']['moment_correction']
+    return config_sha256(base) if stripped == base else None
+
+
+def reproduce(config, label, run_dir, index, scenario_workers, rtol=1e-3, carryover=False):
     from control.validation_suite import json_safe
     from models.team_light.control.baseline_v2 import baseline_params
     run_dir = Path(run_dir)
     record = json.loads((run_dir/f'{label}.record.json').read_text(encoding='utf-8'))
+    if index == 'best':
+        index = best_index(run_dir, label)
     lines = (run_dir/f'{label}.jsonl').read_text(encoding='utf-8').splitlines()
     ref = json.loads(lines[index])
     if ref['index'] != index:
         raise ValueError(f'line {index} holds evaluation {ref["index"]}')
     if not ref.get('scenarios'):
         raise ValueError(f'evaluation {index} is a cache hit — nothing to compare; pick another index')
-    if record['config_sha256'] != config_sha256(config):
+    allowed = {config_sha256(config)}
+    if carryover:
+        base_sha = carryover_allowed(config, label)
+        if base_sha is None:
+            raise ValueError(f'{label}: carry-over check needs a config that differs from arena.json only in '
+                             'controller_model.moment_correction, and a controller it does not apply to')
+        allowed.add(base_sha)
+    if record['config_sha256'] not in allowed:
         raise ValueError('config sha256 differs from the record — this check needs the same config')
 
     native = baseline_params()
@@ -117,6 +152,7 @@ def reproduce(config, label, run_dir, index, scenario_workers, rtol=1e-3):
         diffs.append(('<order>', 'scenario ids differ'))
     problems = tolerance_problems(scores, ref['scenarios'], objective, ref['objective'], config, rtol)
     return dict(controller=label, index=index, scenario_workers=scenario_workers, rtol=rtol,
+                config_sha256=config_sha256(config), record_config_sha256=record['config_sha256'],
                 passed=not problems, tolerance_problems=problems,
                 bit_identical=objective == ref['objective'] and not diffs,
                 record_git_revision=record.get('git_revision'),
@@ -133,12 +169,15 @@ def main(argv=None):
     parser.add_argument('--config', type=Path, default=DEFAULT_CONFIG)
     parser.add_argument('--controller', required=True, choices=ARENA_LABELS)
     parser.add_argument('--run-dir', type=Path, required=True)
-    parser.add_argument('--index', type=int, default=0)
+    parser.add_argument('--index', default='0', help="평가 번호 또는 'best'(최종 최선 평가)")
+    parser.add_argument('--carryover', action='store_true',
+                        help='승계 검증: arena.json으로 튜닝한 기록을 arena_v2(모멘트 절만 다름)에서 다시 계산')
     parser.add_argument('--scenario-workers', type=int, default=1)
     parser.add_argument('--rtol', type=float, default=1e-3)
     args = parser.parse_args(argv)
-    result = reproduce(load_config(args.config), args.controller, args.run_dir, args.index,
-                       args.scenario_workers, rtol=args.rtol)
+    index = args.index if args.index == 'best' else int(args.index)
+    result = reproduce(load_config(args.config), args.controller, args.run_dir, index,
+                       args.scenario_workers, rtol=args.rtol, carryover=args.carryover)
     print(json.dumps(result, indent=2, ensure_ascii=False))
     if result['passed']:
         print(f"PASS (rtol {args.rtol:g} + identical verdicts); bit-identical: {result['bit_identical']}")

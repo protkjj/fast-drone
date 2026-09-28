@@ -2,9 +2,10 @@
 
 kj 지시(2026-09-28): 공력 담당 확인 결과 플랜트 공력 모델은 큰 받음각에서도 신뢰할 수 있다. 그런데
 제어기 내부 공력 모델(집중정수)은 ±20° 창에서 적합했다(`control/kh_adapter.py::fit_lumped_aero`).
-그래서 큰 받음각에서는 플랜트와 제어기 모델이 크게 달라질 수 있다. 다섯 제어기가 같은 모델 계열을
-쓰므로 공정성 문제는 아니지만, 불일치를 ±30°까지 수치로 기록한다. **관문 기준은 바꾸지 않는다**
-(I-10 관문은 `control/test_arena_fairness.py` 그대로 — 병진 ≤ 0.05 g, 트림 각가속도 ≤ 2 rad/s²).
+그래서 큰 받음각에서는 플랜트와 제어기 모델이 크게 달라질 수 있다. 불일치를 ±30°까지 수치로 기록한다.
+측정 결과(보고서 22절) 이 모멘트 모델은 M17·F13·GSLQR만 직접 쓰고 V13(INDI 측정)·CPID는 안 써서
+기울어진 경로였다 → 보정항을 넣었다(control/moment_correction.py, configs/arena_v2.json, 보고서 23절).
+±20° 관문은 control/test_arena_fairness.py의 I-10 확장 시험, ±30°는 이 도구의 정보용 기록.
 
 측정: 속도마다 플랜트 트림 상태에서 자세만 동체 y축(받음각 방향)·z축(옆미끄럼 방향)으로 돌리고,
 로터 입력은 트림값 그대로 둔다. 같은 상태·입력에서 각 모델의 가속도를 플랜트와 비교한다.
@@ -40,17 +41,20 @@ def model_accelerations(factory, x, cache=None):
     if cache is None:
         cache = factory.__dict__.setdefault('_i10_cache', {})
     if not cache:
-        cache['ours'] = AxialDronePlant(factory.cp)
+        # 제어기마다 실제로 예측·선형화에 쓰는 모델(arena_v2의 모멘트 보정은 M17·F13·GSLQR만).
+        # 보정이 없는 설정이면 cp_for가 같은 명목 cp를 돌려줘 기존 I-10과 같다.
+        cp_for = getattr(factory, '_cp_for', lambda label: factory.cp)
+        cache['ours'] = AxialDronePlant(cp_for('M17'))
         cache['plant'] = TeamPlant(factory.p)
         cache['v13'] = build_virtual_dynamics(factory.cp)[0]
-        cache['f13'] = build_f13_dynamics(factory.cp, torque_ratio=ca.SX.sym('g', 4))[0]
+        cache['f13'] = build_f13_dynamics(cp_for('F13'), torque_ratio=ca.SX.sym('g', 4))[0]
     u = x[13:17]
     plant = cache['plant'].evaluate_xdot(x, u)
     ours = cache['ours'].evaluate_xdot(x, u)
     v_body = Rotation.from_quat(x[6:10]).as_matrix().T @ x[3:6]
     T = rotor_thrusts(factory.p, u, v_body)
     x13 = np.concatenate([x[0:10], x[10:13]])
-    gamma = reaction_torque_ratio(factory.cp, u, axial_airspeed(factory.cp, x))
+    gamma = reaction_torque_ratio(factory.cp, u, axial_airspeed(factory.cp, x))   # 추진 모델 — 보정과 무관
     f13 = np.array(cache['f13'](x13, T, gamma)).ravel()
     v13 = np.array(cache['v13'](x13, np.r_[T.sum(), plant[10:13]])).ravel()
     return plant, {'M17/GSLQR': (ours[3:6], ours[10:13]), 'F13': (f13[3:6], f13[10:13]),
@@ -78,13 +82,14 @@ def measure(factory, native, speeds=SPEEDS, angles=ANGLES_DEG):
     return rows
 
 
-def write(rows, out):
+def write(rows, out, config_name='configs/arena.json'):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     (out/'model_mismatch.json').write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding='utf-8')
     lines = ['# I-10 확장 측정(정보용): 제어기 모델 대 플랜트, 트림 자세 ±30°', '',
              '관문이 아니다(I-10 관문: 병진 ≤ 0.49 m/s², 트림 각가속도 ≤ 2 rad/s²). 로터 입력은 트림값.',
-             '제어기 내부 공력은 ±20° 창에서 적합했다(kh_adapter.fit_lumped_aero).', '']
+             '제어기 내부 공력은 ±20° 창에서 적합했다(kh_adapter.fit_lumped_aero).',
+             f'설정: {config_name}', '']
     for axis, title in AXES.items():
         lines += [f'## 동체 {axis}축 회전 — {title}', '',
                   '| V (m/s) | 각도 (°) | 받음각 (°) | M17/GSLQR Δa | M17/GSLQR Δω̇ | F13 Δa | F13 Δω̇ | V13 Δa |',
@@ -106,12 +111,13 @@ def main(argv=None):
     from control.arena_factory import ArenaFactory
     from control.validation_suite import baseline_params
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--config', type=Path, default=ROOT/'configs'/'arena.json')
     parser.add_argument('--out', type=Path, default=ROOT/'results'/'arena'/'model_mismatch')
     args = parser.parse_args(argv)
     native = baseline_params()
-    factory = ArenaFactory(load_config(), native)
+    factory = ArenaFactory(load_config(args.config), native)
     rows = measure(factory, native)
-    write(rows, args.out)
+    write(rows, args.out, str(args.config.relative_to(ROOT)) if args.config.is_absolute() else str(args.config))
     print(f'wrote {len(rows)} rows to {args.out}')
 
 

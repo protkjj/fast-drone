@@ -69,6 +69,17 @@ def guard_problems(spec, root=ROOT):
     actual = config_sha256(base)
     if actual != spec['base_config']['config_sha256']:
         problems.append(f"base config hash {actual[:12]} != recorded {spec['base_config']['config_sha256'][:12]}")
+    for key in ('moment_model', 'carryover'):
+        entry = spec.get(key)
+        if entry is None:
+            continue
+        path = root/entry['path']
+        if not entry.get('sha256'):
+            problems.append(f'{key}: sha256 is empty ({entry["path"]} not finalized)')
+        elif not path.exists():
+            problems.append(f'{key}: {path} missing')
+        elif _sha256_file(path) != entry['sha256']:
+            problems.append(f'{key}: {entry["path"]} sha256 {_sha256_file(path)[:12]} != recorded {entry["sha256"][:12]}')
     tuned = spec['tuned']
     if not tuned.get('run_dir'):
         problems.append('tuned.run_dir is empty (tuning not finalized)')

@@ -2,35 +2,35 @@
   "schema": "main_experiment/1",
   "purpose": "본 실험 캠페인 정의(kj 결정 2026-09-28, 보고서 21절). 경기장 설정(configs/arena.json)은 바꾸지 않고, 그 위에 묶음별 시나리오를 얹는다. control/main_experiment.py가 읽고, 해시가 맞지 않으면 실행을 거부한다.",
   "base_config": {
-    "path": "configs/arena.json",
-    "config_sha256": "1376310bd08e4466da61d87b57af9b13274c198cfdfc2e7c3077ceb19bad8903",
-    "note": "정규화 JSON 해시(control.arena.config_sha256). 원시 파일 sha와 다르다."
+    "path": "configs/arena_v2.json",
+    "config_sha256": "9729aec6ff8b54499c96d38c850fedf305970caad5bb2256e948dfa667ea32ca",
+    "note": "정규화 JSON 해시(control.arena.config_sha256). arena_v2 = arena.json + 제어기 모델 모멘트 보정 절(보고서 23절). 모멘트 모델 파일 sha는 이 설정 안에도 적혀 있다."
   },
   "tuned": {
     "run_dir": "",
     "records": {
       "V13": {
         "sha256": "",
-        "tag": "tune-final"
+        "tag": "tune-final (승계)"
       },
       "GSLQR": {
         "sha256": "",
-        "tag": "tune-final"
+        "tag": "tune-final-4"
       },
       "CPID": {
         "sha256": "",
-        "tag": "tune-final"
+        "tag": "tune-final (승계)"
       },
       "F13": {
         "sha256": "",
-        "tag": "tune-final-3"
+        "tag": "tune-final-4"
       },
       "M17": {
         "sha256": "",
-        "tag": "tune-final-3"
+        "tag": "tune-final-4"
       }
     },
-    "note": "재튜닝(f)이 끝나고 A.10으로 합친 run_dir과 각 <제어기>.record.json의 sha256을 채운다. 비어 있거나 다르면 실행 거부."
+    "note": "M17·F13·GSLQR은 arena_v2(모멘트 보정)로 tune-final-4 재튜닝, V13·CPID는 arena.json 기록 승계(승계 표). 합친 run_dir과 각 <제어기>.record.json의 sha256을 채운다. 비어 있거나 다르면 실행 거부."
   },
   "controllers": [
     "V13",
@@ -359,5 +359,14 @@
     "F13": 4.8,
     "M17": 10.0,
     "note": "맥 실측(V13·GSLQR·CPID: retune_v3 평가 0 재현, 시뮬레이션 132.7 s, V13 튜닝과 동시 실행). F13·M17은 NMPC 솔브 시간 비율(130 ms, 210~320 ms 대 V13 95 ms)로 추정. Windows 속도는 미측정 — --plan에 --speed-ratio(학교/맥)를 주어 보정한다."
+  },
+  "moment_model": {
+    "path": "configs/controller_moment_model.json",
+    "sha256": "a8f49d3f546ac6d0ba03127ddcb5d4524763718e1966dda8bbb74632e6b02ae6"
+  },
+  "carryover": {
+    "path": "configs/tuning_carryover.json",
+    "sha256": "",
+    "note": "V13·CPID는 arena.json으로 튜닝한 기록을 승계한다(평가 0과 최종 최선 평가를 arena_v2에서 비트 동일로 재계산해 증명). 표가 확정되면 sha256을 채운다. 비어 있거나 다르면 실행 거부."
   }
 }

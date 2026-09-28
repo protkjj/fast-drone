@@ -348,6 +348,28 @@ def cpid_heading_for_plant(cp, hover_quat=None):
 # 팩토리
 # ══════════════════════════════════════════════════════════════════
 
+MOMENT_CORRECTION_TARGETS = ('M17', 'F13', 'GSLQR')
+
+
+def moment_corrected_params(config, cp):
+    """설정의 controller_model.moment_correction → (예측용 cp, 적용 대상). 없으면 (cp, ()).
+    파일 sha256이 설정에 적힌 값과 다르면 거부한다 — 설정 해시가 모멘트 모델까지 묶게."""
+    spec = config['controller_model'].get('moment_correction')
+    if spec is None:
+        return cp, ()
+    from control.arena import ROOT
+    from control.moment_correction import load, model_sha256
+    path = ROOT/spec['file']
+    if model_sha256(path) != spec['sha256']:
+        raise ValueError(f'{path}: sha256 differs from controller_model.moment_correction.sha256')
+    targets = tuple(spec['applies_to'])
+    if set(targets) - set(MOMENT_CORRECTION_TARGETS):
+        raise ValueError(f'moment correction can only apply to {MOMENT_CORRECTION_TARGETS}, got {targets}')
+    cp_pred = deepcopy(cp)                 # 명목 cp와 중첩 배열을 공유하지 않게
+    cp_pred['moment_correction'] = load(path)
+    return cp_pred, targets
+
+
 def _load_gains(path):
     data = json.loads((ROOT/path).read_text(encoding='utf-8'))
     return data
@@ -375,6 +397,10 @@ class ArenaFactory:
         self.model = model if model is not None else ControllerModel(self.p)
         self.cp = self.model.cp
         self.controller_model_sha256 = self.model.sha256
+        # 예측·선형화용 모델(kj 결정 2026-09-28 밤, 보고서 23절): 설정에 모멘트 보정이 있으면
+        # M17 예측, F13 예측·내부 루프, GSLQR 선형화에만 준다. 명목 트림·a_avail·V13·CPID는 self.cp
+        # 그대로다. 보정이 없으면 같은 객체라 기존 경로와 비트 동일하다.
+        self.cp_pred, self.moment_correction_applies_to = moment_corrected_params(config, self.cp)
         self.dt = float(config['plant']['dt_s'])
         self.horizon = float(config['preview_horizon_s'])
         self.overrides = overrides or {}
@@ -385,6 +411,10 @@ class ArenaFactory:
                 self.gains[label] = {**self.gains[label], **extra}
         self.settings = {}
         self._gslqr_proto = None
+
+    def _cp_for(self, label):
+        """이 제어기가 예측·선형화에 쓰는 모델. 보정 적용 대상이 아니면 명목 self.cp."""
+        return self.cp_pred if label in self.moment_correction_applies_to else self.cp
 
     # ── 스위트 규약 ────────────────────────────────────────────
     def make(self, label, speed, z):
@@ -469,7 +499,7 @@ class ArenaFactory:
     def _build_f13(self, window, v0, z0):
         from control.nmpc_f13 import build_f13_controller
         spec = self.config['controllers']['F13']
-        inner = build_f13_controller(self.cp, v_ref=v0, z_ref=z0, dt=self.dt,
+        inner = build_f13_controller(self._cp_for('F13'), v_ref=v0, z_ref=z0, dt=self.dt,
                                      **self._nmpc_kwargs('F13', window))
         if inner.alloc_mode != spec['alloc_mode'] or inner.time_align != spec['time_align']:
             raise ValueError('F13 INDI settings differ from the arena config')
@@ -485,7 +515,7 @@ class ArenaFactory:
         # 양추력 하한(kj 결정 2026-09-26 오후)은 M17에만 준다. 세 NMPC 공통 dict(_nmpc_kwargs)에
         # 넣지 않는 이유: V13·F13은 NLP 입력이 추력이라 '추력 ≥ 0'이 이미 상자 제약이다. 이것은 같은
         # 제약을 회전수 좌표로 옮긴 것이지 M17에만 주는 새 이점이 아니다.
-        nmpc = NMPCController(self.cp, v_ref=v0, z_ref=z0, **self._nmpc_kwargs('M17', window),
+        nmpc = NMPCController(self._cp_for('M17'), v_ref=v0, z_ref=z0, **self._nmpc_kwargs('M17', window),
                               rotor_floor=self.config['controllers']['M17'].get('rotor_floor'))
         u_trim = self._trim_input('M17', v0)
         settings = self._nmpc_settings('M17', nmpc, rotor_floor=nmpc.rotor_floor)
@@ -501,7 +531,7 @@ class ArenaFactory:
             V_table = [float(v) for v in spec['V_table_m_s']]
             trims = [self.model.trim(v) for v in V_table]
             self._gslqr_proto = ScheduledLQR(
-                self.cp, v_ref=[0.0, 0.0, 0.0], z_ref=0.0, V_table=V_table,
+                self._cp_for('GSLQR'), v_ref=[0.0, 0.0, 0.0], z_ref=0.0, V_table=V_table,
                 Q=np.diag(np.asarray(g['Q_diag'], dtype=float)),
                 R=np.eye(4)*float(g['R_scale']),
                 integral_states=tuple(g['integral_states']),

@@ -22,6 +22,12 @@ RUN_DIR = 'results/arena/tuning/retune_v3'
 def _spec_file(tmp_path, labels=('GSLQR', 'CPID')):
     """가드를 통과하는 작은 spec — 완료된 retune_v3 GSLQR·CPID 기록을 쓴다(시험·맥 점검 전용)."""
     spec = me.load_spec()
+    # 분산 실행 기능만 본다 — 기준을 arena.json으로 두어 retune_v3(arena.json으로 튜닝) 기록이 그대로
+    # 통과하게 한다(arena_v2에서는 GSLQR이 재튜닝 대상이라 기록이 거부되는 것이 정상).
+    spec['base_config'] = dict(path='configs/arena.json',
+                               config_sha256='1376310bd08e4466da61d87b57af9b13274c198cfdfc2e7c3077ceb19bad8903')
+    spec.pop('moment_model', None)
+    spec.pop('carryover', None)
     spec['controllers'] = list(labels)
     spec['tuned']['run_dir'] = RUN_DIR
     spec['tuned']['records'] = {label: {'sha256': hashlib.sha256(
