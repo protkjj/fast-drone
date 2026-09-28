@@ -92,41 +92,94 @@ def parameter_space(config, label, factory_gains):
 # ══════════════════════════════════════════════════════════════════
 
 class Evaluator:
-    """튜닝 시나리오 전체를 돌려 목적함수 하나를 낸다(시간·난수 무관)."""
+    """튜닝 시나리오 전체를 돌려 목적함수 하나를 낸다(시간·난수 무관).
 
-    def __init__(self, config, native, model, label):
+    scenario_workers > 1이면 시나리오를 별도 프로세스에서 나눠 돌린다. 시나리오끼리 상태를
+    나누지 않으므로(NLP는 시행마다 새로 짓고, 트림 캐시는 호출 순서와 무관) 순차와 비트 동일해야
+    한다 — test_arena_tune_parallel.py가 확인한다. 결과 목록은 항상 시나리오 순서다.
+    """
+
+    def __init__(self, config, native, model, label, scenario_workers=1):
+        if int(scenario_workers) < 1:
+            raise ValueError(f'scenario_workers must be >= 1, got {scenario_workers}')
         self.config, self.native, self.model, self.label = config, native, model, label
         self.scenarios = build_scenarios(config, model.cp, native,
                                          scenarios=config['tuning']['scenarios'])
         self.limits = Acceptance(**config['acceptance'])
         self.paper = PaperCriteria(**config['paper_criteria'])
         self.penalty = float(config['tuning']['objective']['failure_penalty'])
+        self.scenario_workers = int(scenario_workers)
+        self._pool = None
 
     def __call__(self, overrides):
-        import control.validation_suite as suite
-        factory = ArenaFactory(self.config, self.native, overrides=overrides, model=self.model)
-        scores = []
-        for scenario in self.scenarios:
-            entry = dict(id=scenario.id)
-            try:
-                row, result, log = suite.run_trial(factory, self.label, scenario.profile,
-                                                   scenario.cases[0], self.limits)
-                paper = paper_evaluate(result, scenario.profile, self.paper, window=scenario.window,
-                                       solve_log=log, n_max=self.native['n_max'])
-                failed = bool(row['stop_reason']) or paper['paper_failed']
-                entry.update(stop_reason=row['stop_reason'], paper_reasons=paper['paper_reasons'],
-                             window_rmse_velocity=paper['window_rmse_velocity'],
-                             window_rmse_z=paper['window_rmse_z'], max_omega=row['max_omega'],
-                             trajectory_sha256=row['trajectory_sha256'],
-                             integrators=row.get('integrators'))
-            except (ValueError, RuntimeError, np.linalg.LinAlgError) as exc:
-                failed = True
-                entry.update(stop_reason=f'{type(exc).__name__}: {exc}')
-            value = (self.penalty if failed or entry.get('window_rmse_velocity') is None
-                     else entry['window_rmse_velocity'] + entry['window_rmse_z'])
-            entry.update(failed=failed, score=float(value))
-            scores.append(entry)
+        if self.scenario_workers == 1:
+            factory = ArenaFactory(self.config, self.native, overrides=overrides, model=self.model)
+            scores = [self.score(factory, scenario) for scenario in self.scenarios]
+        else:
+            tasks = [(overrides, i) for i in range(len(self.scenarios))]
+            scores = list(self._scenario_pool().map(_score_in_worker, tasks))
         return float(np.mean([e['score'] for e in scores])), scores
+
+    def score(self, factory, scenario):
+        """시나리오 하나를 돌려 채점 항목(dict)을 낸다."""
+        import control.validation_suite as suite
+        entry = dict(id=scenario.id)
+        try:
+            row, result, log = suite.run_trial(factory, self.label, scenario.profile,
+                                               scenario.cases[0], self.limits)
+            paper = paper_evaluate(result, scenario.profile, self.paper, window=scenario.window,
+                                   solve_log=log, n_max=self.native['n_max'])
+            failed = bool(row['stop_reason']) or paper['paper_failed']
+            entry.update(stop_reason=row['stop_reason'], paper_reasons=paper['paper_reasons'],
+                         window_rmse_velocity=paper['window_rmse_velocity'],
+                         window_rmse_z=paper['window_rmse_z'], max_omega=row['max_omega'],
+                         trajectory_sha256=row['trajectory_sha256'],
+                         integrators=row.get('integrators'))
+        except (ValueError, RuntimeError, np.linalg.LinAlgError) as exc:
+            failed = True
+            entry.update(stop_reason=f'{type(exc).__name__}: {exc}')
+        value = (self.penalty if failed or entry.get('window_rmse_velocity') is None
+                 else entry['window_rmse_velocity'] + entry['window_rmse_z'])
+        entry.update(failed=failed, score=float(value))
+        return entry
+
+    def _scenario_pool(self):
+        # spawn 고정: 리눅스 기본 fork는 부모의 CasADi·BLAS 상태를 복제한다. 맥(기본 spawn)과
+        # 학교 리눅스에서 같은 방식으로 돌게 한다.
+        if self._pool is None:
+            import multiprocessing
+            from concurrent.futures import ProcessPoolExecutor
+            self._pool = ProcessPoolExecutor(
+                max_workers=min(self.scenario_workers, len(self.scenarios)),
+                mp_context=multiprocessing.get_context('spawn'),
+                initializer=_init_scenario_worker,
+                initargs=(self.config, self.native, self.label, self.model.sha256))
+        return self._pool
+
+    def close(self):
+        if self._pool is not None:
+            self._pool.shutdown()
+            self._pool = None
+
+
+_WORKER = {}
+
+
+def _init_scenario_worker(config, native, label, model_sha256):
+    """작업자 프로세스마다 한 번: 제어기 모델을 다시 적합하고 부모와 같은지 확인한다."""
+    model = ControllerModel(native)
+    if model.sha256 != model_sha256:
+        raise RuntimeError(f'scenario worker built a different controller model '
+                           f'({model.sha256} vs parent {model_sha256})')
+    _WORKER['evaluator'] = Evaluator(config, native, model, label)
+
+
+def _score_in_worker(task):
+    overrides, index = task
+    evaluator = _WORKER['evaluator']
+    factory = ArenaFactory(evaluator.config, evaluator.native, overrides=overrides,
+                           model=evaluator.model)
+    return evaluator.score(factory, evaluator.scenarios[index])
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -206,15 +259,17 @@ def check_resume_compatible(config, label, run_dir):
                            + '. Start a new --run-dir.')
 
 
-def tune_controller(config, label, budget, run_dir, native=None, model=None):
-    """한 제어기를 예산만큼 튜닝. 같은 run_dir에 로그가 있으면 이어서 한다."""
+def tune_controller(config, label, budget, run_dir, native=None, model=None, scenario_workers=1):
+    """한 제어기를 예산만큼 튜닝. 같은 run_dir에 로그가 있으면 이어서 한다.
+
+    scenario_workers는 실행 방식일 뿐 결과를 바꾸지 않으므로 재개 검사에 넣지 않는다."""
     check_resume_compatible(config, label, run_dir)
     from models.team_light.control.baseline_v2 import baseline_params
     native = native if native is not None else baseline_params()
     model = model if model is not None else ControllerModel(native)
     gains = ArenaFactory(config, native, model=model).gains
     names, prior, apply = parameter_space(config, label, gains)
-    evaluator = Evaluator(config, native, model, label)
+    evaluator = Evaluator(config, native, model, label, scenario_workers=scenario_workers)
     run_dir.mkdir(parents=True, exist_ok=True)
     log_path, record_path = run_dir/f'{label}.jsonl', run_dir/f'{label}.record.json'
     logged = ([json.loads(line) for line in log_path.read_text(encoding='utf-8').splitlines() if line]
@@ -229,7 +284,8 @@ def tune_controller(config, label, budget, run_dir, native=None, model=None):
                   seeds=dict(tuning_range=config['seeds']['tuning'], main_range=config['seeds']['main'],
                              used=[]),
                   config_sha256=config_sha256(config),
-                  controller_model_sha256=model.sha256, status='running', **_environment())
+                  controller_model_sha256=model.sha256, scenario_workers=int(scenario_workers),
+                  status='running', **_environment())
 
     def values_of(e):
         return {name: prior[name]*2.0**exp for name, exp in zip(names, e)}
@@ -261,9 +317,12 @@ def tune_controller(config, label, budget, run_dir, native=None, model=None):
               f'{" (cache)" if hit else ""}', flush=True)
         return objective
 
-    best_e, best, info = compass_search(len(names), int(budget), evaluate,
-                                        initial_step=float(search['initial_step']),
-                                        min_step=float(search['min_step']))
+    try:
+        best_e, best, info = compass_search(len(names), int(budget), evaluate,
+                                            initial_step=float(search['initial_step']),
+                                            min_step=float(search['min_step']))
+    finally:
+        evaluator.close()
     prior_objective = cache[tuple([0.0]*len(names))]
     record.update(spent=info['spent'], restarts=info['restarts'], best_exponents=list(best_e),
                   best_values=values_of(best_e), best_objective=best,
@@ -324,6 +383,9 @@ def main(argv=None):
     parser.add_argument('--run-dir', type=Path, required=True)
     parser.add_argument('--summarize', action='store_true',
                         help='collect <label>.record.json files, check I-4, write summary.json')
+    parser.add_argument('--scenario-workers', type=int, default=1,
+                        help='processes per evaluation for the tuning scenarios (default 1 = sequential; '
+                             'results are bit-identical, only wall time and memory change)')
     args = parser.parse_args(argv)
     config = load_config(args.config)
     if args.summarize:
@@ -343,13 +405,16 @@ def main(argv=None):
         return 0 if not violations else 1
     if not args.controllers:
         parser.error('--controllers is required unless --summarize')
+    if args.scenario_workers < 1:
+        parser.error('--scenario-workers must be >= 1')
     budget = args.budget or int(config['tuning']['budget'])
     from models.team_light.control.baseline_v2 import baseline_params
     native = baseline_params()
     model = ControllerModel(native)
     for label in args.controllers:
         print(f'== {LABEL} tuning {label}: budget {budget} ==', flush=True)
-        tune_controller(config, label, budget, args.run_dir, native=native, model=model)
+        tune_controller(config, label, budget, args.run_dir, native=native, model=model,
+                        scenario_workers=args.scenario_workers)
     return 0
 
 
