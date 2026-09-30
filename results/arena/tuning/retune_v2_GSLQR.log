@@ -1,0 +1,232 @@
+== PILOT tuning GSLQR: budget 120 ==
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 1/120 objective=0.784725
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 2/120 objective=0.739365
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 3/120 objective=0.836848
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 4/120 objective=0.698591
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 5/120 objective=0.883846
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 6/120 objective=0.782847
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 7/120 objective=0.785706
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 8/120 objective=0.784491
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 9/120 objective=0.784858
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 10/120 objective=0.785373
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 11/120 objective=0.784418
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 12/120 objective=0.879044
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 13/120 objective=0.714337
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 14/120 objective=0.881464
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 15/120 objective=0.716446
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 16/120 objective=0.777559
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 17/120 objective=0.788491
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 18/120 objective=0.764472
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 19/120 objective=0.792449
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 20/120 objective=0.64857
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 21/120 objective=0.755155
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 22/120 objective=0.626892
+  [GSLQR] eval 23/120 objective=0.784725 (cache)
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 24/120 objective=0.696539
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 25/120 objective=0.69966
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 26/120 objective=0.698418
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 27/120 objective=0.698685
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 28/120 objective=0.699086
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 29/120 objective=0.698339
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 30/120 objective=0.781696
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 31/120 objective=0.635688
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 32/120 objective=0.786863
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 33/120 objective=0.634647
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 34/120 objective=0.685414
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 35/120 objective=0.706962
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 36/120 objective=0.688254
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 37/120 objective=0.700577
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 38/120 objective=0.572743
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 39/120 objective=0.687873
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 40/120 objective=0.567337
+  [GSLQR] eval 41/120 objective=0.698591 (cache)
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 42/120 objective=0.624726
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 43/120 objective=0.628035
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 44/120 objective=0.626752
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 45/120 objective=0.626967
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 46/120 objective=0.627312
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 47/120 objective=0.626701
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 48/120 objective=0.707185
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 49/120 objective=0.571307
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 50/120 objective=0.71435
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 51/120 objective=0.568547
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 52/120 objective=0.61235
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 53/120 objective=0.638887
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 54/120 objective=0.623343
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 55/120 objective=0.630953
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 56/120 objective=0.511828
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 57/120 objective=0.628766
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 58/120 objective=0.51305
+  [GSLQR] eval 59/120 objective=0.626892 (cache)
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 60/120 objective=0.56516
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 61/120 objective=0.568454
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 62/120 objective=0.567225
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 63/120 objective=0.567395
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 64/120 objective=0.567667
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 65/120 objective=0.567157
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 66/120 objective=0.646831
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 67/120 objective=0.516288
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 68/120 objective=0.649261
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 69/120 objective=0.512519
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 70/120 objective=0.552579
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 71/120 objective=0.579135
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 72/120 objective=0.566331
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 73/120 objective=0.568718
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 74/120 objective=0.465562
+  [GSLQR] eval 75/120 objective=0.567337 (cache)
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 76/120 objective=0.460489
+  [GSLQR] eval 77/120 objective=0.572743 (cache)
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 78/120 objective=0.510821
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 79/120 objective=0.512346
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 80/120 objective=0.511771
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 81/120 objective=0.511859
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 82/120 objective=0.51225
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 83/120 objective=0.511594
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 84/120 objective=0.583143
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 85/120 objective=0.467398
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 86/120 objective=0.585047
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 87/120 objective=0.463524
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 88/120 objective=0.503892
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 89/120 objective=0.517948
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 90/120 objective=0.509853
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 91/120 objective=0.514369
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 92/120 objective=0.416061
+  [GSLQR] eval 93/120 objective=0.51305 (cache)
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 94/120 objective=0.417109
+  [GSLQR] eval 95/120 objective=0.511828 (cache)
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 96/120 objective=0.459547
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 97/120 objective=0.460984
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 98/120 objective=0.460449
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 99/120 objective=0.460511
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 100/120 objective=0.460882
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 101/120 objective=0.460289
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 102/120 objective=0.524682
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 103/120 objective=0.421841
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 104/120 objective=0.527508
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 105/120 objective=0.417054
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 106/120 objective=0.453256
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 107/120 objective=0.465935
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 108/120 objective=0.460199
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 109/120 objective=0.46119
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 110/120 objective=0.380147
+  [GSLQR] eval 111/120 objective=0.460489 (cache)
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 112/120 objective=0.375974
+  [GSLQR] eval 113/120 objective=0.465562 (cache)
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 114/120 objective=0.415648
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 115/120 objective=0.416272
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 116/120 objective=0.416046
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 117/120 objective=0.41607
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 118/120 objective=0.416475
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 119/120 objective=0.41584
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  [GSLQR] eval 120/120 objective=0.470634

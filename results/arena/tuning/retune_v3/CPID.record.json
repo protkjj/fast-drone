@@ -1,0 +1,122 @@
+{
+  "label": "PILOT",
+  "controller": "CPID",
+  "budget": 120,
+  "spent": 120,
+  "parameter_names": [
+    "Kp_vel",
+    "Ki_vel",
+    "Kp_z",
+    "Kd_z",
+    "Ki_z",
+    "Kp_att",
+    "Kd_att"
+  ],
+  "prior": {
+    "Kp_vel": 1.0,
+    "Ki_vel": 0.15,
+    "Kp_z": 2.0,
+    "Kd_z": 2.0,
+    "Ki_z": 0.5,
+    "Kp_att": 1.0,
+    "Kd_att": 1.0
+  },
+  "scenario_ids": [
+    "tune2_gust_lateral_p7_V14",
+    "tune2_gust_lateral_m13_V26",
+    "tune2_gust_lateral_m7_V75",
+    "tune2_gust_lateral_p13_V82",
+    "tune2_gust_vertical_m3.5_V75",
+    "tune2_gust_vertical_p6.5_V82",
+    "tune2_gust_vertical_p3.5_V14",
+    "tune2_gust_vertical_m6.5_V26",
+    "tune2_ramp_accel_V17_70_rho0.8",
+    "tune2_ramp_brake_V80_25_rho1.2",
+    "tune3_step_altitude_p0.7_V0",
+    "tune3_step_altitude_p1.3_V0",
+    "tune3_step_altitude_p0.7_V14",
+    "tune3_step_altitude_p1.3_V14",
+    "tune3_step_speed_p0.7_V0",
+    "tune3_step_speed_p1.3_V0",
+    "tune3_step_speed_p0.7_V14",
+    "tune3_step_speed_p1.3_V14"
+  ],
+  "main_scenario_ids": [
+    "mission_VH",
+    "gust_lateral_p10_VH",
+    "gust_vertical_m5_VH",
+    "ref_accel_0_VH_rho1",
+    "ref_brake_VH_VL_rho1",
+    "mission_VH_mass1.3",
+    "mission_VH_tau2",
+    "gust_lateral_p10_VL",
+    "gust_vertical_m5_VL"
+  ],
+  "objective": {
+    "metric": "window_rmse_velocity + window_rmse_z",
+    "failure": "stop_reason or paper_failed",
+    "failure_penalty": 1000.0
+  },
+  "search": {
+    "method": "compass_log_multiplier",
+    "initial_step": 2.0,
+    "min_step": 1.05
+  },
+  "seeds": {
+    "tuning_range": [
+      2000,
+      2999
+    ],
+    "main_range": [
+      1000,
+      1999
+    ],
+    "used": []
+  },
+  "config_sha256": "1376310bd08e4466da61d87b57af9b13274c198cfdfc2e7c3077ceb19bad8903",
+  "controller_model_sha256": "2582197db2546d329b62bee631beef5f89459c2c4b11a2131ab024240177956d",
+  "status": "complete",
+  "environment": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "machine": "arm64",
+    "cpu": "Apple M4",
+    "python": "3.13.7",
+    "packages": {
+      "numpy": "2.3.3",
+      "scipy": "1.16.3",
+      "casadi": "3.7.2",
+      "matplotlib": "3.10.6"
+    },
+    "threads": {
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1"
+    }
+  },
+  "git_revision": "8911ee17dcaa029189d5a6c7b8d64167624d7bd8",
+  "git_dirty": false,
+  "restarts": 0,
+  "best_exponents": [
+    0.0,
+    4.0,
+    2.0,
+    2.0,
+    0.0,
+    1.0,
+    0.0
+  ],
+  "best_values": {
+    "Kp_vel": 1.0,
+    "Ki_vel": 2.4,
+    "Kp_z": 8.0,
+    "Kd_z": 8.0,
+    "Ki_z": 0.5,
+    "Kp_att": 2.0,
+    "Kd_att": 1.0
+  },
+  "best_objective": 333.5874753775251,
+  "prior_objective": 333.6569611859732,
+  "finished_utc": "2026-09-28T02:53:17.403667+00:00"
+}

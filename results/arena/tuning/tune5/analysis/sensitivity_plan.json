@@ -1,0 +1,573 @@
+{
+  "status": "PLAN_ONLY — not executed",
+  "generated_utc": "2026-09-28T13:17:18.373478+00:00",
+  "design": "one-at-a-time: each tuned parameter ×0.5 and ×2 around the final (best) values",
+  "scenario_set": "tuning",
+  "scenario_ids": [
+    "tune2_gust_lateral_p7_V14",
+    "tune2_gust_lateral_m13_V26",
+    "tune2_gust_lateral_m7_V75",
+    "tune2_gust_lateral_p13_V82",
+    "tune2_gust_vertical_m3.5_V75",
+    "tune2_gust_vertical_p6.5_V82",
+    "tune2_gust_vertical_p3.5_V14",
+    "tune2_gust_vertical_m6.5_V26",
+    "tune2_ramp_accel_V17_70_rho0.8",
+    "tune2_ramp_brake_V80_25_rho1.2",
+    "tune3_step_altitude_p0.7_V0",
+    "tune3_step_altitude_p1.3_V0",
+    "tune3_step_altitude_p0.7_V14",
+    "tune3_step_altitude_p1.3_V14",
+    "tune3_step_speed_p0.7_V0",
+    "tune3_step_speed_p1.3_V0",
+    "tune3_step_speed_p0.7_V14",
+    "tune3_step_speed_p1.3_V14"
+  ],
+  "objective": {
+    "metric": "window_rmse_velocity + window_rmse_z",
+    "failure": "stop_reason or paper_failed",
+    "failure_penalty": 1000.0
+  },
+  "config_sha256": "9729aec6ff8b54499c96d38c850fedf305970caad5bb2256e948dfa667ea32ca",
+  "how_to_run": "values → overrides via control.arena_tune.parameter_space(...)[2], then control.arena_tune.Evaluator(...)(overrides); not done by this tool",
+  "baseline": {
+    "GSLQR": {
+      "best_values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "best_objective": 0.3387652690297373
+    }
+  },
+  "runs": [
+    {
+      "id": "GSLQR:q_z:x0.5",
+      "controller": "GSLQR",
+      "parameter": "q_z",
+      "factor": 0.5,
+      "exponents": [
+        0.0,
+        4.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 6400.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": 0.364522752651291
+    },
+    {
+      "id": "GSLQR:q_z:x2",
+      "controller": "GSLQR",
+      "parameter": "q_z",
+      "factor": 2.0,
+      "exponents": [
+        2.0,
+        4.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 25600.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:q_v_h:x0.5",
+      "controller": "GSLQR",
+      "parameter": "q_v_h",
+      "factor": 0.5,
+      "exponents": [
+        1.0,
+        3.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 10240.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": 0.36239465092014234
+    },
+    {
+      "id": "GSLQR:q_v_h:x2",
+      "controller": "GSLQR",
+      "parameter": "q_v_h",
+      "factor": 2.0,
+      "exponents": [
+        1.0,
+        5.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 40960.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:q_v_z:x0.5",
+      "controller": "GSLQR",
+      "parameter": "q_v_z",
+      "factor": 0.5,
+      "exponents": [
+        1.0,
+        4.0,
+        -1.0,
+        0.0,
+        0.0,
+        -1.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 10.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:q_v_z:x2",
+      "controller": "GSLQR",
+      "parameter": "q_v_z",
+      "factor": 2.0,
+      "exponents": [
+        1.0,
+        4.0,
+        1.0,
+        0.0,
+        0.0,
+        -1.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 40.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:q_phi:x0.5",
+      "controller": "GSLQR",
+      "parameter": "q_phi",
+      "factor": 0.5,
+      "exponents": [
+        1.0,
+        4.0,
+        0.0,
+        -1.0,
+        0.0,
+        -1.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 25.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:q_phi:x2",
+      "controller": "GSLQR",
+      "parameter": "q_phi",
+      "factor": 2.0,
+      "exponents": [
+        1.0,
+        4.0,
+        0.0,
+        1.0,
+        0.0,
+        -1.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 100.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:q_omega:x0.5",
+      "controller": "GSLQR",
+      "parameter": "q_omega",
+      "factor": 0.5,
+      "exponents": [
+        1.0,
+        4.0,
+        0.0,
+        0.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 2.5,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:q_omega:x2",
+      "controller": "GSLQR",
+      "parameter": "q_omega",
+      "factor": 2.0,
+      "exponents": [
+        1.0,
+        4.0,
+        0.0,
+        0.0,
+        1.0,
+        -1.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 10.0,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:q_n:x0.5",
+      "controller": "GSLQR",
+      "parameter": "q_n",
+      "factor": 0.5,
+      "exponents": [
+        1.0,
+        4.0,
+        0.0,
+        0.0,
+        0.0,
+        -2.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.0025,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:q_n:x2",
+      "controller": "GSLQR",
+      "parameter": "q_n",
+      "factor": 2.0,
+      "exponents": [
+        1.0,
+        4.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.01,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:r:x0.5",
+      "controller": "GSLQR",
+      "parameter": "r",
+      "factor": 0.5,
+      "exponents": [
+        1.0,
+        4.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        -2.0,
+        0.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.0015625,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:r:x2",
+      "controller": "GSLQR",
+      "parameter": "r",
+      "factor": 2.0,
+      "exponents": [
+        1.0,
+        4.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.00625,
+        "q_iz": 3200.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:q_iz:x0.5",
+      "controller": "GSLQR",
+      "parameter": "q_iz",
+      "factor": 0.5,
+      "exponents": [
+        1.0,
+        4.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 1600.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:q_iz:x2",
+      "controller": "GSLQR",
+      "parameter": "q_iz",
+      "factor": 2.0,
+      "exponents": [
+        1.0,
+        4.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        -1.0,
+        1.0,
+        0.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 6400.0,
+        "q_ivx": 640.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:q_ivx:x0.5",
+      "controller": "GSLQR",
+      "parameter": "q_ivx",
+      "factor": 0.5,
+      "exponents": [
+        1.0,
+        4.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        -1.0,
+        0.0,
+        -1.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 320.0
+      },
+      "tuning_log_objective": null
+    },
+    {
+      "id": "GSLQR:q_ivx:x2",
+      "controller": "GSLQR",
+      "parameter": "q_ivx",
+      "factor": 2.0,
+      "exponents": [
+        1.0,
+        4.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        -1.0,
+        0.0,
+        1.0
+      ],
+      "values": {
+        "q_z": 12800.0,
+        "q_v_h": 20480.0,
+        "q_v_z": 20.0,
+        "q_phi": 50.0,
+        "q_omega": 5.0,
+        "q_n": 0.005,
+        "r": 0.003125,
+        "q_iz": 3200.0,
+        "q_ivx": 1280.0
+      },
+      "tuning_log_objective": null
+    }
+  ]
+}

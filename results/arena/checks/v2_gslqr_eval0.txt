@@ -1,0 +1,21 @@
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+objective 0.5878666409048878
+tune2_gust_lateral_p7_V14 failed False score 0.1223 stop None
+tune2_gust_lateral_m13_V26 failed False score 0.4655 stop None
+tune2_gust_lateral_m7_V75 failed False score 0.4115 stop None
+tune2_gust_lateral_p13_V82 failed False score 0.7997 stop None
+tune2_gust_vertical_m3.5_V75 failed False score 0.2864 stop None
+tune2_gust_vertical_p6.5_V82 failed False score 0.5701 stop None
+tune2_gust_vertical_p3.5_V14 failed False score 0.0413 stop None
+tune2_gust_vertical_m6.5_V26 failed False score 0.2015 stop None
+tune2_ramp_accel_V17_70_rho0.8 failed False score 3.9018 stop None
+tune2_ramp_brake_V80_25_rho1.2 failed False score 1.043 stop None
+tune3_step_altitude_p0.7_V0 failed False score 0.4266 stop None
+tune3_step_altitude_p1.3_V0 failed False score 0.7923 stop None
+tune3_step_altitude_p0.7_V14 failed False score 0.4258 stop None
+tune3_step_altitude_p1.3_V14 failed False score 0.7918 stop None
+tune3_step_speed_p0.7_V0 failed False score 0.0499 stop None
+tune3_step_speed_p1.3_V0 failed False score 0.0988 stop None
+tune3_step_speed_p0.7_V14 failed False score 0.0489 stop None
+tune3_step_speed_p1.3_V14 failed False score 0.1041 stop None
+EVAL0_EXIT=0

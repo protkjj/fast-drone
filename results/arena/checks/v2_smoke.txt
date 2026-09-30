@@ -1,0 +1,8 @@
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+GSLQR tune2_gust_vertical_p3.5_V14: stop=None paper_failed=False rmse_v=0.0346 rmse_z=0.0068 max_omega=0.32 opt_fail=0/0 finite=True
+GSLQR tune3_step_altitude_p0.7_V0: stop=None paper_failed=False rmse_v=0.2757 rmse_z=0.1509 max_omega=0.00 opt_fail=0/0 finite=True
+F13 tune2_gust_vertical_p3.5_V14: stop=None paper_failed=False rmse_v=0.0732 rmse_z=0.0119 max_omega=0.11 opt_fail=0/200 finite=True
+F13 tune3_step_altitude_p0.7_V0: stop=None paper_failed=False rmse_v=0.1813 rmse_z=0.0580 max_omega=0.00 opt_fail=0/400 finite=True
+M17 tune2_gust_vertical_p3.5_V14: stop=None paper_failed=False rmse_v=0.0350 rmse_z=0.0055 max_omega=0.16 opt_fail=0/200 finite=True
+M17 tune3_step_altitude_p0.7_V0: stop=None paper_failed=False rmse_v=0.1803 rmse_z=0.0586 max_omega=0.00 opt_fail=0/400 finite=True
+DONE

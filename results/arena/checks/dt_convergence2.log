@@ -1,0 +1,10 @@
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+tune3_step_altitude_p0.7_V0 GSLQR one-step {"pos_m": 2.842170943041042e-14, "vel_m_s": 9.003908733964394e-13, "att_deg": 1.494637568550395e-13, "omega_rad_s": 3.9309730680459274e-16, "rotor_rad_s": 2.88150658889208e-09}
+tune3_step_altitude_p0.7_V0 V13 one-step {"pos_m": 2.3092638912203256e-13, "vel_m_s": 1.48100163046861e-11, "att_deg": 1.494637587235975e-13, "omega_rad_s": 1.9843309708425343e-16, "rotor_rad_s": 4.129856279178057e-08}
+tune2_gust_lateral_p13_V82 GSLQR one-step {"pos_m": 2.2748510412271984e-13, "vel_m_s": 1.2068005607324118e-12, "att_deg": 4.966000990991276e-11, "omega_rad_s": 5.2537020792263224e-11, "rotor_rad_s": 4.1382008930668235e-09}
+tune2_gust_lateral_p13_V82 V13 one-step {"pos_m": 3.346053337625411e-11, "vel_m_s": 9.498899568063798e-09, "att_deg": 2.2665074319202317e-08, "omega_rad_s": 1.8278726815826318e-07, "rotor_rad_s": 5.172123564989306e-07}
+tune2_ramp_accel_V17_70_rho0.8 GSLQR one-step {"pos_m": 2.915174224598749e-13, "vel_m_s": 8.37771234436528e-11, "att_deg": 1.1026042765841595e-10, "omega_rad_s": 1.3926592934421446e-09, "rotor_rad_s": 3.279205884609837e-08}
+tune2_ramp_accel_V17_70_rho0.8 V13 one-step {"pos_m": 2.6177015427874504e-13, "vel_m_s": 4.828942521368006e-11, "att_deg": 9.763977215941351e-11, "omega_rad_s": 8.750628021671204e-10, "rotor_rad_s": 2.7554051484912634e-08}
+tune2_ramp_brake_V80_25_rho1.2 GSLQR one-step {"pos_m": 4.944511051760967e-12, "vel_m_s": 1.2435884877625937e-08, "att_deg": 5.7449098240837644e-08, "omega_rad_s": 9.540247007227104e-07, "rotor_rad_s": 9.552195479045622e-09}
+tune2_ramp_brake_V80_25_rho1.2 V13 one-step {"pos_m": 1.6680556361883736e-08, "vel_m_s": 9.574133543382824e-06, "att_deg": 1.652323411894458e-05, "omega_rad_s": 0.00016540141378751372, "rotor_rad_s": 1.0019845149145112e-06}
+wrote /Users/kj/Desktop/dynamic/fast_drone-arena/results/arena/dt_convergence

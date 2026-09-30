@@ -1,0 +1,15 @@
+[0] gust/main_gust_vertical_+5_V_L/CPID: True
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+[0] reference/main_ref_accel_VH_rho0.5/GSLQR: True
+[0] reference/main_ref_accel_VL_rho0.8/CPID: False
+[0] reference/main_ref_accel_VL_rho1/CPID: False
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+[0] gust/main_gust_lateral_+10_V_H/GSLQR: True
+[0] gust/main_gust_lateral_+5_V_H/GSLQR: True
+[0] gust/main_gust_vertical_+5_V_H/GSLQR: True
+[0] gust/main_gust_vertical_-5_V_H/GSLQR: True
+[0] reference/main_ref_accel_VL_rho1.5/CPID: False
+[0] reference/main_ref_accel_VH_rho1.2/GSLQR: False
+[0] reference/main_ref_accel_VL_rho0.5/GSLQR: False
+[0] reference/main_ref_accel_VL_rho1/GSLQR: False
+[0] reference/main_ref_accel_VL_rho1.5/GSLQR: False

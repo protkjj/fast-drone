@@ -1,0 +1,3 @@
+CPID evaluation_0 (index 0): bit_identical=True objective=333.6569611859732
+CPID best (index 115): bit_identical=True objective=333.5874753775251
+CPID: carried over → /Users/kj/Desktop/dynamic/fast_drone-arena/configs/tuning_carryover.json

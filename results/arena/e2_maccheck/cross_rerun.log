@@ -1,0 +1,4 @@
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+[0] gust/main_gust_vertical_+5_V_H/GSLQR: True
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+[0] reference/main_ref_accel_VH_rho1/GSLQR: False

@@ -1,0 +1,21 @@
+Results: /Users/kj/Desktop/dynamic/fast_drone-arena/results/validation/arena_20260927T064504390049Z
+Running mission_VH / GSLQR
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+  suite pass=False paper_fail=True t=46.338s reasons=['incomplete', 'simulation_error', 'altitude_error', 'velocity_error', 'omega_peak', 'final_hover_not_settled', 'propulsion_model_domain']
+Running gust_lateral_p10_VH / GSLQR
+  suite pass=True paper_fail=False t=12s reasons=[]
+Running gust_vertical_m5_VH / GSLQR
+  suite pass=True paper_fail=False t=12s reasons=[]
+Running ref_accel_0_VH_rho1 / GSLQR
+  suite pass=False paper_fail=True t=5.444s reasons=['incomplete', 'simulation_error', 'altitude_error', 'velocity_error', 'final_hover_not_settled']
+Running ref_brake_VH_VL_rho1 / GSLQR
+  suite pass=True paper_fail=False t=52.1s reasons=[]
+Running mission_VH_mass1.3 / GSLQR
+  suite pass=False paper_fail=True t=45.75s reasons=['incomplete', 'simulation_error', 'altitude_error', 'velocity_error', 'omega_peak', 'final_hover_not_settled', 'propulsion_model_domain']
+Running mission_VH_tau2 / GSLQR
+  suite pass=False paper_fail=True t=46.35s reasons=['incomplete', 'simulation_error', 'altitude_error', 'velocity_error', 'omega_peak', 'final_hover_not_settled', 'propulsion_model_domain']
+Running gust_lateral_p10_VL / GSLQR
+  suite pass=True paper_fail=False t=12s reasons=[]
+Running gust_vertical_m5_VL / GSLQR
+  suite pass=True paper_fail=False t=12s reasons=[]
+exit 0

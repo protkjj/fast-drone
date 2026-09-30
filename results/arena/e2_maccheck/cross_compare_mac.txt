@@ -1,0 +1,32 @@
+{
+ "rtol": 0.001,
+ "allow_same_machine": true,
+ "checked": 2,
+ "passed": true,
+ "problems": [],
+ "results": [
+  {
+   "trial_id": "gust/main_gust_vertical_+5_V_H/GSLQR",
+   "passed": true,
+   "verdict_mismatch": [],
+   "numeric_mismatch": [],
+   "bit_identical": true,
+   "hosts": [
+    "Kangjunui-MacBookAir.local",
+    "Kangjunui-MacBookAir.local"
+   ]
+  },
+  {
+   "trial_id": "reference/main_ref_accel_VH_rho1/GSLQR",
+   "passed": true,
+   "verdict_mismatch": [],
+   "numeric_mismatch": [],
+   "bit_identical": true,
+   "hosts": [
+    "Kangjunui-MacBookAir.local",
+    "Kangjunui-MacBookAir.local"
+   ]
+  }
+ ]
+}
+CROSS-CHECK PASS

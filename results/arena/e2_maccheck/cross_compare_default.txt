@@ -1,0 +1,35 @@
+{
+ "rtol": 0.001,
+ "allow_same_machine": false,
+ "checked": 2,
+ "passed": false,
+ "problems": [
+  "gust/main_gust_vertical_+5_V_H/GSLQR: rerun on the same computer (Kangjunui-MacBookAir.local)",
+  "reference/main_ref_accel_VH_rho1/GSLQR: rerun on the same computer (Kangjunui-MacBookAir.local)"
+ ],
+ "results": [
+  {
+   "trial_id": "gust/main_gust_vertical_+5_V_H/GSLQR",
+   "passed": true,
+   "verdict_mismatch": [],
+   "numeric_mismatch": [],
+   "bit_identical": true,
+   "hosts": [
+    "Kangjunui-MacBookAir.local",
+    "Kangjunui-MacBookAir.local"
+   ]
+  },
+  {
+   "trial_id": "reference/main_ref_accel_VH_rho1/GSLQR",
+   "passed": true,
+   "verdict_mismatch": [],
+   "numeric_mismatch": [],
+   "bit_identical": true,
+   "hosts": [
+    "Kangjunui-MacBookAir.local",
+    "Kangjunui-MacBookAir.local"
+   ]
+  }
+ ]
+}
+CROSS-CHECK FAIL

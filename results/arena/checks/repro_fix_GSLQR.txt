@@ -1,0 +1,23 @@
+  ScheduledLQR: 18/18 속도점 유효 (격자 0~85 m/s)
+{
+  "controller": "GSLQR",
+  "index": 0,
+  "scenario_workers": 1,
+  "rtol": 0.001,
+  "config_sha256": "1376310bd08e4466da61d87b57af9b13274c198cfdfc2e7c3077ceb19bad8903",
+  "record_config_sha256": "1376310bd08e4466da61d87b57af9b13274c198cfdfc2e7c3077ceb19bad8903",
+  "passed": true,
+  "tolerance_problems": [],
+  "bit_identical": true,
+  "record_git_revision": "8911ee17dcaa029189d5a6c7b8d64167624d7bd8",
+  "model_sha256_equal": true,
+  "objective": 0.5879376177505309,
+  "reference_objective": 0.5879376177505309,
+  "objective_equal": true,
+  "differing_fields": [],
+  "scenarios": 18,
+  "wall_s": 56.0,
+  "peak_worker_rss_mib": {}
+}
+PASS (rtol 0.001 + identical verdicts); bit-identical: True
+EXIT=0
