@@ -108,17 +108,22 @@ Get-Content check_env_V13.txt -Tail 3
 ```powershell
 $p = Start-Process .\.venv\Scripts\python.exe -ArgumentList '-m','control.arena_tune','--controllers','GSLQR','--budget','3','--run-dir','orphan_check','--scenario-workers','2' -PassThru -WindowStyle Hidden
 ```
+40초 기다린 뒤, **이 시험의 프로세스만** 기록한다: 튜닝 본체와 그 아래 모든 자손(작업자, venv 중계 포함). 다른 프로그램의 파이썬은 판정에 넣지 않는다.
 ```powershell
-Start-Sleep 40; Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Select-Object ProcessId,ParentProcessId,@{n='cmd';e={$_.CommandLine.Substring(0,[math]::Min(80,$_.CommandLine.Length))}}
+Start-Sleep 40; $tune = @(Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Where-Object { $_.CommandLine -like '*orphan_check*' }); $inner = @($tune | Where-Object { $tune.ProcessId -contains $_.ParentProcessId }); if (-not $inner) { $inner = $tune }; $all = Get-CimInstance Win32_Process; $ids = @(); $frontier = @($inner.ProcessId); while ($frontier) { $next = @($all | Where-Object { $frontier -contains $_.ParentProcessId } | ForEach-Object ProcessId); $ids += $next; $frontier = $next }; "tune: $($tune.ProcessId -join ',')  inner: $($inner.ProcessId -join ',')  descendants: $($ids -join ',')" | Tee-Object -FilePath check_orphan_before.txt
 ```
+- `descendants`가 비어 있으면 작업자가 아직 안 떴다. 20초 더 기다렸다가 같은 줄을 다시 실행한다.
+
 튜닝 본체만 강제 종료한다.
 ```powershell
-$tune = Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Where-Object { $_.CommandLine -like '*orphan_check*' }; $inner = $tune | Where-Object { $tune.ProcessId -contains $_.ParentProcessId }; if (-not $inner) { $inner = $tune }; Stop-Process -Id $inner.ProcessId -Force; $inner.ProcessId
+Stop-Process -Id $inner.ProcessId -Force
 ```
+15초 뒤, 기록해 둔 프로세스 중 **아직 살아 있는 것**을 본다.
 ```powershell
-Start-Sleep 15; Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Select-Object ProcessId,ParentProcessId | Tee-Object -FilePath check_orphan.txt
+Start-Sleep 15; $left = @(Get-Process -Id ($ids + $tune.ProcessId) -ErrorAction SilentlyContinue); "left: $($left.Id -join ',')" | Tee-Object -FilePath check_orphan.txt
 ```
-- **비어 있어야 합격.** 남아 있으면 목록을 kj에게 보내고 `taskkill /PID <번호> /T /F`로 정리한다.
+- **`left:` 뒤가 비어 있어야 합격.** 남은 번호가 있으면 파일을 kj에게 보내고 `taskkill /PID <번호> /T /F`로 정리한다.
+- 같은 PowerShell 창에서 이어서 실행해야 한다(`$tune`, `$inner`, `$ids` 변수를 쓴다).
 ```powershell
 Remove-Item -Recurse -Force orphan_check
 ```
@@ -138,6 +143,10 @@ taskkill /PID $p.Id /T /F
 ```powershell
 Select-String '"spent"' resume_check\GSLQR.record.json | Tee-Object -FilePath check_resume_before.txt
 ```
+끊기 전에 끝난 평가 기록(한 줄 = 평가 1회, `control/arena_tune.py:359` 덧붙이기 모드)을 복사해 둔다.
+```powershell
+Copy-Item resume_check\GSLQR.jsonl check_resume_before.jsonl
+```
 같은 명령으로 재개(이번엔 창에서 바로 돌려 끝날 때까지 기다린다):
 ```powershell
 python -m control.arena_tune --controllers GSLQR --budget 3 --run-dir resume_check 2>&1 | Tee-Object -FilePath check_resume_after.log
@@ -145,23 +154,33 @@ python -m control.arena_tune --controllers GSLQR --budget 3 --run-dir resume_che
 ```powershell
 Select-String '"spent"|"status"' resume_check\GSLQR.record.json | Tee-Object -FilePath check_resume_after.txt
 ```
-- 합격: `"status": "complete"`, `"spent": 3`, 재개 로그에 오류 없음.
-- 끊기 전 평가를 처음부터 다시 계산했는지는 재개 로그와 걸린 시간으로 kj가 판단한다.
+끊기 전 기록이 재개 뒤에도 **앞부분에 한 글자도 안 바뀌고** 남아 있는지 비교한다.
+```powershell
+$b = @(Get-Content check_resume_before.jsonl); $a = @(Get-Content resume_check\GSLQR.jsonl); $same = -not (Compare-Object $b @($a | Select-Object -First $b.Count) -SyncWindow 0); "before=$($b.Count) after=$($a.Count) prefix_same=$same" | Tee-Object -FilePath check_resume_compare.txt
+```
+- 합격: `"status": "complete"`, `"spent": 3`, 재개 로그에 오류 없음, **`prefix_same=True`**, `after`가 `before`보다 크거나 같음.
+- `prefix_same=False`면 끊기 전 기록이 바뀐 것이다 — 멈추고 두 `.jsonl`을 kj에게.
+- 재개가 `JSONDecodeError`로 실패하면 강제 종료가 줄을 쓰는 도중에 걸려 마지막 줄이 잘린 것일 수 있다(재개 때 기존 줄을 전부 읽는다, `arena_tune.py:316`) — 그대로 kj에게 보낸다(실제 튜닝에서도 생길 수 있는 문제라 기록 가치가 있다).
+- 끊기 전 평가를 처음부터 다시 계산했는지는 재개 로그와 걸린 시간으로도 함께 본다.
 - 확인 뒤 `Remove-Item -Recurse -Force resume_check`
 
 ## 11. 결과 묶기 → kj에게
 ```powershell
-Compress-Archive -Path check_*.txt, check_*.log, results\school_repro_projected, results\school_repro_legacy -DestinationPath "school_check_$env:COMPUTERNAME.zip"
+Compress-Archive -Path check_*.txt, check_*.log, check_*.jsonl, results\school_repro_projected, results\school_repro_legacy -DestinationPath "school_check_$env:COMPUTERNAME.zip"
 ```
 `school_check_<컴퓨터이름>.zip`을 보낸다. `fds` 폴더는 지우지 않고 둔다(최종 코드가 정해지면 새로 받는다).
 
-## 12. 동욱님과 정할 것 (튜닝 결과를 보기 전에, 다섯 제어기에 같게)
-별도 결정표(작성 예정)를 보고 정한다. 요지:
-1. 저속 프로펠러 모델 범위 이탈(10,000 RPM 하한)을 튜닝에서 실패로 칠지 — 지금은 벌점 없음
-2. 고속 돌풍 전 안정화(2.5–3.0 s, 0.5 m/s)를 판정에 넣을지
-3. 센서 맞춤 비교의 범위 — **동욱님 동의(2026-09-30 밤)**: V13·F13 전용 옵션(INDI 필터 주파수·시작 가드·시간 정렬)은 INDI 센서 민감도 분석용이며 추가 튜닝 기회가 아니다. INDI 고유 기능은 제거실험으로 효과만 확인하고, 맞춤 비교에서는 나머지 제어기에도 구조에 맞는 조정 기회와 비교 가능한 탐색 예산을 준다. 최종 튜닝 설정에서는 기본값(50 Hz, 시작 가드 off)을 유지하는 안이 유력 — 확정 필요
-4. 튜닝 센서 시드 — 여러 시드 묶음(예: 2001–2003)을 다섯 제어기에 같게(동욱님 측 권고, 코드 변경 필요), 시드별 실패 처리 규칙, 본 실험 시드 수
-5. 최종 센서 설정(v9 개발안을 그대로 쓸지)과 초기 상태 오차 포함 여부
+## 12. 결정 상태 — 최종본은 `results/SENSOR_DECISIONS_2026-10-01.md` 맨 아래 "결정 기록" 표
+**확정(2026-09-30 밤, 다시 정하지 않는다)**: D0 동욱님 저장소, D2 돌풍 전 안정화 기준·실패 판정 유지, D3 V13·F13 옵션 기본값 고정(50 Hz·가드 off·V13 S1·F13 S0)·제거실험 분리,
+D4 시나리오별 고정 시드, D5 v9 가정치·항법 초기값 정확 가정 명시, D7 d3 제외(표 7은 17행), D8 ν_act 참 회전수.
+**아직 열린 것**: D1·D6(동욱님 측 원인 격리 결과를 보고), 본 실험 시드 수(제안: 비교 20개, 사다리 5~10개 — 오늘 속도 측정 뒤, 결과 보기 전 확정).
+
+## 13. 태그(`tune-final-7`)가 나온 뒤 짧은 재확인 — 오늘 점검이 대신하지 못하는 것
+오늘 점검은 `a44c718`(D4 없음)과 **참값** V13 재현 기준이다. 최종 태그는 D4(시나리오별 시드)가 들어간 새 코드라, 튜닝 전에 컴퓨터마다 다시 확인한다(동욱님 측 지적, 2026-09-30 밤).
+- 새 태그로 받기 + 4번 환경 점검(`--config <최종 설정> --expect-config-sha256 <해시>`)
+- **센서 포함 튜닝 경로 재현**: 맥에서 최종 설정으로 만든 센서 포함 기준 기록(평가 0)을 이 컴퓨터에서 재현 — 시드 배정·병렬 작업자에서 판정 일치 + rtol 1e-3. (기준 기록은 태그 전에 맥에서 만들어 태그에 넣어야 한다 — 동욱님 측·우리 준비 항목)
+- **센서 포함 설정으로 10번(중단 후 재개)** 다시 — 시드 매핑이 재개 뒤에도 같은지 기록으로 확인
+- 설치·사양(1~3번)과 9번(고아 작업자)은 다시 하지 않아도 된다.
 
 ## 판정 요약표 (컴퓨터마다 채움)
 | 항목 | 합격 기준 | 결과 | 시간 |
@@ -170,6 +189,6 @@ Compress-Archive -Path check_*.txt, check_*.log, results\school_repro_projected,
 | 5 재현 85 m/s | 판정 일치 + rtol 1e-3 | | |
 | 6 재현 20 m/s | 실패까지 똑같이 재현 | | |
 | 8 튜닝 경로 재현 | `PASS (rtol 0.001 …)` | | |
-| 9 고아 작업자 | 목록 비어 있음 | | — |
-| 10 이어 돌리기 | complete, spent 3 | | |
+| 9 고아 작업자 | `left:` 비어 있음(이 시험의 프로세스 기준) | | — |
+| 10 이어 돌리기 | complete, spent 3, `prefix_same=True` | | |
 | 7 작업자 수 | (0.6: ___ / 2.0: ___) | | — |
