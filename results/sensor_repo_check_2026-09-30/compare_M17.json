@@ -1,0 +1,16 @@
+{
+ "label": "M17",
+ "base_head": null,
+ "sensor_head": null,
+ "config_sha256": "1376310bd08e4466da61d87b57af9b13274c198cfdfc2e7c3077ceb19bad8903",
+ "objective_base": 111.44471781913003,
+ "objective_sensor": 111.44471781913003,
+ "trajectories_identical": "18/18",
+ "differing_fields": [],
+ "problems": [],
+ "bit_identical": true,
+ "wall_s": [
+  1952.8,
+  2284.6
+ ]
+}

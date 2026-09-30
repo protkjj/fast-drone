@@ -1,0 +1,16 @@
+{
+ "label": "F13",
+ "base_head": null,
+ "sensor_head": null,
+ "config_sha256": "1376310bd08e4466da61d87b57af9b13274c198cfdfc2e7c3077ceb19bad8903",
+ "objective_base": 0.31468493937583086,
+ "objective_sensor": 0.31468493937583086,
+ "trajectories_identical": "18/18",
+ "differing_fields": [],
+ "problems": [],
+ "bit_identical": true,
+ "wall_s": [
+  584.4,
+  585.9
+ ]
+}
