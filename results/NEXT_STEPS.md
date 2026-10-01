@@ -24,6 +24,71 @@
 - 2026-10-01 학교: **튜닝은 시작하지 않는다** — 점검 절차 1~11(사양·재현·고아 작업자·재개·속도) + 결정 논의.
 - 순서(합의): 현재 기준 보존 → D1·D6 진단 → 수정 여부 → 회귀 검증 → 최종 설정·코드 동결 → `tune-final-7` → 튜닝. 코드 동결 뒤에는 `control/`·`models/team_light/control/`·`configs/`에 아무것도 추가하지 않는다.
 
+## ★ 2026-10-01 새벽: 역할 변경 + D4 구현 진행 중 (위 상자의 '동욱님 측 구현'은 이것으로 대체)
+- **역할 변경(kj, 2026-09-30 밤 늦게)**: kj 쪽이 구현, 동욱님이 검토. 기능 브랜치 → 동욱님 검토 → 합의 뒤 병합·태그. 두 세션 분담:
+  이 세션 = NEXT_STEPS + **② D4**, 다른 세션 = ① M17·F13 기준 비교(임시 폴더) + ③ D1·D6 + SENSOR_DECISIONS·SCHOOL_CHECK·REVIEW 문서.
+- **D4 작업 위치**: 개발 클론 `/Users/kj/Desktop/dynamic/fast-drone-sensor-fusion-dev`, 브랜치 `kj/tune-final-7-prep`(a44c718에서 분기). **미커밋·미push**.
+  계획서 `~/.claude/plans/buzzing-baking-giraffe.md`(kj 승인).
+- 설계: `sensor_feedback.tuning_seeds = {튜닝 시나리오 id: 시드}`(선택 칸, 설정 해시에 포함). 기본 `seed`는 스모크·설계점검용으로 유지하되
+  매핑 시드와 겹치면 거부(잡음 수열은 시드만의 함수 → 표본 내 재사용을 구조적으로 막음). 최종 설정 파일은 D1·D6 뒤 별도 단계(kj 결정).
+- 바꾼 파일: `control/sensor_binding.py`·`arena.py`·`arena_tune.py`(+67/−6), 새 시험 `control/test_sensor_tuning_seeds.py`, 문서 `docs/SENSOR_TEAM_HANDOFF.md` 한 문단(동욱님 문서 — 검토 때 따로 짚을 것).
+- 검증 완료: 새 시험 24 passed(작업자 3 시험 1개는 작성만), 기존 관련 6파일 240 passed·1 xfailed(원래 있던 CPID 영역 표시),
+  a44c718로 만든 단일 시드 기록을 새 코드로 재현 **PASS·bit-identical True**, 매핑 기록으로 `--summarize`·`tuning_extension`·`arena_tuning_report` 정상.
+- **남은 검증(① 비교가 끝난 뒤, 한 번에 하나씩)**: 작업자 3 시험 → `test_arena_tune_parallel`(약 12분) → 참값 경로 재현 3종(retune_v3 GSLQR·CPID 각 약 40 s,
+  env_check V13 약 13분, 목적함수 D0 표와 같고 bit-identical) → 전체 회귀 → kj 보고 → 커밋 승인 → push 승인 → 동욱님 검토 요청 글("제안입니다. 동욱님이 확인하신 뒤 진행해 주세요").
+  - 00:3x 진행: 작업자 3 시험 통과(12 s), retune_v3 GSLQR PASS·bit-identical(0.5879376177505309), CPID PASS·bit-identical(333.6569611859732). V13 재현 진행 중.
+    병렬 튜닝 시험·전체 회귀는 `baseline_eval0.py`가 사라지거나 02:00 이후.
+  - 00:40 V13 env_check PASS·bit-identical(0.3593827310067435, 950.7 s). → **참값 경로 재현 3종 모두 PASS·bit-identical.**
+- **로드맵 7번(본 실험 사다리 시드 부분집합)도 같은 브랜치에 구현**(kj 승인 계획 `~/.claude/plans/main-batch-seeds.md`): `ladder_sensor_seeds`(비교 목록의 부분집합),
+  모든 묶음을 비교/사다리로 분류(모르는 묶음 = 오류). 새 시험 `control/test_main_batch_seeds.py` 20 passed.
+  칸이 없을 때 시행 목록·`--plan` 행이 변경 전과 **완전히 같음**(참값 `main_experiment.json` 795행, v6 후보 7,950행).
+- 무거운 검증(D4+7번 합친 상태, 2026-10-01 오전):
+  - `test_arena_tune_parallel` **11 passed**(16:33).
+  - 전체 회귀(`control scripts`, 병렬 파일 제외): **841 passed, 2 failed, 1 error, 2 skipped, 1 xfailed**(18:39). 셋 다 원인 확인:
+    1. `scripts/test_sensor_envelope_screen.py::test_source_provenance_keeps_active_reproduction_valid` 실패와
+    2. `scripts/test_sensor_preflight.py::test_static_pass_does_not_open_paper_gate` 실패(audit의 `active_reference_compatible`)는 **같은 원인, 우리 변경이 낳은 설계상 결과**다.
+       동욱님의 재현 기준 파일 `scripts/data/sensor_reproduction_v13.json`이 런타임 소스 해시(`control/` .py)를 고정하고 있어, `control/`을 고치면 기준이 낡는다.
+       ⚠️ `scripts/sensor_reproduce.py:63`도 같은 검사로 **실행 자체를 거부**한다 → 우리 브랜치 코드로는 학교 점검 5·6번이 거부된다
+       (오늘 학교 점검은 a44c718이라 영향 없음). 기준 파일은 코드 동결 때 다시 기록해야 한다(동욱님 산출물 — 방식은 동욱님과 합의).
+    3. `control/test_fallback.py::test_recovery_resets` ERROR(`fixture 'ctrl' not found`)는 파일을 고치지 않았고 픽스처 해석 오류라 **원래 있던 것으로 보임 — a44c718에서 재현 확인 필요**(Bash 차단으로 아직 못 함).
+  - 3번은 다른 세션이 a44c718에서 재현 확인(5 passed, 1 error 동일) → **원래 있던 문제, 우리 변경과 무관.**
+  - **재현 기준 수치 비교(kj 승인 방법, 09:29~09:35)**: `sensor_reproduce`의 실행·비교 부분(설정 해시 검사 → `run_campaign` → `compare`)을 그대로,
+    런타임 해시 게이트는 실행하지 않고 차이 목록을 공개. 스크립트·결과 = 스크래치패드 `numeric_replay.py`, `numeric_replay/result.json`.
+    - 코드 특정값: 브랜치 `kj/tune-final-7-prep`, HEAD a44c718 + 미커밋, `git diff` sha256 `9a9256c6…`, 5개 파일 sha256 기록(실행 전후 동일).
+    - 해시 차이 = **정확히 바꾼 5개 파일**. 두 기준(v13 VH 시드 3, legacy VL 시드 4) 모두 **판정·수치 rtol 1e-3 일치**, `compare`가 1% 변화를 잡는 것도 확인.
+    - 궤적은 기준과 비트가 달랐다 → 격리: **같은 맥에서 a44c718 원본(git archive)으로 돌리니 우리 브랜치와 궤적 sha256이 비트 동일**
+      (v13 `34afba26…`, legacy `313d81f8…`), 원본도 기준(`db4216a3…`, `ea5c566b…`)과는 비트가 다름. → **우리 변경은 궤적을 바꾸지 않는다.**
+      기준 파일은 이 맥에서 a44c718 원본으로도 비트 재현이 안 된다(다른 환경에서 만든 것으로 보임 — 동욱님께 확인할 것).
+
+## ★ 2026-10-01 오전: ① 완료, D1·D6 격리 결과(다른 세션 보고 — 원문은 다른 세션 기록)
+- **① M17·F13 기준 비교 통과**: 6cad076 대 a44c718, 참값 arena.json 평가 0에서 둘 다 궤적 해시 18/18·목적함수 비트 동일.
+  V13·GSLQR·CPID 재현과 합쳐 **다섯 제어기 모두 센서 끔 상태 기존과 같음**. 기록 `e65e493`(`results/sensor_repo_check_2026-09-30/`, SENSOR_DECISIONS D0 절).
+- **D1·D6**: 저속 이탈 주원인 = 항법 센서 첫 갱신(기압 0.02 s, GNSS 0.12 s)에서 추정 고도가 +0.4 m 계단처럼 튐. **fallback은 원인 아님 → D6는 이 이유로 고치지 않음.**
+  가설(추정기 초기 위치 σ 0.5 m가 원인)을 E5로 검증 중(약 2~2.5시간, 순차 1개).
+- 영향: D1·D6 결론이 D5(초기화 가정)를 바꿀 수 있다(초기 σ 또는 사전 수렴). **최종 설정 파일(로드맵 8)은 E5 결과 뒤에.**
+
+## 튜닝까지 남은 일 (kj 정리, 2026-10-01 새벽)
+**A. 바로 이어서**
+1. ① M17·F13 판정 → `results/sensor_repo_check_2026-09-30/`로 옮기고 결정표 D0 표에 추가 — 다른 세션, 커밋·push 승인
+2. D4 남은 검증(병렬 튜닝 시험, 전체 회귀) → 보고 — 이 세션
+3. D4를 `kj/tune-final-7-prep`에 커밋 → 브랜치 push → 동욱님께 검토 요청(제안 형태) — 이 세션, 커밋·push 승인
+4. 학교 점검 zip 분석(4대 배분, 작업자 수, 본 실험 시드 수별 예상 일수) — 다른 세션
+
+**B. 튜닝 전에 꼭(코드 동결 전)**
+5. D1·D6 원인 격리(저속 모델 범위 이탈: 초기화 / fallback / 센서 오차) — 다른 세션 설계, 실행 담당 미정(새 세션 추천)
+6. 격리 결과로 fallback 수정 여부 결정 → 고치면 D6 3단계 검증(수정 전 동일 / 수정 후 설명·회귀 / 원본 재현 버전 보존) — kj·동욱님
+7. ⚠️ **본 실험 묶음별 시드 코드**: 실행기는 시드 목록 하나를 모든 묶음에 쓴다(`main_distributed.Campaign.trials` 114행, `main_sensor_seeds`에서 옴 — 코드 확인).
+   비교 20개·사다리 5~10개로 나누려면 `main_distributed` 수정 필요. `control/` 코드라 `runtime_source_hashes`에 들어가므로 **튜닝 전에** 해야 한다
+   (튜닝 뒤 수정 = 재개·I-4·게인 로딩 거부). 시드 개수 자체는 설정 파일이라 나중에 정해도 된다. 담당 미정.
+8. 최종 설정 파일: v9 센서 + `tuning_seeds` 2001–2018 + 기본(개발) 시드 + V13·F13 옵션 기본값. 본 실험 파일이 v6 대신 이것을 가리키게, 해시 계산 — D1·D6 뒤
+9. 맥에서 센서 포함 기준 기록(평가 0) — 학교 재확인용, 설정 확정 뒤. (최종 18개 매핑 설정으로 평가 0 재현 = D4의 남은 빈틈도 여기서 메운다)
+10. 전체 회귀 → 동욱님 검토 → 병합 → 코드 동결 → 태그 `tune-final-7` — 동욱님 합의
+11. 학교 절차(DISTRIBUTED_RUN A절)를 동욱님 저장소·새 태그·설정 해시로 교체 — 다른 세션
+
+**C. 튜닝 시작**
+12. 학교에서 새 태그로 짧은 재확인(절차서 13번: 환경 점검, 센서 포함 기준 기록 재현, 재개) → 통과하면 튜닝
+- 가장 오래 걸릴 것: 5~6. 놓치기 쉬운 것: 7(본 실험용인데 튜닝 전에 넣어야 함).
+
 ## ~~지금 돌고 있는 것 — 건드리지 않는다~~ [대체됨 2026-09-30, ★ 상자 참고]
 > **끝난 일이다.** V13 retune_v3은 2026-09-28 22:36에 66/120회에서 중단했다(센서 없음, 부분 결과, `retune_v3/V13_PARTIAL_NOTE.md`). 폴더와 로그는 `de36409`에 커밋했다. 지금 도는 튜닝은 없다. 아래는 당시 기록이다.
 
