@@ -21,9 +21,22 @@ PowerShell을 열고 **그 컴퓨터가 맡은 제어기 줄 하나만** 붙여 
 ```powershell
 irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller M17 -Topic <주제>
 ```
-- 컴퓨터 2 (F13): 위 줄에서 `M17` → `F13`
-- 컴퓨터 3 (V13): `M17` → `V13`
-- 컴퓨터 4: `GSLQR`로 한 번 실행하고, 끝나면 `CPID`로 한 번 더(두 번째는 점검을 건너뛰고 바로 시작)
+- 컴퓨터 2 (F13):
+```powershell
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller F13 -Topic <주제>
+```
+- 컴퓨터 3 (V13):
+```powershell
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller V13 -Topic <주제>
+```
+- 컴퓨터 4 (GSLQR):
+```powershell
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller GSLQR -Topic <주제>
+```
+- 컴퓨터 4 (CPID, GSLQR 줄이 "done"을 찍은 뒤 같은 창에서. 점검은 건너뛰고 바로 시작):
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller CPID -Topic <주제>
+```
 
 동작 요약
 - 점검(약 15~25분)에서 하나라도 FAIL이면 **튜닝을 시작하지 않고** 휴대폰에 FAIL 알림 → `fds\tune7_check_<PC>_<시각>\` 폴더를 kj에게.
