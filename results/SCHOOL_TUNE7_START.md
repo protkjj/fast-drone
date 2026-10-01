@@ -107,6 +107,29 @@ Select-String '"spent"|"status"' results\arena\tuning\tune7\<제어기>.record.j
 Compress-Archive -Path check_*.txt, results\tune7_repro_projected, results\tune7_repro_legacy -DestinationPath "tune7_check_$env:COMPUTERNAME.zip"
 ```
 
+## 10. 휴대폰 알림 (ntfy, 튜닝 시작 뒤 컴퓨터마다)
+알림: 감시 시작 / 첫 평가 완료 / 30회마다 / **120회 완료** / **2시간 넘게 새 평가 없음**(재시작·멈춤 의심). 메시지에는 제어기 이름·횟수·시각만 들어간다(ntfy.sh는 공개 서버).
+
+**휴대폰(한 번만)**: ntfy 앱 설치 → `+` → 주제 이름 입력 → 구독. 주제는 남이 못 맞힐 이름으로(예: `kj-tune7-` 뒤에 무작위 글자 8개). 아래 `<주제>`에 그 이름을 쓴다.
+
+**컴퓨터마다**
+1. 브라우저(GitHub 로그인)로 `https://github.com/protkjj/fast-drone/blob/protkjj/arena-completion/results/tune7_notify.ps1` → **Raw** → `Ctrl+S` → `C:\Users\<사용자>\tune7_notify.ps1`로 저장(**`fds` 폴더 안에 두지 않는다**).
+2. 내려받은 파일 차단 해제:
+```powershell
+Unblock-File $HOME\tune7_notify.ps1
+```
+3. 시험 알림 — 휴대폰에 `notify test OK`가 와야 한다(안 오면 `$HOME\tune7_notify_<제어기>.err`를 본다. 학교망이 막으면 알림은 포기하고 튜닝은 그대로 둔다):
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_notify.ps1 -Controller <제어기> -Topic <주제> -Test
+```
+4. 감시 시작(창을 닫아도 계속 돈다, 컴퓨터 4는 GSLQR·CPID로 두 번):
+```powershell
+Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',"$HOME\tune7_notify.ps1",'-Controller','<제어기>','-Topic','<주제>'
+```
+- 휴대폰에 `watcher started`가 오면 된다.
+- 컴퓨터가 재시작되면 튜닝 재개(8번)와 함께 4번도 다시 한다.
+- 예산 연장(180회)으로 이어 돌릴 때도 4번을 다시 한다(120회 완료에서 감시가 끝나므로).
+
 ## 판정표 (컴퓨터마다)
 | 컴퓨터 | 맡은 제어기 | 4 점검 | 6 재현 기준 2개 | 6 튜닝 경로 | 7 고아 | 작업자 N | 6 튜닝 경로 벽시계 | 첫 평가 벽시계 |
 |---|---|---|---|---|---|---|---|---|
