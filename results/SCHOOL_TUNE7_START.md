@@ -10,6 +10,27 @@
 - 명령은 PowerShell에서 한 줄씩. FAIL이면 그 컴퓨터는 멈추고 화면·파일을 kj에게. 다른 컴퓨터는 계속해도 된다.
 - 한 컴퓨터 안에서는 무거운 단계를 동시에 돌리지 않는다(시간 측정이 틀어진다).
 
+## 0. 준비 확인 (컴퓨터마다 맨 처음) — 2026-10-01 추가: 학교 PC에 Python이 없었음
+```powershell
+git --version
+```
+```powershell
+py -0
+```
+- `git`이 없으면 Git for Windows를 설치한다(https://git-scm.com/download/win, 기본값으로 설치).
+- `py -0` 목록에 `-V:3.13`이 없거나 `py`가 없으면 **Python 3.13.7**을 사용자 계정에 설치한다(관리자 권한 불필요):
+```powershell
+Invoke-WebRequest https://www.python.org/ftp/python/3.13.7/python-3.13.7-amd64.exe -OutFile $HOME\python-3.13.7-amd64.exe
+```
+```powershell
+Start-Process $HOME\python-3.13.7-amd64.exe -ArgumentList '/quiet','InstallAllUsers=0','PrependPath=0','Include_launcher=1','Include_test=0' -Wait
+```
+```powershell
+py -3.13 --version
+```
+→ `Python 3.13.7`. `py`를 못 찾으면 PowerShell 창을 닫고 새로 연다. 다운로드가 막히면 브라우저로 python.org에서 3.13.7 "Windows installer (64-bit)"를 받아 **Install Now**.
+- ⚠️ **재부팅하면 설치·파일이 지워지는 복원 프로그램**(딥프리즈, 하드디스크 보호 등)이 있는지 확인한다. 있으면 튜닝 기록(`fds\results\…\tune7`)이 사라질 수 있으니 **튜닝 시작 전에 kj에게 알린다**.
+
 ## 1. 받기
 ```powershell
 cd $HOME
