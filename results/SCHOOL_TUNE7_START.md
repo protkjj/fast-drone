@@ -9,6 +9,7 @@
 - 배분(kj): 컴퓨터 1 = M17, 2 = F13, 3 = V13, 4 = GSLQR + CPID. F13·M17은 다른 컴퓨터. 한 제어기는 한 컴퓨터에서 끝까지.
 - 명령은 PowerShell에서 한 줄씩. FAIL이면 그 컴퓨터는 멈추고 화면·파일을 kj에게. 다른 컴퓨터는 계속해도 된다.
 - 한 컴퓨터 안에서는 무거운 단계를 동시에 돌리지 않는다(시간 측정이 틀어진다).
+- ⚠️ 명령 안의 `<코어>`·`N`·`<제어기>`·`<주제>`는 **자리표시**다. 그대로 치면 오류가 난다 — 숫자·이름으로 바꿔 넣는다(예: `<코어>` → `8`, `N` → `3`, `<제어기>` → `M17`).
 
 ## 0. 준비 확인 (컴퓨터마다 맨 처음) — 2026-10-01 추가: 학교 PC에 Python이 없었음
 ```powershell
@@ -96,7 +97,14 @@ $t = Measure-Command { python scripts\sensor_reproduce.py --output results\tune7
 ```powershell
 $t = Measure-Command { python scripts\sensor_reproduce.py --reference scripts\data\sensor_legacy_reproduction_tune7.json --output results\tune7_repro_legacy *> check_repro_legacy.txt }; "$($t.TotalSeconds) s" | Tee-Object -FilePath check_repro_legacy_time.txt
 ```
-센서 포함 튜닝 경로(맥 순차 약 18분, 작업자 N이면 더 짧음):
+재현 기준 결과 확인(둘 다 마지막 부분에 PASS/판정 일치가 보여야 한다):
+```powershell
+Get-Content check_repro_projected.txt -Tail 6
+```
+```powershell
+Get-Content check_repro_legacy.txt -Tail 6
+```
+센서 포함 튜닝 경로(맥 순차 약 18분, 작업자 N이면 더 짧음 — `N`은 5번 0.6 결과와 3 중 작은 값):
 ```powershell
 $t = Measure-Command { python -m control.arena_tune_repro --config configs/arena_tune7.json --controller V13 --run-dir results/arena/tuning/env_check_tune7 --index 0 --scenario-workers N *> check_env_tune7.txt }; "$($t.TotalSeconds) s" | Tee-Object -FilePath check_env_tune7_time.txt
 ```
