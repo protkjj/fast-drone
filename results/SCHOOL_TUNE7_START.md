@@ -9,7 +9,9 @@
 - 배분(kj): 컴퓨터 1 = M17, 2 = F13, 3 = V13, 4 = GSLQR + CPID. F13·M17은 다른 컴퓨터. 한 제어기는 한 컴퓨터에서 끝까지.
 - 명령은 PowerShell에서 한 줄씩. FAIL이면 그 컴퓨터는 멈추고 화면·파일을 kj에게. 다른 컴퓨터는 계속해도 된다.
 - 한 컴퓨터 안에서는 무거운 단계를 동시에 돌리지 않는다(시간 측정이 틀어진다).
-- ⚠️ 명령 안의 `<코어>`·`N`·`<제어기>`·`<주제>`는 **자리표시**다. 그대로 치면 오류가 난다 — 숫자·이름으로 바꿔 넣는다(예: `<코어>` → `8`, `N` → `3`, `<제어기>` → `M17`).
+- 숫자(코어 8, 작업자 수)는 **PC-63(i7-10700 물리 코어 8, 메모리 15.9 GB, 여유 8.9 GB)** 기준으로 채웠다. 전산실 컴퓨터가 같은 사양이면 그대로 복사해 쓴다.
+  사양이 다르면(2번 결과의 `NumberOfCores`나 여유 메모리가 다르면) 5번을 그 컴퓨터 값으로 다시 돌려 작업자 수를 바꾼다.
+- `<주제>`만 자리표시로 남겼다(휴대폰 알림 주제 이름 — 저장소에 적지 않음). 그대로 치지 말고 kj의 주제 이름으로 바꾼다.
 
 ## 0. 준비 확인 (컴퓨터마다 맨 처음) — 2026-10-01 추가: 학교 PC에 Python이 없었음
 ```powershell
@@ -55,7 +57,7 @@ git describe --tags --exact-match
 ```powershell
 & { "computer: $env:COMPUTERNAME"; (Get-CimInstance Win32_OperatingSystem).Caption; Get-CimInstance Win32_Processor | Format-List Name,NumberOfCores,NumberOfLogicalProcessors | Out-String; "total_mem_GiB: " + [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB,1); "free_mem_GiB: " + [math]::Round((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1MB,1) } | Tee-Object -FilePath check_spec.txt
 ```
-`NumberOfCores`(물리 코어)를 아래 `<코어>`에 쓴다.
+`NumberOfCores`(물리 코어)가 8이 아니면 아래 5번의 `8`을 그 값으로 바꾼다.
 
 ## 3. 파이썬 환경 (이미 `.venv`가 있으면 활성화·환경변수 줄만)
 ```powershell
@@ -82,12 +84,12 @@ python scripts\setup_env.py --commit $(git rev-parse HEAD) --config configs\aren
 
 ## 5. 작업자 수
 ```powershell
-python -m control.arena_suggest_workers 0.6 --physical-cores <코어>
+python -m control.arena_suggest_workers 0.6 --physical-cores 8
 ```
 ```powershell
-python -m control.arena_suggest_workers 2.0 --physical-cores <코어>
+python -m control.arena_suggest_workers 2.0 --physical-cores 8
 ```
-6번의 N은 0.6 결과(3 이하).
+PC-63 결과: 0.6 → **7**, 2.0 → **3**(F13용 1.2 → **5**). 같은 사양이면 아래 숫자 그대로. 다르면 아래 작업자 수를 그 결과로 바꾼다.
 
 ## 6. 재현 점검 (하나라도 FAIL이면 이 컴퓨터는 튜닝하지 않는다)
 센서 재현 기준 두 개(각 약 3분):
@@ -104,9 +106,9 @@ Get-Content check_repro_projected.txt -Tail 6
 ```powershell
 Get-Content check_repro_legacy.txt -Tail 6
 ```
-센서 포함 튜닝 경로(맥 순차 약 18분, 작업자 N이면 더 짧음 — `N`은 5번 0.6 결과와 3 중 작은 값):
+센서 포함 튜닝 경로(맥 순차 약 18분, 작업자 3개로 약 6~10분 — 재현 점검은 작업자 3개 상한):
 ```powershell
-$t = Measure-Command { python -m control.arena_tune_repro --config configs/arena_tune7.json --controller V13 --run-dir results/arena/tuning/env_check_tune7 --index 0 --scenario-workers N *> check_env_tune7.txt }; "$($t.TotalSeconds) s" | Tee-Object -FilePath check_env_tune7_time.txt
+$t = Measure-Command { python -m control.arena_tune_repro --config configs/arena_tune7.json --controller V13 --run-dir results/arena/tuning/env_check_tune7 --index 0 --scenario-workers 3 *> check_env_tune7.txt }; "$($t.TotalSeconds) s" | Tee-Object -FilePath check_env_tune7_time.txt
 ```
 ```powershell
 Get-Content check_env_tune7.txt -Tail 2
@@ -117,18 +119,34 @@ Get-Content check_env_tune7.txt -Tail 2
 ## 7. 고아 작업자 점검 (컴퓨터마다 한 번, 1~2분)
 `results/SCHOOL_CHECK_SENSOR_2026-10-01.md` 9번 그대로(이 시험의 PID 기준, `left:` 비어 있어야 합격).
 
-## 8. 튜닝 시작 (맡은 제어기마다)
-작업자 수: M17 → 5번의 2.0 결과, F13 → `python -m control.arena_suggest_workers 1.2 --physical-cores <코어>`, V13 → 0.6 결과, 컴퓨터 4 → 0.6 결과를 GSLQR·CPID 반씩.
+## 8. 튜닝 시작 (그 컴퓨터가 맡은 제어기 줄만 실행)
+작업자 수(PC-63 기준): M17 **3**, F13 **5**, V13 **7**, 컴퓨터 4는 GSLQR **4** + CPID **3**.
+
+**컴퓨터 1 — M17**
 ```powershell
-$c = '<제어기>'; $stamp = Get-Date -Format yyyyMMdd_HHmm; $p = Start-Process .\.venv\Scripts\python.exe -ArgumentList '-m','control.arena_tune','--controllers',$c,'--budget','120','--config','configs/arena_tune7.json','--run-dir','results/arena/tuning/tune7','--scenario-workers','N' -PassThru -WindowStyle Hidden -RedirectStandardOutput "tune7_${c}_$stamp.log" -RedirectStandardError "tune7_${c}_$stamp.err"; $p.Id | Out-File -Encoding ascii "tune_$c.pid"; $p.Id
+$c = 'M17'; $stamp = Get-Date -Format yyyyMMdd_HHmm; $p = Start-Process .\.venv\Scripts\python.exe -ArgumentList '-m','control.arena_tune','--controllers',$c,'--budget','120','--config','configs/arena_tune7.json','--run-dir','results/arena/tuning/tune7','--scenario-workers','3' -PassThru -WindowStyle Hidden -RedirectStandardOutput "tune7_${c}_$stamp.log" -RedirectStandardError "tune7_${c}_$stamp.err"; $p.Id | Out-File -Encoding ascii "tune_$c.pid"; $p.Id
 ```
-- 컴퓨터 4는 `$c`를 GSLQR, CPID로 두 번 실행.
-- 첫 평가가 끝나면(`spent` 1) 벽시계 시간을 kj에게:
+**컴퓨터 2 — F13**
 ```powershell
-Select-String '"spent"|"status"' results\arena\tuning\tune7\<제어기>.record.json; (Get-Item results\arena\tuning\tune7\<제어기>.jsonl).LastWriteTime
+$c = 'F13'; $stamp = Get-Date -Format yyyyMMdd_HHmm; $p = Start-Process .\.venv\Scripts\python.exe -ArgumentList '-m','control.arena_tune','--controllers',$c,'--budget','120','--config','configs/arena_tune7.json','--run-dir','results/arena/tuning/tune7','--scenario-workers','5' -PassThru -WindowStyle Hidden -RedirectStandardOutput "tune7_${c}_$stamp.log" -RedirectStandardError "tune7_${c}_$stamp.err"; $p.Id | Out-File -Encoding ascii "tune_$c.pid"; $p.Id
+```
+**컴퓨터 3 — V13**
+```powershell
+$c = 'V13'; $stamp = Get-Date -Format yyyyMMdd_HHmm; $p = Start-Process .\.venv\Scripts\python.exe -ArgumentList '-m','control.arena_tune','--controllers',$c,'--budget','120','--config','configs/arena_tune7.json','--run-dir','results/arena/tuning/tune7','--scenario-workers','7' -PassThru -WindowStyle Hidden -RedirectStandardOutput "tune7_${c}_$stamp.log" -RedirectStandardError "tune7_${c}_$stamp.err"; $p.Id | Out-File -Encoding ascii "tune_$c.pid"; $p.Id
+```
+**컴퓨터 4 — GSLQR과 CPID(두 줄 모두)**
+```powershell
+$c = 'GSLQR'; $stamp = Get-Date -Format yyyyMMdd_HHmm; $p = Start-Process .\.venv\Scripts\python.exe -ArgumentList '-m','control.arena_tune','--controllers',$c,'--budget','120','--config','configs/arena_tune7.json','--run-dir','results/arena/tuning/tune7','--scenario-workers','4' -PassThru -WindowStyle Hidden -RedirectStandardOutput "tune7_${c}_$stamp.log" -RedirectStandardError "tune7_${c}_$stamp.err"; $p.Id | Out-File -Encoding ascii "tune_$c.pid"; $p.Id
+```
+```powershell
+$c = 'CPID'; $stamp = Get-Date -Format yyyyMMdd_HHmm; $p = Start-Process .\.venv\Scripts\python.exe -ArgumentList '-m','control.arena_tune','--controllers',$c,'--budget','120','--config','configs/arena_tune7.json','--run-dir','results/arena/tuning/tune7','--scenario-workers','3' -PassThru -WindowStyle Hidden -RedirectStandardOutput "tune7_${c}_$stamp.log" -RedirectStandardError "tune7_${c}_$stamp.err"; $p.Id | Out-File -Encoding ascii "tune_$c.pid"; $p.Id
+```
+- 진행 확인(예: M17 — 다른 제어기는 이름만 바꿈). 첫 평가가 끝나면(`spent` 1) 벽시계 시간을 kj에게:
+```powershell
+Select-String '"spent"|"status"' results\arena\tuning\tune7\M17.record.json; (Get-Item results\arena\tuning\tune7\M17.jsonl).LastWriteTime
 ```
 - 튜닝 중 `fds`의 `control/`·`models/team_light/control/`·`configs/`에 아무것도 추가·수정하지 않는다. 결과·로그 저장은 괜찮다.
-- 멈추기: `taskkill /PID (Get-Content tune_<제어기>.pid) /T /F`. 재개: 8번 명령을 같은 컴퓨터에서 그대로.
+- 멈추기(예: M17): `taskkill /PID (Get-Content tune_M17.pid) /T /F`. 재개: 그 컴퓨터의 8번 명령을 그대로.
 - 재시작·로그오프 뒤: 새 PowerShell → `cd $HOME\fds; Set-ExecutionPolicy -Scope Process Bypass; .\.venv\Scripts\Activate.ps1` → 3번 환경변수 줄 → 8번 명령.
 
 ## 9. 점검 결과 묶기 (튜닝 시작 뒤, 컴퓨터마다)
@@ -142,18 +160,20 @@ Compress-Archive -Path check_*.txt, results\tune7_repro_projected, results\tune7
 **휴대폰(한 번만)**: ntfy 앱 설치 → `+` → 주제 이름 입력 → 구독. 주제는 남이 못 맞힐 이름으로(예: `kj-tune7-` 뒤에 무작위 글자 8개). 아래 `<주제>`에 그 이름을 쓴다.
 
 **컴퓨터마다**
-1. 브라우저(GitHub 로그인)로 `https://github.com/protkjj/fast-drone/blob/protkjj/arena-completion/results/tune7_notify.ps1` → **Raw** → `Ctrl+S` → `C:\Users\<사용자>\tune7_notify.ps1`로 저장(**`fds` 폴더 안에 두지 않는다**).
+1. 브라우저(GitHub 로그인)로 `https://github.com/protkjj/fast-drone/blob/protkjj/arena-completion/results/tune7_notify.ps1` → **Raw** → `Ctrl+S` → `C:\Users\USER\tune7_notify.ps1`로 저장(PC-63 사용자 이름 `USER` 기준)(**`fds` 폴더 안에 두지 않는다**).
 2. 내려받은 파일 차단 해제:
 ```powershell
 Unblock-File $HOME\tune7_notify.ps1
 ```
-3. 시험 알림 — 휴대폰에 `notify test OK`가 와야 한다(안 오면 `$HOME\tune7_notify_<제어기>.err`를 본다. 학교망이 막으면 알림은 포기하고 튜닝은 그대로 둔다):
+3. 시험 알림 — 휴대폰에 `notify test OK`가 와야 한다(안 오면 `$HOME\tune7_notify_M17.err`처럼 그 제어기 이름의 파일을 본다. 학교망이 막으면 알림은 포기하고 튜닝은 그대로 둔다):
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_notify.ps1 -Controller <제어기> -Topic <주제> -Test
+powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_notify.ps1 -Controller M17 -Topic <주제> -Test
 ```
-4. 감시 시작(창을 닫아도 계속 돈다, 컴퓨터 4는 GSLQR·CPID로 두 번):
+3·4번 명령의 `M17`은 그 컴퓨터가 맡은 제어기로 바꾼다(F13 / V13 / GSLQR / CPID).
+
+4. 감시 시작(창을 닫아도 계속 돈다, 컴퓨터 4는 `GSLQR`, `CPID`로 두 번):
 ```powershell
-Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',"$HOME\tune7_notify.ps1",'-Controller','<제어기>','-Topic','<주제>'
+Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',"$HOME\tune7_notify.ps1",'-Controller','M17','-Topic','<주제>'
 ```
 - 휴대폰에 `watcher started`가 오면 된다.
 - 컴퓨터가 재시작되면 튜닝 재개(8번)와 함께 4번도 다시 한다.
