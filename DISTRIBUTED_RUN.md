@@ -62,8 +62,12 @@ clone이 다른 브랜치/커밋(git revision FAIL), pip install이 일부만 �
 
 ## A. 튜닝 분산 — 다섯 제어기를 학교 Windows 4대에서, 태그 `tune-final-7`(센서 설정)
 
-> **⚠️ 태그 전 자리표시**: `<센서 설정>`(설정 파일 경로)과 `<설정 해시>`는 센서 모델이 들어간 설정이 정해지면 `tune-final-7`을
-> 달기 전에 채운다(Claude). 이 상자가 남아 있으면 아직 학교에서 시작하지 않는다.
+> **✅ 태그 완료(2026-10-01)** — **학교에서는 `results/SCHOOL_TUNE7_START.md`를 따른다**(이 A절의 최신·완결판, 받기부터 튜닝 시작까지).
+> - 저장소: **`https://github.com/leo11dk/fast-drone-sensor-fusion`(동욱님 저장소, 공개 — 토큰 불필요)**, D0 결정
+> - 태그 `tune-final-7` = 커밋 `87039e946ce122c9f89bb89a4127c086ac459e90`(태그 객체 `074fd616…`, 동욱님 저장소 `main`과 같음)
+> - 설정 `configs/arena_tune7.json`, config_sha256 `e7ef609705ea447c2082cf063517a2a1b31598421f624851d1a81911c36f8801`
+> - 재현 점검: 참값 `env_check` + 센서 포함 `env_check_tune7` + 센서 재현 기준 `scripts/data/*_tune7.json`(해시 검사 포함)
+> - 아래 A.1~A.11은 옛 저장소(`protkjj/fast-drone`, 폴더 `fast-drone-shard`) 기준 문구가 남아 있다 — 주소·폴더가 다르면 `SCHOOL_TUNE7_START.md`가 맞다. 바뀐 점 요약: `results/DISTRIBUTED_RUN_A_tune7_DRAFT.md`.
 
 > **재시작·로그오프 뒤 이어 돌리기 (학교 정책으로 컴퓨터가 꺼졌을 때)**
 > PowerShell을 새로 열고 아래 세 줄을 실행한 다음, 이 컴퓨터가 맡은 제어기마다 **A.6의 시작 명령을 그대로 다시 실행**한다.
@@ -104,8 +108,8 @@ clone이 다른 브랜치/커밋(git revision FAIL), pip install이 일부만 �
 - 시간 추정(맥 실측 기준, Windows 속도와 센서 계산 비용은 모름): M17이 일정을 정한다 — 순차 평가 1회 약 35~40분,
   작업자 4개면 120회에 약 1.5일. 예산 연장(180회, A.10)이 걸리면 약 50% 더. 첫 평가 시간을 재서 kj에게 알린다.
 
-기준값(`tune-final-7`, `<센서 설정>` — 튜닝 기록의 config_sha256이 이 값이어야 한다):
-- config_sha256 = `<설정 해시>`
+기준값(`tune-final-7`, `configs/arena_tune7.json` — 튜닝 기록의 config_sha256이 이 값이어야 한다):
+- config_sha256 = `e7ef609705ea447c2082cf063517a2a1b31598421f624851d1a81911c36f8801`
 - 제어기 모델은 A.3이 **계수**로 판정한다(맥 기준 `configs/controller_model_reference.json`, rtol 1e-8). sha는 기록만 한다.
 
 **이력**(쓰지 않는 태그): `tune-final-3`(옛 모델, 실행하지 않음), `tune-final-4`(모멘트 보정 호버 NaN — 무효),
@@ -126,7 +130,7 @@ Set-PSReadLineOption -HistorySaveStyle SaveNothing
 cd $HOME
 ```
 ```powershell
-git clone --branch tune-final-7 --depth 1 https://<READ_ONLY_TOKEN>@github.com/protkjj/fast-drone.git fast-drone-shard
+git clone --branch tune-final-7 --depth 1 https://github.com/leo11dk/fast-drone-sensor-fusion.git fast-drone-shard
 ```
 ```powershell
 cd fast-drone-shard
@@ -161,7 +165,7 @@ $env:OMP_NUM_THREADS="1"; $env:OPENBLAS_NUM_THREADS="1"; $env:VECLIB_MAXIMUM_THR
 
 ### A.3 설정·모델 점검
 ```powershell
-python scripts\setup_env.py --commit $(git rev-parse HEAD) --config <센서 설정> --expect-config-sha256 <설정 해시> 2>&1 | Tee-Object -FilePath setup_env_A3.txt
+python scripts\setup_env.py --commit $(git rev-parse HEAD) --config configs/arena_tune7.json --expect-config-sha256 e7ef609705ea447c2082cf063517a2a1b31598421f624851d1a81911c36f8801 2>&1 | Tee-Object -FilePath setup_env_A3.txt
 ```
 - 종료코드(`$LASTEXITCODE`)가 0이 아니면 멈추고 표를 kj에게 보낸다.
 - 패키지 버전 WARN은 괜찮다. 기준이 맥이라 Windows에서는 같은 빌드가 없을 수 있고, 최종 판정은 A.4가 한다.
@@ -226,7 +230,7 @@ python -m control.arena_suggest_workers 2.0
 
 시작 명령이다. `<제어기>`(3곳)를 M17·F13·V13·GSLQR·CPID 중 맡은 것으로, `N`을 위에서 나온 수로 바꾼다. 컴퓨터 4는 GSLQR과 CPID로 두 번 실행한다.
 ```powershell
-$c = '<제어기>'; $stamp = Get-Date -Format yyyyMMdd_HHmm; $p = Start-Process .\.venv\Scripts\python.exe -ArgumentList '-m','control.arena_tune','--controllers',$c,'--budget','120','--config','<센서 설정>','--run-dir','results/arena/tuning/tune7','--scenario-workers','N' -PassThru -WindowStyle Hidden -RedirectStandardOutput "tune7_${c}_$stamp.log" -RedirectStandardError "tune7_${c}_$stamp.err"; $p.Id | Out-File -Encoding ascii "tune_$c.pid"; $p.Id
+$c = '<제어기>'; $stamp = Get-Date -Format yyyyMMdd_HHmm; $p = Start-Process .\.venv\Scripts\python.exe -ArgumentList '-m','control.arena_tune','--controllers',$c,'--budget','120','--config','configs/arena_tune7.json','--run-dir','results/arena/tuning/tune7','--scenario-workers','N' -PassThru -WindowStyle Hidden -RedirectStandardOutput "tune7_${c}_$stamp.log" -RedirectStandardError "tune7_${c}_$stamp.err"; $p.Id | Out-File -Encoding ascii "tune_$c.pid"; $p.Id
 ```
 - 창을 닫아도 계속 돈다(`-WindowStyle Hidden`으로 따로 띄운 프로세스라서).
 - 튜닝이 도는 동안 **시스템 절전은 코드가 막는다**(Windows `SetThreadExecutionState`, 화면 꺼짐은 막지 않음, 끝나면 자동 해제). 단, 학교 정책의 강제 재시작, Windows 업데이트, 야간 종료, 자동 로그오프는 막지 못한다. 그때는 맨 위 상자대로 재개한다.
@@ -276,7 +280,7 @@ Compress-Archive -Path results\arena\tuning\tune7\<제어기>.record.json, resul
    - `판정: 120회에서 끝냄`이면 3으로 간다. 판정 결과(제어기별 개선율·실패 수)는 보고서에 옮긴다.
 3. I-4 검사:
    ```bash
-   python3 -m control.arena_tune --summarize --config <센서 설정> --run-dir results/arena/tuning/tune7
+   python3 -m control.arena_tune --summarize --config configs/arena_tune7.json --run-dir results/arena/tuning/tune7
    ```
    - `i4_violations`가 빈 목록이어야 한다. 예산, 시나리오, 목적함수, 탐색 방식이 5종 모두 같다는 뜻이다. 위반이 있으면 보고서에 그대로 적고 멈춘다.
    - `integrator_limit.flagged`는 보고서의 '결정 필요' 항목으로 올린다.
@@ -359,7 +363,7 @@ A.2와 같다(`py -3.13 -m venv .venv` → `Set-ExecutionPolicy -Scope Process B
 
 ### B.3 설정·모델 점검
 ```powershell
-python scripts\setup_env.py --commit $(git rev-parse HEAD) --config <센서 설정> --expect-config-sha256 <설정 해시> 2>&1 | Tee-Object -FilePath setup_env_B3.txt
+python scripts\setup_env.py --commit $(git rev-parse HEAD) --config configs/arena_tune7.json --expect-config-sha256 e7ef609705ea447c2082cf063517a2a1b31598421f624851d1a81911c36f8801 2>&1 | Tee-Object -FilePath setup_env_B3.txt
 ```
 - 종료코드(`$LASTEXITCODE`)가 0이 아니면 멈추고 `setup_env_B3.txt`를 kj에게 보낸다. 판정 기준은 A.3과 같다(제어기 모델은 계수 rtol 1e-8, sha는 기록만).
 

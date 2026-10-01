@@ -7,7 +7,7 @@
 | 항목 | 옛 A절 | 새 A절 |
 |---|---|---|
 | 저장소 | `protkjj/fast-drone`(비공개, 토큰 필요) | **`leo11dk/fast-drone-sensor-fusion`(공개, 토큰 불필요)** — D0 결정 |
-| 태그 | `tune-final-7`(자리표시) | `tune-final-7` = `<태그 커밋>` |
+| 태그 | `tune-final-7`(자리표시) | `tune-final-7` = `87039e9`(태그 객체 `074fd616`) |
 | 설정 | `<센서 설정>` | **`configs/arena_tune7.json`** |
 | 설정 해시 | `<설정 해시>` | **`e7ef609705ea447c2082cf063517a2a1b31598421f624851d1a81911c36f8801`** |
 | 재현 점검 | V13 참값 기록(`env_check`) | 참값 `env_check` **+ 센서 포함 `env_check_tune7` + 센서 재현 기준 `*_tune7.json`** |

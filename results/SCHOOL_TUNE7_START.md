@@ -4,7 +4,7 @@
 **계획 B**: 태그가 없으면 `results/SCHOOL_CHECK_SENSOR_2026-10-01.md`(1~11, `a44c718`)로 점검만 하고 튜닝은 시작하지 않는다.
 
 - 저장소: `https://github.com/leo11dk/fast-drone-sensor-fusion` (공개, 토큰 불필요)
-- 태그: `tune-final-7` = `<태그 커밋>` (출발 전에 채움)
+- 태그: `tune-final-7` = 커밋 `87039e946ce122c9f89bb89a4127c086ac459e90`(태그 객체 `074fd616…`), 동욱님 저장소 `main`과 같음
 - 설정: `configs/arena_tune7.json`, config_sha256 = `e7ef609705ea447c2082cf063517a2a1b31598421f624851d1a81911c36f8801`
 - 배분(kj): 컴퓨터 1 = M17, 2 = F13, 3 = V13, 4 = GSLQR + CPID. F13·M17은 다른 컴퓨터. 한 제어기는 한 컴퓨터에서 끝까지.
 - 명령은 PowerShell에서 한 줄씩. FAIL이면 그 컴퓨터는 멈추고 화면·파일을 kj에게. 다른 컴퓨터는 계속해도 된다.
@@ -27,7 +27,7 @@ git checkout tune-final-7
 ```powershell
 git describe --tags --exact-match
 ```
-→ `tune-final-7`이 나와야 한다.
+→ `tune-final-7`이 나와야 한다. `git rev-parse HEAD`는 `87039e946ce122c9f89bb89a4127c086ac459e90`이어야 한다.
 
 ## 2. 사양 기록
 ```powershell
