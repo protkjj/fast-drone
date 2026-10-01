@@ -1,73 +1,115 @@
-| group | ctrl | seed | pass | track | domain | first exit s | exits 0-0.5 / 0.5-3 / 3- | min RPM 0-0.5 / 0.5-3 / 3- | 1st cmd min RPM | INDI fallback steps |
-|---|---|---:|---|---|---|---:|---|---|---:|---:|
-| e4_hold | F13 | 3 | False | True | False | 0.152 | 35 / 0 / 0 | 9264 / 10339 / 10102 | 11337 | 1 |
-| e4_hold | F13 | 4 | False | True | False | 0.026 | 73 / 1 / 1 | 7156 / 9925 / 9864 | 11346 | 1 |
-| e4_hold | F13 | 5 | False | True | False | 0.156 | 1 / 0 / 0 | 9999 / 10270 / 10145 | 11404 | 1 |
-| e4_hold | V13 | 3 | False | True | False | 0.136 | 42 / 0 / 1 | 7985 / 10158 / 9837 | 11337 | 1 |
-| e4_hold | V13 | 4 | False | True | False | 0.026 | 76 / 4 / 7 | 5706 / 9728 / 9526 | 11346 | 1 |
-| e4_hold | V13 | 5 | False | True | False | 0.132 | 17 / 0 / 2 | 9342 / 10048 / 9990 | 11404 | 1 |
-| full | CPID | 3 | True | True | True | — | 0 / 0 / 0 | 11047 / 10262 / 10686 | 11441 | — |
-| full | CPID | 4 | True | True | True | — | 0 / 0 / 0 | 10352 / 10236 / 10741 | 11168 | — |
-| full | CPID | 5 | True | True | True | — | 0 / 0 / 0 | 10789 / 10208 / 10532 | 11060 | — |
-| full | F13 | 3 | False | True | False | 0.152 | 35 / 0 / 0 | 9266 / 10339 / 10102 | 11568 | 1 |
-| full | F13 | 4 | False | True | False | 0.026 | 73 / 1 / 1 | 7157 / 9925 / 9864 | 11456 | 1 |
-| full | F13 | 5 | False | True | False | 0.156 | 1 / 0 / 0 | 9998 / 10270 / 10145 | 11527 | 1 |
-| full | GSLQR | 3 | True | True | True | — | 0 / 0 / 0 | 11088 / 11030 / 10784 | 11445 | — |
-| full | GSLQR | 4 | False | True | False | 0.040 | 1 / 0 / 0 | 9936 / 11091 / 10904 | 11344 | — |
-| full | GSLQR | 5 | True | True | True | — | 0 / 0 / 0 | 11206 / 10941 / 10780 | 11202 | — |
-| full | M17 | 3 | False | True | False | 0.130 | 33 / 0 / 0 | 8078 / 10389 / 10081 | 11427 | — |
-| full | M17 | 4 | False | True | False | 0.026 | 63 / 0 / 8 | 6132 / 10295 / 9826 | 11182 | — |
-| full | M17 | 5 | False | True | False | 0.128 | 11 / 0 / 0 | 9716 / 10301 / 10177 | 11264 | — |
-| full | V13 | 3 | False | True | False | 0.136 | 42 / 0 / 1 | 7988 / 10158 / 9837 | 11498 | 1 |
-| full | V13 | 4 | False | True | False | 0.026 | 76 / 4 / 7 | 5709 / 9728 / 9526 | 11383 | 1 |
-| full | V13 | 5 | False | True | False | 0.132 | 17 / 0 / 2 | 9342 / 10048 / 9990 | 11469 | 1 |
-| imu_only | CPID | 3 | True | True | True | — | 0 / 0 / 0 | 11225 / 11138 / 10948 | 11443 | — |
-| imu_only | CPID | 4 | True | True | True | — | 0 / 0 / 0 | 11266 / 11188 / 11035 | 11171 | — |
-| imu_only | CPID | 5 | True | True | True | — | 0 / 0 / 0 | 11213 / 11183 / 10949 | 11067 | — |
-| imu_only | F13 | 3 | True | True | True | — | 0 / 0 / 0 | 10711 / 10712 / 10545 | 11568 | 1 |
-| imu_only | F13 | 4 | True | True | True | — | 0 / 0 / 0 | 10844 / 10758 / 10475 | 11456 | 1 |
-| imu_only | F13 | 5 | True | True | True | — | 0 / 0 / 0 | 10643 / 10727 / 10419 | 11527 | 1 |
-| imu_only | GSLQR | 3 | True | True | True | — | 0 / 0 / 0 | 11318 / 11257 / 10986 | 11453 | — |
-| imu_only | GSLQR | 4 | True | True | True | — | 0 / 0 / 0 | 11288 / 11278 / 11032 | 11347 | — |
-| imu_only | GSLQR | 5 | True | True | True | — | 0 / 0 / 0 | 11296 / 11291 / 10994 | 11253 | — |
-| imu_only | M17 | 3 | True | True | True | — | 0 / 0 / 0 | 10979 / 11004 / 10717 | 11420 | — |
-| imu_only | M17 | 4 | True | True | True | — | 0 / 0 / 0 | 10967 / 10885 / 10794 | 11182 | — |
-| imu_only | M17 | 5 | True | True | True | — | 0 / 0 / 0 | 10895 / 10924 / 10743 | 11298 | — |
-| imu_only | V13 | 3 | True | True | True | — | 0 / 0 / 0 | 10572 / 10601 / 10475 | 11498 | 1 |
-| imu_only | V13 | 4 | True | True | True | — | 0 / 0 / 0 | 10780 / 10689 / 10417 | 11383 | 1 |
-| imu_only | V13 | 5 | True | True | True | — | 0 / 0 / 0 | 10539 / 10675 / 10317 | 11469 | 1 |
-| navigation_only | CPID | 3 | True | True | True | — | 0 / 0 / 0 | 11095 / 10331 / 10788 | 11327 | — |
-| navigation_only | CPID | 4 | True | True | True | — | 0 / 0 / 0 | 10454 / 10231 / 10744 | 11327 | — |
-| navigation_only | CPID | 5 | True | True | True | — | 0 / 0 / 0 | 10832 / 10249 / 10663 | 11327 | — |
-| navigation_only | F13 | 3 | False | True | False | 0.158 | 26 / 0 / 0 | 9754 / 10727 / 10666 | 11589 | 1 |
-| navigation_only | F13 | 4 | False | True | False | 0.026 | 66 / 0 / 0 | 7282 / 10359 / 10519 | 11589 | 1 |
-| navigation_only | F13 | 5 | True | True | True | — | 0 / 0 / 0 | 10336 / 10545 / 10669 | 11589 | 1 |
-| navigation_only | GSLQR | 3 | True | True | True | — | 0 / 0 / 0 | 11080 / 11079 / 10874 | 11390 | — |
-| navigation_only | GSLQR | 4 | False | True | False | 0.040 | 1 / 0 / 0 | 9945 / 11129 / 10976 | 11390 | — |
-| navigation_only | GSLQR | 5 | True | True | True | — | 0 / 0 / 0 | 11207 / 10942 / 10908 | 11390 | — |
-| navigation_only | M17 | 3 | False | True | False | 0.132 | 32 / 0 / 0 | 8319 / 10537 / 10207 | 11401 | — |
-| navigation_only | M17 | 4 | False | True | False | 0.026 | 61 / 0 / 0 | 6185 / 10168 / 10123 | 11401 | — |
-| navigation_only | M17 | 5 | False | True | False | 0.128 | 13 / 0 / 0 | 9591 / 10347 / 10284 | 11401 | — |
-| navigation_only | V13 | 3 | False | True | False | 0.140 | 38 / 0 / 0 | 8330 / 10593 / 10447 | 11529 | 1 |
-| navigation_only | V13 | 4 | False | True | False | 0.026 | 76 / 0 / 0 | 6102 / 10222 / 10180 | 11529 | 1 |
-| navigation_only | V13 | 5 | False | True | False | 0.134 | 18 / 0 / 0 | 9754 / 10429 / 10504 | 11529 | 1 |
-| quiet_sampled | CPID | 3 | True | True | True | — | 0 / 0 / 0 | 11340 / 11336 / 11148 | 11327 | — |
-| quiet_sampled | F13 | 3 | True | True | True | — | 0 / 0 / 0 | 11333 / 11334 / 11065 | 11589 | 1 |
-| quiet_sampled | GSLQR | 3 | True | True | True | — | 0 / 0 / 0 | 11345 / 11338 / 11096 | 11390 | — |
-| quiet_sampled | M17 | 3 | True | True | True | — | 0 / 0 / 0 | 11342 / 11342 / 11087 | 11401 | — |
-| quiet_sampled | V13 | 3 | True | True | True | — | 0 / 0 / 0 | 11341 / 11341 / 11071 | 11529 | 1 |
-| rotor_only | CPID | 3 | True | True | True | — | 0 / 0 / 0 | 11339 / 11332 / 11146 | 11325 | — |
-| rotor_only | CPID | 4 | True | True | True | — | 0 / 0 / 0 | 11338 / 11331 / 11144 | 11324 | — |
-| rotor_only | CPID | 5 | True | True | True | — | 0 / 0 / 0 | 11339 / 11333 / 11148 | 11320 | — |
-| rotor_only | F13 | 3 | True | True | True | — | 0 / 0 / 0 | 11294 / 11291 / 11043 | 11589 | 1 |
-| rotor_only | F13 | 4 | True | True | True | — | 0 / 0 / 0 | 11303 / 11300 / 11042 | 11589 | 1 |
-| rotor_only | F13 | 5 | True | True | True | — | 0 / 0 / 0 | 11296 / 11290 / 11038 | 11589 | 1 |
-| rotor_only | GSLQR | 3 | True | True | True | — | 0 / 0 / 0 | 11330 / 11317 / 11081 | 11382 | — |
-| rotor_only | GSLQR | 4 | True | True | True | — | 0 / 0 / 0 | 11326 / 11314 / 11077 | 11370 | — |
-| rotor_only | GSLQR | 5 | True | True | True | — | 0 / 0 / 0 | 11332 / 11313 / 11079 | 11338 | — |
-| rotor_only | M17 | 3 | True | True | True | — | 0 / 0 / 0 | 11298 / 11262 / 11061 | 11394 | — |
-| rotor_only | M17 | 4 | True | True | True | — | 0 / 0 / 0 | 11278 / 11278 / 11060 | 11385 | — |
-| rotor_only | M17 | 5 | True | True | True | — | 0 / 0 / 0 | 11287 / 11283 / 11078 | 11359 | — |
-| rotor_only | V13 | 3 | True | True | True | — | 0 / 0 / 0 | 11304 / 11302 / 11046 | 11529 | 1 |
-| rotor_only | V13 | 4 | True | True | True | — | 0 / 0 / 0 | 11315 / 11299 / 11047 | 11529 | 1 |
-| rotor_only | V13 | 5 | True | True | True | — | 0 / 0 / 0 | 11309 / 11289 / 11047 | 11529 | 1 |
+| group | ctrl | seed | pass | track | domain | first exit s | exits 0-0.5 / 0.5-3 / 3- | min RPM 0-0.5 / 0.5-3 / 3- | 1st cmd min RPM | INDI fallback steps | max est z err 0-0.2 s [m] (first >5 cm at) |
+|---|---|---:|---|---|---|---:|---|---|---:|---:|---|
+| baro_only | F13 | 3 | True | True | True | — | 0 / 0 / 0 | 10526 / 10863 / 10875 | 11589 | 1 | 0.188 (0.02) |
+| baro_only | F13 | 4 | False | True | False | 0.026 | 41 / 0 / 0 | 7327 / 10870 / 10899 | 11589 | 1 | 0.376 (0.02) |
+| baro_only | F13 | 5 | True | True | True | — | 0 / 0 / 0 | 10951 / 10921 / 10927 | 11589 | 1 | 0.112 (0.02) |
+| baro_only | GSLQR | 3 | True | True | True | — | 0 / 0 / 0 | 11187 / 11060 / 11045 | 11390 | — | 0.188 (0.02) |
+| baro_only | GSLQR | 4 | True | True | True | — | 0 / 0 / 0 | 10092 / 11172 / 11097 | 11390 | — | 0.375 (0.02) |
+| baro_only | GSLQR | 5 | True | True | True | — | 0 / 0 / 0 | 11288 / 11181 / 11039 | 11390 | — | 0.111 (0.02) |
+| baro_only | V13 | 3 | True | True | True | — | 0 / 0 / 0 | 10392 / 10767 / 10692 | 11529 | 1 | 0.188 (0.02) |
+| baro_only | V13 | 4 | False | True | False | 0.026 | 40 / 0 / 0 | 6309 / 10687 / 10790 | 11529 | 1 | 0.376 (0.02) |
+| baro_only | V13 | 5 | True | True | True | — | 0 / 0 / 0 | 10440 / 10812 / 10818 | 11529 | 1 | 0.112 (0.02) |
+| e4_hold | F13 | 3 | False | True | False | 0.152 | 35 / 0 / 0 | 9264 / 10339 / 10102 | 11337 | 1 | 0.195 (0.02) |
+| e4_hold | F13 | 4 | False | True | False | 0.026 | 73 / 1 / 1 | 7156 / 9925 / 9864 | 11346 | 1 | 0.405 (0.02) |
+| e4_hold | F13 | 5 | False | True | False | 0.156 | 1 / 0 / 0 | 9999 / 10270 / 10145 | 11404 | 1 | 0.115 (0.02) |
+| e4_hold | V13 | 3 | False | True | False | 0.136 | 42 / 0 / 1 | 7985 / 10158 / 9837 | 11337 | 1 | 0.195 (0.02) |
+| e4_hold | V13 | 4 | False | True | False | 0.026 | 76 / 4 / 7 | 5706 / 9728 / 9526 | 11346 | 1 | 0.405 (0.02) |
+| e4_hold | V13 | 5 | False | True | False | 0.132 | 17 / 0 / 2 | 9342 / 10048 / 9990 | 11404 | 1 | 0.115 (0.02) |
+| full | CPID | 3 | True | True | True | — | 0 / 0 / 0 | 11047 / 10262 / 10686 | 11441 | — | 0.195 (0.02) |
+| full | CPID | 4 | True | True | True | — | 0 / 0 / 0 | 10352 / 10236 / 10741 | 11168 | — | 0.405 (0.02) |
+| full | CPID | 5 | True | True | True | — | 0 / 0 / 0 | 10789 / 10208 / 10532 | 11060 | — | 0.115 (0.02) |
+| full | F13 | 3 | False | True | False | 0.152 | 35 / 0 / 0 | 9266 / 10339 / 10102 | 11568 | 1 | 0.195 (0.02) |
+| full | F13 | 4 | False | True | False | 0.026 | 73 / 1 / 1 | 7157 / 9925 / 9864 | 11456 | 1 | 0.405 (0.02) |
+| full | F13 | 5 | False | True | False | 0.156 | 1 / 0 / 0 | 9998 / 10270 / 10145 | 11527 | 1 | 0.115 (0.02) |
+| full | GSLQR | 3 | True | True | True | — | 0 / 0 / 0 | 11088 / 11030 / 10784 | 11445 | — | 0.195 (0.02) |
+| full | GSLQR | 4 | False | True | False | 0.040 | 1 / 0 / 0 | 9936 / 11091 / 10904 | 11344 | — | 0.405 (0.02) |
+| full | GSLQR | 5 | True | True | True | — | 0 / 0 / 0 | 11206 / 10941 / 10780 | 11202 | — | 0.115 (0.02) |
+| full | M17 | 3 | False | True | False | 0.130 | 33 / 0 / 0 | 8078 / 10389 / 10081 | 11427 | — | 0.195 (0.02) |
+| full | M17 | 4 | False | True | False | 0.026 | 63 / 0 / 8 | 6132 / 10295 / 9826 | 11182 | — | 0.405 (0.02) |
+| full | M17 | 5 | False | True | False | 0.128 | 11 / 0 / 0 | 9716 / 10301 / 10177 | 11264 | — | 0.115 (0.02) |
+| full | V13 | 3 | False | True | False | 0.136 | 42 / 0 / 1 | 7988 / 10158 / 9837 | 11498 | 1 | 0.195 (0.02) |
+| full | V13 | 4 | False | True | False | 0.026 | 76 / 4 / 7 | 5709 / 9728 / 9526 | 11383 | 1 | 0.405 (0.02) |
+| full | V13 | 5 | False | True | False | 0.132 | 17 / 0 / 2 | 9342 / 10048 / 9990 | 11469 | 1 | 0.115 (0.02) |
+| full_sig005 | F13 | 3 | False | True | False | 0.156 | 8 / 0 / 0 | 9645 / 10325 / 10113 | 11568 | 1 | 0.035 (None) |
+| full_sig005 | F13 | 4 | False | True | False | 0.340 | 39 / 1 / 1 | 9185 / 9937 / 9879 | 11456 | 1 | 0.039 (None) |
+| full_sig005 | F13 | 5 | True | True | True | — | 0 / 0 / 0 | 10361 / 10264 / 10149 | 11527 | 1 | 0.015 (None) |
+| full_sig005 | GSLQR | 3 | True | True | True | — | 0 / 0 / 0 | 11109 / 11073 / 10791 | 11445 | — | 0.035 (None) |
+| full_sig005 | GSLQR | 4 | True | True | True | — | 0 / 0 / 0 | 10926 / 11048 / 10903 | 11344 | — | 0.039 (None) |
+| full_sig005 | GSLQR | 5 | True | True | True | — | 0 / 0 / 0 | 11113 / 10936 / 10782 | 11202 | — | 0.015 (None) |
+| full_sig005 | M17 | 3 | False | True | False | 0.132 | 22 / 0 / 0 | 8990 / 10397 / 10105 | 11427 | — | 0.035 (None) |
+| full_sig005 | M17 | 4 | False | True | False | 0.326 | 32 / 0 / 7 | 8513 / 10310 / 9833 | 11182 | — | 0.039 (None) |
+| full_sig005 | M17 | 5 | True | True | True | — | 0 / 0 / 0 | 10341 / 10296 / 10196 | 11264 | — | 0.015 (None) |
+| full_sig005 | V13 | 3 | False | True | False | 0.136 | 26 / 0 / 1 | 9096 / 10137 / 9850 | 11498 | 1 | 0.035 (None) |
+| full_sig005 | V13 | 4 | False | True | False | 0.332 | 39 / 3 / 7 | 8432 / 9746 / 9546 | 11383 | 1 | 0.039 (None) |
+| full_sig005 | V13 | 5 | False | True | False | 6.714 | 0 / 0 / 1 | 10122 / 10042 / 9999 | 11469 | 1 | 0.015 (None) |
+| gnss_only | F13 | 3 | True | True | True | — | 0 / 0 / 0 | 10052 / 11019 / 10716 | 11589 | 1 | 0.021 (None) |
+| gnss_only | F13 | 4 | False | True | False | 0.338 | 30 / 0 / 0 | 9519 / 10879 / 10670 | 11589 | 1 | 0.027 (None) |
+| gnss_only | F13 | 5 | True | True | True | — | 0 / 0 / 0 | 10813 / 10791 / 10834 | 11589 | 1 | 0.008 (None) |
+| gnss_only | GSLQR | 3 | True | True | True | — | 0 / 0 / 0 | 11019 / 11189 / 10911 | 11390 | — | 0.021 (None) |
+| gnss_only | GSLQR | 4 | True | True | True | — | 0 / 0 / 0 | 11060 / 11117 / 10954 | 11390 | — | 0.027 (None) |
+| gnss_only | GSLQR | 5 | True | True | True | — | 0 / 0 / 0 | 11113 / 11080 / 10951 | 11390 | — | 0.008 (None) |
+| gnss_only | V13 | 3 | False | True | False | 0.138 | 24 / 0 / 0 | 9451 / 10926 / 10587 | 11529 | 1 | 0.021 (None) |
+| gnss_only | V13 | 4 | False | True | False | 0.332 | 32 / 0 / 0 | 8904 / 10747 / 10594 | 11529 | 1 | 0.027 (None) |
+| gnss_only | V13 | 5 | True | True | True | — | 0 / 0 / 0 | 10670 / 10683 / 10704 | 11529 | 1 | 0.008 (None) |
+| imu_only | CPID | 3 | True | True | True | — | 0 / 0 / 0 | 11225 / 11138 / 10948 | 11443 | — | 0.000 (None) |
+| imu_only | CPID | 4 | True | True | True | — | 0 / 0 / 0 | 11266 / 11188 / 11035 | 11171 | — | 0.001 (None) |
+| imu_only | CPID | 5 | True | True | True | — | 0 / 0 / 0 | 11213 / 11183 / 10949 | 11067 | — | 0.001 (None) |
+| imu_only | F13 | 3 | True | True | True | — | 0 / 0 / 0 | 10711 / 10712 / 10545 | 11568 | 1 | 0.000 (None) |
+| imu_only | F13 | 4 | True | True | True | — | 0 / 0 / 0 | 10844 / 10758 / 10475 | 11456 | 1 | 0.001 (None) |
+| imu_only | F13 | 5 | True | True | True | — | 0 / 0 / 0 | 10643 / 10727 / 10419 | 11527 | 1 | 0.001 (None) |
+| imu_only | GSLQR | 3 | True | True | True | — | 0 / 0 / 0 | 11318 / 11257 / 10986 | 11453 | — | 0.000 (None) |
+| imu_only | GSLQR | 4 | True | True | True | — | 0 / 0 / 0 | 11288 / 11278 / 11032 | 11347 | — | 0.001 (None) |
+| imu_only | GSLQR | 5 | True | True | True | — | 0 / 0 / 0 | 11296 / 11291 / 10994 | 11253 | — | 0.001 (None) |
+| imu_only | M17 | 3 | True | True | True | — | 0 / 0 / 0 | 10979 / 11004 / 10717 | 11420 | — | 0.000 (None) |
+| imu_only | M17 | 4 | True | True | True | — | 0 / 0 / 0 | 10967 / 10885 / 10794 | 11182 | — | 0.001 (None) |
+| imu_only | M17 | 5 | True | True | True | — | 0 / 0 / 0 | 10895 / 10924 / 10743 | 11298 | — | 0.001 (None) |
+| imu_only | V13 | 3 | True | True | True | — | 0 / 0 / 0 | 10572 / 10601 / 10475 | 11498 | 1 | 0.000 (None) |
+| imu_only | V13 | 4 | True | True | True | — | 0 / 0 / 0 | 10780 / 10689 / 10417 | 11383 | 1 | 0.001 (None) |
+| imu_only | V13 | 5 | True | True | True | — | 0 / 0 / 0 | 10539 / 10675 / 10317 | 11469 | 1 | 0.001 (None) |
+| navigation_only | CPID | 3 | True | True | True | — | 0 / 0 / 0 | 11095 / 10331 / 10788 | 11327 | — | 0.195 (0.02) |
+| navigation_only | CPID | 4 | True | True | True | — | 0 / 0 / 0 | 10454 / 10231 / 10744 | 11327 | — | 0.405 (0.02) |
+| navigation_only | CPID | 5 | True | True | True | — | 0 / 0 / 0 | 10832 / 10249 / 10663 | 11327 | — | 0.115 (0.02) |
+| navigation_only | F13 | 3 | False | True | False | 0.158 | 26 / 0 / 0 | 9754 / 10727 / 10666 | 11589 | 1 | 0.195 (0.02) |
+| navigation_only | F13 | 4 | False | True | False | 0.026 | 66 / 0 / 0 | 7282 / 10359 / 10519 | 11589 | 1 | 0.405 (0.02) |
+| navigation_only | F13 | 5 | True | True | True | — | 0 / 0 / 0 | 10336 / 10545 / 10669 | 11589 | 1 | 0.115 (0.02) |
+| navigation_only | GSLQR | 3 | True | True | True | — | 0 / 0 / 0 | 11080 / 11079 / 10874 | 11390 | — | 0.195 (0.02) |
+| navigation_only | GSLQR | 4 | False | True | False | 0.040 | 1 / 0 / 0 | 9945 / 11129 / 10976 | 11390 | — | 0.405 (0.02) |
+| navigation_only | GSLQR | 5 | True | True | True | — | 0 / 0 / 0 | 11207 / 10942 / 10908 | 11390 | — | 0.115 (0.02) |
+| navigation_only | M17 | 3 | False | True | False | 0.132 | 32 / 0 / 0 | 8319 / 10537 / 10207 | 11401 | — | 0.196 (0.02) |
+| navigation_only | M17 | 4 | False | True | False | 0.026 | 61 / 0 / 0 | 6185 / 10168 / 10123 | 11401 | — | 0.405 (0.02) |
+| navigation_only | M17 | 5 | False | True | False | 0.128 | 13 / 0 / 0 | 9591 / 10347 / 10284 | 11401 | — | 0.115 (0.02) |
+| navigation_only | V13 | 3 | False | True | False | 0.140 | 38 / 0 / 0 | 8330 / 10593 / 10447 | 11529 | 1 | 0.196 (0.02) |
+| navigation_only | V13 | 4 | False | True | False | 0.026 | 76 / 0 / 0 | 6102 / 10222 / 10180 | 11529 | 1 | 0.405 (0.02) |
+| navigation_only | V13 | 5 | False | True | False | 0.134 | 18 / 0 / 0 | 9754 / 10429 / 10504 | 11529 | 1 | 0.115 (0.02) |
+| navigation_only_sig005 | F13 | 3 | True | True | True | — | 0 / 0 / 0 | 10171 / 10718 / 10676 | 11589 | 1 | 0.035 (None) |
+| navigation_only_sig005 | F13 | 4 | False | True | False | 0.340 | 36 / 0 / 0 | 9522 / 10371 / 10534 | 11589 | 1 | 0.039 (None) |
+| navigation_only_sig005 | F13 | 5 | True | True | True | — | 0 / 0 / 0 | 10704 / 10532 / 10677 | 11589 | 1 | 0.014 (None) |
+| navigation_only_sig005 | GSLQR | 3 | True | True | True | — | 0 / 0 / 0 | 11116 / 11086 / 10881 | 11390 | — | 0.035 (None) |
+| navigation_only_sig005 | GSLQR | 4 | True | True | True | — | 0 / 0 / 0 | 10968 / 11073 / 10975 | 11390 | — | 0.039 (None) |
+| navigation_only_sig005 | GSLQR | 5 | True | True | True | — | 0 / 0 / 0 | 11111 / 10941 / 10910 | 11390 | — | 0.014 (None) |
+| navigation_only_sig005 | M17 | 3 | False | True | False | 0.132 | 20 / 0 / 0 | 9033 / 10546 / 10229 | 11401 | — | 0.035 (None) |
+| navigation_only_sig005 | M17 | 4 | False | True | False | 0.328 | 32 / 0 / 0 | 8607 / 10185 / 10139 | 11401 | — | 0.039 (None) |
+| navigation_only_sig005 | M17 | 5 | True | True | True | — | 0 / 0 / 0 | 10221 / 10326 / 10292 | 11401 | — | 0.013 (None) |
+| navigation_only_sig005 | V13 | 3 | False | True | False | 0.144 | 21 / 0 / 0 | 9439 / 10583 / 10459 | 11529 | 1 | 0.035 (None) |
+| navigation_only_sig005 | V13 | 4 | False | True | False | 0.332 | 39 / 0 / 0 | 8822 / 10240 / 10197 | 11529 | 1 | 0.039 (None) |
+| navigation_only_sig005 | V13 | 5 | True | True | True | — | 0 / 0 / 0 | 10492 / 10413 / 10510 | 11529 | 1 | 0.013 (None) |
+| quiet_sampled | CPID | 3 | True | True | True | — | 0 / 0 / 0 | 11340 / 11336 / 11148 | 11327 | — | 0.000 (None) |
+| quiet_sampled | F13 | 3 | True | True | True | — | 0 / 0 / 0 | 11333 / 11334 / 11065 | 11589 | 1 | 0.000 (None) |
+| quiet_sampled | GSLQR | 3 | True | True | True | — | 0 / 0 / 0 | 11345 / 11338 / 11096 | 11390 | — | 0.000 (None) |
+| quiet_sampled | M17 | 3 | True | True | True | — | 0 / 0 / 0 | 11342 / 11342 / 11087 | 11401 | — | 0.000 (None) |
+| quiet_sampled | V13 | 3 | True | True | True | — | 0 / 0 / 0 | 11341 / 11341 / 11071 | 11529 | 1 | 0.000 (None) |
+| rotor_only | CPID | 3 | True | True | True | — | 0 / 0 / 0 | 11339 / 11332 / 11146 | 11325 | — | 0.000 (None) |
+| rotor_only | CPID | 4 | True | True | True | — | 0 / 0 / 0 | 11338 / 11331 / 11144 | 11324 | — | 0.000 (None) |
+| rotor_only | CPID | 5 | True | True | True | — | 0 / 0 / 0 | 11339 / 11333 / 11148 | 11320 | — | 0.000 (None) |
+| rotor_only | F13 | 3 | True | True | True | — | 0 / 0 / 0 | 11294 / 11291 / 11043 | 11589 | 1 | 0.000 (None) |
+| rotor_only | F13 | 4 | True | True | True | — | 0 / 0 / 0 | 11303 / 11300 / 11042 | 11589 | 1 | 0.000 (None) |
+| rotor_only | F13 | 5 | True | True | True | — | 0 / 0 / 0 | 11296 / 11290 / 11038 | 11589 | 1 | 0.000 (None) |
+| rotor_only | GSLQR | 3 | True | True | True | — | 0 / 0 / 0 | 11330 / 11317 / 11081 | 11382 | — | 0.000 (None) |
+| rotor_only | GSLQR | 4 | True | True | True | — | 0 / 0 / 0 | 11326 / 11314 / 11077 | 11370 | — | 0.000 (None) |
+| rotor_only | GSLQR | 5 | True | True | True | — | 0 / 0 / 0 | 11332 / 11313 / 11079 | 11338 | — | 0.000 (None) |
+| rotor_only | M17 | 3 | True | True | True | — | 0 / 0 / 0 | 11298 / 11262 / 11061 | 11394 | — | 0.000 (None) |
+| rotor_only | M17 | 4 | True | True | True | — | 0 / 0 / 0 | 11278 / 11278 / 11060 | 11385 | — | 0.000 (None) |
+| rotor_only | M17 | 5 | True | True | True | — | 0 / 0 / 0 | 11287 / 11283 / 11078 | 11359 | — | 0.000 (None) |
+| rotor_only | V13 | 3 | True | True | True | — | 0 / 0 / 0 | 11304 / 11302 / 11046 | 11529 | 1 | 0.000 (None) |
+| rotor_only | V13 | 4 | True | True | True | — | 0 / 0 / 0 | 11315 / 11299 / 11047 | 11529 | 1 | 0.000 (None) |
+| rotor_only | V13 | 5 | True | True | True | — | 0 / 0 / 0 | 11309 / 11289 / 11047 | 11529 | 1 | 0.000 (None) |

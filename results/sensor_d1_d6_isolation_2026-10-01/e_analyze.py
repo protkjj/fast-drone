@@ -60,6 +60,11 @@ def main():
             paths = [str(s) for s in d['indi_path']]
             row['indi_fallback_steps'] = sum(s.startswith('fallback') for s in paths)
             row['indi_first_path'] = paths[0] if paths else None
+        if 'xs_est' in d.files:
+            early = ts <= 0.2+1e-9
+            dz = d['xs_est'][early, 2]-xs[early, 2]
+            row['est_z_err_max_0_0.2'] = float(np.max(np.abs(dz)))
+            row['est_z_err_first_jump_t'] = float(ts[early][np.argmax(np.abs(dz) > 0.05)]) if (np.abs(dz) > 0.05).any() else None
         if 'xs_est' in d.files and first is not None:
             k = int(np.argmax(~inside)) + 1
             e = d['xs_est'][k]-xs[k]
@@ -71,8 +76,8 @@ def main():
         rows.append(row)
     with open(out.replace('.md', '.json'), 'w', encoding='utf-8') as f:
         json.dump(rows, f, ensure_ascii=False, indent=1)
-    lines = ['| group | ctrl | seed | pass | track | domain | first exit s | exits 0-0.5 / 0.5-3 / 3- | min RPM 0-0.5 / 0.5-3 / 3- | 1st cmd min RPM | INDI fallback steps |',
-             '|---|---|---:|---|---|---|---:|---|---|---:|---:|']
+    lines = ['| group | ctrl | seed | pass | track | domain | first exit s | exits 0-0.5 / 0.5-3 / 3- | min RPM 0-0.5 / 0.5-3 / 3- | 1st cmd min RPM | INDI fallback steps | max est z err 0-0.2 s [m] (first >5 cm at) |',
+             '|---|---|---:|---|---|---|---:|---|---|---:|---:|---|']
     for r in rows:
         if r['status'] != 'ok':
             lines.append(f"| {r['group']} | {r['ctrl']} | {r['seed']} | MISSING |||||||||")
@@ -82,7 +87,8 @@ def main():
                      f"{'—' if r['first_exit_s'] is None else f'{r['first_exit_s']:.3f}'} | "
                      f"{r['exits_0-0.5']} / {r['exits_0.5-3']} / {r['exits_3-']} | "
                      f"{fmt(r['minrpm_0-0.5'])} / {fmt(r['minrpm_0.5-3'])} / {fmt(r['minrpm_3-'])} | "
-                     f"{fmt(r['first_cmd_rpm_min'])} | {r.get('indi_fallback_steps', '—')} |")
+                     f"{fmt(r['first_cmd_rpm_min'])} | {r.get('indi_fallback_steps', '—')} | "
+                     f"{r.get('est_z_err_max_0_0.2', float('nan')):.3f} ({r.get('est_z_err_first_jump_t')}) |")
     with open(out, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines)+'\n')
     print(f'{len(rows)} trials -> {out}')

@@ -20,9 +20,26 @@ def main():
     from control.sensor_binding import resolve_feedback
     from control.sensor_matching_screen import sensor_group_profile
 
+    from copy import deepcopy
     config = load_config('configs/arena_rotor_projected_development_v9.json')
-    if variant != 'full':
-        profile = dict(sensor_group_profile(resolve_feedback(config).profile, variant))
+    nominal = resolve_feedback(config).profile
+    # E5: '<group>_sig005' = same group with estimator initial position sigma 0.05 m (was 0.5 m).
+    # E2: 'baro_only' / 'gnss_only' = quiet_sampled with only that sensor's errors restored.
+    sigma = None
+    group = variant
+    if variant.endswith('_sig005'):
+        group, sigma = variant[:-len('_sig005')], 0.05
+    if group != 'full' or sigma is not None:
+        if group == 'full':
+            profile = deepcopy(dict(nominal))
+        elif group in ('baro_only', 'gnss_only'):
+            profile = dict(sensor_group_profile(nominal, 'quiet_sampled'))
+            sensor = 'barometer' if group == 'baro_only' else 'gnss'
+            profile[sensor] = deepcopy(nominal[sensor])
+        else:
+            profile = dict(sensor_group_profile(nominal, group))
+        if sigma is not None:
+            profile['estimator'] = dict(profile['estimator'], initial_position_sigma=sigma)
         profile['name'] = f'{variant}_nominal'
         config['sensor_feedback']['profile'] = load_sensor_profile(profile)
         config = validate_config(config)
