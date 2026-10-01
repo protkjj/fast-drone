@@ -77,7 +77,7 @@ $t = Measure-Command { python scripts\sensor_reproduce.py --reference scripts\da
 ```
 센서 포함 튜닝 경로(맥 순차 약 18분, 작업자 N이면 더 짧음):
 ```powershell
-$t = Measure-Command { python -m control.arena_tune_repro --controller V13 --run-dir results/arena/tuning/env_check_tune7 --index 0 --scenario-workers N *> check_env_tune7.txt }; "$($t.TotalSeconds) s" | Tee-Object -FilePath check_env_tune7_time.txt
+$t = Measure-Command { python -m control.arena_tune_repro --config configs/arena_tune7.json --controller V13 --run-dir results/arena/tuning/env_check_tune7 --index 0 --scenario-workers N *> check_env_tune7.txt }; "$($t.TotalSeconds) s" | Tee-Object -FilePath check_env_tune7_time.txt
 ```
 ```powershell
 Get-Content check_env_tune7.txt -Tail 2

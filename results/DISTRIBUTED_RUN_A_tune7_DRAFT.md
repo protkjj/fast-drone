@@ -53,7 +53,7 @@ python -m control.arena_tune_repro --controller V13 --run-dir results/arena/tuni
 ```
 **A.4b 센서 포함 튜닝 경로**(새 — 시나리오별 시드·사전 수렴 경로, 맥 순차 약 18분):
 ```powershell
-python -m control.arena_tune_repro --controller V13 --run-dir results/arena/tuning/env_check_tune7 --index 0 --scenario-workers N 2>&1 | Tee-Object -FilePath env_check_tune7_V13.txt
+python -m control.arena_tune_repro --config configs/arena_tune7.json --controller V13 --run-dir results/arena/tuning/env_check_tune7 --index 0 --scenario-workers N 2>&1 | Tee-Object -FilePath env_check_tune7_V13.txt
 ```
 **A.4c 센서 재현 기준 두 개**(각 약 3분):
 ```powershell
