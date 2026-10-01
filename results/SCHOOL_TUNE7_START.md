@@ -13,6 +13,46 @@
   사양이 다르면(2번 결과의 `NumberOfCores`나 여유 메모리가 다르면) 5번을 그 컴퓨터 값으로 다시 돌려 작업자 수를 바꾼다.
 - `<주제>`만 자리표시로 남겼다(휴대폰 알림 주제 이름 — 저장소에 적지 않음). 그대로 치지 말고 kj의 주제 이름으로 바꾼다.
 
+## ★ 빠른 절차 — 스크립트 두 개로 (2026-10-01 추가, 권장)
+명령을 하나씩 치지 않는다. 점검 스크립트가 태그·설정·작업자 수·재현 3종·고아 작업자를 **모두 돌리고 결과를 파일로 남긴 뒤** 맨 끝에 `ALL PASS`/`FAIL`과 이 컴퓨터용 시작 명령을 보여 준다.
+
+**A. Python 3.13·Git이 없으면** 아래 0번만 먼저 한다.
+**B. 받기 + 가상환경**(컴퓨터마다 한 번):
+```powershell
+cd $HOME; git clone https://github.com/leo11dk/fast-drone-sensor-fusion.git fds; cd $HOME\fds; git checkout tune-final-7
+```
+```powershell
+py -3.13 -m venv .venv; .\.venv\Scripts\python.exe -m pip install -r requirements-lock.txt
+```
+(이미 `fds`·`.venv`가 있으면 B는 건너뛴다.)
+
+**C. 스크립트 세 개 받기**(브라우저, GitHub 로그인 상태): 아래 각 주소 → **Raw** → `Ctrl+S` → `C:\Users\USER\` 에 같은 이름으로 저장(**`fds` 폴더 안에 두지 않는다**)
+- `https://github.com/protkjj/fast-drone/blob/protkjj/arena-completion/results/tune7_school_check.ps1`
+- `https://github.com/protkjj/fast-drone/blob/protkjj/arena-completion/results/tune7_start.ps1`
+- `https://github.com/protkjj/fast-drone/blob/protkjj/arena-completion/results/tune7_notify.ps1`
+```powershell
+Unblock-File $HOME\tune7_school_check.ps1, $HOME\tune7_start.ps1, $HOME\tune7_notify.ps1
+```
+
+**D. 점검**(약 15~25분, 끝나면 휴대폰에 `ALL PASS`/`FAIL` 알림):
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_school_check.ps1 -Topic <주제>
+```
+- 결과: `$HOME\fds\tune7_check_<컴퓨터>_<시각>\summary.json`(+ 각 단계 로그). FAIL이면 그 폴더를 kj에게.
+
+**E. 튜닝 시작**(ALL PASS인 컴퓨터만, 맡은 제어기로 — 작업자 수·환경변수·알림 감시를 스크립트가 알아서):
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_start.ps1 -Controller M17 -Topic <주제>
+```
+- 컴퓨터 2는 `F13`, 3은 `V13`, 4는 `GSLQR`을 먼저 실행하고 이어서 `CPID`.
+- 재시작·로그오프 뒤 재개도 **같은 명령**(같은 컴퓨터).
+- `<주제>`는 kj 휴대폰 알림 주제 이름으로 바꾼다(저장소에 적지 않음).
+- ⚠️ 이 스크립트들은 맥에서 만들었고 PowerShell로 시험해 보지 못했다. 오류가 나면 화면을 그대로 kj에게 보내고, 그동안은 아래 수동 절차를 쓴다.
+
+---
+
+## (예비) 수동 절차 — 스크립트가 막힐 때만
+
 ## 0. 준비 확인 (컴퓨터마다 맨 처음) — 2026-10-01 추가: 학교 PC에 Python이 없었음
 ```powershell
 git --version
