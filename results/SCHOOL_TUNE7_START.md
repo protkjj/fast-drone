@@ -99,13 +99,14 @@ $t = Measure-Command { python scripts\sensor_reproduce.py --output results\tune7
 ```powershell
 $t = Measure-Command { python scripts\sensor_reproduce.py --reference scripts\data\sensor_legacy_reproduction_tune7.json --output results\tune7_repro_legacy *> check_repro_legacy.txt }; "$($t.TotalSeconds) s" | Tee-Object -FilePath check_repro_legacy_time.txt
 ```
-재현 기준 결과 확인(둘 다 마지막 부분에 PASS/판정 일치가 보여야 한다):
+재현 기준 판정 확인 — 결과 폴더의 `comparison.json`(합격 = `"reproduction_pass": true`, `"problems": []`. `trajectory_bit_identical`은 false여도 됨):
 ```powershell
-Get-Content check_repro_projected.txt -Tail 6
+Select-String '"reproduction_pass"|"trajectory_bit_identical"|"problems"' results\tune7_repro_projected\comparison.json
 ```
 ```powershell
-Get-Content check_repro_legacy.txt -Tail 6
+Select-String '"reproduction_pass"|"trajectory_bit_identical"|"problems"' results\tune7_repro_legacy\comparison.json
 ```
+- ⚠️ 위 재현 명령을 **다시 돌리면** 결과 폴더가 이미 있어서 `reproduction output must be new or empty`로 멈춘다(로그 파일도 이 오류로 덮어써짐). 다시 할 때는 폴더 이름을 바꾼다(예: `results\tune7_repro_projected_2`).
 센서 포함 튜닝 경로(맥 순차 약 18분, 작업자 3개로 약 6~10분 — 재현 점검은 작업자 3개 상한):
 ```powershell
 $t = Measure-Command { python -m control.arena_tune_repro --config configs/arena_tune7.json --controller V13 --run-dir results/arena/tuning/env_check_tune7 --index 0 --scenario-workers 3 *> check_env_tune7.txt }; "$($t.TotalSeconds) s" | Tee-Object -FilePath check_env_tune7_time.txt
