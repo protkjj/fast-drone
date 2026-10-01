@@ -11,31 +11,30 @@
 - 한 컴퓨터 안에서는 무거운 단계를 동시에 돌리지 않는다(시간 측정이 틀어진다).
 - 숫자(코어 8, 작업자 수)는 **PC-63(i7-10700 물리 코어 8, 메모리 15.9 GB, 여유 8.9 GB)** 기준으로 채웠다. 전산실 컴퓨터가 같은 사양이면 그대로 복사해 쓴다.
   사양이 다르면(2번 결과의 `NumberOfCores`나 여유 메모리가 다르면) 5번을 그 컴퓨터 값으로 다시 돌려 작업자 수를 바꾼다.
-- `<주제>`만 자리표시로 남겼다(휴대폰 알림 주제 이름 — 저장소에 적지 않음). 그대로 치지 말고 kj의 주제 이름으로 바꾼다.
 
 ## ★★ 한 줄로 끝 (2026-10-01 저녁, 가장 권장)
 PowerShell을 열고 **그 컴퓨터가 맡은 제어기 줄 하나만** 붙여 넣는다. Python 설치·받기·가상환경·점검·튜닝 시작·휴대폰 알림을 스크립트가 다 한다(동욱님 저장소 `school/tune7_all.ps1`, 공개).
-`<주제>`만 kj 알림 주제 이름으로 바꾼다.
+
 
 - 컴퓨터 1 (M17):
 ```powershell
-irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller M17 -Topic <주제>
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller M17 -Topic kj-tune-19287363
 ```
 - 컴퓨터 2 (F13):
 ```powershell
-irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller F13 -Topic <주제>
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller F13 -Topic kj-tune-19287363
 ```
 - 컴퓨터 3 (V13):
 ```powershell
-irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller V13 -Topic <주제>
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller V13 -Topic kj-tune-19287363
 ```
 - 컴퓨터 4 (GSLQR):
 ```powershell
-irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller GSLQR -Topic <주제>
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller GSLQR -Topic kj-tune-19287363
 ```
 - 컴퓨터 4 (CPID, GSLQR 줄이 "done"을 찍은 뒤 같은 창에서. 점검은 건너뛰고 바로 시작):
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller CPID -Topic <주제>
+powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller CPID -Topic kj-tune-19287363
 ```
 
 동작 요약
@@ -71,17 +70,16 @@ Unblock-File $HOME\tune7_school_check.ps1, $HOME\tune7_start.ps1, $HOME\tune7_no
 
 **D. 점검**(약 15~25분, 끝나면 휴대폰에 `ALL PASS`/`FAIL` 알림):
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_school_check.ps1 -Topic <주제>
+powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_school_check.ps1 -Topic kj-tune-19287363
 ```
 - 결과: `$HOME\fds\tune7_check_<컴퓨터>_<시각>\summary.json`(+ 각 단계 로그). FAIL이면 그 폴더를 kj에게.
 
 **E. 튜닝 시작**(ALL PASS인 컴퓨터만, 맡은 제어기로 — 작업자 수·환경변수·알림 감시를 스크립트가 알아서):
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_start.ps1 -Controller M17 -Topic <주제>
+powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_start.ps1 -Controller M17 -Topic kj-tune-19287363
 ```
 - 컴퓨터 2는 `F13`, 3은 `V13`, 4는 `GSLQR`을 먼저 실행하고 이어서 `CPID`.
 - 재시작·로그오프 뒤 재개도 **같은 명령**(같은 컴퓨터).
-- `<주제>`는 kj 휴대폰 알림 주제 이름으로 바꾼다(저장소에 적지 않음).
 - ⚠️ 이 스크립트들은 맥에서 만들었고 PowerShell로 시험해 보지 못했다. 오류가 나면 화면을 그대로 kj에게 보내고, 그동안은 아래 수동 절차를 쓴다.
 
 ---
@@ -243,7 +241,7 @@ Unblock-File $HOME\tune7_notify.ps1
 ```
 3. 시험 알림 — 휴대폰에 `notify test OK`가 와야 한다(안 오면 `$HOME\tune7_notify_M17.err`처럼 그 제어기 이름의 파일을 본다. 학교망이 막으면 알림은 포기하고 튜닝은 그대로 둔다):
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_notify.ps1 -Controller M17 -Topic <주제> -Test
+powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_notify.ps1 -Controller M17 -Topic kj-tune-19287363 -Test
 ```
 3·4번 명령의 `M17`은 그 컴퓨터가 맡은 제어기로 바꾼다(F13 / V13 / GSLQR / CPID).
 

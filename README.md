@@ -6,27 +6,27 @@
 > 원본 `protkjj/fast-drone`의 `control` 브랜치에서 출발한 독립 저장소다.
 
 ## 학교 PC 센서 튜닝(tune-final-7) — 한 줄 명령
-PowerShell에 **그 컴퓨터가 맡은 줄 하나만** 붙여 넣는다. `<주제>`는 kj 휴대폰 알림 주제 이름으로 바꾼다.
+PowerShell에 **그 컴퓨터가 맡은 줄 하나만** 붙여 넣는다.
 재부팅 뒤에도 같은 줄을 다시 붙여 넣으면 이어서 돈다. 자세한 내용은 [SCHOOL_TUNE7_START](results/SCHOOL_TUNE7_START.md).
 
 - 컴퓨터 1 (M17)
 ```powershell
-irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller M17 -Topic <주제>
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller M17 -Topic kj-tune-19287363
 ```
 - 컴퓨터 2 (F13)
 ```powershell
-irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller F13 -Topic <주제>
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller F13 -Topic kj-tune-19287363
 ```
 - 컴퓨터 3 (V13)
 ```powershell
-irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller V13 -Topic <주제>
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller V13 -Topic kj-tune-19287363
 ```
 - 컴퓨터 4 (GSLQR, 그다음 같은 창에서 CPID 줄)
 ```powershell
-irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller GSLQR -Topic <주제>
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/tune7_all.ps1 -OutFile $HOME\tune7_all.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller GSLQR -Topic kj-tune-19287363
 ```
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller CPID -Topic <주제>
+powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\tune7_all.ps1 -Controller CPID -Topic kj-tune-19287363
 ```
 
 > **새 검증 진입점:** `python -m control.mission_sim`은 팀원 기체
