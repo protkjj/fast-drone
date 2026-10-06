@@ -5,7 +5,28 @@
 > · [현재 세 제어기 응답](docs/shared_results/mission.png)
 > 원본 `protkjj/fast-drone`의 `control` 브랜치에서 출발한 독립 저장소다.
 
-## 학교 PC 센서 튜닝(tune-final-7) — 한 줄 명령
+## ★ 학교 PC 자동 이어가기(180회 연장 → 본 실험) — 2026-10-06부터 이것만
+각 PC에 **자기 줄 하나만** 붙여 넣는다. 백그라운드로 돌아서 창을 닫아도 된다. 재부팅·로그오프 뒤에는 같은 줄을 다시.
+진행은 휴대폰 알림(`main7`)으로, 로그는 `C:\Users\<사용자>\main7\chain_<제어기>.log`.
+
+- PC-61 (M17)
+```powershell
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/main7_chain.ps1 -OutFile $HOME\main7_chain.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\main7_chain.ps1 -Controllers M17 -Topic kj-tune-19287363
+```
+- PC-62 (F13)
+```powershell
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/main7_chain.ps1 -OutFile $HOME\main7_chain.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\main7_chain.ps1 -Controllers F13 -Topic kj-tune-19287363
+```
+- PC-63 (V13 + CPID)
+```powershell
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/main7_chain.ps1 -OutFile $HOME\main7_chain.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\main7_chain.ps1 -Controllers V13,CPID -Topic kj-tune-19287363
+```
+- PC-64 (GSLQR)
+```powershell
+irm https://raw.githubusercontent.com/leo11dk/fast-drone-sensor-fusion/main/school/main7_chain.ps1 -OutFile $HOME\main7_chain.ps1; powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\main7_chain.ps1 -Controllers GSLQR -Topic kj-tune-19287363
+```
+
+## (지난 단계) 학교 PC 센서 튜닝(tune-final-7) — 한 줄 명령
 PowerShell에 **그 컴퓨터가 맡은 줄 하나만** 붙여 넣는다.
 재부팅 뒤에도 같은 줄을 다시 붙여 넣으면 이어서 돈다. 자세한 내용은 [SCHOOL_TUNE7_START](results/SCHOOL_TUNE7_START.md).
 
